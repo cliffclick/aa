@@ -25,10 +25,10 @@ public class TestHM {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_HMT=false;
+    DO_HMT=true;
     DO_GCP=true;
-    RSEED=0;
-    test44();
+    RSEED=24;
+    test40();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -110,11 +110,11 @@ public class TestHM {
   // Because {y->y} is passed in, all 'y' types must agree.
   // This unifies 3 and 5 which results in 'nint8'
   @Test public void test05() {
-    rune("({ id -> (pair (id 3) (id 5)) } {x->x})",
-         "*( nint8, nint8)",
-         "*( nint8, nint8)",
-         "*[7](^=any, 3, 5)",
-         "*[7](^=any, nint8, nint8)",
+    rune("({ id -> (pair (id 3) (id 5) ) } {x->x})",
+         "*( nint8, nint8)",   // HMT result type, using both GCP + HMT
+         "*( nint8, nint8)",   // HMT result type, HMT alone
+         "*[7](^=any, 3, 5)",  // GCP result type, using both GCP + HMT
+         "*[7](^=any, nint8, nint8)", // GCP result type, GCP alone
           "[7]",null);
   }
 
@@ -395,7 +395,7 @@ map ={fun parg -> (fun (cdr parg))};
     rune("x = w = (x x); { z -> z}; (x { y -> y.u})",
          "A:Cannot unify { A -> A } and *@{ u = A; ... }",
          "A:Cannot unify { A -> A } and *@{ u = A; ... }",
-         "[17,18,19,23]{any,3 ->Scalar }",
+         "Scalar",
          "Scalar",
          "[4,10]","[17,18,19,23]");
   }
@@ -1064,7 +1064,7 @@ maybepet = petcage.get;
 """,
          "*(nflt32,nflt32,*str:(nint8))",
          "*(nflt32,nflt32,*str:(nint8))",
-         "*[12](^=any, nflt32, nflt32, *[4]str:(, nint8))",
+         "*[12](^=any, Scalar, Scalar, *[4]str:(, nint8))",
          "*[12](^=any, Scalar, Scalar, *[4]str:(, nint8))",
          "[4,12]",null);
   }
@@ -1151,6 +1151,38 @@ A:*@{
          "[4,7,8,9,12]","[18]");
   }
 
+// CNC - Probably incorrectly typed from AA; Haskel gets a (slightly) different
+// type with no self-recursive infinite type
+  @Test public void test78() {
+    rune("I = {x->x};"+
+         "K = {x->{y->x}};"+
+         "W = {x->(x x)};"+
+         "term = {z->{y ->((y (z I))(z K))}};"+
+         "test = (term W);"+
+         "test",
+         "{ { A:{A->A} -> {A->B} } -> B }",
+         "[22]{any,3 ->Scalar }",
+         null,"[19,22]");
+  }
+
+  @Test public void test79() {
+    rune("I = {x->x};"+
+         "K = {x->{y->x}};"+
+         "W = {x->(x x)};"+
+         "term = {z->{y ->((y (z I))(z K))}};"+
+         "test = (term W);"+
+         "(test {x -> {y -> (pair (x 3) (((y \"a\") \"b\") \"c\")) } })",
+         "*(A:Cannot unify {A->A} and 3 and *str:(nint8), A)",
+         "*[7](^=any, Scalar, Scalar)",
+         "[4,7]","[]");
+  }
+
+  // Test was buggy, since 'rand' is a known non-zero function pointer constant,
+  // GCP folds the 'if' to the true arm.  Instead call: '(rand 2)'
+  @Test public void test80() {
+    run("i = {x -> x}; k = {x -> (i x)}; l = {x -> (k x)}; m = {x -> (l x)}; n = {x -> (m x)}; (if (rand 2) (n 1) (n \"a\"))",
+        "Cannot unify 1 and *str:(97)", "nScalar" );
+  }
 
 }
 

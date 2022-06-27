@@ -163,17 +163,14 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   // As the input falls from a ->2,3* cycle to scalar, the output (after
   // wrap-and-approximate) is not monotonic.
 
-  // Invariant: the fidxes can appear in the return-chain only if they strictly
-  // grow, otherwise we should have approximated.  This check stops at end end
-  // or a matching fidx, but does not check after any match.
-  private static boolean check(TypeFunPtr tfp) {
-    // Scan for a dup or the cycle
-    BitsFun fidxs = tfp._fidxs;
-    while( tfp._ret instanceof TypeFunPtr ret ) {
-      if( ret==tfp ) return true; // Found the ending cycle
-      if( fidxs.isa(ret._fidxs) && fidxs!=ret._fidxs ) return true; // Strict increase in bits is OK
-      if( fidxs.overlaps(ret._fidxs) )
-        return false; // Partial overlap is NOT ok
+
+  private static final VBitSet CHK2 = new VBitSet();
+  private static boolean check2(TypeFunPtr tfp) {
+    // Make sure a FIDX appears only once, up to an ending self-cycle.
+    CHK2.clear();
+    while( tfp._ret!=tfp ) {      // Break if self-cycle, which can have anything
+      for( int fidx : tfp._fidxs ) if( CHK2.tset(fidx) ) return false;
+      if( !(tfp._ret instanceof TypeFunPtr ret) ) break;
       tfp = ret;
     }
     return true;
@@ -181,70 +178,83 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
 
   // Functions can grow indefinitely, if being built in a recursive loop.
   // We check that fidx return invariant holds.
-  public static TypeFunPtr make ( boolean any, boolean nil, boolean sub, BitsFun fidxs, int nargs, Type dsp, Type ret ) { return _makex(any, nil, sub, fidxs,nargs,dsp,ret,false); }
-  // Make and approximate an endlessly growing chain.
-  public static TypeFunPtr makex( boolean any, boolean nil, boolean sub, BitsFun fidxs, int nargs, Type dsp, Type ret ) { return _makex(any, nil, sub, fidxs,nargs,dsp,ret,true ); }
-
-  // Walk the TFP return chain.  If we find the end or a TFP with strictly
-  // increasing fidxs, we can wrap and return.  If we have fidx overlap, but
-  // not strictly increasing, we need to chop the TFP return chain here.
-  private static TypeFunPtr _makex( boolean any, boolean nil, boolean sub, BitsFun fidxs, int nargs, Type dsp, Type ret, boolean apx ) {
-    assert !(ret instanceof TypeFunPtr rtfp) || check(rtfp);
+  public static TypeFunPtr make ( boolean any, boolean nil, boolean sub, BitsFun fidxs, int nargs, Type dsp, Type ret ) {
     TypeFunPtr tfp = malloc(any, nil, sub, fidxs,nargs,dsp,ret).hashcons_free();
-    TypeFunPtr tfp2 = apx ? tfp._makex( fidxs) : tfp;
-    assert check(tfp2);
+    assert check2(tfp);          // Assert new return-chain is valid
+    return tfp;
+  }
+
+  // Assert the ret has the invariant.
+  // Make the TFP, which might not have the invariant.
+  // Call _rule2; the result has the invariant.
+  // Check and return.
+  public static TypeFunPtr makex( boolean any, boolean nil, boolean sub, BitsFun fidxs, int nargs, Type dsp, Type ret ) {
+    assert !(ret instanceof TypeFunPtr rtfp) || check2(rtfp); // Assert old return-chain is valid
+    // Make the TFP, but it may NOT pass the invariant
+    TypeFunPtr tfp = malloc(any, nil, sub, fidxs,nargs,dsp,ret).hashcons_free();
+    CHK2.clear();
+    TypeFunPtr tfp2 = tfp._rule2(fidxs,true); // Approx
+    assert check2(tfp2);         // Assert new return-chain is valid
     return tfp2;
   }
 
-  // Walk to the end, looking for the need to approximate or not.
-  // Returns either self or an approxed value.  Caller can wrap-and-return.
-  private TypeFunPtr _makex( BitsFun fidxs ) {
-    if( _ret==this || !(_ret instanceof TypeFunPtr tfp) )
-      return this;              // Always OK.
-    // Overlaps, without strictly increasing.
-    if( sideways(fidxs,tfp._fidxs,tfp._ret!=XSCALAR) ) {
-      Type ret = tfp._make_apx( ); // Must approx
-      if( ret instanceof TypeFunPtr tfp2 && sideways(fidxs,tfp2._fidxs,tfp2._ret!=XSCALAR) )
-        return add_cycle(tfp2);   // Cycle keeps rolling up
-      // Wrap and return
-      return make( _any, _nil, _sub, fidxs.meet(_fidxs),_nargs,_dsp,ret);
+
+  // Walk the ret chain recursively.
+  // ApxRule: apx folds cycles from the ret-chain back to the front, until Rule2 holds.
+
+  // This fails:
+  // Rule1: fidxs appear in increasing sets (forces finite chain length)
+  // (1)       b -> a  -> x
+  // (2)       b -> ab -> ab*   // (1) isa (2)
+  // Wrap with a->:
+  // (1) a ->  b -> a  -> x
+  // (2) a ->  b -> ab -> ab*   // (1) isa (2)
+  // Approx the repeats of (a) in (1) (apply ApxRule until rule1 holds)
+  // (1) a -> ab -> ab*
+  // (2) a ->  b -> ab*   // FAILS MONOTONICITY
+
+
+  // Rule2: fidxs appear once, and optionally in a final cycle
+  // (1)      b -> a -> a,b*
+  // (2)      b -> a -> Scalar   // (1) isa (2)
+  // Wrap with a->:
+  // (1) a -> b -> a -> a,b*
+  // (2) a -> b -> a -> Scalar
+  // Approx the repeats of (a) in (1) (apply ApxRule until rule2 holds)
+  // (1) a -> b -> a,b -> a,b*
+  // (2) a -> b -> a   -> Scalar  // FAILS MONOTONICITY
+  // (3) a -> b -> Scalar // If end in a below-TFP, NO REPEATS....
+
+  // Rule2: roll forwards and check that new_fidxs do not appear anywhere
+  private TypeFunPtr _rule2(BitsFun new_fidxs, boolean first) {
+    if( this==_ret ) return this; // Self-cycle, end is fine
+    if( new_fidxs!=BitsFun.EMPTY && new_fidxs.overlaps(_fidxs) && !first )
+      return _rule2_apx(); // Overlaps, so do hard approximation
+
+    if( !(_ret instanceof TypeFunPtr rtfp) || rtfp==this )
+      return this;              // End is fine, either self-cycle or a non-TFP
+
+    TypeFunPtr tfp = rtfp._rule2(new_fidxs,false);
+    if( tfp==_ret ) return this; // Return was fine, so i am fine
+    if( tfp==null ) return make_from(_dsp,rtfp._ret); // Hard fail
+    if( new_fidxs.overlaps(tfp._fidxs) ) return make_from(_dsp,tfp._ret);
+    return make_from(_dsp,tfp);  // Wrap the return
+  }
+
+  private TypeFunPtr _rule2_apx() {
+    if( this==_ret ) return this; // I am my own self-cycle
+    if( !(_ret instanceof TypeFunPtr rtfp) ) { // make a self cycle
+      if( _ret.isa(GENERIC_FUNPTR) )           // Falls to a cycle?
+        return make_cycle(_any,_nil,_sub,_fidxs,_nargs,_dsp);
+      return null;              // Hard fail, return low self
     }
-    Type ret = tfp._makex(fidxs); // Continue checking to the end
-    if( ret==_ret ) return this;  // No change
-    return make( _any, _nil, _sub, _fidxs, _nargs, _dsp, ret);// Wrap and return
+    TypeFunPtr apx = rtfp._rule2_apx();
+    if( apx==null ) return make_from(_dsp,rtfp._ret);
+    // Fold my _fidxs into return cycle and return
+    return make_cycle(_any,_nil,_sub,_fidxs.meet(apx._fidxs),_nargs,_dsp);
   }
 
-  // True if the fidxs overlap and are NOT strictly increasing.
-  private boolean sideways(BitsFun f0, BitsFun f1, boolean lo) {
-    return f0.overlaps(f1) &&    // Overlap
-      (!(f0!=f1 && f0.isa(f1)) || // NOT strictly increasing
-       !lo); // or strictly increasing into hi
-  }
-
-  // MUST approx 'this'.  Recurses to the end.  Returns either SCALAR or ALL or
-  // an interned-self-cycle.
-  private Type _make_apx( ) {
-    if( _ret==this ) return this; // Already a self-cycle
-    if( _ret==XSCALAR || _ret==ANY ) // Approx self as a self-cycle
-      return make_cycle( _any, _nil, _sub, _fidxs,_nargs,_dsp);
-    if( !(_ret instanceof TypeFunPtr tfp) )
-      return _ret==ALL ? ALL : SCALAR; // Approx self as SCALAR
-    Type ret = tfp._make_apx();        // Recursive walk to the end
-    if( !(ret instanceof TypeFunPtr tfp2) ) return ret; // Approx self as a SCALAR
-    return add_cycle(tfp2);    // Approx self as a self-cycle merged into the returned self-cycle
-  }
-
-  // Merge into the self-cycle
-  private TypeFunPtr add_cycle( TypeFunPtr cyc) {
-    assert cyc._ret==cyc;
-    BitsFun fidxs = _fidxs.meet(cyc._fidxs);
-    int nargs = Math.min(_nargs,cyc._nargs);
-    Type dsp = _dsp.meet(cyc._dsp);
-    return make_cycle( _any, _nil, _sub, fidxs,nargs,dsp);
-  }
-
-  // Install a length-1 self-cycle (if 'ret' is a TFP or high) or a short
-  // normal TFP if 'ret' is not a TFP.
+  // Install a length-1 self-cycle
   static TypeFunPtr make_cycle( boolean any, boolean nil, boolean sub, BitsFun fidxs, int nargs, Type dsp ) {
     TypeFunPtr tfp = malloc(any,nil,sub,fidxs,nargs,dsp,null);
     tfp._ret = tfp;             // Make a self-cycle of length 1
@@ -275,14 +285,14 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     boolean any = fidxs.above_center();
     boolean nil = any &&  haz_nil;
     boolean sub = any || !haz_nil;
-    return _makex(any, nil, sub, fidxs.clear(0),nargs,dsp,ret,false);
+    return make(any, nil, sub, fidxs.clear(0),nargs,dsp,ret);
   }
   public static TypeFunPtr makex( BitsFun fidxs, int nargs, Type dsp, Type ret ) {
     boolean haz_nil = fidxs.test(0);
     boolean any = fidxs.above_center();
     boolean nil = any &&  haz_nil;
     boolean sub = any || !haz_nil;
-    return _makex(any, nil, sub, fidxs,nargs,dsp,ret,true );
+    return makex(any, nil, sub, fidxs,nargs,dsp,ret);
   }
   public static TypeFunPtr make( int fidx, int nargs, Type dsp, Type ret ) { return make(BitsFun.make0(fidx),nargs,dsp,ret); }
   public static TypeFunPtr make_new_fidx( int parent, int nargs, Type dsp, Type ret ) { return make(BitsFun.make_new_fidx(parent),nargs,dsp,ret); }

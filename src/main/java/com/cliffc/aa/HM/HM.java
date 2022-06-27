@@ -825,7 +825,7 @@ public class HM {
       // Lazily building a call-graph, needed to track arg_meet.
       // We got here because, e.g. _fun._flow added some more functions, all those
       // new functions need the arg_meet.
-      if( work!=null )
+      if( work!=null && tfp._fidxs != BitsFun.NALL )
         for( int fidx : tfp._fidxs ) {
           Func lambda = Lambda.FUNS.get(fidx);
           // new call site for lambda; all args must meet into this lambda;
@@ -946,12 +946,11 @@ public class HM {
       // Check for some Lambdas present
       Type flow = _fun._flow;
       if( !(flow instanceof TypeFunPtr tfp) ) return;
-      assert tfp._fidxs != BitsFun.NALL;
 
       // child arg to a call-site changed; find the arg#;
       int argn = Util.find(_args,child);
       // visit all Lambdas; meet the child flow into the Lambda arg#
-      if( argn != -1 )
+      if( argn != -1 && tfp._fidxs != BitsFun.NALL )
         for( int fidx : tfp._fidxs )
           Lambda.FUNS.get(fidx).arg_meet(argn,child._flow,work);
     }
@@ -1050,41 +1049,49 @@ public class HM {
         // Apply might) with the most conservative flow arguments possible.
         for( int fidx : tfp._fidxs ) {
           if( fidx==0 ) continue;
-          Func fun = Lambda.FUNS.get(fidx);
-          if( !EXT_FIDXS.test(fidx) ) {
-            T2 tfun = fun.as_fun();
-            tfun.add_deps_work(work);
-            tfun.get("ret").clr_cp();
-          }
-          EXT_FIDXS = EXT_FIDXS.set(fidx);
-          for( int i=0; i<fun.nargs(); i++ ) {
-            // One-time make compatible external func/struct for this argument
-            Type cflow;
-            if( fun instanceof Lambda lam ) {
-              Ident[] ids = lam._refs[i];
-              if( ids!=null ) {
-                EXT_DEPS.add(ids); // Add to external deps; when HM_FREEZE flips these all need to be visited
-                for( Ident id : lam._refs[i] ) EXT_DEPS.add(id._par);
-              }
-              T2 t2 = lam.targ(i); // Get HM constraints on the arg
-              if( t2.is_fun() && !lam.extsetf(i) ) new EXTLambda(t2); // Make a canonical external function to call
-              if( t2.is_ptr() && !lam.extsetp(i) ) new EXTStruct(t2); // Make a canonical external struct for args
-              cflow = t2.as_flow(false);
-            } else {
-              cflow = TypeNil.SCALAR; // Most conservative args
-            }
-            fun.arg_meet(i,cflow,work); // Root / external-world calls this function with this arg
-          }
+          do_fidx(fidx, work);
         }
         // The flow return also escapes
         _escapes(tfp._ret,work);
       }
+      // TODO: test40 fails with rseed24, because the Root type falls thru some of the fidxs
+      // before hitting Scalar.  In rseed 24 it hits scalar fast, before noting the escape
+      // of fidx 17.  This fix escapes ALL fidxs upon hitting scalar, and is very conservative
+      // and weakens the gold answer for several tests.
+
+      //if( t==TypeNil.SCALAR || t==TypeNil.NSCALR ) {
+      //  for( long fidx : Lambda.FUNS.keySetLong() )
+      //    if( !EXT_FIDXS.test((int)fidx) &&
+      //        !(Lambda.FUNS.get((int)fidx) instanceof PrimSyn) )
+      //      do_fidx((int)fidx,work);
+      //}
     }
 
-    // Find a named T2
-    T2 find_t2(int uid) {
-      return visit( syn -> syn._hmt._uid==uid ? syn._hmt : null, (t0,t1) -> t0==null ? t1 : t0 );
+    private static void do_fidx(int fidx, @NotNull Work<Syntax> work) {
+      Func fun = Lambda.FUNS.get(fidx);
+      if( !EXT_FIDXS.test(fidx) )
+        fun.as_fun().add_deps_work(work); // TODO: why?
+      EXT_FIDXS = EXT_FIDXS.set(fidx);
+      for( int i=0; i<fun.nargs(); i++ ) {
+        // One-time make compatible external func/struct for this argument
+        Type cflow;
+        if( fun instanceof Lambda lam ) {
+          Ident[] ids = lam._refs[i];
+          if( ids!=null ) {
+            EXT_DEPS.add(ids); // Add to external deps; when HM_FREEZE flips these all need to be visited
+            for( Ident id : lam._refs[i] ) EXT_DEPS.add(id._par);
+          }
+          T2 t2 = lam.targ(i); // Get HM constraints on the arg
+          if( t2.is_fun() && !lam.extsetf(i) ) new EXTLambda(t2); // Make a canonical external function to call
+          if( t2.is_ptr() && !lam.extsetp(i) ) new EXTStruct(t2); // Make a canonical external struct for args
+          cflow = t2.as_flow(false);
+        } else {
+          cflow = TypeNil.SCALAR; // Most conservative args
+        }
+        fun.arg_meet(i,cflow,work); // Root / external-world calls this function with this arg
+      }
     }
+
   }
 
   // External Struct: every possible Struct in the Universe that might be
@@ -1331,7 +1338,6 @@ public class HM {
       _ptr.add_hm_work(work);
     }
     @Override Type val(Work<Syntax> work) {
-      if( find().is_err() ) return TypeNil.SCALAR;
       Type trec = _ptr._flow;
       if( trec==TypeNil.NIL ) return TypeNil.XSCALAR; // Field from nil
       if( !(trec instanceof TypeMemPtr tmp) ) return trec.oob(TypeNil.SCALAR);
@@ -1357,10 +1363,13 @@ public class HM {
         return TypeNil.SCALAR;
       T2 t2fld = t2rec.arg(_id);
       // Field from wrong alias (ignore/XSCALAR should not affect GCP field type),
-      if( t2fld==null )
-        return TypeNil.SCALAR.oob(DO_HM);
+      if( t2fld==null ) {
+        Root.EXT_DEPS.add(this);
+        return TypeNil.SCALAR.oob(!HM_FREEZE);
+      }
       // HMT tells us the field is missing
-      if( t2fld.is_err() ) return TypeNil.SCALAR;
+      if( t2fld.is_err() )
+        return TypeNil.SCALAR;
       // Convert the HM to a flow type; depends on HM_FREEZE
       Root.EXT_DEPS.add(this);
       return t2fld.as_flow(false);
@@ -2049,7 +2058,7 @@ public class HM {
         if( tfun != null ) return tfun;  // TODO: Returning recursive flow-type functions
         ADUPS.put(_uid, TypeNil.XSCALAR);
         Type rez = arg("ret")._as_flow(deep);
-        return TypeFunPtr.make(fidxs,size()-1+DSP_IDX,Type.ANY,rez);
+        return TypeFunPtr.makex(fidxs,size()-1+DSP_IDX,Type.ANY,rez);
       }
       if( is_obj() ) {
         assert HM_FREEZE && deep; // Only for final reporting
@@ -2283,7 +2292,10 @@ public class HM {
     }
     // Delete a field
     private boolean del_fld( String id, Work<Syntax> work) {
-      if( Util.eq("*",id) ) return false; // Do not break ptr-ness, instead keep field and will be an error
+      if( Util.eq("*",id) || // Do not break ptr-ness, instead keep field and will be an error
+          Util.eq("ret",id) ||  // Do not break function-ness
+          id.charAt(0)==' ' )   // Also leave function args
+        return false;
       add_deps_work(work);
       _args.remove(id);
       if( _args.size()==0 ) _args=null;
@@ -2576,7 +2588,6 @@ public class HM {
     // stronger flow types from the matching input types.
     Type walk_types_out( Type t, Apply apply, boolean test ) {
       assert !unified();
-      if( is_err() ) return TypeNil.SCALAR; // Do not attempt lift
 
       // Fast-path cutout
       if( t==TypeNil.XSCALAR ) return TypeNil.XSCALAR; // No lift, do not bother
