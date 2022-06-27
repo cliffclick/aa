@@ -152,11 +152,12 @@ public final class FunPtrNode extends Node {
     if( !self.is_fun() ) {      // Force a function if not already
       if( test ) return true;
       TV2[] tv2s = new TV2[parms.length+1];
-      for( int i=DSP_IDX; i<parms.length; i++ )
-        if( parms[i]!=null ) {
-          assert parms[i]._idx==i && parms[i].has_tvar();
-          tv2s[i] = parms[i].tvar();
-        }
+      for( int i=DSP_IDX; i<parms.length; i++ ) {
+        ParmNode parm = parms[i];
+        assert parm==null || (parm._idx==i && parm.has_tvar());
+        tv2s[i] = parm!=null ? parm.tvar() : TV2.make_leaf("FunPtr_unify");
+      }
+      
       tv2s[parms.length] = ret.rez().tvar(); // Return last slot
       self.unify(TV2.make_fun("FunPtr_unify",tv2s),test);
       self = self.find();

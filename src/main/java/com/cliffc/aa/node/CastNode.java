@@ -48,7 +48,7 @@ public class CastNode extends Node {
 
     // If the cast is in-error, we cannot lift.
     Node n1 = in(1);
-    if( n1 instanceof FreshNode ) n1 = ((FreshNode)n1).id();
+    if( n1 instanceof FreshNode frs ) n1 = frs.id();
     if( !checked(in(0),n1) ) return t;
     // Lift result.
     return _t.join(t);
@@ -69,6 +69,17 @@ public class CastNode extends Node {
   @Override public boolean unify( boolean test ) {
     TV2 maynil = tvar(1); // arg in HM
     TV2 notnil = tvar();  // ret in HM
+
+    // If this is a type-cast, and not a not-nil cast
+    // just do a normal base unification.
+    if( TypeNil.XNIL.isa(_t) ) {
+      boolean progress = notnil.unify(maynil,test);
+      TV2 tv2 = notnil.find();
+      if( tv2.is_base() && tv2._flow==_t )
+        return progress;
+      return test || tv2.unify(TV2.make_base(_t,"Cast_unify"),test);
+    }
+
 
     // If the maynil is already nil-checked, can be a nilable of a nilable.
     if( maynil==notnil ) throw unimpl(); // return false;
@@ -98,18 +109,26 @@ public class CastNode extends Node {
     return TV2.make_nil(notnil,"Cast_unify").find().unify(maynil,test);
   }
 
+  @Override public void add_work_hm() {
+    Env.GVN.add_flow(in(1));
+    Env.GVN.add_flow_uses(this);
+  }
+
   @Override public @NotNull CastNode copy( boolean copy_edges) {
     @NotNull CastNode nnn = (CastNode)super.copy(copy_edges);
     Env.GVN.add_dom(nnn);
     return nnn;
   }
 
-  private static boolean checked( Node n, Node addr ) {
-    if( !(n instanceof CProjNode && ((CProjNode)n)._idx==1) ) return false; // Not a Cast of a CProj-True
+  private boolean checked( Node n, Node addr ) {
+    // Cast up for a typed Parm; always apply
+    if( TypeNil.XNIL.isa(_t) ) return true;
+    // Cast-away-nil at a IfNode
+    if( !(n instanceof CProjNode cpj && cpj._idx==1) ) return false; // Not a Cast of a CProj-True
     Node n0 = n.in(0);
     if( n0 instanceof IfNode ) {
       Node na = n0.in(1);
-      if( na instanceof FreshNode ) na = ((FreshNode)na).id();
+      if( na instanceof FreshNode frs ) na = frs.id();
       if( na == addr ) return true; // Guarded by If-n-zero
     }
     if( n0 instanceof ConNode && ((TypeTuple) n0._val).at(1)==Type.XCTRL )

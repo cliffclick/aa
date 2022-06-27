@@ -267,7 +267,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     TypeFlds.free(flds);
     return fs;
   }
-  static TypeStruct make0(String name, Type def, TypeFld[] flds) { return make(name,def,TypeFlds.hash_cons(remove_dups(def,flds))); }
+  public static TypeStruct make0(String name, Type def, TypeFld[] flds) { return make(name,def,TypeFlds.hash_cons(remove_dups(def,flds))); }
   public TypeStruct make_from(TypeFld[] flds) { return make0(_clz,_def,flds); }
 
   Type nmeet( TypeNil tn ) {

@@ -56,13 +56,12 @@ public final class RetNode extends Node {
   // TODO: needs to come from both Combo and _t
   Type formal(int idx) { return fun().parm(idx)._t; }
   // Called by testing
-  public TypeTuple formals() {
+  public TypeStruct formals() {
     ParmNode[] parms = fun().parms();
-    Type[] ts = Types.get(_nargs-DSP_IDX);
+    TypeFld[] ts = TypeFlds.get(_nargs-DSP_IDX);
     for( int i=DSP_IDX; i<_nargs; i++ )
-      if( parms[i]!=null )
-        ts[i-DSP_IDX] = parms[i]._t;
-    return TypeTuple.make(ts);
+      ts[i-DSP_IDX] = TypeFld.make_tup(parms[i]==null ? Type.ANY : parms[i]._t, i);
+    return TypeStruct.make0("",Type.ALL,ts);
   }
 
 

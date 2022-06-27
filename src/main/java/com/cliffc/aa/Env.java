@@ -158,7 +158,7 @@ public class Env implements AutoCloseable {
 
     Node rez = Env.ROOT.in(REZ_IDX);
     Type mem = Env.ROOT.in(MEM_IDX)._val;
-    TypeTuple formals = null;
+    TypeStruct formals = null;
     if( rez._val instanceof TypeFunPtr tfp ) {
       RetNode ret = RetNode.get(tfp._fidxs);
       if( ret != null ) formals = ret.formals();

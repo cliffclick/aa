@@ -242,16 +242,9 @@ public abstract class PrimNode extends Node {
   @Override public boolean unify( boolean test ) {
     TV2 self = tvar();
     if( self.is_base() && !self.is_copy() ) return false;
-    if( test ) return true;
-    return self.unify(TV2.make_base(_tfp._ret,"PrimNode_create").clr_cp(),test);
-  }
-  private static boolean atx(TV2 tv, Type tformal, boolean test) {
-    if( tv._flow==tformal ) return false; // ALL-vs-ALL
-    if( tv.is_obj() && tformal instanceof TypeStruct tsp &&
-        tv.arg(CANONICAL_INSTANCE)._flow.isa(tsp.get(CANONICAL_INSTANCE)._t) )
-      return false; // E.g. TypeStruct.INT vs TV2.args("clz")=="int"
-    if( test ) return true;
-    return tv.unify(TV2.make(tformal,"PrimNode"),test);
+    // TODO: unify self with _tfp._ret base
+    // TODO: unify input args to formals
+    return test || self.unify(TV2.make_base(_tfp._ret,"PrimNode_create").clr_cp(),test);
   }
 
   @Override public ErrMsg err( boolean fast ) {

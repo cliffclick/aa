@@ -26,9 +26,9 @@ public class TestHM {
     JIG=true;
 
     DO_HMT=true;
-    DO_GCP=true;
-    RSEED=24;
-    test40();
+    DO_GCP=false;
+    RSEED=0;
+    test78();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {

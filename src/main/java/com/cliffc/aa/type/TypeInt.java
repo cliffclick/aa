@@ -118,6 +118,10 @@ public class TypeInt extends TypeNil<TypeInt> {
 
   @Override public TypeInt widen() { return INT64; }
   @Override public boolean is_con()  { return _z==0; }
-  public TypeInt minsize(TypeInt ti) { return (TypeInt)join(ti); } // smaller size of Prim AND
+  public TypeInt minsize(TypeInt ti) {
+    int zs =    _z==0 ? log(   _con) :    _z;
+    int zi = ti._z==0 ? log(ti._con) : ti._z;
+    return make(false, false, false, Math.min(zs,zi), 0);
+  }
   public TypeInt maxsize(TypeInt ti) { return (TypeInt)meet(ti);  }
 }

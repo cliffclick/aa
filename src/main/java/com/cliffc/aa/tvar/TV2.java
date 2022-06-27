@@ -687,7 +687,10 @@ public class TV2 {
   }
   // Delete a field
   private void del_fld( String id ) {
-    if( Util.eq("*",id) ) return; // Do not break ptr-ness, instead keep field and will be an error
+    if( Util.eq("*"  ,id) || // Do not break ptr-ness, instead keep field and will be an error
+        Util.eq("ret",id) || // Do not break function-ness
+        id.charAt(0)==' ' )  // Also leave function args
+      return;
     add_deps_flow();
     _args.remove(id);
     if( _args.size()==0 )  _args=null;

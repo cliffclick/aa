@@ -997,8 +997,8 @@ public class Parse implements Comparable<Parse> {
     //fun.set_nongens(_e._nongen.compact());
     // Build Parms for system incoming values
     int rpc_idx = init(new ParmNode(CTL_IDX,fun,null,TypeRPC.ALL_CALL   ,Env.ALL_CALL)).push();
-    int clo_idx = init(new ParmNode(DSP_IDX,fun,null,scope().dsp()._tptr,scope().ptr())).push();
-    Node mem    = init(new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM     ,mem() ));
+    int clo_idx = init(new ParmNode(DSP_IDX,fun,null,formals.at(DSP_IDX),scope().ptr())).push();
+    Node mem    = init(new ParmNode(MEM_IDX,fun,null,formals.at(MEM_IDX),mem() ));
 
     // Increase scope depth for function body.
     int fptr_idx;
@@ -1015,6 +1015,8 @@ public class Parse implements Comparable<Parse> {
       assert fun==_e._fun && fun==_e._scope.ctrl();
       for( int i=ARG_IDX; i<formals.len(); i++ ) { // User parms start
         Node parm = gvn(new ParmNode(i,fun,errmsg,Type.ALL,Env.ALL));
+        if( formals.at(i)!=TypeNil.SCALAR )
+          parm = gvn(new CastNode(fun,parm,formals.at(i)));
         scope().stk().add_fld(TypeFld.make(ids.at(i),formals.at(i),args_are_mutable),parm,bads.at(i-ARG_IDX));
       }
 
@@ -1023,7 +1025,7 @@ public class Parse implements Comparable<Parse> {
       if( rez == null ) rez = err_ctrl2("Missing function body");
       require('}',oldx-1);      // Matched with opening {}
       stk.close();
-    
+
       // Merge normal exit into all early-exit paths
       assert e._scope.is_closure();
       rez = merge_exits(rez);
@@ -1032,7 +1034,7 @@ public class Parse implements Comparable<Parse> {
       Node xrpc = Node.pop(rpc_idx);
       Node xfun = Node.pop(fun_idx); assert xfun == fun;
       RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,xrpc,fun));
-      
+
       _e = e._par;            // Pop nested environment; pops nongen also
       // The FunPtr builds a real display; any up-scope references are passed in now.
       Node fptr = gvn(new FunPtrNode(ret,_e._scope.ptr()));

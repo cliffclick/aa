@@ -30,7 +30,7 @@ public class TestParse {
     DO_HMT=false;
     DO_GCP=true;
     RSEED=0;
-    testerr("x=(1+(x=2)+x); x", "Cannot re-assign final field '.x' in @{x=2}",0);
+    test("1._+_(2)", "int:3" ,"int:3" );
   }
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
@@ -219,7 +219,7 @@ public class TestParse {
     // Anonymous function definition.  Note: { x -> x&1 }; 'x' can be either an
     // int or any struct with an operator '_&_', which needs to be nil-checked
     // before loading the operator field.
-    test("{x:int -> x&1}","[54]{int64,4 -> int64 }","{int64 -> int64}");
+    test("{x:int -> x&1}","[54]{any,4 -> int:int1 }","@{^=any}","{A int64 -> int64}",null,"[54]");
     //test("{5}()", TypeInt.con(5), "5"); // No args nor -> required; this is simply a function returning 5, being executed
     //testerr("{x:flt y -> x+y}", "Unable to resolve _+_",13); // {Scalar Scalar -> Scalar}
     //
@@ -931,7 +931,7 @@ HashTable = {@{
   }
 
   // Run a program once, with a given seed and typing flags
-  static private void _test0( String program, String gcp, String formals, String hmt_expect, String err, int cur_off, int rseed ) {
+  static private void _test0( String program, String gcp, String formals, String hmt_expect, String esc_ptrs, String esc_funs, String err, int cur_off, int rseed ) {
     TypeEnv te = Exec.file("test",program,rseed,gcp!=null,hmt_expect!=null);
     if( err != null ) {
       assertTrue(te._errs != null && te._errs.size()>=1);
@@ -947,8 +947,8 @@ HashTable = {@{
         assertEquals(expect,actual);
         // Also check GCP formals.
         if( expect instanceof TypeFunPtr ) {
-          TypeTuple actual_formals = te._formals;
-          TypeTuple expect_formals = (TypeTuple)Type.valueOf(formals);
+          TypeStruct actual_formals = te._formals;
+          TypeStruct expect_formals = (TypeStruct)Type.valueOf(formals);
           assertEquals(expect_formals,actual_formals);
         } else
           assert formals==null;
@@ -960,8 +960,10 @@ HashTable = {@{
       }
       // Track expected Root escapes
       if( gcp != null && hmt_expect != null ) {
-        BitsFun   fidxs   = BitsFun  .EMPTY;
-        BitsAlias aliases = BitsAlias.EMPTY;
+        String esc_ptrs2 = "*"+esc_ptrs+"()";
+        String esc_funs2 =     esc_funs+"{any,3->Scalar}";
+        BitsAlias aliases = esc_ptrs==null ? BitsAlias.EMPTY : ((TypeMemPtr)Type.valueOf(esc_ptrs2))._aliases;
+        BitsFun   fidxs   = esc_funs==null ? BitsFun  .EMPTY : ((TypeFunPtr)Type.valueOf(esc_funs2))._fidxs  ;
         assertEquals(fidxs  ,te._fidxs  );
         assertEquals(aliases,te._aliases);
       }
@@ -970,28 +972,28 @@ HashTable = {@{
   private static String stripIndent(String s){ return s.replace("\n","").replace(" ",""); }
 
   // Run a program once-per-rseed
-  static private void _test1( String program, String gcp, String formals, String hmt_expect, String err, int cur_off ) {
+  static private void _test1( String program, String gcp, String formals, String hmt_expect, String esc_ptrs, String esc_funs, String err, int cur_off ) {
     if( JIG )
-      _test0(program,gcp,formals,hmt_expect,err,cur_off,RSEED);
+      _test0(program,gcp,formals,hmt_expect,esc_ptrs,esc_funs,err,cur_off,RSEED);
     else
       for( int rseed=0; rseed<4; rseed++ )
-        _test0(program,gcp,formals,hmt_expect,err,cur_off,rseed);
+        _test0(program,gcp,formals,hmt_expect,esc_ptrs,esc_funs,err,cur_off,rseed);
   }
 
   // Run a program in all 3 modes, with all rseeds
-  static private void _test2( String program, String gcp, String formals, String hmt_expect, String err, int cur_off ) {
-    if( !JIG || ( DO_GCP && !DO_HMT) )  _test1(program,gcp ,formals,null      ,err,cur_off);
-    if( !JIG || (!DO_GCP &&  DO_HMT) )  _test1(program,null,null   ,hmt_expect,err,cur_off);
-    if( !JIG || ( DO_GCP &&  DO_HMT) )  _test1(program,gcp ,formals,hmt_expect,err,cur_off);
+  static private void _test2( String program, String gcp, String formals, String hmt_expect, String esc_ptrs, String esc_funs, String err, int cur_off ) {
+    if( !JIG || ( DO_GCP && !DO_HMT) )  _test1(program,gcp ,formals,null      ,esc_ptrs,esc_funs,err,cur_off);
+    if( !JIG || (!DO_GCP &&  DO_HMT) )  _test1(program,null,null   ,hmt_expect,esc_ptrs,esc_funs,err,cur_off);
+    if( !JIG || ( DO_GCP &&  DO_HMT) )  _test1(program,gcp ,formals,hmt_expect,esc_ptrs,esc_funs,err,cur_off);
   }
 
   // Run a program in all 3 modes, yes function returns, no errors
-  private void test( String program, String gcp, String formals, String hmt_expect ) {
-    _test2(program,gcp,formals,hmt_expect,null,0);
+  private void test( String program, String gcp, String formals, String hmt_expect, String esc_ptrs, String esc_funs ) {
+    _test2(program,gcp,formals,hmt_expect,esc_ptrs,esc_funs,null,0);
   }
   // Short form test: simple GCP, no formal args
   private void test( String program, String gcp, String hmt_expect ) {
-    _test2(program,gcp,null,hmt_expect,null,0);
+    _test2(program,gcp,null,hmt_expect,null,null,null,0);
   }
   // Run a program in all 3 modes, yes function returns, no errors
   private void test( String program, Function<Type,Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect ) {
@@ -1023,7 +1025,7 @@ HashTable = {@{
   }
 
   static void testerr( String program, String err, int cur_off ) {
-    _test2(program,"",null,"",err,cur_off);
+    _test2(program,"",null,"",null,null,err,cur_off);
   }
 
 

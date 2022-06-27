@@ -24,8 +24,8 @@ public abstract class Node implements Cloneable, IntSupplier {
   static final byte OP_CONTYPE= 5;
   static final byte OP_CPROJ  = 6;
   static final byte OP_ERR    = 7;
-  static final byte OP_FRESH  = 8;
-  static final byte OP_FIELD  = 9;
+  static final byte OP_FIELD  = 8;
+  static final byte OP_FRESH  = 9;
   static final byte OP_FUN    =10;
   static final byte OP_FUNPTR =11;
   static final byte OP_IF     =12;
