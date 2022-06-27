@@ -125,7 +125,7 @@ public class CallNode extends Node {
   Node set_arg (int idx, Node arg) { assert idx>=DSP_IDX && idx <nargs(); return set_def(idx,arg); }
   public CallNode set_fdx( Node fun) { set_def(DSP_IDX, fun); return this; }
   public void set_mem( Node mem) { set_def(MEM_IDX, mem); }
-  @Override void walk_reset0() { assert is_prim(); _not_resolved_by_gcp = false; }
+  @Override void walk_reset0() { _not_resolved_by_gcp = false; }
 
   // Add a bunch of utilities for breaking down a Call.value tuple:
   // takes a Type, upcasts to tuple, & slices by name.

@@ -26,7 +26,6 @@ public class PhiNode extends Node {
     return _t==phi._t;
   }
   @Override void walk_reset0() {
-    assert is_prim();
     while( len()>1 && !in(len()-1).is_prim() )
       pop(); // Kill wired primitive inputs
   }

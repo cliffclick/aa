@@ -575,7 +575,7 @@ public class Parse implements Comparable<Parse> {
       skipWS();
       int rhsx = _x;            // Invariant: WS already skipped
       // Get the oper function to call
-      Node opfun = gvn(new FieldNode(lhs,binop._name));
+      Node opfun = gvn(new FieldNode(lhs,binop._name,errMsg(opx)));
       int fidx = opfun.push();
       // Parse the RHS operand
       Node rhs = binop._lazy
@@ -678,7 +678,7 @@ public class Parse implements Comparable<Parse> {
       if( op.is_open() ) throw unimpl(); // Parse the close
       if( op._nargs!=1 ) throw unimpl(); // No binary/trinary allowed here
       // Load field e0.op2_ as TFP, and instance call.
-      Node fun = gvn(new FieldNode(e0,op._name));
+      Node fun = gvn(new FieldNode(e0,op._name,errMsg(oldx)));
       n = do_call(errMsgs(oldx,oldx),args(fun));
     } else {
       // Normal leading term
@@ -716,8 +716,9 @@ public class Parse implements Comparable<Parse> {
           //return n.unkeep();
           throw unimpl();       // SetField before Store
         } else {
-          Node st = gvn(new LoadNode(mem(),castnn,errMsg(fld_start)));
-          n = gvn(new FieldNode(st,fld));
+          Parse bad = errMsg(fld_start);
+          Node st = gvn(new LoadNode(mem(),castnn,bad));
+          n = gvn(new FieldNode(st,fld,bad));
         }
 
       } else if( peek('(') ) {  // Attempt a function-call
@@ -785,18 +786,18 @@ public class Parse implements Comparable<Parse> {
     // Scope is discovered by walking lexical display stack.
     // Pointer to the proper display is found via ptr-walking live display stack.
     // Now properly load from the display.
+    Parse bad = errMsg();
     Node ptr = get_display_ptr(scope);
-    Node ld = gvn(new LoadNode(mem(),ptr,null));
+    Node ld = gvn(new LoadNode(mem(),ptr,bad));
     int ld_x = ld.push();
-    Node n = gvn(new FieldNode(ld,tok));
+    Node n = gvn(new FieldNode(ld,tok,bad));
     if( n.is_forward_ref() )    // Prior is actually a forward-ref
       return err_ctrl1(ErrMsg.forward_ref(this,((FunPtrNode)n)));
     // Do a full lookup on "+", and execute the function
     int nidx = n.push();
-    Node plus = gvn(new FieldNode(n,"_+_"));
+    Node plus = gvn(new FieldNode(n,"_+_",bad));
     Node inc = con(TypeStruct.make_int(TypeInt.con(d)));
     Node sum = do_call(errMsgs(_x-2,_x,_x), args(plus,inc));
-    Parse bad = errMsg();
     Node stf = gvn(new SetFieldNode(tok,Access.RW,Node.peek(ld_x),sum,bad));
     // Active memory for the chosen scope, after the call to plus
     scope().replace_mem(new StoreNode(mem(),ptr,stf,bad));
@@ -870,20 +871,22 @@ public class Parse implements Comparable<Parse> {
     if( Util.eq(tok,"=") || Util.eq(tok,"^") )
       { _x = oldx; return null; } // Disallow '=' as a fact, too easy to make mistakes
     ScopeNode scope = lookup_scope(tok,false);
+    Parse bad = errMsg(oldx);
     if( scope == null ) { // Assume any unknown id is a forward-ref of a recursive function
       // Ops cannot be forward-refs, so are just 'not a fact'.  Cannot declare
       // them as a undefined forward-ref right now, because the op might be the
       // tail-half of a balanced-op, which is parsed by term() above.
       if( isOp(tok) ) { _x = oldx; return null; }
       // Must be a forward reference
-      return val_fref(tok,errMsg(oldx));
+      return val_fref(tok,bad);
     }
 
     // Must load against most recent display update, in case some prior store
     // is in-error.  Directly loading against the display would bypass the
     // (otherwise alive) error store.
-    Node ld = gvn(new LoadNode(mem(),get_display_ptr(scope),null));
-    Node fd = gvn(new FieldNode(ld,tok));
+    
+    Node ld = gvn(new LoadNode(mem(),get_display_ptr(scope),bad));
+    Node fd = gvn(new FieldNode(ld,tok,bad));
     // If in the middle of a definition (e.g. a HM Let, or recursive assign)
     // then no Fresh per normal HM rules.  If loading from a struct or from
     // normal Lambda arguments, again no Fresh per normal HM rules.
@@ -1427,7 +1430,7 @@ public class Parse implements Comparable<Parse> {
       Node dsp = gvn(new LoadNode(mmem,ptr,null)); // Gen linked-list walk code, walking display slot
       while( dsp instanceof SetFieldNode ) // Bypass partial frame updates
         dsp = dsp.in(0); // Never set the display, so bypass
-      ptr = gvn(new FieldNode(dsp,"^"));
+      ptr = gvn(new FieldNode(dsp,"^",null));
       e = e._par;                                 // Walk linked-list in parser also
     }
   }

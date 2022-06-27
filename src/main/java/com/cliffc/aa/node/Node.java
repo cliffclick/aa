@@ -832,7 +832,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       Node def = _defs.at(i);   // Walk data defs for more errors
       if( def == null || def._val == Type.XCTRL ) continue;
       // Walk function bodies that are wired
-      if( def instanceof FunPtrNode && !(this instanceof ScopeNode) )
+      if( def instanceof FunPtrNode && !(this instanceof RootNode) )
         continue;
       def.walkerr_def(errs,bs);
     }

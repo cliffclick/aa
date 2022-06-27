@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
@@ -10,10 +11,12 @@ import com.cliffc.aa.util.Util;
 // instead of by index in TypeTuple.
 public class FieldNode extends Node {
   public final String _fld;
+  public final Parse _bad;
 
-  public FieldNode(Node struct, String fld) {
+  public FieldNode(Node struct, String fld, Parse bad) {
     super(OP_FIELD,struct);
     _fld=fld;
+    _bad = bad;
   }
 
   @Override public String xstr() { return "."+_fld; }   // Self short name
@@ -53,7 +56,7 @@ public class FieldNode extends Node {
 
   @Override public Node ideal_reduce() {
     if( in(0) instanceof StructNode clz )
-      return clz.in_bind(_fld,in(0));
+      return clz.in_bind(_fld,in(0),_bad);
     // For named prototypes, if the field load fails, try again in the
     // prototype.  Only valid for final fields.
     String sclz=null;
@@ -63,7 +66,7 @@ public class FieldNode extends Node {
     if( sclz!=null ) {
       StructNode clz = proto(sclz);
       if( clz!=null )
-        return clz.in_bind(_fld,in(0));
+        return clz.in_bind(_fld,in(0),_bad);
     }
 
     // Back-to-back SetField/Field
@@ -86,7 +89,7 @@ public class FieldNode extends Node {
       if( fcnt>0 ) {
         Node lphi = new PhiNode(TypeNil.SCALAR,phi._badgc,phi.in(0));
         for( int i=1; i<phi.len(); i++ )
-          lphi.add_def(Env.GVN.add_work_new(new FieldNode(phi.in(i),_fld)));
+          lphi.add_def(Env.GVN.add_work_new(new FieldNode(phi.in(i),_fld,_bad)));
         subsume(lphi);
         return lphi;
       }
