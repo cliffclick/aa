@@ -2110,8 +2110,8 @@ public class HM {
       int cmp =  _fpriority(sf) - _fpriority(hf);
       if( cmp == 0 ) { that._tflow = sf.meet(hf); sf = se; hf = he; } // Tied; meet; advance both
       if( cmp  > 0 ) { that._tflow = sf;          sf = se;          } // Pick winner, advance
-      if( cmp  < 0 ) {                           hf = he;          } // Pick winner, advance
-      if( !(sf==null && hf==null) ) {                                // If there is an error flow
+      if( cmp  < 0 ) {                            hf = he;          } // Pick winner, advance
+      if( !(sf==null && hf==null) ) {                                 // If there is an error flow
         int cmp2 =  _fpriority(sf) - _fpriority(hf); // In a triple-error, pick best two
         if( cmp2 == 0 ) that._eflow = sf.meet(hf);
         if( cmp2  > 0 ) that._eflow = sf;
@@ -2122,7 +2122,7 @@ public class HM {
       return progress;
     }
     // Sort flow types; int >> flt >> ptr >> null
-    private int _fpriority( Type t0 ) {
+    private static int _fpriority( Type t0 ) {
       if( t0 instanceof TypeInt ) return 3;
       if( t0 instanceof TypeFlt ) return 2;
       if( t0 instanceof TypeMemPtr ) return 1;
@@ -2306,35 +2306,34 @@ public class HM {
       // Progress on the parts
       boolean progress = false;
       if( _tflow !=null ) progress = unify_base(that, work);
-      if( _may_nil && !that._may_nil ) { if( work==null ) return true; progress = that._may_nil = true; }
-      if( is_ptr() && !that.is_ptr() ) { // Error, fresh_unify a ptr into a non-ptr non-leaf
-        if( work==null ) return true;
-        //return vput(that,that._unify(_fresh(nongen),work));
-        throw unimpl();         // TODO: direct fresh-unify?
-      }
-      if( is_fun() && !that.is_fun() ) { // Error, fresh_unify a fun into a non-fun non-leaf
-        if( work==null ) return true;
-        progress = that._is_fun = true;
-        if( that._args==null )
-          that._args = (NonBlockingHashMap<String,T2>)_args.clone(); // Error case; bring over the function args
-      }
-      if( is_obj() && !that.is_obj() ) { // Error, fresh_unify a struct into a non-struct non-leaf
-        if( work==null ) return true;
-        progress = that._is_obj = true;
-        if( that._args==null )
-          that._args = (NonBlockingHashMap<String,T2>)_args.clone(); // Error case; bring over the function args
-      }
-      if( _err!=null && !_err.equals(that._err) ) {
-        if( that._err!=null ) throw unimpl(); // TODO: Combine single error messages
-        else { // Error, fresh_unify an error into a non-leaf non-error
-           if( work==null ) return true;
-           progress = true;
-           that._err = _err;
+
+      // Check for mismatched LHS and RHS
+      if( work==null ) {
+        if( _may_nil && !that._may_nil ) return true;
+        if( is_ptr() && !that.is_ptr() ) return true;
+        if( is_fun() && !that.is_fun() ) return true;
+        if( is_obj() && !that.is_obj() ) return true;
+        if( _err!=null && !Util.eq(_err,that._err) ) return true;
+      } else {
+        if( _may_nil && !that._may_nil ) { progress = that._may_nil = true; }
+        if( is_ptr() && !that.is_ptr() ) // Error, fresh_unify a ptr into a non-ptr non-leaf
+          //return vput(that,that._unify(_fresh(nongen),work));
+          throw unimpl();         // TODO: direct fresh-unify?
+        if( is_fun() && !that.is_fun() ) // Error, fresh_unify a fun into a non-fun non-leaf
+          that.cp_args(_args)._is_fun=progress=true;
+        if( is_obj() && !that.is_obj() ) // Error, fresh_unify a struct into a non-struct non-leaf
+          that.cp_args(_args)._is_obj=progress=true;
+        if( _err!=null && !Util.eq(_err,that._err) ) {
+          if( that._err!=null ) throw unimpl(); // TODO: Combine single error messages
+          else { // Error, fresh_unify an error into a non-leaf non-error
+            progress = true;
+            that._err = _err;
+          }
         }
       }
-
-      // Both same (probably both nil)
+      
       vput(that,progress);      // Early set, to stop cycles
+      // Both same (probably both nil)
       if( _args==that._args ) return progress;
 
       // Structural recursion unification, lazy on LHS
@@ -2392,7 +2391,12 @@ public class HM {
       return vput(this,false);
     }
     private static Type meet_nil(Type t) { return t==null ? null : t.meet(TypeNil.XNIL); }
-
+    private T2 cp_args(NonBlockingHashMap<String,T2> args ) {
+      if( _args==null )
+        _args = (NonBlockingHashMap<String,T2>)args.clone(); // Error case; bring over the args
+      return this;
+    }
+    
 
     // Return a fresh copy of 'this'
     T2 fresh() {

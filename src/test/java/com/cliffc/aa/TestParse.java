@@ -30,62 +30,7 @@ public class TestParse {
     DO_HMT=true;
     DO_GCP=false;
     RSEED=0;
-    test("x=3; and2={x -> x & 2}; and2(x)", "int:2", "int:2");
-  }
-
-  // temp/junk holder for "instant" junits, when debugged moved into other tests
-  @Test public void testParse() {
-    // TODO:
-    // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.
-    // The Meet loses precision to fast.  This is a typing bug.
-
-    // fails, str.hash, str.eq is missing.
-    // needs a class for primitives which includes things like hash & eq & toString.
-    //test("tab = [7];\n" +
-    //     "put = { key val ->\n" +
-    //     "  idx = key.hash() % #tab;\n" +
-    //     "  entry = tab[idx];\n" +
-    //     "  entry && key.eq(entry.key) ? (oldval=entry.val; entry.val:=val; ^oldval);\n" +
-    //     "  0\n" +
-    //     "};\n" +
-    //     "put(\"Monday\",1);\n",
-    //     Type.XNIL);
-
-    // A collection of tests which like to fail easily
-    test("-1",  TypeInt.con( -1));
-    test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
-    testerr("x=1+y","Unknown ref 'y'",4);
-    test("math.rand(1)?x=4:x=3;x", TypeInt.INT8); // x defined on both arms, so available after
-    test("x=@{n:=1;v:=2}; x.n := 3; x", "*@{n:=3; v:=2}","@{n=3, v=2}");
-    test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
-    testerr("sq={x -> x*x}; sq(\"abc\")", "*\"abc\" is none of (flt64,int64)",9);
-    test("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
-    testerr("math.rand(1)?x=2: 3 ;y=x+2;y", "'x' not defined on false arm of trinary",20);
-    testerr("_+_(1,2,3)", "Passing 3 arguments to _+_ which takes 2 arguments",3);
-    testerr("{x y -> x+y}", "Scalar is none of (flt64,int64,*str?)",8); // {Scalar Scalar -> Scalar}
-    testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y' in @{x=1}",19);
-    testerr("Point=:@{x;y}; Point((0,1))", "*(0, 1) is not a *Point:@{x:=; y:=}",21);
-    test("x=@{a:=1;         b= {a=a+1;b=0}}; x.         b(); x.a",TypeInt.con(2));
-    test("x=@{a:=1;noinline_b= {a=a+1;b=0}}; x.noinline_b(); x.a",TypeInt.INT8);
-
-    test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0(_&_,2)", TypeNil.NIL);
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(1)",TypeInt.con(1));
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", TypeInt.BOOL );
-    test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(1)",TypeInt.con(1));
-    test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
-    test("A= :@{n=A?; v=flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
-    testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(0);(1,);(1,).0;@{x;y];","Expected closing '}' but found ']' instead",63);
-    //test("noinline_inc={x -> x&1}; noinline_p={x -> noinline_inc(x)*2}; noinline_p",
-    //  (ignore->TypeFunPtr.make(29,ARG_IDX+1, TypeMemPtr.NO_DISP, TypeInt.INT64)),
-    //  ( () -> TypeStruct.args(Type.SCALAR)),
-    //     "[29]{ int64 -> int64 }" );
-    //// id accepts and returns both ints and reference types (arrays).
-    //test("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",
-    //  (ignore -> TypeMemPtr.make(9,TypeStruct.make_test(TypeInt.INT8,TypeInt.con(3)))),
-    //  null,
-    //     "(int64, 3)");
-    throw unimpl();
+    test("{x:int -> x&1}","[54]{any,4 -> int:int1 }","@{^=any}","{A int64 -> int64}",null,"[54]");
   }
 
   @Test public void testParse00() {

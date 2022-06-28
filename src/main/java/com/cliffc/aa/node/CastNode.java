@@ -77,7 +77,7 @@ public class CastNode extends Node {
       TV2 tv2 = notnil.find();
       if( tv2.is_base() && tv2._tflow ==_t )
         return progress;
-      return test || tv2.unify(TV2.make_base(_t,"Cast_unify"),test);
+      return test || tv2.unify(TV2.make(_t,"Cast_unify"),test);
     }
 
 

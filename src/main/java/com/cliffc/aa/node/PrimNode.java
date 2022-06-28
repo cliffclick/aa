@@ -241,10 +241,12 @@ public abstract class PrimNode extends Node {
   // primitive computes a result.
   @Override public boolean unify( boolean test ) {
     TV2 self = tvar();
-    if( self.is_base() && !self.is_copy() ) return false;
-    // TODO: unify self with _tfp._ret base
+    if( !self.is_copy() && self.is_clz()!=null && self.arg(CANONICAL_INSTANCE)._tflow==((TypeStruct)_tfp._ret)._def )
+      return false;             // Already unified
+    if( !self.is_copy() && self.is_leaf() && _tfp._ret==TypeNil.SCALAR )
+      return false;             // Already a leaf
     // TODO: unify input args to formals
-    return test || self.unify(TV2.make_base(_tfp._ret,"PrimNode_create").clr_cp(),test);
+    return test || self.unify(TV2.make(_tfp._ret,"PrimNode_create").clr_cp(),test);
   }
 
   @Override public ErrMsg err( boolean fast ) {
@@ -558,7 +560,7 @@ public abstract class PrimNode extends Node {
   public static class AndThen extends PrimNode {
     private static final TypeTuple ANDTHEN = TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, Type.ALL, TypeFunPtr.THUNK); // {val tfp -> val }
     // Takes a value on the LHS, and a THUNK on the RHS.
-    public AndThen() { super("&&",true/*lazy*/,ANDTHEN,TypeTuple.RET); }
+    public AndThen() { super("&&",true/*lazy*/,ANDTHEN,TypeNil.SCALAR); }
     @Override public Type apply(Type[] ts) { throw unimpl(); }
     @Override public Type value() { return TypeTuple.RET; }
     // Expect this to inline everytime
@@ -596,7 +598,7 @@ public abstract class PrimNode extends Node {
       }
     }
 
-    // Unify trailing result ProjNode with the AndTHen directly.
+    // Unify trailing result ProjNode with the AndThen directly.
     @Override public boolean unify_proj( ProjNode proj, boolean test ) {
       assert proj._idx==REZ_IDX;
       return tvar().unify(proj.tvar(),test);
@@ -611,7 +613,7 @@ public abstract class PrimNode extends Node {
   public static class OrElse extends PrimNode {
     private static final TypeTuple ORELSE = TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, Type.ALL, TypeFunPtr.THUNK); // {val tfp -> val }
     // Takes a value on the LHS, and a THUNK on the RHS.
-    public OrElse() { super("||",true/*lazy*/,ORELSE,TypeTuple.RET); }
+    public OrElse() { super("||",true/*lazy*/,ORELSE,TypeNil.SCALAR); }
     @Override public Type apply(Type[] ts) { throw unimpl(); }
     @Override public Type value() { return TypeTuple.RET; }
     // Expect this to inline everytime
@@ -648,7 +650,7 @@ public abstract class PrimNode extends Node {
         return this;
       }
     }
-    // Unify trailing result ProjNode with the AndTHen directly.
+    // Unify trailing result ProjNode with the OrElse directly.
     @Override public boolean unify_proj( ProjNode proj, boolean test ) {
       assert proj._idx==REZ_IDX;
       return tvar().unify(proj.tvar(),test);

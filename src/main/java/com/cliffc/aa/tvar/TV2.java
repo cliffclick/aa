@@ -256,7 +256,6 @@ public class TV2 {
       if( ts._clz.length()>0 ) {
         args.put(ts._clz, make_leaf(alloc_site));
         args.put(CANONICAL_INSTANCE,make(ts._def,alloc_site));
-        //args.put(PRIM_WRAP_FIELD_NAME,make_base(ts._def,alloc_site));
       }
       yield make_struct(args,alloc_site);
     }
@@ -267,7 +266,7 @@ public class TV2 {
     case TypeNil n -> {
       if( t == TypeNil.XNIL )
         yield make_nil(TV2.make_leaf(alloc_site),alloc_site);
-      throw unimpl();
+      yield make_leaf(alloc_site);
     }
     case Type tt -> {
       if( t==Type.ANY ) yield make_leaf(alloc_site);
@@ -485,7 +484,6 @@ public class TV2 {
     assert !is_unified() && !that.is_unified();
     if( this==that ) return false;
     if( test ) return true; // Report progress without changing
-    //if( _uid < that._uid ) throw unimpl(); // Reverse UID to keep the Low.
 
     // Merge all the hard bits
     that._is_fun  |= _is_fun;
@@ -495,8 +493,7 @@ public class TV2 {
       that._is_obj = true;
     }
     // Merge all the hard bits
-    that.union_flow(_tflow);
-    that.union_flow(_eflow);
+    unify_base(that,test);
 
     // Merge arguments
     if( _args!=null ) {
@@ -505,7 +502,7 @@ public class TV2 {
     }
     // Merge errors
     if( _err!=null && that._err==null ) that._err = _err;
-    else if( _err!=null && !_err.equals(that._err) )
+    else if( _err!=null && !Util.eq(_err,that._err) )
       throw unimpl();         // TODO: Combine single errors
 
     // Work all the deps
@@ -515,15 +512,43 @@ public class TV2 {
     return _union(that);
   }
 
-  private void union_flow( Type t0 ) {
-    if( t0==null ) return;      // Nothing to merge into
-    if( _tflow ==null ) _tflow = t0;
-    else if( t0.getClass()== _tflow.getClass() || t0==TypeNil.XNIL || _tflow ==TypeNil.XNIL ) _tflow = t0.meet(_tflow);
-    else if( _eflow==null ) _eflow = t0;
-    else if( t0.getClass()==_eflow.getClass() ) _eflow = t0.meet(_eflow);
-    // Else have both _flow and _eflow AND t0: have 3 unique type classes so
-    // drop t0, and only report the first two.
-    // TODO: Probably have to keep them sorted to be canonical during errors
+  // Unify this._tflow into that._tflow.  Flow is limited to only one of
+  // {int,flt,ptr} and a 2nd unrelated flow type is kept as an error in
+  // that._eflow.  Basically a pick the max 2 of 4 values, and each value is
+  // range 0-3.  Returns progress.
+  boolean unify_base(TV2 that, boolean test) {
+    boolean progress = false;
+    if( that._is_copy && !_is_copy )  { // Progress if setting is_copy
+      if( test ) return true;
+      progress = true;
+      that.clr_cp();
+    }
+    Type sf = _tflow, hf = that._tflow;     // Flow of self and that.
+    if( sf==null && hf==null ) return progress;// Fast cutout
+    Type se = _eflow, he = that._eflow;     // Error flow of self and that.
+    Type of = that._tflow, oe = that._eflow; // Old versions, to check for progress
+    int cmp =  _fpriority(sf) - _fpriority(hf);
+    if( cmp == 0 ) { that._tflow = sf.meet(hf); sf = se; hf = he; } // Tied; meet; advance both
+    if( cmp  > 0 ) { that._tflow = sf;          sf = se;          } // Pick winner, advance
+    if( cmp  < 0 ) {                            hf = he;          } // Pick winner, advance
+    if( !(sf==null && hf==null) ) {                                 // If there is an error flow
+      int cmp2 =  _fpriority(sf) - _fpriority(hf); // In a triple-error, pick best two
+      if( cmp2 == 0 ) that._eflow = sf.meet(hf);
+      if( cmp2  > 0 ) that._eflow = sf;
+      if( cmp2  < 0 ) that._eflow = hf;
+    }
+    progress |= of!=that._tflow || oe!=that._eflow; // Progress check
+    if( test && progress ) { that._tflow=of; that._eflow=oe; } // Unwind if just testing
+    return progress;
+  }
+  // Sort flow types; int >> flt >> ptr >> null
+  private static int _fpriority( Type t0 ) {
+    if( t0 instanceof TypeInt ) return 4;
+    if( t0 instanceof TypeFlt ) return 3;
+    if( t0 instanceof TypeMemPtr ) return 2;
+    if( t0 == Type.ALL ) return 1;
+    assert t0==null;
+    return 0;
   }
 
   // Union this into that; this can already be unified (if rolling up).
@@ -714,6 +739,7 @@ public class TV2 {
   // Used in the recursive unification process.  During fresh_unify tracks the
   // mapping from LHS TV2s to RHS TVs.
   private static final HashMap<TV2,TV2> VARS = new HashMap<>();
+  private static int FCNT;
 
   // Make a (lazy) fresh copy of 'this' and unify it with 'that'.  This is
   // the same as calling 'fresh' then 'unify', without the clone of 'this'.
@@ -722,6 +748,7 @@ public class TV2 {
   // Returns progress.
   // If test, we are testing only and make no changes.
   public boolean fresh_unify(TV2 that, TV2[] nongen, boolean test) {
+    FCNT=0;
     assert VARS.isEmpty() && DUPS.isEmpty();
     boolean progress = _fresh_unify(that,nongen,test);
     VARS.clear();  DUPS.clear();
@@ -750,34 +777,59 @@ public class TV2 {
       return test || vput(that,that.union(_fresh(nongen),test));
 
     // Special handling for nilable
-    boolean progress = false;
     if( this.is_nil() && !that.is_nil() )
       return vput(that,that.unify_nil_this(test));
     // That is nilable and this is not
     if( that.is_nil() && !this.is_nil() )
       return unify_nil(that,test,nongen);
 
-    //// Several trivial cases that do not really do any work
-    //// Bases MEET cons in RHS
-    //if( is_base() && that.is_base() ) {
-    //  Type mt = _type.meet(that._type);
-    //  if( mt==that._type ) return vput(that,false);
-    //  if( test ) return true;
-    //  that._type = mt;
-    //  return vput(that,true);
-    //}
-    //
-    //
-    //// Check for being the same structure
-    //if( !Util.eq(_name,that._name) )
-    //  throw unimpl();
-    //
-    //// Structural recursion unification, lazy on LHS.  Fields in both sides are
-    //// directly unified.  Fields on one side check to see if the other side is
-    //// open; if open the field is copied else deleted
-    //boolean progress = vput(that,false); // Early set, to stop cycles
-    //FCNT++;                              // Recursion count on Fresh
-    //assert FCNT < 100;          // Infinite _fresh_unify cycles
+    // Progress on the parts
+    boolean progress = false;
+    if( _tflow !=null ) progress = unify_base(that, test);
+    
+    // Check for mismatched LHS and RHS
+    if( test ) {
+      if( _may_nil && !that._may_nil ) return true;
+      if( is_ptr() && !that.is_ptr() ) return true;
+      if( is_fun() && !that.is_fun() ) return true;
+      if( is_obj() && !that.is_obj() ) return true;
+      if( _err!=null && !Util.eq(_err,that._err) ) return true;
+    } else {
+      if( _may_nil && !that._may_nil ) { progress = that._may_nil = true; }
+      if( is_ptr() && !that.is_ptr() ) // Error, fresh_unify a ptr into a non-ptr non-leaf
+        //return vput(that,that._unify(_fresh(nongen),work));
+        throw unimpl();         // TODO: direct fresh-unify?
+      if( is_fun() && !that.is_fun() ) // Error, fresh_unify a fun into a non-fun non-leaf
+        that.cp_args(_args)._is_fun=progress=true;
+      if( is_obj() && !that.is_obj() ) // Error, fresh_unify a struct into a non-struct non-leaf
+        that.cp_args(_args)._is_obj=progress=true;
+      if( _err!=null && !Util.eq(_err,that._err) ) {
+        if( that._err!=null ) throw unimpl(); // TODO: Combine single error messages
+        else { // Error, fresh_unify an error into a non-leaf non-error
+          progress = true;
+          that._err = _err;
+        }
+      }
+    }
+
+    vput(that,progress);        // Early set, to stop cycles
+    // Both same (probably both nil)
+    if( _args==that._args ) return progress;
+
+    // Structural recursion unification, lazy on LHS.  Fields in both sides are
+    // directly unified.  Fields on one side check to see if the other side is
+    // open; if open the field is copied else deleted.
+
+    // The other major compilation is prototypes:
+    // CNC... fresh prototype vs not fresh...
+    // LHS does not care, but needs to iterate prototype args
+    // RHS DOES care
+    
+    FCNT++;            // Recursion count on Fresh
+    assert FCNT < 100; // Infinite _fresh_unify cycles
+    boolean missing = size()!= that.size();
+    if( _args != null )
+      throw unimpl();
     //for( String key : _args.keySet() ) {
     //  TV2 lhs =      get(key);  assert lhs!=null;
     //  TV2 rhs = that.get(key);
@@ -792,7 +844,7 @@ public class TV2 {
     //  if( (that=that.find()).is_err() ) return true;
     //  if( progress && test ) return true;
     //}
-    //FCNT--;
+    FCNT--;
     //// Fields in RHS and not the LHS are also merged; if the LHS is open we'd
     //// just copy the missing fields into it, then unify the structs (shortcut:
     //// just skip the copy).  If the LHS is closed, then the extra RHS fields
@@ -817,24 +869,29 @@ public class TV2 {
   private boolean vput(TV2 that, boolean progress) { VARS.put(this,that); return progress; }
   private TV2 vput(TV2 that) { VARS.put(this,that); return that; }
 
-    private boolean unify_nil_this( boolean test ) {
-      if( test ) return unify_nil_this_test();
-      boolean progress = false;
-      Type tmt = meet_nil(_tflow); if( progress |= (tmt!=_tflow) ) _tflow = tmt;
-      Type emt = meet_nil(_eflow); if( progress |= (emt!=_eflow) ) _eflow = emt;
-      if( !_may_nil && !is_base() ) { progress = _may_nil = true; }
-      if( progress ) add_deps_flow();
-      return progress;
-    }
-    private boolean unify_nil_this_test( ) {
-      if( meet_nil(_tflow)!=_tflow ) return true;
-      if( meet_nil(_eflow)!=_eflow ) return true;
-      if( !_may_nil && !is_base() ) return true;
-      return false;
-    }
-    private static Type meet_nil(Type t) { return t==null ? null : t.meet(TypeNil.XNIL); }
-
+  private boolean unify_nil_this( boolean test ) {
+    if( test ) return unify_nil_this_test();
+    boolean progress = false;
+    Type tmt = meet_nil(_tflow); if( progress |= (tmt!=_tflow) ) _tflow = tmt;
+    Type emt = meet_nil(_eflow); if( progress |= (emt!=_eflow) ) _eflow = emt;
+    if( !_may_nil && !is_base() ) { progress = _may_nil = true; }
+    if( progress ) add_deps_flow();
+    return progress;
+  }
+  private boolean unify_nil_this_test( ) {
+    if( meet_nil(_tflow)!=_tflow ) return true;
+    if( meet_nil(_eflow)!=_eflow ) return true;
+    if( !_may_nil && !is_base() ) return true;
+    return false;
+  }
+  private static Type meet_nil(Type t) { return t==null ? null : t.meet(TypeNil.XNIL); }
+  private TV2 cp_args(NonBlockingHashMap<String,TV2> args ) {
+    if( _args==null )
+      _args = (NonBlockingHashMap<String,TV2>)args.clone(); // Error case; bring over the args
+    return this;
+  }
   
+
   public TV2 fresh(TV2[] nongen) {
     assert VARS.isEmpty();
     TV2 tv2 = _fresh(nongen);
@@ -1041,13 +1098,13 @@ public class TV2 {
     if( !_is_copy || UPDATE_VISIT.tset(_uid) ) return;
     _is_copy = false;
     if( _deps!=null ) {
-      //add_deps_flow();
-      //for( Syntax syn : _deps )
-      //  if( syn instanceof Lambda lam && lam.find().arg("ret")==this )
+      add_deps_flow();
+      for( Node n : _deps.values() )
+        if( n instanceof FunPtrNode fptr && fptr.tvar().arg("ret")==this )
       //    for( Apply apply : lam._applys )
       //      if( (ret=apply._fun.find().arg("ret"))!=null )
       //        ret._clr_cp();
-      throw unimpl();
+          throw unimpl();
     }
     if( _args != null )
       for( TV2 t2 : _args.values() )
@@ -1231,7 +1288,7 @@ public class TV2 {
   // True if string is a clazz string (which ends in ':')
   static boolean is_clz(String fld) { return fld.charAt(fld.length()-1)==':'; }
   // Null if not a clazz object, or the clazz string otherwise
-  String is_clz() {
+  public String is_clz() {
     if( _args==null ) return null;
     String clz=null;
     for( String arg : _args.keySet() )
