@@ -559,8 +559,17 @@ public class TV2 {
     return leaf.union(copy,test) | _union(that);
   }
 
+  // U-F union; that is nilable and a fresh copy of this becomes that.  No change
+  // if only testing, and reports progress.  Handles cycles in the fresh side.
   boolean unify_nil(TV2 that, boolean test, TV2[] nongen) {
-    throw unimpl();
+    assert !is_nil() && that.is_nil();
+    if( test ) return true; // Will make progress;
+    TV2 leaf = that.arg("?");  assert leaf.is_leaf();
+    // A shallow copy and fresh-unify fails if 'this' is cyclic, because the
+    // shallow copy peels one part of the loop.
+    TV2 copy = _fresh(nongen).strip_nil();
+    copy._unify(leaf,true);
+    return vput(that,true);
   }
 
   // --------------------------------------------
@@ -575,11 +584,17 @@ public class TV2 {
   private boolean _eq( TV2 that) {
     assert !is_unified() && !that.is_unified();
     if( this==that ) return true;
-    if( _flow != that._flow ) return false;   // Base types, if present, must match
-    if( _err!=null && !_err.equals(that._err) ) return false; // Base-cases have to be completely identical
-    if( is_leaf() ) return false;             // Two leaves must be the same leaf, already checked for above
-    if( size() != that.size() ) return false; // Mismatched sizes
+    if( _flow   !=that._flow   ||  // Base cases have to be bitwise identical
+        _eflow  !=that._eflow  ||
+        _may_nil!=that._may_nil||
+        _is_fun !=that._is_fun ||
+        _is_obj !=that._is_obj ||
+        !Util.eq(_err,that._err) ) // Error strings equal
+      return false;
+    if( is_leaf() ) return false; // Two leaves must be the same leaf, already checked for above
     if( _args==that._args ) return true;      // Same arrays (generally both null)
+    if( size() != that.size() ) return false; // Mismatched sizes
+    
     // Cycles stall the equal/unequal decision until we see a difference.
     TV2 tc = CDUPS.get(this);
     if( tc!=null )  return tc==that; // Cycle check; true if both cycling the same
@@ -721,8 +736,8 @@ public class TV2 {
 
     // Check for cycles
     TV2 prior = VARS.get(this);
-    if( prior!=null )         // Been there, done that
-      return prior.find()._unify(that,test);  // Also 'prior' needs unification with 'that'
+    if( prior!=null )                        // Been there, done that
+      return prior.find()._unify(that,test); // Also 'prior' needs unification with 'that'
     // Check for equals (internally checks this==that)
     if( eq(that) ) return vput(that,false);
 
@@ -735,10 +750,22 @@ public class TV2 {
     if( that.is_leaf() )  // RHS is a tvar; union with a deep copy of LHS
       return test || vput(that,that.union(_fresh(nongen),test));
 
+    // Special handling for nilable
+    boolean progress = false;
+    if( this.is_nil() && !that.is_nil() ) {
+      Type mt  = that. _flow==null ? null : that. _flow.meet(TypeNil.XNIL);
+      if(  mt != that. _flow ) { if( test ) return true; progress = true; that._flow  = mt; }
+      Type emt = that._eflow==null ? null : that._eflow.meet(TypeNil.XNIL);
+      if( emt != that._eflow ) { if( test ) return true; progress = true; that._eflow =emt; }
+      if( !that._may_nil && !that.is_base() ) { if( test ) return true; progress = that._may_nil = true; }
+      if( progress ) that.add_deps_flow();
+      return vput(that,progress);
+    }
+    // That is nilable and this is not
+    if( that.is_nil() && !this.is_nil() )
+      return unify_nil(that,test,nongen);
+    
     //// Several trivial cases that do not really do any work
-    //if( that.is_err() ) return vput(that,false); // That is an error, ignore 'this' and no progress
-    //if( this.is_err() ) return vput(that,_unify(that,test));
-    //
     //// Bases MEET cons in RHS
     //if( is_base() && that.is_base() ) {
     //  Type mt = _type.meet(that._type);
@@ -748,28 +775,6 @@ public class TV2 {
     //  return vput(that,true);
     //}
     //
-    //// Special handling for nilable
-    //if( this.is_nil() && !that.is_nil() ) {
-    //  Type mt = that._type.meet_nil(Type.XNIL);
-    //  if( mt == that._type ) return false;
-    //  if( test ) return true;
-    //  throw unimpl();
-    //}
-    //
-    //// That is nilable and this is not
-    //if( that.is_nil() && !this.is_nil() ) {
-    //  assert is_base() || is_obj();
-    //  if( test ) return true;
-    //  TV2 copy = this;
-    //  if( _type.must_nil() ) { // Make a not-nil version
-    //    copy = copy("fresh_unify_vs_nil");
-    //    copy._type = _type.join(Type.NSCALR);
-    //    if( _args!=null )
-    //      copy._args = (NonBlockingHashMap<String, TV2>) _args.clone(); // shallow copy
-    //  }
-    //  boolean progress = copy._fresh_unify(that.get("?"),nongen,test);
-    //  return _type.must_nil() ? vput(that,progress) : progress;
-    //}
     //
     //// Check for being the same structure
     //if( !Util.eq(_name,that._name) )

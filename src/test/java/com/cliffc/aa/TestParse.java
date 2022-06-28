@@ -27,10 +27,10 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_HMT=false;
-    DO_GCP=true;
+    DO_HMT=true;
+    DO_GCP=false;
     RSEED=0;
-    testerr("{x:flt y -> x+y}", "Unable to resolve _+_",13); // {Scalar Scalar -> Scalar}
+    test("x=3; and2={x -> x & 2}; and2(x)", "int:2", "int:2");
   }
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
@@ -222,11 +222,11 @@ public class TestParse {
     test("{x:int -> x&1}","[54]{any,4 -> int:int1 }","@{^=any}","{A int64 -> int64}",null,"[54]");
     test("{5}()", "int:5", "int:5"); // No args nor -> required; this is simply a function returning 5, being executed
     testerr("{x:flt y -> x+y}", "Unable to resolve _+_",13); // {Scalar Scalar -> Scalar}
-    //
-    //// Function execution and result typing
-    //test("x=3; andx={y -> x & y}; andx(2)", TypeInt.con(2), "2"); // trivially inlined; capture external variable
-    //test("x=3; and2={x -> x & 2}; and2(x)", TypeInt.con(2), "2"); // trivially inlined; shadow  external variable
-    //testerr("plus2={x -> x+2}; x", "Unknown ref 'x'",18); // Scope exit ends lifetime
+
+    // Function execution and result typing
+    test("x=3; andx={y -> x & y}; andx(2)", "int:2", "int:2"); // trivially inlined; capture external variable
+    test("x=3; and2={x -> x & 2}; and2(x)", "int:2", "int:2"); // trivially inlined; shadow  external variable
+    testerr("plus2={x -> x+2}; x", "Unknown ref 'x'",18); // Scope exit ends lifetime
     //testerr("fun={x -> }; fun(0)", "Missing function body",10);
     //testerr("fun(2)", "Unknown ref 'fun'", 0);
     //test("mul3={x -> y=3; x*y}; mul3(2)", TypeInt.con(6)); // multiple statements in func body

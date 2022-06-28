@@ -210,6 +210,7 @@ public class HM {
       }, (a,b)->null);
   }
 
+
   // Reset global statics between tests
   static void reset() {
     //System.out.println("Type.INTERN reprobes");
@@ -866,8 +867,6 @@ public class HM {
       T2.T2MAP.clear();
       for( Syntax arg : _args )
         { T2.WDUPS.clear(true); arg.find().walk_types_in(arg._flow,true); }
-      // Assert monotonic inputs
-      assert monotonic_inputs();
 
       T2.T2JOIN_LEAFS.clear();
       T2.T2JOIN_BASES.clear();
@@ -895,48 +894,6 @@ public class HM {
       return rezt2.walk_types_out(ret, this, test);
     }
 
-
-    // Assert monotonic inputs.  Walk the prior set of inputs, and find them in
-    // the current T2MAP and assert their Flow types are monotonic.  Due to
-    // Leaf expansions, new inputs might appear.  Due to unification some
-    // several prior inputs might now be the same.
-    private boolean monotonic_inputs() {
-      if( _old_t2map.isEmpty() ) return true;
-      for( Map.Entry<T2,Type> e : _old_t2map.entrySet() ) {
-        T2 t2 = e.getKey().find(), t3=t2;
-        Type t = e.getValue();
-        Type tnew = T2.T2MAP.get(t2);
-        // Try again, allowing a nil - commonly the HM type picks up a nil
-        if( tnew==null && !t2._may_nil ) {
-          t3 = t2.copy();
-          t3._may_nil=true;
-          tnew = T2.T2MAP.get(t3);
-        }
-        // Try again with cyclic equals, might have a more complex equality
-        if( tnew==null )
-          for( Map.Entry<T2,Type> e2 : T2.T2MAP.entrySet() ) {
-            if( e2.getKey().cycle_equals(t2) ) { tnew = e2.getValue(); break; }
-            if( e2.getKey().cycle_equals(t3) ) { tnew = e2.getValue(); break; }
-          }
-        // Try again widening base; the HMT type '1' might expand to 'int8'
-        if( tnew==null && t2.is_base() )
-          for( Map.Entry<T2,Type> e2 : T2.T2MAP.entrySet() )
-            if( e2.getKey().is_base() && t2._flow.isa(e2.getKey()._flow) )
-              tnew = tnew == null ? e2.getValue() : tnew.meet(e2.getValue());
-        // Try again as a lost field.  Some structs can lose fields, and these
-        // are "as if" Scalar or Error and can not lift, so OK to lose.  Since
-        // the old_t2map is not a deep defensive copy, we lost the record of
-        // the previous fields ; just assume it's ok.  This weakens this
-        // assert a fair amount if fields are being removed.
-        if( tnew==null )
-          for( Map.Entry<T2,Type> e2 : T2.T2MAP.entrySet() )
-            if( e2.getKey().is_ptr() )
-              { tnew = TypeNil.SCALAR; break; }
-        if( !t.isa(tnew) )      // Fails NPE if tnew misses
-          return false;
-      }
-      return true;
-    }
 
     @Override void add_val_work( Syntax child, @NotNull Work<Syntax> work) {
       // push self, because self returns the changed-functions' ret
@@ -1613,7 +1570,7 @@ public class HM {
       // Already an expanded nilable with base
       if( arg.is_base() && ret.is_base() ) {
         assert !arg.is_open() && !ret.is_open();
-        assert arg._flow == ret._flow.meet(TypeNil.XNIL);
+        assert arg._tflow == ret._tflow.meet(TypeNil.XNIL);
         return false;
       }
       // Already an expanded nilable with ptr
@@ -1794,7 +1751,7 @@ public class HM {
     // Nil is NOT allowed to appear with others, but it can fold into all of them.
 
     // Contains a Bases flow-type, or null if not a Base.
-    Type _flow;
+    Type _tflow;
     Type _eflow;                // Error flow; incompatible with _flow
 
     // Can be nil
@@ -1830,7 +1787,7 @@ public class HM {
     T2 copy() {
       // Shallow clone of args
       T2 t = new T2(_args==null ? null : (NonBlockingHashMap<String,T2>)_args.clone());
-      t._flow = _flow;
+      t._tflow = _tflow;
       t._eflow = _eflow;
       t._may_nil = _may_nil;
       t._is_fun = _is_fun;
@@ -1843,11 +1800,11 @@ public class HM {
       return t;
     }
 
-    boolean is_leaf() { return _args==null && _flow==null && !_is_obj && !_is_fun; }
+    boolean is_leaf() { return _args==null && _tflow ==null && !_is_obj && !_is_fun; }
     boolean unified() { return get(">>")!=null; }
     boolean is_nil () { return get("?" )!=null; }
     boolean is_ptr () { return get("*" )!=null; }
-    boolean is_base() { return _flow != null; }
+    boolean is_base() { return _tflow != null; }
     boolean is_fun () { return _is_fun; }
     boolean is_obj () { return _is_obj; }
     boolean is_open() { return _open; }           // Struct-specific
@@ -1882,7 +1839,7 @@ public class HM {
     static T2 make_base(Type flow) {
       assert !(flow instanceof TypeStruct) && !(flow instanceof TypeFunPtr) && !(flow instanceof TypeMemPtr) && !(flow instanceof TypeFld);
       T2 t2 = new T2(null);
-      t2._flow=flow;
+      t2._tflow =flow;
       assert t2.is_base();
       return t2;
     }
@@ -1956,7 +1913,7 @@ public class HM {
       // Nested nilable-and-not-leaf, need to fixup the nilable
       if( n.is_base() ) {
         _may_nil=false;
-        _flow = n._flow.meet(TypeNil.XNIL);
+        _tflow = n._tflow.meet(TypeNil.XNIL);
         if( n._eflow!=null ) _eflow = n._eflow.meet(TypeNil.XNIL);
         if( !n._is_copy ) clr_cp();
       }
@@ -1980,31 +1937,30 @@ public class HM {
 
     // True if any portion allows for nil
     boolean has_nil() {
-      if(  _flow instanceof TypeNil tn && tn.must_nil() ) return true;
+      if( _tflow instanceof TypeNil tn && tn.must_nil() ) return true;
       if( _eflow instanceof TypeNil tn && tn.must_nil() ) return true;
       if( _may_nil                                      ) return true;
       return false;
     }
-
+    // Add nil
+    void add_nil() {
+      if( _tflow!=null ) _tflow = _tflow.meet(TypeNil.XNIL);
+      if( _eflow!=null ) _eflow = _eflow.meet(TypeNil.XNIL);
+      _may_nil = true;
+    }
     // Strip off nil
     T2 strip_nil() {
-      if(  _flow!=null )  _flow =  _flow.join(TypeNil.NSCALR);
+      if( _tflow!=null ) _tflow = _tflow.join(TypeNil.NSCALR);
       if( _eflow!=null ) _eflow = _eflow.join(TypeNil.NSCALR);
       _may_nil = false;
       return this;
-    }
-    // Add nil
-    void add_nil() {
-      if(  _flow!=null ) _flow =   _flow.meet(TypeNil.XNIL);
-      if( _eflow!=null ) _eflow = _eflow.meet(TypeNil.XNIL);
-      _may_nil = true;
     }
 
     // Varies as unification happens; not suitable for a HashMap/HashSet unless
     // unchanging (e.g. defensive clone)
     @Override public int hashCode() {
       int hash = 0;
-      if(    _flow!=null ) hash+=    _flow._hash;
+      if(    _tflow !=null ) hash+=    _tflow._hash;
       if(   _eflow!=null ) hash+=   _eflow._hash;
       if( _is_fun ) hash = (hash+ 7)*13;
       if( _may_nil) hash = (hash+13)*23;
@@ -2035,7 +1991,7 @@ public class HM {
       assert !unified();
       if( is_err() ) return TypeNil.SCALAR;
       if( is_leaf() ) return TypeNil.SCALAR.oob(!HM_FREEZE);
-      if( is_base() ) return _flow;
+      if( is_base() ) return _tflow;
       if( is_ptr() ) {
         // all escaping aliases that are compatible
         BitsAlias aliases = BitsAlias.EMPTY;
@@ -2127,7 +2083,7 @@ public class HM {
       merge_deps(that,work);    // Merge update lists, for future unions
       // Kill extra information, to prevent accidentally using it
       _args = new NonBlockingHashMap<>() {{put(">>", that);}};
-      _flow = _eflow = null;
+      _tflow = _eflow = null;
       _is_fun = _is_obj = _may_nil = _open = false;
       _is_copy = true;
       _deps = null;
@@ -2147,13 +2103,13 @@ public class HM {
         progress = true;
         that.clr_cp();
       }
-      Type sf = _flow , hf = that._flow ;     // Flow of self and that.
+      Type sf = _tflow, hf = that._tflow;     // Flow of self and that.
       Type se = _eflow, he = that._eflow;     // Error flow of self and that.
-      Type of = that._flow, oe = that._eflow; // Old versions, to check for progress
+      Type of = that._tflow, oe = that._eflow; // Old versions, to check for progress
       if( sf==null && hf==null ) return progress;// Fast cutout
       int cmp =  _fpriority(sf) - _fpriority(hf);
-      if( cmp == 0 ) { that._flow = sf.meet(hf); sf = se; hf = he; } // Tied; meet; advance both
-      if( cmp  > 0 ) { that._flow = sf;          sf = se;          } // Pick winner, advance
+      if( cmp == 0 ) { that._tflow = sf.meet(hf); sf = se; hf = he; } // Tied; meet; advance both
+      if( cmp  > 0 ) { that._tflow = sf;          sf = se;          } // Pick winner, advance
       if( cmp  < 0 ) {                           hf = he;          } // Pick winner, advance
       if( !(sf==null && hf==null) ) {                                // If there is an error flow
         int cmp2 =  _fpriority(sf) - _fpriority(hf); // In a triple-error, pick best two
@@ -2161,8 +2117,8 @@ public class HM {
         if( cmp2  > 0 ) that._eflow = sf;
         if( cmp2  < 0 ) that._eflow = hf;
       }
-      progress |= of!=that._flow || oe!=that._eflow; // Progress check
-      if( work==null && progress ) { that._flow=of; that._eflow=oe; } // Unwind if just testing
+      progress |= of!=that._tflow || oe!=that._eflow; // Progress check
+      if( work==null && progress ) { that._tflow =of; that._eflow=oe; } // Unwind if just testing
       return progress;
     }
     // Sort flow types; int >> flt >> ptr >> null
@@ -2185,8 +2141,9 @@ public class HM {
       T2 copy = copy().strip_nil();
       return leaf.union(copy,work) | _union(that,work);
     }
-    // U-F union; that is nilable and a fresh copy of this becomes that.
-    // No change if only testing, and reports progress.
+    // U-F union; that is nilable and a fresh copy of this becomes that.  No
+    // change if only testing, and reports progress.  Handles cycles in the
+    // fresh side.
     boolean unify_nil(T2 that, Work<Syntax> work, VStack nongen) {
       assert !is_nil() && that.is_nil();
       if( work==null ) return true; // Will make progress;
@@ -2320,18 +2277,19 @@ public class HM {
     }
 
     // Inner version, self-recursive and uses VARS and DUPS for cycles.
-    @SuppressWarnings("unchecked")
     private boolean _fresh_unify(T2 that, VStack nongen, Work<Syntax> work) {
       assert !unified() && !that.unified();
+
       // Check for cycles
       T2 prior = VARS.get(this);
-      if( prior!=null )         // Been there, done that
-        return prior.find()._unify(that,work);  // Also, 'prior' needs unification with 'that'
+      if( prior!=null )                        // Been there, done that
+        return prior.find()._unify(that,work); // Also, 'prior' needs unification with 'that'
       // Check for equals
       if( cycle_equals(that) ) return vput(that,false);
 
-      // In the non-generative set, so do a hard unify, not a fresh-unify.
-      if( nongen_in(nongen) ) return vput(that,_unify(that,work)); // Famous 'occurs-check', switch to the normal unify
+      // Famous 'occurs-check': In the non-generative set, so do a hard unify,
+      // not a fresh-unify.
+      if( nongen_in(nongen) ) return vput(that,_unify(that,work));
 
       // LHS leaf, RHS is unchanged but goes in the VARS
       if( this.is_leaf() ) return vput(that,false);
@@ -2341,8 +2299,8 @@ public class HM {
       // Special handling for nilable
       boolean progress = false;
       if( this.is_nil() && !that.is_nil() ) {
-        Type mt  = that. _flow==null ? null : that. _flow.meet(TypeNil.XNIL);
-        if(  mt!=that. _flow ) { if( work==null ) return true; progress = true; that._flow  = mt; }
+        Type mt  = that._tflow ==null ? null : that._tflow.meet(TypeNil.XNIL);
+        if(  mt!=that._tflow ) { if( work==null ) return true; progress = true; that._tflow = mt; }
         Type emt = that._eflow==null ? null : that._eflow.meet(TypeNil.XNIL);
         if( emt!=that._eflow ) { if( work==null ) return true; progress = true; that._eflow =emt; }
         if( !that._may_nil && !that.is_base() ) { if( work==null ) return true; progress = that._may_nil = true; }
@@ -2354,14 +2312,12 @@ public class HM {
         return unify_nil(that,work,nongen);
 
       // Progress on the parts
-      if( _flow!=null ) progress = unify_base(that, work);
+      if( _tflow !=null ) progress = unify_base(that, work);
       if( _may_nil && !that._may_nil ) { if( work==null ) return true; progress = that._may_nil = true; }
       if( is_ptr() && !that.is_ptr() ) { // Error, fresh_unify a ptr into a non-ptr non-leaf
         if( work==null ) return true;
-        //vput(that,progress = true);
-        //if( that._args==null )
-        //  that._args = (NonBlockingHashMap<String,T2>)_args.clone(); // Error case; bring over the function args
-        return vput(that,that._unify(_fresh(nongen),work));
+        //return vput(that,that._unify(_fresh(nongen),work));
+        throw unimpl();         // TODO: direct fresh-unify?
       }
       if( is_fun() && !that.is_fun() ) { // Error, fresh_unify a fun into a non-fun non-leaf
         if( work==null ) return true;
@@ -2493,11 +2449,11 @@ public class HM {
     boolean _cycle_equals(T2 t) {
       assert !unified() && !t.unified();
       if( this==t ) return true;
-      if( _flow   !=t._flow    ) return false; // Base-cases have to be completely identical
+      if( _tflow  !=t._tflow   ) return false; // Base-cases have to be completely identical
       if( _eflow  !=t._eflow   ) return false;
       if( _may_nil!=t._may_nil ) return false; // Base-cases have to be completely identical
       if( _is_fun !=t._is_fun  ) return false; // Base-cases have to be completely identical
-      if( _is_obj !=t._is_obj ) return false; // Base-cases have to be completely identical
+      if( _is_obj !=t._is_obj  ) return false; // Base-cases have to be completely identical
       if( _err!=null && !_err.equals(t._err) ) return false; // Base-cases have to be completely identical
       if( is_leaf() ) return false;               // Two leaves must be the same leaf, already checked for above
       if( size() != t.size() ) return false;      // Mismatched sizes
@@ -2769,7 +2725,7 @@ public class HM {
           sb.p("Cannot unify ");
           if( is_fun () ) str_fun (sb,visit,dups,debug).p(" and ");
           if( is_base() ) str_base(sb)                 .p(" and ");
-          if( is_ptr () ) str_ptr (sb,visit,dups,debug,_flow).p(" and ");
+          if( is_ptr () ) str_ptr (sb,visit,dups,debug, _tflow).p(" and ");
           if( _eflow!=null) sb.p(_eflow)               .p(" and ");
           if( is_obj () ) str_obj (sb,visit,dups,debug).p(" and ");
           return sb.unchar(5);
@@ -2778,7 +2734,7 @@ public class HM {
       }
 
       if( is_base() ) return str_base(sb);
-      if( is_ptr () ) return str_ptr(sb,visit,dups,debug,_flow);
+      if( is_ptr () ) return str_ptr(sb,visit,dups,debug, _tflow);
       if( is_fun () ) return str_fun(sb,visit,dups,debug);
       if( is_obj () ) return str_obj(sb,visit,dups,debug);
       if( is_nil () ) return str0(sb,visit,_args.get("?"),dups,debug).p('?');
@@ -2791,7 +2747,7 @@ public class HM {
       return sb.unchar().p(")");
     }
     static private SB str0(SB sb, VBitSet visit, T2 t, VBitSet dups, boolean debug) { return t==null ? sb.p("_") : t.str(sb,visit,dups,debug); }
-    private SB str_base(SB sb) { return sb.p(_flow); }
+    private SB str_base(SB sb) { return sb.p(_tflow); }
     private SB str_ptr(SB sb, VBitSet visit, VBitSet dups, boolean debug, Type flow) {
       T2 obj = _args==null ? null : _args.get("*");
       str0(sb.p('*'),visit,obj,dups,debug);
@@ -2850,7 +2806,7 @@ public class HM {
           ? tmp.make_from((TypeStruct)tmp._obj.widen())
           : t.widen();
     }
-    private Type widen() { return widen(_flow); }
+    private Type widen() { return widen(_tflow); }
 
     // Debugging tool
     T2 find(int uid) { return _find(uid,new VBitSet()); }

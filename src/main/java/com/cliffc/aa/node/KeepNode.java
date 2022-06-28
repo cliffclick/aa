@@ -7,7 +7,7 @@ public class KeepNode extends Node {
   @Override public Type value() { return Type.ALL; }
   @Override public Type live () { return Type.ALL; }
   // Oddly: keeps you alive as you were before
-  @Override public Type live_use( Node def ) { return def._live; }
+  @Override public Type live_use( Node def ) { return is_prim() ? Type.ALL : def._live; }
   @Override public boolean equals(Object o) { return this==o; }
   @Override public boolean has_tvar() { return false; }
 }
