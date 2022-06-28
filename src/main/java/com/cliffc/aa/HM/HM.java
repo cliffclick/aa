@@ -2297,21 +2297,14 @@ public class HM {
         return work==null || vput(that,that.union(_fresh(nongen),work));
 
       // Special handling for nilable
-      boolean progress = false;
-      if( this.is_nil() && !that.is_nil() ) {
-        Type mt  = that._tflow ==null ? null : that._tflow.meet(TypeNil.XNIL);
-        if(  mt!=that._tflow ) { if( work==null ) return true; progress = true; that._tflow = mt; }
-        Type emt = that._eflow==null ? null : that._eflow.meet(TypeNil.XNIL);
-        if( emt!=that._eflow ) { if( work==null ) return true; progress = true; that._eflow =emt; }
-        if( !that._may_nil && !that.is_base() ) { if( work==null ) return true; progress = that._may_nil = true; }
-        if( progress ) that.add_deps_work(work);
-        return vput(that,progress);
-      }
+      if( this.is_nil() && !that.is_nil() )
+        return vput(that,that.unify_nil_this(work));
       // That is nilable and this is not
       if( that.is_nil() && !this.is_nil() )
         return unify_nil(that,work,nongen);
 
       // Progress on the parts
+      boolean progress = false;
       if( _tflow !=null ) progress = unify_base(that, work);
       if( _may_nil && !that._may_nil ) { if( work==null ) return true; progress = that._may_nil = true; }
       if( is_ptr() && !that.is_ptr() ) { // Error, fresh_unify a ptr into a non-ptr non-leaf
@@ -2382,6 +2375,24 @@ public class HM {
       return progress;
     }
     private boolean vput(T2 that, boolean progress) { VARS.put(this,that); return progress; }
+
+    private boolean unify_nil_this( Work<Syntax> work ) {
+      if( work==null ) return unify_nil_this_test();
+      boolean progress = false;
+      Type tmt = meet_nil(_tflow); if( progress |= (tmt!=_tflow) ) _tflow = tmt;
+      Type emt = meet_nil(_eflow); if( progress |= (emt!=_eflow) ) _eflow = emt;
+      if( !_may_nil && !is_base() ) { progress = _may_nil = true; }
+      if( progress ) add_deps_work(work);
+      return progress;
+    }
+    private boolean unify_nil_this_test( ) {
+      if( meet_nil(_tflow)!=_tflow ) return true;
+      if( meet_nil(_eflow)!=_eflow ) return true;
+      if( !_may_nil && !is_base() ) return true;
+      return vput(this,false);
+    }
+    private static Type meet_nil(Type t) { return t==null ? null : t.meet(TypeNil.XNIL); }
+
 
     // Return a fresh copy of 'this'
     T2 fresh() {

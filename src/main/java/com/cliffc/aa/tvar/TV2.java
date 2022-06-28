@@ -91,7 +91,7 @@ public class TV2 {
   // A dataflow type or null.  A 2nd dataflow type for errors.
   // If Leaf or unified or Nil or Apply, then null.
   // If Base, then the flow type.
-  public Type _flow, _eflow;
+  public Type _tflow, _eflow;
 
   // Can be nil
   boolean _may_nil;
@@ -133,7 +133,7 @@ public class TV2 {
   TV2 copy(String alloc_site) {
     // Shallow clone of args
     TV2 t = new TV2(_args==null ? null : (NonBlockingHashMap<String,TV2>)_args.clone(),alloc_site);
-    t._flow = _flow;
+    t._tflow = _tflow;
     t._eflow = _eflow;
     t._may_nil = _may_nil;
     t._is_fun = _is_fun;
@@ -146,21 +146,21 @@ public class TV2 {
   }
 
   // Accessors
-  public boolean is_leaf() { return _args==null && _flow==null && !_is_obj && !_is_fun; }
+  public boolean is_leaf() { return _args==null && _tflow ==null && !_is_obj && !_is_fun; }
   public boolean is_unified(){return _get(">>")!=null; }
   public boolean is_nil () { return _get("?" )!=null; }
-  public boolean is_base() { return _flow != null; }
+  public boolean is_base() { return _tflow != null; }
   public boolean is_ptr () { return _get("*")!=null; }
   public boolean is_fun () { return _is_fun; }
   public boolean is_obj () { return _is_obj; }
   public boolean is_open() { return _open; }           // Struct-specific
   public boolean is_err () { return _err!=null || is_err2(); }
   boolean is_err2()  { return
-      (_flow   ==null ? 0 : 1) + // Any 2 or more set of _flow,_is_fun,_is_obj
-      (_eflow  ==null ? 0 : 1) + // Any 2 or more set of _flow,_is_fun,_is_obj
-      (_flow!=null && _args!=null ? 1 : 0) + // Base (flow) and also args
-      (_is_fun        ? 1 : 0) +
-      (_is_obj     ? 1 : 0) >= 2;
+      (_tflow ==null ? 0 : 1) + // Any 2 or more set of _flow,_is_fun,_is_obj
+      (_eflow ==null ? 0 : 1) + // Any 2 or more set of _flow,_is_fun,_is_obj
+      (_tflow !=null && _args!=null ? 1 : 0) + // Base (flow) and also args
+      (_is_fun ? 1 : 0) +
+      (_is_obj ? 1 : 0) >= 2;
   }
   public boolean is_copy() { return _is_copy; }
   public boolean may_nil() { return _may_nil; }
@@ -181,7 +181,7 @@ public class TV2 {
   public static TV2 make_base(Type flow, @NotNull String alloc_site) {
     assert !(flow instanceof TypeFunPtr) && !(flow instanceof TypeMemPtr);
     TV2 t2 = new TV2(null,alloc_site);
-    t2._flow=flow;
+    t2._tflow =flow;
     assert t2.is_base();
     return t2;
   }
@@ -230,7 +230,7 @@ public class TV2 {
   public static TV2 make_ptr( TypeMemPtr flow, String alloc_site ) {
     NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>(){{put("*",make_leaf(alloc_site));}};
     TV2 t2 = new TV2(args,alloc_site);
-    t2._flow=flow;
+    t2._tflow =flow;
     assert t2.is_ptr();
     return t2;
   }
@@ -285,7 +285,7 @@ public class TV2 {
   public void free() {
     if( !is_unified() ) ALLOCS.get(_alloc_site)._free++;
     _args = null;
-    _flow = _eflow = null;
+    _tflow = _eflow = null;
     _open = false;
     _deps = null;
     _err  = null;
@@ -357,19 +357,19 @@ public class TV2 {
     return this;
   }
   private TV2 _add_nil(TV2 n) {
-    if( n.is_leaf() ) ;
     // Nested nilable-and-not-leaf, need to fixup the nilable
-    else if( n.is_base() ) {
-      _flow = n._flow.meet(TypeNil.XNIL);
+    if( n.is_base() ) {
+      _may_nil = false;
+      _tflow = n._tflow.meet(TypeNil.XNIL);
       if( n._eflow!=null ) _eflow = n._eflow.meet(TypeNil.XNIL);
       if( !n._is_copy ) clr_cp();
     }
-    else if( n.is_ptr() ) {
+    if( n.is_ptr() ) {
       if( _args==null ) _args = new NonBlockingHashMap<>();
       _args.put("*",n.arg("*"));
     }
-    else if( n.is_fun() ) throw unimpl();
-    else if( n.is_obj() ) {
+    if( n.is_fun() ) throw unimpl();
+    if( n.is_obj() ) {
       // Recursively add-nil the fields
       for( String key : n._args.keySet() ) {
         TV2 arg = n.arg(key);
@@ -379,7 +379,7 @@ public class TV2 {
       _may_nil = true;
       _open = n._open;
     }
-    else if( n.is_nil() )       // Peel nested is_nil
+    if( n.is_nil() )            // Peel nested is_nil
       _args.put("?",n.arg("?"));
     return this;
   }
@@ -389,28 +389,27 @@ public class TV2 {
 
   // Strip off nil
   public TV2 strip_nil() {
-    if(  _flow!=null )  _flow =  _flow.join(TypeNil.NSCALR);
-    if( _eflow!=null ) _eflow = _eflow.join(TypeNil.NSCALR);
-    if( _args!=null )
-      for( TV2 t2 : _args.values() )
-        t2.strip_nil();
+    if( _tflow != null ) _tflow = _tflow.join(TypeNil.NSCALR);
+    if( _eflow != null ) _eflow = _eflow.join(TypeNil.NSCALR);
     _may_nil = false;
     return this;
   }
 
   // Varies as unification happens; not suitable for a HashMap/HashSet unless
   // unchanging (e.g. defensive clone)
-  @Override public int hashCode() {
+  int _hash;
+  @Override public int hashCode() { return _hash==0 ? (_hash=compute_hash()) : _hash;  }
+  private int compute_hash() {
     int hash = 0;
-    if(    _flow!=null ) hash+=    _flow._hash;
-    if(   _eflow!=null ) hash+=   _eflow._hash;
-    if( _is_fun ) hash = (hash+ 7)*13;
-    if( _may_nil) hash = (hash+13)*23;
-    if( _is_obj ) hash = (hash+23)*29;
+    if( _tflow!=null ) hash += _tflow._hash;
+    if( _eflow!=null ) hash += _eflow._hash;
+    if( _is_fun ) hash = (hash+ 7)*11;
+    if( _may_nil) hash = (hash+19)*23;
+    if( _is_obj ) hash = (hash+29)*31;
     if( _args!=null )
       for( String key : _args.keySet() )
         hash ^= key.hashCode();
-    return hash;
+    return hash==0 ? 0xdeadbeef : hash;
   }
 
   // True if changes (or would change if testing)
@@ -438,7 +437,7 @@ public class TV2 {
   Type _as_flow() {
     assert !is_unified();
     if( is_leaf() ) return TypeNil.SCALAR;
-    if( is_base() ) return _flow;
+    if( is_base() ) return _tflow;
     if( is_nil()  )
       return arg("?")._as_flow().meet(TypeNil.NIL);
     if( is_fun()  ) {
@@ -496,7 +495,7 @@ public class TV2 {
       that._is_obj = true;
     }
     // Merge all the hard bits
-    that.union_flow(_flow);
+    that.union_flow(_tflow);
     that.union_flow(_eflow);
 
     // Merge arguments
@@ -518,8 +517,8 @@ public class TV2 {
 
   private void union_flow( Type t0 ) {
     if( t0==null ) return;      // Nothing to merge into
-    if( _flow==null ) _flow = t0;
-    else if( t0.getClass()== _flow.getClass() || t0==TypeNil.XNIL || _flow==TypeNil.XNIL ) _flow = t0.meet( _flow);
+    if( _tflow ==null ) _tflow = t0;
+    else if( t0.getClass()== _tflow.getClass() || t0==TypeNil.XNIL || _tflow ==TypeNil.XNIL ) _tflow = t0.meet(_tflow);
     else if( _eflow==null ) _eflow = t0;
     else if( t0.getClass()==_eflow.getClass() ) _eflow = t0.meet(_eflow);
     // Else have both _flow and _eflow AND t0: have 3 unique type classes so
@@ -536,7 +535,7 @@ public class TV2 {
     if( _args!=null ) _args.clear();
     else _args = new NonBlockingHashMap<>();
     _args.put(">>", that);
-    _flow = _eflow = null;
+    _tflow = _eflow = null;
     _is_fun = _is_obj = _may_nil = _open = false;
     _is_copy = true;
     _deps = null;
@@ -584,7 +583,7 @@ public class TV2 {
   private boolean _eq( TV2 that) {
     assert !is_unified() && !that.is_unified();
     if( this==that ) return true;
-    if( _flow   !=that._flow   ||  // Base cases have to be bitwise identical
+    if( _tflow !=that._tflow ||  // Base cases have to be bitwise identical
         _eflow  !=that._eflow  ||
         _may_nil!=that._may_nil||
         _is_fun !=that._is_fun ||
@@ -594,7 +593,7 @@ public class TV2 {
     if( is_leaf() ) return false; // Two leaves must be the same leaf, already checked for above
     if( _args==that._args ) return true;      // Same arrays (generally both null)
     if( size() != that.size() ) return false; // Mismatched sizes
-    
+
     // Cycles stall the equal/unequal decision until we see a difference.
     TV2 tc = CDUPS.get(this);
     if( tc!=null )  return tc==that; // Cycle check; true if both cycling the same
@@ -752,19 +751,12 @@ public class TV2 {
 
     // Special handling for nilable
     boolean progress = false;
-    if( this.is_nil() && !that.is_nil() ) {
-      Type mt  = that. _flow==null ? null : that. _flow.meet(TypeNil.XNIL);
-      if(  mt != that. _flow ) { if( test ) return true; progress = true; that._flow  = mt; }
-      Type emt = that._eflow==null ? null : that._eflow.meet(TypeNil.XNIL);
-      if( emt != that._eflow ) { if( test ) return true; progress = true; that._eflow =emt; }
-      if( !that._may_nil && !that.is_base() ) { if( test ) return true; progress = that._may_nil = true; }
-      if( progress ) that.add_deps_flow();
-      return vput(that,progress);
-    }
+    if( this.is_nil() && !that.is_nil() )
+      return vput(that,that.unify_nil_this(test));
     // That is nilable and this is not
     if( that.is_nil() && !this.is_nil() )
       return unify_nil(that,test,nongen);
-    
+
     //// Several trivial cases that do not really do any work
     //// Bases MEET cons in RHS
     //if( is_base() && that.is_base() ) {
@@ -825,6 +817,24 @@ public class TV2 {
   private boolean vput(TV2 that, boolean progress) { VARS.put(this,that); return progress; }
   private TV2 vput(TV2 that) { VARS.put(this,that); return that; }
 
+    private boolean unify_nil_this( boolean test ) {
+      if( test ) return unify_nil_this_test();
+      boolean progress = false;
+      Type tmt = meet_nil(_tflow); if( progress |= (tmt!=_tflow) ) _tflow = tmt;
+      Type emt = meet_nil(_eflow); if( progress |= (emt!=_eflow) ) _eflow = emt;
+      if( !_may_nil && !is_base() ) { progress = _may_nil = true; }
+      if( progress ) add_deps_flow();
+      return progress;
+    }
+    private boolean unify_nil_this_test( ) {
+      if( meet_nil(_tflow)!=_tflow ) return true;
+      if( meet_nil(_eflow)!=_eflow ) return true;
+      if( !_may_nil && !is_base() ) return true;
+      return false;
+    }
+    private static Type meet_nil(Type t) { return t==null ? null : t.meet(TypeNil.XNIL); }
+
+  
   public TV2 fresh(TV2[] nongen) {
     assert VARS.isEmpty();
     TV2 tv2 = _fresh(nongen);
@@ -1158,7 +1168,7 @@ public class TV2 {
     return sb.unchar().p(")");
   }
   static private SB str0(SB sb, VBitSet visit, TV2 t, VBitSet dups, boolean debug) { return t==null ? sb.p("_") : t.str(sb,visit,dups,debug); }
-  private SB str_base(SB sb) { return sb.p(_flow); }
+  private SB str_base(SB sb) { return sb.p(_tflow); }
   private SB str_ptr(SB sb, VBitSet visit, VBitSet dups, boolean debug ) {
     TV2 obj = _args==null ? null : _args.get("*");
     str0(sb.p('*'),visit,obj,dups,debug);
@@ -1181,7 +1191,7 @@ public class TV2 {
     if( clz!=null ) {
       sb.p(clz).p(':');
       if( clz.equals("int") || clz.equals("flt"))
-        return sb.p(arg(CANONICAL_INSTANCE)._flow);
+        return sb.p(arg(CANONICAL_INSTANCE)._tflow);
     }
     final boolean is_tup = is_tup(); // Distinguish tuple from struct during printing
     sb.p(is_tup ? "(" : "@{");
