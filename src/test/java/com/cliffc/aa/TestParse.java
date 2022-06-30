@@ -30,7 +30,7 @@ public class TestParse {
     DO_HMT=true;
     DO_GCP=false;
     RSEED=0;
-    test("{x:int -> x&1}","[54]{any,4 -> int:int1 }","@{^=any}","{A int64 -> int64}",null,"[54]");
+    test("x=3; and2={x -> x & 2}; and2(x)", "int:2", "int:2"); // trivially inlined; shadow  external variable
   }
 
   @Test public void testParse00() {
@@ -164,7 +164,7 @@ public class TestParse {
     // Anonymous function definition.  Note: { x -> x&1 }; 'x' can be either an
     // int or any struct with an operator '_&_', which needs to be nil-checked
     // before loading the operator field.
-    test("{x:int -> x&1}","[54]{any,4 -> int:int1 }","@{^=any}","{A int64 -> int64}",null,"[54]");
+    test("{x:int -> x&1}","[54]{any,4 -> int:int1 }","@{^=any}","{A int:int64 -> int:int64}",null,"[54]");
     test("{5}()", "int:5", "int:5"); // No args nor -> required; this is simply a function returning 5, being executed
     testerr("{x:flt y -> x+y}", "Unable to resolve _+_",13); // {Scalar Scalar -> Scalar}
 

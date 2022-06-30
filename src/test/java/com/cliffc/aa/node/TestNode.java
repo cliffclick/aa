@@ -232,7 +232,7 @@ public class TestNode {
     //test1monotonic_intrinsic(new NewStrNode.ConvertF64Str());
     //test1monotonic_intrinsic(new NewStrNode.AddStrStr());
     test1monotonic(new   LoadNode(_ins[1],_ins[2],null));
-    StructNode nnn1 = new StructNode(false,false,null);
+    StructNode nnn1 = new StructNode(false,false,null,TypeStruct.ISUSED);
     set_type(1,TypeNil.SCALAR);  nnn1.add_fld(TypeFld.make("x"),_ins[1],null);
     set_type(2,TypeNil.SCALAR);  nnn1.add_fld(TypeFld.make("y"),_ins[2],null);
     test1monotonic(nnn1);

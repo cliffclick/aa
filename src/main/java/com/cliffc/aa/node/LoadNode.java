@@ -25,8 +25,7 @@ public class LoadNode extends Node {
     Type tmem = mem()._val;       // Memory
     // We allow Loads against Clazz types
     if( tadr instanceof TypeStruct ts ) {
-      String tname = ts.clz().substring(0,ts.clz().length()-1);
-      StructNode clz = Env.PROTOS.get(tname);
+      StructNode clz = Env.PROTOS.get(ts.clz());
       if( clz != null ) return clz._val;
     }
     if( !(tadr instanceof TypeMemPtr tmp) ) return tadr.oob();

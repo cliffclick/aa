@@ -69,6 +69,10 @@ public class CastNode extends Node {
   @Override public boolean unify( boolean test ) {
     TV2 maynil = tvar(1); // arg in HM
     TV2 notnil = tvar();  // ret in HM
+    // If the maynil is already nil-checked, can be a nilable of a nilable.
+    // If the cast is already satisfied, then no change
+    if( maynil==notnil ) return false;
+
 
     // If this is a type-cast, and not a not-nil cast
     // just do a normal base unification.
@@ -80,9 +84,6 @@ public class CastNode extends Node {
       return test || tv2.unify(TV2.make(_t,"Cast_unify"),test);
     }
 
-
-    // If the maynil is already nil-checked, can be a nilable of a nilable.
-    if( maynil==notnil ) throw unimpl(); // return false;
 
     // Already an expanded nilable
     if( maynil.is_nil() && maynil.arg("?") == notnil ) return false;

@@ -395,7 +395,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // Meet over clazz names.
   // TODO: will also need a unique lexical numbering, not just a name, to
   // handle the case of the same name used in two different scopes.
-  private static String clz_meet(String s0, String s1) {
+  public static String clz_meet(String s0, String s1) {
     if( Util.eq(s0,s1) ) return s0; // Fast path
     assert check_name(s0) && check_name(s1);
     // Peel off sign character
@@ -551,6 +551,9 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // Field type by index, AIOOBE if field not found
   public Type at( int idx ) { return _flds[idx]._t; }
 
+  // Drop all fields except _clz and _def
+  public Type make_canonical() { return make(_clz,_def); }
+  
   // Non-allocating iterator; pulls iterators from a pool.  The hard part is
   // telling when an iterator ends early, to avoid leaking.  This is not
   // exactly asserted for, so some leaks may happen.

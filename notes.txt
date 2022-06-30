@@ -1,4 +1,67 @@
 =======================================
+6/28/2022
+
+Much progress on primitives and HM.
+
+Decision:
+
+User visible prims are actually structs, with _def field being the actual
+primitive.  The struct holds final fields, typically holding function pointers,
+all pre-bound on the display to this struct.  This is semantics only, as its
+wildly inefficient to replicate all the fields all the time (at least it was
+for Types).  So their presence (or absence) needs to be hidden behind an
+abstraction layer.
+
+User sees: int64
+Actual type: SA:@{_def=int64; int: -> Vleaf; _&_ = { *SA *SA -> *SA }; _+_ = ... }
+
+
+User sees: 3.
+Actual type: S3:@{_def=int:3; int: -> Vleaf; _&_ = { *S3 *SA -> *SA }; _+_ = ... }
+
+Implementation type: @{_def=int:3; _clz="int:"; ... } 
+
+When iterating the fields of the impl_type, walk the existing fields normally.
+Then get the prototype (Env.PROTOS.get("int:")), and walk those fields, just
+the none-'$' fields.  Every field that is a FUNCTION (or could be?) gets its
+first arg pre-bound to the self S3 type.
+
+The INT Prototype, partially thru typing:
+V428:@{
+  $ = int:int64;
+  !_   = { V7 -> %int:int1 };
+  -_   = { V11 -> %int:int64 };
+  _!=_ = V37;
+  _%_  = { V47 V49 -> %int:int64 };
+  _&&_ = { V61 V58 -> %V51 };
+  _&_  = { V64 V66 -> %int:int64 };
+  _*_  = V17;
+  _+_  = V67;
+  _-_  = V76;
+  _/_  = V29;
+  _<=_ = V85;
+  _<_  = V94;
+  _==_ = V103;
+  _>=_ = V112;
+  _>_  = V121;
+  _|_  = { V131 V133 -> %int:int64 };
+  _||_ = { V53 V54 -> X59>>%V52 }
+}
+
+
+Issue: finding a clz field is expensive.
+
+Idea; pull out the clz field as the "_is_obj" flag.  String.  null for
+not-is-obj.  Not-null for is_obj.  Empty string for plain Object.  Otherwise
+e.g. "int:" for int-clazz.  Does not play nice with unification.
+
+Idea; use a specific " clz0" field, with leading space.  Contents are the clazz
+as a TV2 constant string base.  Plays nice with normal unification.  Can have "
+clz1", " clz2" etc fields for subclazzes.
+
+
+
+=======================================
 3/14/2022
 
 Looking at primitives & prototypes.

@@ -159,7 +159,7 @@ public final class FunPtrNode extends Node {
       }
       
       tv2s[parms.length] = ret.rez().tvar(); // Return last slot
-      self.unify(TV2.make_fun("FunPtr_unify",tv2s),test);
+      self.unify(TV2.make_fun("FunPtr_unify",false,tv2s),test);
       self = self.find();
       assert self.is_fun();
       progress = true;

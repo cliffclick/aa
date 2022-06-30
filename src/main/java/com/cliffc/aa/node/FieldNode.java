@@ -50,8 +50,7 @@ public class FieldNode extends Node {
 
   private static StructNode proto(String clz) {
     if( clz.isEmpty() ) return null;
-    String tname = clz.substring(0,clz.length()-1);
-    return Env.PROTOS.get(tname);
+    return Env.PROTOS.get(clz);
   }
 
   @Override public Node ideal_reduce() {

@@ -506,7 +506,7 @@ public final class CallEpiNode extends Node {
       targs[DSP_IDX] = TV2.make_leaf("CallEpi_unify");
       for( int i=ARG_IDX; i<nargs; i++ ) targs[i] = call.tvar(i);
       targs[nargs] = tvar();    // Return
-      TV2 nfun = TV2.make_fun("CallEpi_unify", targs);
+      TV2 nfun = TV2.make_fun("CallEpi_unify", false, targs);
       progress = tfun.unify(nfun,test);
     } else {
 
@@ -514,6 +514,10 @@ public final class CallEpiNode extends Node {
       int miss=0;
       for( int i=ARG_IDX; i<nargs; i++ ) {
         TV2 formal = tfun.arg(TV2.argname(i));
+        if( formal == null && tfun.is_open() ) {
+          if( test ) return true;
+          tfun._args.put(TV2.argname(i),formal=TV2.make_leaf("CallEpi_unify_open"));
+        }
         if( formal == null ) {      // No matching formal (too many args pass)
           miss++;
           progress |= bad_arg_cnt(test);

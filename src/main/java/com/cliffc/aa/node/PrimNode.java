@@ -1,14 +1,13 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
-import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
-import static com.cliffc.aa.type.TypeStruct.CANONICAL_INSTANCE;
 
 // Primitives are nodes to do primitive operations.  Internally they carry a
 // '_formals' to type their arguments.  Similar to functions and FunNodes and
@@ -126,15 +125,14 @@ public abstract class PrimNode extends Node {
   // Make and install a primitive Clazz.
   private static void install( String s, PrimNode[] prims, TypeStruct canonical_prim ) {
     String tname = (s+":").intern();
-    StructNode rec = new StructNode(false,false,null);
+    StructNode rec = new StructNode(false,false,null, TypeStruct.make(tname,canonical_prim._def));
     for( PrimNode prim : prims ) prim.as_fun(rec,true);
     for( Node n : rec._defs )
       if( n instanceof UnresolvedNode unr )
         Env.GVN.add_work_new(unr.define()); // Flag all overloaded prims as being known
-    rec.add_fld(TypeFld.make(CANONICAL_INSTANCE,canonical_prim),Node.con(canonical_prim),null);
     rec.init();
     rec.close();
-    Env.PROTOS.put(s,rec);         // clazz String -> clazz Struct mapping, for values
+    Env.PROTOS.put(tname,rec);     // clazz String -> clazz Struct mapping, for values
     Env.SCP_0.add_type(tname,rec); // type  String -> clazz Struct mapping, for types
     // Inject the primitive class into scope above top-level display
     alloc_inject(rec,s);
@@ -183,7 +181,7 @@ public abstract class PrimNode extends Node {
 
   // Build and install match package
   private static void install_math(PrimNode rand) {
-    StructNode rec = new StructNode(false,false,null);
+    StructNode rec = new StructNode(false,false,null,TypeStruct.ISUSED);
     rand.as_fun(rec,false);
     Type pi = make_wrap(TypeFlt.PI);
     rec.add_fld(TypeFld.make("pi",pi),Node.con(pi),null);
@@ -241,7 +239,7 @@ public abstract class PrimNode extends Node {
   // primitive computes a result.
   @Override public boolean unify( boolean test ) {
     TV2 self = tvar();
-    if( !self.is_copy() && self.is_clz()!=null && self.arg(CANONICAL_INSTANCE)._tflow==((TypeStruct)_tfp._ret)._def )
+    if( !self.is_copy() && self.is_obj() && self.arg(" def")._tflow==((TypeStruct)_tfp._ret)._def )
       return false;             // Already unified
     if( !self.is_copy() && self.is_leaf() && _tfp._ret==TypeNil.SCALAR )
       return false;             // Already a leaf

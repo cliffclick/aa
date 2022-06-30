@@ -6,10 +6,13 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.*;
+import java.util.BitSet;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.TreeMap;
 
-import static com.cliffc.aa.AA.*;
-import static com.cliffc.aa.type.TypeStruct.CANONICAL_INSTANCE;
+import static com.cliffc.aa.AA.DSP_IDX;
+import static com.cliffc.aa.AA.unimpl;
 
 /** Hindley-Milner based type variables.
  *
@@ -85,7 +88,7 @@ public class TV2 {
   // If Nil    , contains the single key "?"  and all other fields are null.
   // If Lambda , contains keys "x","y","z" for args or "ret" for return.
   // If Struct , contains keys for the field labels.  No display & not-null.
-    // If Error  , _eflow may contain a 2nd flow type; also blends keys from all takers
+  // If Error  , _eflow may contain a 2nd flow type; also blends keys from all takers
   public NonBlockingHashMap<String,TV2> _args;
 
   // A dataflow type or null.  A 2nd dataflow type for errors.
@@ -99,19 +102,20 @@ public class TV2 {
   // Is a Lambda; keys x,y,z,ret may appear.
   boolean _is_fun;
 
-  // True for T2 returns from any primitive which might widen its result or
+  // True for TV2 returns from any primitive which might widen its result or
   // root args.  Otherwise, in cases like:
   //       "f0 = { f -> (if (rand) 1 (f (f0 f) 2))}; f0"
   // f's inputs and outputs gets bound to a '1': f = { 1 2 -> 1 }
   boolean _is_copy = true;
 
-  // Contains the set of aliased Structs, or null if not a Struct.
-  // If set, then keys for field names may appear.
-  boolean _is_obj;
-  // Structs allow more fields.  Not quite the same as TypeStruct._open field.
+  // If null, not a struct.  If non-null, contains a Env.PROTO prototype or can
+  // be the empty struct for no-prototype.
+  String _clz;
+  
+  // Struct allows more fields.  Not quite the same as TypeStruct._def==Type.ANY
   boolean _open;
 
-  // Null for no-error, or else a single-T2 error
+  // Null for no-error, or else a single-TV2 error
   String _err = null;
 
   // Set of dependent CallEpiNodes, to be re-worklisted if the called function changes TV2.
@@ -137,7 +141,7 @@ public class TV2 {
     t._eflow = _eflow;
     t._may_nil = _may_nil;
     t._is_fun = _is_fun;
-    t._is_obj = _is_obj;
+    t._clz = _clz;
     t._open = _open;
     t._is_copy = _is_copy;
     t._deps = _deps;
@@ -146,21 +150,21 @@ public class TV2 {
   }
 
   // Accessors
-  public boolean is_leaf() { return _args==null && _tflow ==null && !_is_obj && !_is_fun; }
+  public boolean is_leaf() { return _args==null && _tflow ==null && _clz==null && !_is_fun; }
   public boolean is_unified(){return _get(">>")!=null; }
   public boolean is_nil () { return _get("?" )!=null; }
   public boolean is_base() { return _tflow != null; }
   public boolean is_ptr () { return _get("*")!=null; }
   public boolean is_fun () { return _is_fun; }
-  public boolean is_obj () { return _is_obj; }
+  public boolean is_obj () { return _clz!=null; }
   public boolean is_open() { return _open; }           // Struct-specific
   public boolean is_err () { return _err!=null || is_err2(); }
   boolean is_err2()  { return
-      (_tflow ==null ? 0 : 1) + // Any 2 or more set of _flow,_is_fun,_is_obj
-      (_eflow ==null ? 0 : 1) + // Any 2 or more set of _flow,_is_fun,_is_obj
+      (_tflow ==null ? 0 : 1) + // Any 2 or more set of _flow,_is_fun,_clz
+      (_eflow ==null ? 0 : 1) + // Any 2 or more set of _flow,_is_fun,_clz
       (_tflow !=null && _args!=null ? 1 : 0) + // Base (flow) and also args
       (_is_fun ? 1 : 0) +
-      (_is_obj ? 1 : 0) >= 2;
+      (_clz == null ? 0 : 1) >= 2;
   }
   public boolean is_copy() { return _is_copy; }
   public boolean may_nil() { return _may_nil; }
@@ -185,7 +189,8 @@ public class TV2 {
     assert t2.is_base();
     return t2;
   }
-  public static TV2 make_fun(@NotNull String alloc_site, TV2... t2s) {
+  
+  public static TV2 make_fun(@NotNull String alloc_site, boolean open, TV2... t2s) {
     NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
     for( int i=DSP_IDX; i<t2s.length-1; i++ )
       if( t2s[i]!=null ) args.put(argname(i), t2s[i]);
@@ -193,6 +198,7 @@ public class TV2 {
     TV2 t2 = new TV2(args,alloc_site);
     t2._is_fun = true;
     t2._may_nil = false;
+    t2._open = open; // May add more arguments
     return t2;
   }
   public static TV2 make_fun(@NotNull String alloc_site, TypeFunPtr tfp) {
@@ -205,24 +211,38 @@ public class TV2 {
     t2._may_nil = false;
     return t2;
   }
-  // A struct with fields
+  // A struct with fields, made from a StructNode.  Instances have a non-empty
+  // clz.  Clz objects themselves are instances of the empty clz.  The _def
+  // field is included.
   public static TV2 make_struct( StructNode rec, String alloc_site ) {
     NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
+    TypeStruct ts = rec.ts();
+    if( !ts._clz.isEmpty() )
+      args.put(" def",make_base(ts._def,alloc_site));
     for( int i=0; i<rec._defs._len; i++ )
       if( rec.in(i).has_tvar() )
-        args.put(rec.ts().get(i)._fld,rec.tvar(i));
-    return make_struct(args,alloc_site);
+        args.put(ts.get(i)._fld,rec.tvar(i));
+    return make_struct(args,ts.clz(),alloc_site);
   }
-  private static TV2 make_struct( NonBlockingHashMap<String,TV2> args, String alloc_site ) {
+  private static TV2 make_struct( TypeStruct ts, String alloc_site ) {
+    NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
+    if( !ts._clz.isEmpty() )
+      args.put(" def",make_base(ts._def,alloc_site));
+    for( TypeFld fld : ts )
+      //  args.put(fld._fld,make(fld._t));
+      throw unimpl();
+    return make_struct(args,ts.clz(),alloc_site);
+  }
+  private static TV2 make_struct( NonBlockingHashMap<String,TV2> args, String clz, String alloc_site ) {
     TV2 t2 = new TV2(args,alloc_site);
-    t2._is_obj = true;
+    t2._clz = clz;
     t2._may_nil = false;
     t2._open = false;
     return t2;
   }
   public void make_struct_from() {
     assert !is_obj();           // If error, might also be is_fun or is_base
-    _is_obj = true;
+    _clz = "";                  // No particular clazz
     _open = true;
     if( _args==null ) _args = new NonBlockingHashMap<>();
     assert is_obj();
@@ -249,23 +269,14 @@ public class TV2 {
 
   public static TV2 make(Type t, String alloc_site) {
     return switch( t ) {
-    case TypeStruct ts -> {
-      NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
-      for( TypeFld fld : ts )
-        args.put(fld._fld,make(fld._t,alloc_site));
-      if( ts._clz.length()>0 ) {
-        args.put(ts._clz, make_leaf(alloc_site));
-        args.put(CANONICAL_INSTANCE,make(ts._def,alloc_site));
-      }
-      yield make_struct(args,alloc_site);
-    }
+    case TypeStruct ts -> make_struct(ts,alloc_site);
     case TypeFlt f -> make_base(t,alloc_site);
     case TypeInt i -> make_base(t,alloc_site);
     case TypeFunPtr tfp ->
       make_fun(alloc_site,tfp);
     case TypeNil n -> {
       if( t == TypeNil.XNIL )
-        yield make_nil(TV2.make_leaf(alloc_site),alloc_site);
+        yield make_nil(make_leaf(alloc_site),alloc_site);
       yield make_leaf(alloc_site);
     }
     case Type tt -> {
@@ -374,7 +385,7 @@ public class TV2 {
         TV2 arg = n.arg(key);
         _args.put(key,arg.copy("add_nil")._add_nil(arg));
       }
-      _is_obj = true;
+      _clz = n._clz;
       _may_nil = true;
       _open = n._open;
     }
@@ -383,6 +394,57 @@ public class TV2 {
     return this;
   }
 
+  // Get at a key, with U-F rollup.  The key is looked up both locally, and in
+  // a clazz - this avoids eagerly making all final fields in all instances.
+  // If DOES add the key locally, so should not be called with testing.
+  TV2 clz_arg( String key ) {
+    TV2 tv = _get(key);
+    if( tv==null ) tv = _clz_arg(key);
+    if( tv==null ) return null;
+    TV2 tv2 = tv.find();
+    if( tv == tv2 ) return tv;
+    _args.put(key,tv2);
+    return tv2;
+  }
+  // Look up the field key in the clazz instance, if any.  If it exists, it
+  // should be a final function field with a display which will bind to this
+  // instance.
+  
+  // Eg, looking up _+_ in int:@{ def=3 } ends up with:
+  //    SELF:int:@{ def=3; _+_ = { SELF ... -> Vleaf } }
+  // And the clz:
+  //             @{        _+_ = { Vdsp ... -> Vleaf } }  
+  TV2 _clz_arg( String key ) {
+    if( _clz==null || _clz.isEmpty() ) return null;
+    // Clazz must exist, but might not be unified/structured yet.
+    StructNode sclz = Env.PROTOS.get(_clz);
+    TV2 clz = sclz.tvar();
+    // If not yet a clazz, make it one
+    if( !clz.is_obj() ) {
+      clz._clz = "";            // Clazzes do not have a clazz.
+      if( clz._args==null ) clz._args = new NonBlockingHashMap<>();
+    }
+    // Find the field, making if needed.
+    TV2 fld = clz.arg(key);
+    // At least a leaf field in the clazz
+    if( fld==null )
+      clz._args.put(key,fld = make_leaf("clz_arg"));
+    // At least the leaf is a function, taking a display and allowing more arguments
+    if( !fld.is_fun() ) {
+      if( fld._args==null ) fld._args = new NonBlockingHashMap<String,TV2>();
+      fld._args.put(argname(DSP_IDX),make_leaf("clz_arg dsp"));
+      fld._args.put(" ret",make_leaf("clz_arg ret"));
+      fld._is_fun=true;
+      fld._open=true;
+    }
+    // Put a fresh copy in the local instance
+    _args.put(key,fld=fld._fresh(null));
+    TV2 dsp = fld.arg(argname(DSP_IDX));
+    dsp._unify(this,false);
+    return fld;
+  }
+  
+  
   private long dbl_uid(TV2 t) { return dbl_uid(t._uid); }
   private long dbl_uid(long uid) { return ((long)_uid<<32)|uid; }
 
@@ -404,7 +466,7 @@ public class TV2 {
     if( _eflow!=null ) hash += _eflow._hash;
     if( _is_fun ) hash = (hash+ 7)*11;
     if( _may_nil) hash = (hash+19)*23;
-    if( _is_obj ) hash = (hash+29)*31;
+    if( _clz!=null ) hash ^= _clz.hashCode();
     if( _args!=null )
       for( String key : _args.keySet() )
         hash ^= key.hashCode();
@@ -488,9 +550,13 @@ public class TV2 {
     // Merge all the hard bits
     that._is_fun  |= _is_fun;
     that._may_nil |= _may_nil;
-    if( _is_obj ) {
-      that._open = that._is_obj ? (that._open & _open) : _open;
-      that._is_obj = true;
+    if( _clz!=null ) {
+      if( that._clz!=null ) {
+        if( Util.eq(_clz,that._clz) || _clz.isEmpty() ) ; // No subclass
+        else if( that._clz.isEmpty() ) that._clz = _clz;  // Take subclass
+        else throw unimpl();                              // Merge unrelated subclazzes
+      }
+      that._open = that._clz!=null ? (that._open & _open) : _open;
     }
     // Merge all the hard bits
     unify_base(that,test);
@@ -561,10 +627,10 @@ public class TV2 {
     else _args = new NonBlockingHashMap<>();
     _args.put(">>", that);
     _tflow = _eflow = null;
-    _is_fun = _is_obj = _may_nil = _open = false;
+    _is_fun = _may_nil = _open = false;
     _is_copy = true;
     _deps = null;
-    _err = null;
+    _err = _clz = null;
     assert is_unified();
     return true;
   }
@@ -612,7 +678,7 @@ public class TV2 {
         _eflow  !=that._eflow  ||
         _may_nil!=that._may_nil||
         _is_fun !=that._is_fun ||
-        _is_obj !=that._is_obj ||
+        !Util.eq(_clz,that._clz) || 
         !Util.eq(_err,that._err) ) // Error strings equal
       return false;
     if( is_leaf() ) return false; // Two leaves must be the same leaf, already checked for above
@@ -687,21 +753,21 @@ public class TV2 {
         (is_fun() && that.is_fun()) ||
         (is_nil() && that.is_nil()) ||
         (is_ptr() && that.is_ptr()) )
-      unify_flds(this,that,test);
+      unify_flds(this,that);
     return find().union(that.find(),test);
   }
 
   // Structural recursion unification.  Called nested, and called by NotNil
   // at the top-level directly.
-  static void unify_flds(TV2 thsi, TV2 that, boolean test) {
+  static void unify_flds(TV2 thsi, TV2 that) {
     if( thsi._args==that._args ) return;  // Already equal (and probably both nil)
     for( String key : thsi._args.keySet() ) {
-      TV2 fthis = thsi.arg(key); // Field of this
-      TV2 fthat = that.arg(key); // Field of that
+      TV2 fthis = thsi.    arg(key); // Field of this
+      TV2 fthat = that.clz_arg(key); // Field of that, maybe in a clazz
       if( fthat==null ) {        // Missing field in that
         if( that.is_open() ) that.add_fld(key,fthis); // Add to RHS
         else                 thsi.del_fld(key); // Remove from LHS
-      } else fthis._unify(fthat,test);          // Normal matching field unification
+      } else fthis._unify(fthat,false); // Normal matching field unification
       // Progress may require another find()
       thsi=thsi.find();
       that=that.find();
@@ -801,8 +867,11 @@ public class TV2 {
         throw unimpl();         // TODO: direct fresh-unify?
       if( is_fun() && !that.is_fun() ) // Error, fresh_unify a fun into a non-fun non-leaf
         that.cp_args(_args)._is_fun=progress=true;
-      if( is_obj() && !that.is_obj() ) // Error, fresh_unify a struct into a non-struct non-leaf
-        that.cp_args(_args)._is_obj=progress=true;
+      if( is_obj() && !that.is_obj() ) { // Error, fresh_unify a struct into a non-struct non-leaf
+        that.cp_args(_args);
+        that._clz = _clz;
+        progress=true;
+      }
       if( _err!=null && !Util.eq(_err,that._err) ) {
         if( that._err!=null ) throw unimpl(); // TODO: Combine single error messages
         else { // Error, fresh_unify an error into a non-leaf non-error
@@ -1244,29 +1313,23 @@ public class TV2 {
   private SB str_obj(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     if( is_math() ) return sb.p("@{MATH}");
     // The struct contains a clz field, print as "klazz:@{fields}"
-    String clz = is_clz();
-    if( clz!=null ) {
-      sb.p(clz).p(':');
-      if( clz.equals("int") || clz.equals("flt"))
-        return sb.p(arg(CANONICAL_INSTANCE)._tflow);
-    }
+    if( (Util.eq(_clz,"int:") || Util.eq(_clz,"flt:")) && size()==1 )
+      return sb.p(_clz).p(arg(" def")._tflow);
     final boolean is_tup = is_tup(); // Distinguish tuple from struct during printing
-    sb.p(is_tup ? "(" : "@{");
+    sb.p(_clz).p(is_tup ? "(" : "@{");
     if( _args==null ) sb.p("_ ");
     else {
+      TV2 def = _get(" def");
+      if( def!=null ) str0(sb.p(" def="),visit,def.debug_find(),dups,debug).p(is_tup ? ',' : ';');      
       for( String fld : sorted_flds() ) {
         // Skip fields from functions; happens in error cases when mixing
         // structs and functions
         if( fld.charAt(0)==' ' ) continue;
-        // Skip klazz name, already pre-printed ahead of struct
-        if( clz!=null && Util.eq(fld,clz) ) continue;
-        // Skip field names in a tuple
         str0(is_tup ? sb.p(' ') : sb.p(' ').p(fld).p(" = "),visit,_args.get(fld),dups,debug).p(is_tup ? ',' : ';');
       }
     }
     if( is_open() ) sb.p(" ...,");
-    if( _args!=null && _args.size() > 0 ) sb.unchar();
-    sb.p(!is_tup ? "}" : ")");
+    sb.unchar().p(!is_tup ? "}" : ")");
     if( _may_nil ) sb.p("?");
     return sb;
   }
@@ -1274,7 +1337,7 @@ public class TV2 {
   private void vname( SB sb, boolean debug) {
     String v = VNAMES.get(this);
     if( v==null ) {
-      if( (v=is_clz())!=null ) ;
+      if( false ) ;
       else if( debug && is_unified()) v= "X"+_uid;
       else if( debug && is_leaf() )   v= "V"+_uid;
       else if( (++VCNT)-1+'A' < 'V')  v= "" + (char) ('A' + VCNT - 1);
@@ -1285,18 +1348,5 @@ public class TV2 {
   }
   private boolean is_tup() {  return _args==null || _args.isEmpty() || _args.containsKey("0"); }
   boolean is_math() { return is_obj() && _args!=null && _args.containsKey("pi"); }
-  // True if string is a clazz string (which ends in ':')
-  static boolean is_clz(String fld) { return fld.charAt(fld.length()-1)==':'; }
-  // Null if not a clazz object, or the clazz string otherwise
-  public String is_clz() {
-    if( _args==null ) return null;
-    String clz=null;
-    for( String arg : _args.keySet() )
-      if( is_clz(arg) )          // Is clazz marker field?
-        if( clz==null ) clz=arg; // Found clazz marker field
-        else return null;        // Tooo many marker fields
-    if( clz==null ) return null;
-    return clz.substring(0,clz.length()-1); // Found exactly 1 clazz marker field
-  }
   private Collection<String> sorted_flds() { return new TreeMap<>(_args).keySet(); }
 }

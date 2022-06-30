@@ -2,7 +2,10 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.*;
+import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.AryInt;
+import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.Util;
 import org.jetbrains.annotations.NotNull;
 
 import java.text.NumberFormat;
@@ -11,7 +14,6 @@ import java.util.BitSet;
 
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
-import static com.cliffc.aa.type.TypeStruct.CANONICAL_INSTANCE;
 
 /*** an implementation of language AA
  *
@@ -900,7 +902,7 @@ public class Parse implements Comparable<Parse> {
    *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
    */
   private StructNode tuple(int oldx, Node s, int first_arg_start) {
-    StructNode nn = new StructNode(false,false,errMsg(oldx)).init();
+    StructNode nn = new StructNode(false,false,errMsg(oldx), TypeStruct.ISUSED).init();
     // First stmt is parsed already
     Parse bad = errMsg(first_arg_start);
     while( s!= null ) {         // More args
@@ -1276,14 +1278,14 @@ public class Parse implements Comparable<Parse> {
       throw unimpl();           // Reserved for type variables
     // Shortcut for the two primitive types
     String tname = (tok+":").intern();
-    StructNode nnn = _e.lookup_type(tname);
-    if( nnn == null ) {
+    StructNode clz = _e.lookup_type(tname);
+    if( clz == null ) {
       if( !allow_fref ) // Forward-refs not allowed in this context
         return null;    // SO no type here
-      nnn = type_fref(tname,false); // None, so create
+      clz = type_fref(tname,false); // None, so create
     }
     // Clazzes have a canonical worse-case instance
-    return nnn.get(CANONICAL_INSTANCE)._t;
+    return clz.ts().make_canonical();
   }
 
   // Create a value forward-reference.  Must turn into a function call later.

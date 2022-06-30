@@ -5,6 +5,7 @@ import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.type.TypeFld.Access;
@@ -53,11 +54,11 @@ public class StructNode extends Node {
   // _fld_starts[2]==6, offset to start of oneth arg
   private final Ary<Parse> _fld_starts;
 
-  public StructNode(boolean is_closure, boolean forward_ref, Parse bad_start) {
+  public StructNode(boolean is_closure, boolean forward_ref, Parse bad_start, TypeStruct ts) {
     super(OP_STRUCT);
     _is_closure = is_closure;
     _forward_ref = forward_ref;
-    _ts = TypeStruct.ISUSED;
+    _ts = ts;
     _fld_starts = new Ary<>(new Parse[]{bad_start});
   }
 
@@ -125,7 +126,6 @@ public class StructNode extends Node {
   // Add a field
   public Node add_fld( TypeFld fld, Node val, Parse badt ) {
     assert !_closed;
-    int len = len();
     // Change TypeStruct for fields
     set_ts(_ts.add_fldx(fld));
     int idx = _ts.find(fld._fld);   // Where inserted
@@ -155,13 +155,6 @@ public class StructNode extends Node {
     set_ts(_ts.replace_fld(_ts.get(name).make_from(unr._val)));
     set_def(idx,unr);           // No change to def orders
     xval();
-  }
-
-  // For reseting primitives for multi-testing
-  public void pop_fld() {
-    pop();
-    _fld_starts.pop();
-    set_ts(_ts.pop_fld(len()));
   }
 
   // Remove a field, preserving order.  For reseting primitives for multi-testing
@@ -260,7 +253,7 @@ public class StructNode extends Node {
   private boolean check_fields(TV2 rec) {
     if( rec._args != null )
       for( String id : rec._args.keySet() )
-        if( _ts.find(id)==-1 && !rec.arg(id).is_err() )
+        if( !Util.eq(id," def") && _ts.find(id)==-1 && !rec.arg(id).is_err() )
           return false;
     return true;
   }

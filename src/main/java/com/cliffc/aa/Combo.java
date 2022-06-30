@@ -130,6 +130,9 @@ public abstract class Combo {
 
     // Set all values to ANY and lives to DEAD, their most optimistic types.
     // Set all type-vars to Leafs.
+    if( AA.DO_HMT )
+      for( StructNode n : Env.PROTOS.values() )
+        n.set_tvar();           // Set prototypes early, so instances can find
     Env.ROOT.walk_initype();
 
     // Make the non-gen set in a pre-pass

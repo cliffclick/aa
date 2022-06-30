@@ -729,12 +729,13 @@ public abstract class Node implements Cloneable, IntSupplier {
       assert _val==value() && _live==live();
     }
     if( AA.DO_HMT && has_tvar() )
-      _tvar = new_tvar();
+      set_tvar();
     // Walk reachable graph
     for( Node def : _defs ) if( def != null ) def.walk_initype();
     for( Node use : _uses )                   use.walk_initype();
   }
-
+  public void set_tvar() { if( _tvar==null ) _tvar = new_tvar(); }
+  
   // Reset
   public final void walk_reset( ) {
     if( Env.GVN.on_flow(this) ) return; // Been there, done that

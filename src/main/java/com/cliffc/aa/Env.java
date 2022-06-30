@@ -121,7 +121,7 @@ public class Env implements AutoCloseable {
   Env( Env par, FunNode fun, boolean is_closure, Node ctrl, Node mem, Node dsp_ptr, StructNode fref ) {
     _par = par;
     _fun = fun;
-    StructNode dsp = fref==null ? new StructNode(is_closure,false,null).init() : fref;
+    StructNode dsp = fref==null ? new StructNode(is_closure,false,null, TypeStruct.ISUSED).init() : fref;
     dsp.add_fld(TypeFld.make_dsp(dsp_ptr._val),dsp_ptr,null);
     NewNode nnn = new NewNode(mem,dsp).init();
     mem = new MProjNode(nnn).init();

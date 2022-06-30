@@ -49,7 +49,7 @@ Lazy operands:
   - Indicated when Oper is built.
   - Parser thunks the operand, and passes the thunk.
   - Example:    a && b
-  - Called as:  a._&&_( { -> b } )
+  - Called as:  a._&&_( { -> b } )  or a._&&_( {b} )
 
  */
 
