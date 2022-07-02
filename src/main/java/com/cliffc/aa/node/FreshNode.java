@@ -15,6 +15,7 @@ public class FreshNode extends Node {
     return in(0)==Env.CTL_0 ? null : (FunNode)in(0);
   }
   public Node id() { return in(1); } // The HM identifier
+  public static Node peek(Node f) { return f instanceof FreshNode fsh ? fsh.id() : f; }
   TV2[] nongen() { return fun()==null ? null : fun()._nongen; }
 
   @Override public Type value() { return id()._val; }
@@ -35,40 +36,15 @@ public class FreshNode extends Node {
   }
 
   @Override public boolean has_tvar() { return true; }
+  
+  @Override public void set_tvar() {
+    _tvar = new_tvar();
+    if( id()._tvar==null ) id().walk_initype();
+    id().tvar().push_dep(this);
+  }
 
   @Override public boolean unify( boolean test ) {
-
-    // If the Fresh is an above-center TypeFunPtr, then it is a function choice
-    // and actually expects a following Call selecting which function.
-    // Basically cheating as control-flow selection amongst calls using an
-    // 'isa' notion on the first argument.
-
-    // If so, Fresh-unify against selected targets instead of an Unresolved input.
     TV2[] nongen = nongen();
-    //if( id() instanceof UnresolvedNode &&
-    //    _val instanceof TypeFunPtr ) {
-    //  TypeFunPtr tfp = (TypeFunPtr)_val;
-    //  if( tfp.fidxs().above_center() ) {
-    //    if( _uses._len==1 && _uses.at(0) instanceof CallNode ) {
-    //      CallNode call = (CallNode)_uses.at(0);
-    //      BitsFun cfidxs = CallNode.ttfp(call._val).fidxs();
-    //      if( !cfidxs.above_center() ) { // Call has resolved
-    //        boolean progress = false;
-    //        // For all the FPtrs into the Unresolved
-    //        for( Node fptr : id()._defs ) {
-    //          // If the FunPtr is called
-    //          if( cfidxs.test_recur(((TypeFunPtr)fptr._val).fidx()) ) {
-    //            // Fresh unify against it
-    //            progress |= fptr.tvar().fresh_unify(tvar(), nongen,test);
-    //            fptr.tvar().push_dep(this);
-    //          }
-    //        }
-    //        return progress;
-    //      }
-    //    }
-    //  }
-    //}
-
     return id().tvar().fresh_unify(tvar(),nongen,test);
   }
   @Override public void add_work_hm() {

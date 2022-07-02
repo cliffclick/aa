@@ -892,7 +892,7 @@ public class Parse implements Comparable<Parse> {
     // If in the middle of a definition (e.g. a HM Let, or recursive assign)
     // then no Fresh per normal HM rules.  If loading from a struct or from
     // normal Lambda arguments, again no Fresh per normal HM rules.
-    return ld.is_forward_ref() || !scope.stk()._is_closure
+    return fd.is_forward_ref() || scope.stk()._is_closure
       ? fd
       : gvn(new FreshNode(_e._fun,fd));
   }

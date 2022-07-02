@@ -539,9 +539,17 @@ public final class CallEpiNode extends Node {
     TV2 tret = tfun.find().arg(" ret");
     if( tret.is_copy() && fdx._val instanceof TypeFunPtr tfp ) {
       for( int fidx : tfp._fidxs )
-        if( fidx!=0 && !RetNode.FUNS.at(fidx).funptr().tvar().arg(" ret").is_copy() ) {
-          if( !test ) tret.clr_cp();
-          return true;
+        if( fidx!=0 ) {
+          RetNode ret = RetNode.FUNS.at(fidx);
+          if( ret!=null ) {
+            FunPtrNode fptr = ret.funptr();
+            TV2 tfun2 = fptr.tvar();
+            if( !tfun2.is_fun() ) tfun2.push_dep(this); // Come back around when this becomes a function
+            else if( tfun2.arg(" ret").is_copy() ) {
+              if( !test ) tret.clr_cp();
+              return true;
+            }
+          }
         }
     }
 

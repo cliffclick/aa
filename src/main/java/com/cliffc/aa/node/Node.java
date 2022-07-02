@@ -523,7 +523,11 @@ public abstract class Node implements Cloneable, IntSupplier {
   public boolean unify_proj( ProjNode proj, boolean test ) { throw unimpl(); }
 
   // HM changes; push related neighbors
-  public void add_work_hm() { tvar().add_deps_flow(); }
+  public void add_work_hm() {
+    tvar().add_deps_flow();
+    for( Node def : _defs ) if( def!=null && def.has_tvar() ) Env.GVN.add_flow(def);
+    for( Node use : _uses ) if( use!=null && use.has_tvar() ) Env.GVN.add_flow(use);
+  }
 
   // Do One Step of forwards-dataflow analysis.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
@@ -601,6 +605,11 @@ public abstract class Node implements Cloneable, IntSupplier {
         }
       }
       Env.GVN.add_reduce(nnn);  // Rerun the replacement
+      // Any new nodes made post-Combo-HM need a TVar
+      if( AA.DO_HMT && Combo.HM_FREEZE && nnn.has_tvar() && nnn._tvar==null ) { 
+        nnn.set_tvar();
+        assert Env.GVN.on_flow(nnn);
+      }
       return nnn._elock();      // After putting in VALS
     }
     // No progress; put in VALS and return

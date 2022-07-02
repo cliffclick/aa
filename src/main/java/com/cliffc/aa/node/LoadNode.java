@@ -130,13 +130,13 @@ public class LoadNode extends Node {
       // Bypass if aliases do not overlap
       if( !aliases.test_recur(nnn._alias) )
         return set_mem(nnn.mem());
-    //  // Also bypass if address predates the allocation.  Here we just see that
-    //  // the address comes from the function Parm, and the New is made in the
-    //  // function.
-    //  Node adr2 = adr instanceof CastNode ? adr.in(1) : adr;
-    //  if( adr2 instanceof ParmNode )
-    //    return set_mem(mem.in(1));
-      throw unimpl();
+      // Also bypass if address predates the allocation.  Here we just see that
+      // the address comes from the function Parm, and the New is made in the
+      // function.
+      Node adr2 = adr instanceof CastNode ? adr.in(1) : adr;
+      if( adr2 instanceof ParmNode )
+        //return set_mem(mem.in(1));
+        throw unimpl();
     }
 
     return null;

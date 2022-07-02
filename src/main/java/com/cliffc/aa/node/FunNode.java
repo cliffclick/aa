@@ -193,7 +193,7 @@ public class FunNode extends RegionNode {
     }
 
     // Look for appropriate type-specialize callers
-    TypeStruct formals = type_special(parms);
+    TypeStruct formals = null; // type_special(parms);
     Ary<Node> body = find_body(ret);
     int path = -1;              // Paths will split according to type
     if( formals == null ) {     // No type-specialization to do
@@ -203,6 +203,7 @@ public class FunNode extends RegionNode {
       if( path == -1 ) return null;
       assert CallNode.ttfp(in(path).val(0)).fidx()!=-1; // called by a single-target call
       Node fdx = ((CallNode)in(path).in(0)).fdx();
+      if( fdx instanceof FreshNode fsh ) fdx = fsh.id();
       assert fdx instanceof FunPtrNode; // Shoulda cleared out
       body.add(fdx);
       if( !is_prim() ) _cnt_size_inlines++; // Disallow infinite size-inlining of recursive non-primitives
@@ -450,7 +451,7 @@ public class FunNode extends RegionNode {
       if( n==null ) continue;   // Defs can be null
       // As a special case for H-M, always clone uses of nil constants.
       // These need private H-M variables to support polymorphic nil-typing.
-      if( n instanceof ConNode && ((ConNode)n)._t==TypeNil.NIL ) freached.tset(n._uid);
+      if( n instanceof ConNode && ((ConNode)n)._t==TypeNil.XNIL ) freached.tset(n._uid);
       if( !freached.get (n._uid) ) continue; // Not reached from fcn top
       if(  breached.tset(n._uid) ) continue; // Already visited?
       body.push(n);                          // Part of body
@@ -629,7 +630,7 @@ public class FunNode extends RegionNode {
       assert c._defs._len==0;
       // FunPtr clones for path calls: always use the original Code, as the
       // path clone will be going away.
-      if( n instanceof FunPtrNode && path >= 0 && path_call.fdx()!= n ) {
+      if( n instanceof FunPtrNode && path >= 0 && FreshNode.peek(path_call.fdx())!= n ) {
         c.add_def(n.in(0)); //
         Node dsp = map.get(n.in(1));
         c.add_def(dsp==null ? n.in(1) : dsp );
@@ -830,17 +831,18 @@ public class FunNode extends RegionNode {
   }
   // Returns matching FunPtr for a Calls FDX
   public FunPtrNode fptr(Node fdx) {
-    FunPtrNode fptr=null;
-    if( fdx instanceof FunPtrNode ) {
-      fptr = (FunPtrNode)fdx;
-    } else {
-      assert fdx instanceof UnresolvedNode;
-      for( Node fdx2 : fdx._defs )
-        if( (fptr=(FunPtrNode)fdx2).fun()==this )
-          break;
-    }
+    FunPtrNode fptr = _fptr(fdx);
     assert fptr.fun()==this;
     return fptr;
+  }
+  private FunPtrNode _fptr(Node fdx) {
+    fdx = FreshNode.peek(fdx);
+    if( fdx instanceof FunPtrNode fptr ) return fptr;
+    assert fdx instanceof UnresolvedNode;
+    for( Node fdx2 : fdx._defs )
+      if( ((FunPtrNode)fdx2).fun()==this )
+        return (FunPtrNode)fdx2;
+    return null;
   }
 
   @Override public boolean equals(Object o) { return this==o; } // Only one

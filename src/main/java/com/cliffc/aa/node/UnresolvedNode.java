@@ -60,26 +60,30 @@ public class UnresolvedNode extends Node {
   }
 
   // Looks at the fidxs in TFP, and the arguments given and tries to resolve
-  // the call.  Returns TFP if it cannot be further resolved.
+  // the call.  Returns TFP if it cannot be further resolved.  Must be
+  // monotonic, as it is used by CallNode.
   static TypeFunPtr resolve_value( Type[] tcall ) {
     TypeFunPtr tfp = (TypeFunPtr)tcall[tcall.length-1], tfp2=null;
     if( tfp._fidxs==BitsFun.NALL || // Too low , will not resolve.  Might lift to OK
         tfp.above_center() ||       // Too high, will not resolve.  Might fall to OK
         tfp._fidxs.abit() != -1 )   // Already resolved to single target
       return tfp;
+    boolean high = false;       // True if args too high to resolve
     for( int fidx : tfp._fidxs ) {
       RetNode ret = RetNode.get(fidx);
-      if( ret._nargs == tcall.length-1 ) {
-        Type actual = tcall[ARG_IDX];
+      if( ret._nargs == tcall.length-1 ) { // Ignore if wrong arg count
+        Type actual = tcall[ARG_IDX];      // TODO: Looking at first arg only
         Type formal = ret.formal(ARG_IDX);
-        if( !actual.above_center() &&
-            actual.isa(formal) &&
-            !(actual.getClass()==TypeInt.class && formal.getClass()==TypeFlt.class) ) {
+        if( actual.isa(formal) ) {
           TypeFunPtr tfp3 = TypeFunPtr.make(fidx,ret._nargs,tcall[DSP_IDX],ret.rez()._val);
           tfp2 = tfp2==null ? tfp3 : (TypeFunPtr)tfp2.meet(tfp3);
+          high = actual.above_center();
         }
       }
     }
+    if( high ) // Arg types too high, can fall either way
+      // Result is high, with choice fidxs, choice ret, but the display is legit
+      return tfp.dual().make_from(tfp.dsp(),tfp._ret.dual());
     return tfp2==null ? tfp : tfp2;
   }
 

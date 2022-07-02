@@ -450,6 +450,9 @@ public class TV2 {
 
   // Strip off nil
   public TV2 strip_nil() {
+    TV2 def = arg(" def");
+    if( def != null)
+      _args.put(" def",def.strip_nil());
     if( _tflow != null ) _tflow = _tflow.join(TypeNil.NSCALR);
     if( _eflow != null ) _eflow = _eflow.join(TypeNil.NSCALR);
     _may_nil = false;
@@ -658,7 +661,7 @@ public class TV2 {
     // A shallow copy and fresh-unify fails if 'this' is cyclic, because the
     // shallow copy peels one part of the loop.
     TV2 copy = _fresh(nongen).strip_nil();
-    copy._unify(leaf,true);
+    copy._unify(leaf,false);
     return vput(that,true);
   }
 
@@ -784,11 +787,12 @@ public class TV2 {
   }
 
   // Insert a new field
-  public void add_fld( String id, TV2 fld) {
+  public boolean add_fld( String id, TV2 fld) {
     if( _args==null ) _args = new NonBlockingHashMap<>();
     fld.push_deps(_deps);
     _args.put(id,fld);
     add_deps_flow();
+    return true;                // Always progress
   }
   // Delete a field
   private void del_fld( String id ) {
@@ -896,43 +900,43 @@ public class TV2 {
     
     FCNT++;            // Recursion count on Fresh
     assert FCNT < 100; // Infinite _fresh_unify cycles
-    boolean missing = size()!= that.size();
+    boolean missing = size()!= that.size(); // Quick check to avoid walking the RHS
     if( _args != null )
-      throw unimpl();
-    //for( String key : _args.keySet() ) {
-    //  TV2 lhs =      get(key);  assert lhs!=null;
-    //  TV2 rhs = that.get(key);
-    //  if( rhs==null ) {         // No RHS to unify against
-    //    if( that.open() ) {     // If RHS is open, copy field into it
-    //      if( test ) return true; // Will definitely make progress
-    //      progress |= that.add_fld(key,lhs._fresh(nongen));
-    //    } // If closed, no copy
-    //  } else {
-    //    progress |= lhs._fresh_unify(rhs,nongen,test);
-    //  }
-    //  if( (that=that.find()).is_err() ) return true;
-    //  if( progress && test ) return true;
-    //}
+      for( String key : _args.keySet() ) {
+        TV2 lhs =          arg(key);  assert lhs!=null;
+        TV2 rhs = that.clz_arg(key);
+        if( rhs==null ) {       // No RHS to unify against
+          missing = true;       // Might be missing RHS
+          if( is_open() || that.is_open() || lhs.is_err() || (is_fun() && that.is_fun()) ) {
+            if( test ) return true;       // Will definitely make progress
+            TV2 nrhs = lhs._fresh(nongen); // New RHS value
+            if( !that.is_open() ) {
+              nrhs._err = "Missing field " + key; // TODO: merge errors
+              this.add_deps_flow();
+            }
+            progress |= that.add_fld(key,nrhs);
+          } // Else neither side is open, field is not needed in RHS
+        } else {
+          progress |= lhs._fresh_unify(rhs,nongen,test);
+        }
+        if( progress && test ) return true;
+    }
     FCNT--;
-    //// Fields in RHS and not the LHS are also merged; if the LHS is open we'd
-    //// just copy the missing fields into it, then unify the structs (shortcut:
-    //// just skip the copy).  If the LHS is closed, then the extra RHS fields
-    //// are removed.
-    //if( !open() )
-    //  for( String id : that.args() )      // For all fields in RHS
-    //    if( get(id)==null ) {             // Missing in LHS
+    // Fields in RHS and not the LHS are also merged; if the LHS is open we'd
+    // just copy the missing fields into it, then unify the structs (shortcut:
+    // just skip the copy).  If the LHS is closed, then the extra RHS fields
+    // are removed.
+    if( missing && is_obj() && !is_open() && that._args!=null )
+      for( String id : that._args.keySet() ) // For all fields in RHS
+        if( clz_arg(id)==null ) {            // Missing in LHS
     //      if( test ) return true;         // Will definitely make progress
     //      { that._args.remove(id); progress=true; } // Extra fields on both sides are dropped
-    //    }
-    //Type mt = that._type.meet(_type);   // All aliases
-    //boolean open = that._open & _open;
-    //if( that._open != open || that._type != mt ) progress = true;
-    //if( test && progress ) return true;
-    //that._open = open; // Pick up open stat
-    //that._type = mt;   // Pick up all aliases
-    //
-    //return progress;
-    throw unimpl();
+          throw unimpl();
+        }
+    
+    if( is_obj() && that._open && !_open) { progress = true; that._open = false; }
+    if( progress && test ) that.add_deps_flow();
+    return progress;
   }
 
   private boolean vput(TV2 that, boolean progress) { VARS.put(this,that); return progress; }

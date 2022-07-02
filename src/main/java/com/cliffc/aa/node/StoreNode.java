@@ -94,8 +94,8 @@ public class StoreNode extends Node {
     }
 
     // No need for 'Fresh' address, as Stores have no TVar (produce memory not a scalar)
-    if( adr() instanceof FreshNode )
-      return set_def(2,((FreshNode)adr()).id());
+    if( adr() instanceof FreshNode fsh )
+      return set_def(2,fsh.id());
 
     // Escape a dead MemSplit
     if( mem instanceof MProjNode && mem.in(0) instanceof MemSplitNode msp &&

@@ -369,12 +369,6 @@ public class CallNode extends Node {
     ts[_defs._len] = UnresolvedNode.resolve_value(ts);
     return TypeTuple.make(ts);
   }
-  // Get (shallow) aliases from the type
-  private BitsAlias get_alias( Type t ) {
-    if( t instanceof TypeMemPtr ) return ((TypeMemPtr)t)._aliases;
-    if( TypeMemPtr.ISUSED.isa(t)   ) return BitsAlias.NALL;
-    return BitsAlias.EMPTY;
-  }
 
   @Override public void add_flow_extra(Type old) {
     if( old==Type.ANY || _val==Type.ANY ||
