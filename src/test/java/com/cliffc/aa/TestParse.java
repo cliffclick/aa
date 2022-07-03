@@ -30,7 +30,7 @@ public class TestParse {
     DO_HMT=true;
     DO_GCP=false;
     RSEED=0;
-    _test2("x=3; addx={y -> x+y}; addx(2)", "int:5",null,"int:5","int:5","int:5",null,null,"Unable to resolve _+_",-1); // must inline to resolve overload {+}:Int
+    test("x=3; mul2={x -> x*2}; mul2(2.1)", "flt:4.2","flt:4.2"); // must inline to resolve overload {*}:Flt with I->F conversion
   }
 
   @Test public void testParse00() {
@@ -176,7 +176,7 @@ public class TestParse {
     testerr("fun(2)", "Unknown ref 'fun'", 0);
     test("mul3={x -> y=3; x*y}; mul3(2)", "int:6","A", "int:6","int:6"); // multiple statements in func body
     _test2("x=3; addx={y -> x+y}; addx(2)", "int:5",null,"int:5","int:5","int:5",null,null,"Unable to resolve _+_",-1); // must inline to resolve overload {+}:Int
-    //test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
+    test("x=3; mul2={x -> x*2}; mul2(2.1)", "flt:4.2","flt:4.2"); // must inline to resolve overload {*}:Flt with I->F conversion
     //test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     //test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
     //testerr("sq={x -> x&x}; sq(\"abc\")", "*\"abc\" is not a int64",9);

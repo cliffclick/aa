@@ -831,15 +831,20 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     String id() {
       skipWS();
       int oldx=_x;
-      while( _x < _str.length() && isId(at(_x)) ) _x++;
+      if( _x < _str.length() && isId0(at(_x)) ) _x++;
+      while( _x < _str.length() && isId1(at(_x)) ) _x++;
       return _str.substring(oldx,_x).intern();
     }
     // Rules for an ID character
-    private static boolean isId(char c) {
+    private static boolean isId0(char c) {
       return c=='^' || c=='_' || c=='~' ||
-        ('0' <= c && c <= '9') ||
         ('A' <= c && c <= 'Z') ||
         ('a' <= c && c <= 'z');
+    }
+    private static boolean isId1(char c) {
+      return isId0(c) || 
+        ('0' <= c && c <= '9') ||
+        c=='*';
     }
 
     // Examples: [], [0], [5], [2,3,4], [0,ALL]

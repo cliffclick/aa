@@ -126,7 +126,7 @@ public class HM {
     DO_HM  = do_hm ;
     DO_GCP = do_gcp;
 
-    for( PrimSyn prim : new PrimSyn[]{ new If(), new Pair(), new EQ(), new EQ0(), new Mul(), new Add(), new Dec(), new IRand(), new Str(), new Triple(), new Factor(), new IsEmpty(), new NotNil()} )
+    for( PrimSyn prim : new PrimSyn[]{ new If(), new Pair(), new EQ(), new EQ0(), new IMul(), new FMul(), new I2F(), new Add(), new Dec(), new IRand(), new Str(), new Triple(), new Factor(), new IsEmpty(), new NotNil()} )
       PRIMSYNS.put(prim.name(),prim);
     new EXTStruct(T2.make_str(TypeMemPtr.STRPTR),TypeMemPtr.STR_ALIAS);
 
@@ -1591,13 +1591,13 @@ public class HM {
   }
 
   // multiply
-  static class Mul extends PrimSyn {
-    @Override String name() { return "*"; }
-    public Mul() {
+  static class IMul extends PrimSyn {
+    @Override String name() { return "i*"; }
+    public IMul() {
       super(IDS[2],INT64(),INT64(),INT64());
       _hmt.arg("ret").clr_cp();
     }
-    @Override PrimSyn make() { return new Mul(); }
+    @Override PrimSyn make() { return new IMul(); }
     @Override Type apply( Type[] flows) {
       Type t0 = flows[0];
       Type t1 = flows[1];
@@ -1610,6 +1610,46 @@ public class HM {
           return TypeInt.con(t0.getl()*t1.getl());
       }
       return TypeInt.INT64;
+    }
+  }
+  static class FMul extends PrimSyn {
+    @Override String name() { return "f*"; }
+    public FMul() {
+      super(IDS[2],FLT64(),FLT64(),FLT64());
+      _hmt.arg("ret").clr_cp();
+    }
+    @Override PrimSyn make() { return new FMul(); }
+    @Override Type apply( Type[] flows) {
+      Type t0 = flows[0];
+      Type t1 = flows[1];
+      if( t0.above_center() || t1.above_center() )
+        return TypeFlt.FLT64.dual();
+      if( t0 instanceof TypeFlt && t1 instanceof TypeFlt ) {
+        if( t0.is_con() && t0.getd()==0 ) return TypeNil.XNIL;
+        if( t1.is_con() && t1.getd()==0 ) return TypeNil.XNIL;
+        if( t0.is_con() && t1.is_con() )
+          return TypeFlt.con(t0.getd()*t1.getd());
+      }
+      return TypeFlt.FLT64;
+    }
+  }
+  static class I2F extends PrimSyn {
+    @Override String name() { return "i2f"; }
+    public I2F() {
+      super(IDS[1],INT64(),FLT64());
+      _hmt.arg("ret").clr_cp();
+    }
+    @Override PrimSyn make() { return new I2F(); }
+    @Override Type apply( Type[] flows) {
+      Type t0 = flows[0];
+      if( t0.above_center() )
+        return TypeFlt.FLT64.dual();
+      if( t0 instanceof TypeInt ) {
+        if( t0.is_con() && t0.getl()==0 ) return TypeNil.XNIL;
+        if( t0.is_con() )
+          return TypeFlt.con((double)t0.getl());
+      }
+      return TypeFlt.FLT64;
     }
   }
 
@@ -2365,7 +2405,7 @@ public class HM {
       // are removed.
       if( missing && is_obj() && !is_open() && that._args!=null )
         for( String id : that._args.keySet() ) // For all fields in RHS
-          if( arg(id)==null ) {                // Missing in LHS
+          if( arg(id)==null && !that.arg(id).is_err()) {   // Missing in LHS
             if( work == null ) return true;    // Will definitely make progress
             progress |= that.del_fld(id,work);
           }
