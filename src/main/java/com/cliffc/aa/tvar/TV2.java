@@ -928,7 +928,7 @@ public class TV2 {
     // are removed.
     if( missing && is_obj() && !is_open() && that._args!=null )
       for( String id : that._args.keySet() ) // For all fields in RHS
-        if( clz_arg(id)==null ) {            // Missing in LHS
+        if( clz_arg(id)==null && !that.arg(id).is_err() ) { // Missing in LHS
     //      if( test ) return true;         // Will definitely make progress
     //      { that._args.remove(id); progress=true; } // Extra fields on both sides are dropped
           throw unimpl();

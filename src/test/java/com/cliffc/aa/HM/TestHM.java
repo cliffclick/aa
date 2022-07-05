@@ -27,7 +27,7 @@ public class TestHM {
 
     DO_HMT=false;
     DO_GCP=true;
-    RSEED=0;
+    RSEED=2;
     test81();
   }
 
@@ -1175,6 +1175,7 @@ A:*@{
          "[4,7]","[]");
   }
 
+  // Stacked if functions "carry thru" precision.
   // Test was buggy, since 'rand' is a known non-zero function pointer constant,
   // GCP folds the 'if' to the true arm.  Instead call: '(rand 2)'
   @Test public void test80() {
@@ -1182,7 +1183,23 @@ A:*@{
         "Cannot unify 1 and *str:(97)", "nScalar" );
   }
 
+
+  // Simple overloaded function test.
   @Test public void test81() {
+    rune("f = &["                +  // Define overloaded fcns 'f'
+         "  { x -> (i* x 2  ) };"+  // Arg is 'int'
+         "  { x -> (f* x 3.0) };"+  // Arg is 'flt'
+         "];"+
+         "(pair (f 2) (f 1.2))",    // Call with different args
+         "*(int64,flt64)", "*(int64,flt64)",
+         "*[7](^=any,4,3.6000001f)", "*[7](^=any,~Scalar,~Scalar)",
+         "[4,7]",null);
+  }
+
+// CNC test case here is trying to get HM to do some overload resolution.
+// Without, many simple int/flt tests in main AA using HM alone fail to find a
+// useful type.
+  @Test public void test82() {
     rune(
 """
 iwrap = { ii ->

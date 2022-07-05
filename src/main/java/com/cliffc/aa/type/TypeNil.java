@@ -114,6 +114,7 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     return switch(cid) {
     case  "Scalar" ->  SCALAR;
     case "~Scalar" -> XSCALAR;
+    case "~Scalar0" -> AND_XSCALAR;
     case "nScalar" -> NSCALR;
     case "xnil"    -> XNIL;
     default        -> null;

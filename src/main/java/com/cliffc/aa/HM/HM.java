@@ -106,9 +106,10 @@ BNF for the "core AA" syntax:
         { id* -> fe0 } | // Lambda.  Multiple args are allowed and tracked.  Numbered uniquely
         id             | // Use of an id, either a lambda arg or in a Let/In
         id = fe0; fe1  | // Eqv: letrec ld = fe0 in fe1
-        @{ (label = fe0;)* } | Structures.  Numbered uniquely.
+        @{ (label = fe0;)* } | Structures.  Numbered uniquely.  ';' is a field-seperator not a field-end
         fe = e         | // No  field after expression
-        fe.label         // Yes field after expression
+        fe.label       | // Yes field after expression
+        &[ (fe0;)* ]     // A collection of ad-hoc polymorphism lambdas.
 
 BNF for the "core AA" pretty-printed types:
    T = Vnnn               | // Leaf number nnn
@@ -118,6 +119,7 @@ BNF for the "core AA" pretty-printed types:
        { T* -> Tret }     | // Lambda, arg count is significant
        *T0                | // Ptr-to-struct; T0 is either a leaf, or unified, or a struct
        @{ (label = T;)* } | // ';' is a field-seperator not a field-end
+       &[ (e0;)* ]        | // Collection of ad-hoc poly lambdas; e0 is base, unified, or a lambda
        (Error base* T0*)
 
    Multiple stacked T????s collapse
@@ -318,6 +320,21 @@ public class HM {
       return new Struct(ids.asAry(),flds.asAry());
     }
 
+    // Ad-hoc polymorphism; overloading
+    if( BUF[X]=='&' ) {
+      X++;
+      require('[');
+      Ary<Syntax> funs = new Ary<>(Syntax.class);
+      while( skipWS()!=']' && X < BUF.length ) {
+        Syntax fun = fterm();
+        if( fun==null ) throw unimpl("Missing function in ad-hoc overload");
+        funs.push(fun);
+        if( skipWS()==';' ) X++;
+      }
+      require(']');
+      return new Overload(funs.asAry());
+    }
+    
     throw unimpl("Unknown syntax");
   }
   // Parse a term with an optional following field.
@@ -781,7 +798,9 @@ public class HM {
       //   any arg-pair-unifies make progress
       //   this-unify-_fun.return makes progress
       T2 tfun = _fun.find();
-      if( !tfun.is_fun() ) {    // Not a function, so progress
+      if( tfun.is_over() ) {
+        throw unimpl();
+      } else if( !tfun.is_fun() ) {    // Not a function, so progress
         if( work==null ) return true; // Will-progress & just-testing
         T2[] targs = new T2[_args.length+1];
         for( int i=0; i<_args.length; i++ )
@@ -837,11 +856,26 @@ public class HM {
       Type flow = _fun._flow;
       if( !(flow instanceof TypeFunPtr tfp) ) return flow.oob(TypeNil.SCALAR);
       if( tfp._fidxs == BitsFun.EMPTY )  return TypeNil.XSCALAR;  // Nothing being called, stay high
+      // If the input function is an overloaded function, and resolved by HMT
+      // trim the functions down (and sharpen the return type).
+      T2 t2fun = _fun.find();
+      if( tfp._fidxs.above_center() && t2fun.is_fun() ) {
+        int xfdx=0;
+        for( int fidx : tfp._fidxs ) {
+          Func lam = Lambda.FUNS.get(fidx);
+          T2 ffun = lam.as_fun();
+          if( t2fun.cycle_equals(ffun) )
+            if( xfdx==0 ) xfdx=fidx;
+            else throw unimpl();
+        }
+        if( xfdx!=0 ) // Found exactly one resolvable HMT choice
+          tfp = (TypeFunPtr)((Lambda)Lambda.FUNS.get(xfdx))._flow;
+      }
       // Meet all calling arguments over all called function args.
       // Lazily building a call-graph, needed to track arg_meet.
       // We got here because, e.g. _fun._flow added some more functions, all those
       // new functions need the arg_meet.
-      if( work!=null && tfp._fidxs != BitsFun.NALL )
+      if( work!=null && tfp._fidxs != BitsFun.NALL && !tfp._fidxs.above_center() )
         for( int fidx : tfp._fidxs ) {
           Func lambda = Lambda.FUNS.get(fidx);
           // new call site for lambda; all args must meet into this lambda;
@@ -922,7 +956,7 @@ public class HM {
       // child arg to a call-site changed; find the arg#;
       int argn = Util.find(_args,child);
       // visit all Lambdas; meet the child flow into the Lambda arg#
-      if( argn != -1 && tfp._fidxs != BitsFun.NALL )
+      if( argn != -1 && tfp._fidxs != BitsFun.NALL && !tfp._fidxs.above_center() )
         for( int fidx : tfp._fidxs )
           Lambda.FUNS.get(fidx).arg_meet(argn,child._flow,work);
     }
@@ -1361,6 +1395,70 @@ public class HM {
     }
   }
 
+  static class Overload extends Syntax {
+    final Syntax[] _funs;
+    Overload( Syntax[] funs ) { assert funs.length>1; _funs=funs; }
+    @Override SB str(SB sb) {
+      sb.p("&[ ");
+      for( Syntax fun : _funs )
+        fun.str(sb).p("; ");
+      return sb.unchar(2).p("]");
+    }
+    @Override SB p1(SB sb, VBitSet dups) { return sb.p("&[ ... ] "); }
+    @Override SB p2(SB sb, VBitSet dups) {
+      for( Syntax fun : _funs )
+        fun.p0(sb.i().nl(),dups);
+      return sb;
+    }
+    @Override boolean hm(Work<Syntax> work) { return false; }
+    @Override void add_hm_work( @NotNull Work<Syntax> work) { throw unimpl(); }
+    @Override Type val(Work<Syntax> work) {
+      // Join (choice) of all children.  If some child is below any function,
+      // we fall to Scalar and force reporting an error.
+      Type t = TypeNil.SCALAR;
+      for( Syntax fun : _funs ) {
+        Type tf = fun._flow;
+        if( !tf.above_center() ) { // Input is still falling
+          if( !(tf instanceof TypeFunPtr tfp) )
+            return TypeNil.SCALAR; // Some fun is below any function, so are we
+          tf = tfp.make_from(tfp._fidxs.dual()); // Use the high TFP for choice
+        }
+        t = t.join(tf);
+      }
+      return t;
+    }
+    @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) {
+      work.add(this);
+      if( child instanceof Lambda lam )
+        work.addAll(lam._applys);
+    }
+
+    @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
+      T2 hmt = T2.make_overload();
+      prep_tree_impl(par, nongen, work, hmt);
+      int cnt = 1;                // One for self
+      for( int i=0; i<_funs.length; i++ ) { // Prep all sub-fields
+        cnt += _funs[i].prep_tree(this,nongen,work);
+        hmt._args.put("&"+i,_funs[i].find());
+      }
+      assert hmt.is_over();
+      return cnt;
+    }
+    @Override boolean more_work(Work<Syntax> work) {
+      if( !more_work_impl(work) ) return false;
+      for( Syntax fun : _funs )
+        if( !fun.more_work(work) )
+          return false;
+      return true;
+    }
+    @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
+      T rez = map.apply(this);
+      for( Syntax fun : _funs )
+        rez = reduce.apply(rez,fun.visit(map,reduce));
+      return rez;
+    }
+  }
+
 
   abstract static class PrimSyn extends Lambda {
     static T2  BOOL (){ return T2.make_base(TypeInt.BOOL); }
@@ -1796,8 +1894,9 @@ public class HM {
     // If unified, contains the single key ">>" and all other fields are null.
     // If Nil    , contains the single key "?"  and all other fields are null.
     // If Ptr    , contains the single key "*"  and all other fields are null.
-    // If Lambda , contains keys "x","y","z" for args or "ret" for return.
+    // If Lambda , contains keys " x"," y"," z" for args or " ret" for return.
     // If Struct , contains keys for the field labels.  No display & not-null.
+    // If Overload,contains keys for ad-hoc polymorphic functions, all "&n"
     // If Error  , _eflow may contain a 2nd flow type; also blends keys from all takers
     NonBlockingHashMap<String,T2> _args;
 
@@ -1859,6 +1958,7 @@ public class HM {
     boolean unified() { return get(">>")!=null; }
     boolean is_nil () { return get("?" )!=null; }
     boolean is_ptr () { return get("*" )!=null; }
+    boolean is_over() { return get("&0")!=null; }
     boolean is_base() { return _tflow != null; }
     boolean is_fun () { return _is_fun; }
     boolean is_obj () { return _is_obj; }
@@ -1869,6 +1969,7 @@ public class HM {
         (_eflow  !=null ? 1 : 0) +
         (is_ptr()       ? 1 : 0) +
         (is_fun()       ? 1 : 0) +
+        (is_over()      ? 1 : 0) +
         (is_obj()       ? 1 : 0)
         >= 2;                   // Two or more unrelated types is an error
     }
@@ -1933,7 +2034,12 @@ public class HM {
       T2 t2str = make_open_struct(new String[]{"str:","0"},new T2[]{make_leaf(),make_base(flow._obj._def)});
       return make_ptr(t2str);
     }
+    // No fields (yet), filled in during prep-tree
+    static T2 make_overload() {
+      return new T2(new NonBlockingHashMap<>());      
+    }
 
+    
     T2 debug_find() {// Find, without the roll-up
       if( !unified() ) return this; // Shortcut
       if( _args==null ) return this;
@@ -2259,6 +2365,9 @@ public class HM {
 
       if( work==null ) return true; // Here we definitely make progress; bail out early if just testing
 
+      if( is_over() || that.is_over() )
+        throw unimpl();
+      
       // Structural recursion unification.
       if( (is_obj() && that.is_obj()) ||
           (is_fun() && that.is_fun()) ||
@@ -2364,8 +2473,11 @@ public class HM {
 
       // Check for mismatched LHS and RHS
       if( work==null ) {
+        if( is_over() && that.is_fun() )
+          return fresh_unify_over(that,nongen,null);
         if( _may_nil && !that._may_nil ) return true;
         if( is_ptr() && !that.is_ptr() ) return true;
+        if( is_over()&& !that.is_over()) return true;
         if( is_fun() && !that.is_fun() ) return true;
         if( is_obj() && !that.is_obj() ) return true;
         if( _err!=null && !Util.eq(_err,that._err) ) return true;
@@ -2391,6 +2503,10 @@ public class HM {
       // Both same (probably both nil)
       if( _args==that._args ) return progress;
 
+      if( this.is_over() ) return fresh_unify_over(that,nongen,work);
+      if( that.is_over() ) throw unimpl();
+
+      
       // Structural recursion unification, lazy on LHS
       boolean missing = size()!= that.size();
       if( _args != null )
@@ -2452,7 +2568,6 @@ public class HM {
       return this;
     }
     
-
     // Return a fresh copy of 'this'
     T2 fresh() {
       assert VARS.isEmpty();
@@ -2483,6 +2598,50 @@ public class HM {
       assert !t.unified();
       return t;
     }
+
+    // Fresh-unify an ad-hoc polymorphic overload to a function
+    private boolean fresh_unify_over( T2 that, VStack nongen, Work<Syntax> work ) {
+      if( !that.is_fun() ) throw unimpl();
+
+      // Require exactly one of the overloads can unify without error.  If
+      // there is more than one, then no progress (and no unification and the
+      // program is ambiguous still).
+      T2 no_err=null;
+      for( T2 overfun : _args.values() ) {
+        if( overfun.trial_unify(that) ) ;         // Error, ignore
+        else if( no_err==null ) no_err = overfun; // Collect non-errors
+        else return false;      // Two or more no-errors
+      }
+      if( no_err==null ) throw unimpl(); // All folks have error
+      return no_err._fresh_unify(that,nongen,work); // Exactly one non-error
+    }
+
+    // Do a trial unification between this and that.  Report back if any error
+    // happens.  No change to either side, this is a trial only.
+    private boolean trial_unify(T2 that) {
+      return _trial_unify(that);
+    }
+    private boolean _trial_unify(T2 that) {
+      assert !unified() && !that.unified();
+      if( this==that ) return false;
+      if( this.is_leaf() ) return false;
+      if( that.is_leaf() ) return false;
+      if( this.is_base() && that.is_base() )
+        // No error if same base class.  Might be progress, but no error.
+        // Note: still too weak if looking at trial unify of errors,
+        // as might have same class in one of the error types.
+        return _tflow.getClass()!=that._tflow.getClass();
+
+      if( is_fun() && that.is_fun() ) {
+        for( String id : _args.keySet() ) {
+          T2 lhs = this.arg(id);
+          T2 rhs = that.arg(id);
+          if( rhs==null || lhs._trial_unify(rhs) ) return true;
+        }
+        return false;
+      }
+      throw unimpl();
+    }    
 
     // -----------------
     private static final VBitSet ODUPS = new VBitSet();
@@ -2806,6 +2965,7 @@ public class HM {
       if( is_base() ) return str_base(sb);
       if( is_ptr () ) return str_ptr(sb,visit,dups,debug, _tflow);
       if( is_fun () ) return str_fun(sb,visit,dups,debug);
+      if( is_over() ) return str_ovr(sb,visit,dups,debug);
       if( is_obj () ) return str_obj(sb,visit,dups,debug);
       if( is_nil () ) return str0(sb,visit,_args.get("?"),dups,debug).p('?');
 
@@ -2832,6 +2992,14 @@ public class HM {
           str0(sb,visit,_args.get(fld),dups,debug).p(' ');
       }
       return str0(sb.p("-> "),visit,_args.get("ret"),dups,debug).p(" }").p(_may_nil ? "?" : "");
+    }
+    private SB str_ovr(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
+      sb.p("&[ ");
+      for( int i=0; i<_args.size(); i++ ) {
+        T2 fun = _args.get("&"+i);
+        str0(sb,visit,fun,dups,debug).p("; ");
+      }
+      return sb.unchar(2).p(" ]");
     }
     private SB str_obj(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
       if( is_prim() ) return sb.p("@{PRIMS}");
