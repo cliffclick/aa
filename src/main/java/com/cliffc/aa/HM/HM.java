@@ -12,101 +12,116 @@ import java.util.function.IntSupplier;
 import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.AA.DSP_IDX;
 
-// Combined Hindley-Milner and Global Constant Propagation typing.
+/**
+Combined Hindley-Milner and Global Constant Propagation typing.
 
-// Complete stand-alone, for research.
+Complete stand-alone, for research.
 
-// Treats HM as a Monotone Analysis Framework; converted to a worklist style.
-// The type-vars are monotonically unified, gradually growing over time - and
-// this is treated as the MAF lattice.  Some normal Algo-W work gets done in a
-// prepass; e.g. discovering identifier sources (SSA form), and building the
-// non-generative set.  Because of the non-local unification behavior type-vars
-// include a "dependent Syntax" set; a set of Syntax elements put back on the
-// worklist if this type unifies, beyond the expected parent and AST children.
-//
-// The normal HM unification steps are treated as the MAF transfer "functions",
-// taking type-vars as inputs and producing new, unified, type-vars.  Because
-// unification happens in-place (normal Tarjan disjoint-set union), the
-// transfer "functions" are executed for side effects only, and return a
-// progress flag.  The transfer functions are virtual calls on each Syntax
-// element.  Some steps are empty because of the pre-pass (Let,Con).
-//
-// HM Bases include anything from the GCP lattice, and are generally sharper
-// than e.g. 'int'.  Bases with values of '3' and "abc" are fine.  These are
-// widened to the normal HM types if returned from any primitive; they remain
-// sharp if returned or passed to primitives.  HM functions that escape have
-// their GCP type widened "as if" called from the most HM-general legal call
-// site; otherwise GCP assumes escaping functions are never called and their
-// arguments have unrealistic high flow types.
-//
-// HM includes polymorphic structures and fields (structural typing not duck
-// typing), polymorphic nil-checking, constant bases and an error type-var.
-// Both HM and GCP types fully support recursive/cyclic types.
-//
-// HM errors keep all the not-unifiable types, all at once.  Further unifications
-// with the error either add a new not-unifiable type, or unify with one of the
-// prior types.  These means that types can ALWAYS unify, including nonsensical
-// unifications between e.g. the constant 5 and a struct @{ x,y }.  The errors
-// are reported when a type prints.
-//
-// Unification typically makes many temporary type-vars and immediately unifies
-// them.  For efficiency, this algorithm checks to see if unification requires
-// an allocation first, instead of just "allocate and unify".  The major place
-// this happens is identifiers, which normally make a "fresh" copy of their
-// type-var, then unify.  I use a combined "make-fresh-and-unify" unification
-// algorithm there.  It is a structural clone of the normal unify, except that
-// it lazily makes a fresh-copy of the left-hand-side on demand only; typically
-// discovering that no fresh-copy is required.  This appears to reduce some
-// worse-case examples to near-linear time.
-//
-// To engineer and debug the algorithm, the unification step includes a flag to
-// mean "actually unify, and report a progress flag" vs "report if progress".
-// The report-only mode is aggressively asserted for in the main loop; all
-// Syntax elements that can make progress are asserted as on the worklist.
-//
-// GCP gets the normal MAF treatment, no surprises there except perhaps the
-// size of the GCP lattice.  The GCP lattice includes the obvious int and float
-// ranges and constants, structs, aliases broken into equivalence classes,
-// function indices (fidxs) also broken into equivalence classes (and this
-// allows GCP to compute a reasonably precise Call Graph), contents of memory,
-// and Return Program Counters ala continuations (no real use is made of these
-// yet).
-//
-// The combined algorithm includes transfer functions taking facts from both
-// MAF lattices, producing results in the other lattice.
-//
-// For the GCP->HM direction, the HM 'if' has a custom transfer function
-// instead of the usual one.  Unification looks at the GCP value, and unifies
-// either the true arm, or the false arm, or both or neither.  In this way GCP
-// allows HM to avoid picking up constraints from dead code.
-//
-// Also for GCP->HM, the HM ground terms or base terms include anything from
-// the GCP lattice.  The GCP fidxs / Call Graph is used to track HM terms that
-// might come from a primitive or a escaped input.
-//
-// For the HM->GCP direction, the GCP 'apply' has a customer transfer function
-// where the result from a call gets lifted (JOINed) based on the matching GCP
-// inputs - and the match comes from using the same HM type-var on both inputs
-// and outputs.  This allows e.g. "map" calls which typically merge many GCP
-// values at many applies (call sites) and thus end up typed as a Scalar to
-// Scalar, to improve the GCP type on a per-call-site basis.
-//
-// Also for HM->GCP, the HM types are used to constrain the GCP types that can
-// call any escaped function.  You can think of this as using HM "module types"
-// to derive the GCP calling types.
-//
-// Test case 45 demonstrates this combined algorithm, with a program which can
-// only be typed using the combination of GCP and HM.
-//
-// BNF for the "core AA" syntax:
-//    e  = number | string | primitives | (fe0 fe1*) | { id* -> fe0 } | id | id = fe0; fe1 | @{ (label = fe0)* }
-//    fe = e | fe.label                 // optional field after expression
-//
-// BNF for the "core AA" pretty-printed types:
-//    T = X | X:T | { X* -> X } | base | @{ (label = X)* } | T? | Error
-//    base = any lattice element, all are nilable
-//    Multiple stacked T????s collapse
-//
+Treats HM as a Monotone Analysis Framework; converted to a worklist style.  The
+type-vars are monotonically unified, gradually growing over time - and this is
+treated as the MAF lattice.  Some normal Algo-W work gets done in a prepass;
+e.g. discovering identifier sources (SSA form), and building the non-generative
+set.  Because of the non-local unification behavior type-vars include a
+"dependent Syntax" set; a set of Syntax elements put back on the worklist if
+this type unifies, beyond the expected parent and AST children.
+
+The normal HM unification steps are treated as the MAF transfer "functions",
+taking type-vars as inputs and producing new, unified, type-vars.  Because
+unification happens in-place (normal Tarjan disjoint-set union), the transfer
+"functions" are executed for side effects only, and return a progress flag.
+The transfer functions are virtual calls on each Syntax element.  Some steps
+are empty because of the pre-pass (Let,Con).
+
+HM Bases include anything from the GCP lattice, and are generally sharper than
+e.g. 'int'.  Bases with values of '3' and "abc" are fine.  These are widened to
+the normal HM types if returned from any primitive; they remain sharp if
+returned or passed to primitives.  HM functions that escape have their GCP type
+widened "as if" called from the most HM-general legal call site; otherwise GCP
+assumes escaping functions are never called and their arguments have
+unrealistic high flow types.
+
+HM includes polymorphic structures and fields (structural typing not duck
+typing), polymorphic nil-checking, constant bases and an error type-var.  Both
+HM and GCP types fully support recursive/cyclic types.
+
+HM errors keep all the not-unifiable types, all at once.  Further unifications
+with the error either add a new not-unifiable type, or unify with one of the
+prior types.  These means that types can ALWAYS unify, including nonsensical
+unifications between e.g. the constant 5 and a struct @{ x,y }.  The errors are
+reported when a type prints.
+
+Unification typically makes many temporary type-vars and immediately unifies
+them.  For efficiency, this algorithm checks to see if unification requires an
+allocation first, instead of just "allocate and unify".  The major place this
+happens is identifiers, which normally make a "fresh" copy of their type-var,
+then unify.  I use a combined "make-fresh-and-unify" unification algorithm
+there.  It is a structural clone of the normal unify, except that it lazily
+makes a fresh-copy of the left-hand-side on demand only; typically discovering
+that no fresh-copy is required.  This appears to reduce some worse-case
+examples to near-linear time.
+
+To engineer and debug the algorithm, the unification step includes a flag to
+mean "actually unify, and report a progress flag" vs "report if progress".  The
+report-only mode is aggressively asserted for in the main loop; all Syntax
+elements that can make progress are asserted as on the worklist.
+
+GCP gets the normal MAF treatment, no surprises there except perhaps the size
+of the GCP lattice.  The GCP lattice includes the obvious int and float ranges
+and constants, structs, aliases broken into equivalence classes, function
+indices (fidxs) also broken into equivalence classes (and this allows GCP to
+compute a reasonably precise Call Graph), contents of memory, and Return
+Program Counters ala continuations (no real use is made of these yet).
+
+The combined algorithm includes transfer functions taking facts from both MAF
+lattices, producing results in the other lattice.
+
+For the GCP->HM direction, the HM 'if' has a custom transfer function instead
+of the usual one.  Unification looks at the GCP value, and unifies either the
+true arm, or the false arm, or both or neither.  In this way GCP allows HM to
+avoid picking up constraints from dead code.
+
+Also for GCP->HM, the HM ground terms or base terms include anything from the
+GCP lattice.  The GCP fidxs / Call Graph is used to track HM terms that might
+come from a primitive or a escaped input.
+
+For the HM->GCP direction, the GCP 'apply' has a customer transfer function
+where the result from a call gets lifted (JOINed) based on the matching GCP
+inputs - and the match comes from using the same HM type-var on both inputs and
+outputs.  This allows e.g. "map" calls which typically merge many GCP values at
+many applies (call sites) and thus end up typed as a Scalar to Scalar, to
+improve the GCP type on a per-call-site basis.
+
+Also for HM->GCP, the HM types are used to constrain the GCP types that can
+call any escaped function.  You can think of this as using HM "module types" to
+derive the GCP calling types.
+
+Test case 45 demonstrates this combined algorithm, with a program which can
+only be typed using the combination of GCP and HM.
+
+BNF for the "core AA" syntax:
+   e  = number         | // Primitive numbers; note that wrapped AA numbers are explicitly wrapped in tests
+        string         | // More or less a proxy for arrays.
+        primitives     | // +, -, *, /, eq, etc
+        (fe0 fe1*)     | // Application.  Multiple args are allowed and tracked
+        { id* -> fe0 } | // Lambda.  Multiple args are allowed and tracked.  Numbered uniquely
+        id             | // Use of an id, either a lambda arg or in a Let/In
+        id = fe0; fe1  | // Eqv: letrec ld = fe0 in fe1
+        @{ (label = fe0;)* } | Structures.  Numbered uniquely.
+        fe = e         | // No  field after expression
+        fe.label         // Yes field after expression
+
+BNF for the "core AA" pretty-printed types:
+   T = Vnnn               | // Leaf number nnn
+       >>T1               | // Unified; lazyily collapsed with 'find()' calls
+       base               | // any lattice element, all are nilable
+       T0?T1              | // T1 is a not-nil T0
+       { T* -> Tret }     | // Lambda, arg count is significant
+       *T0                | // Ptr-to-struct; T0 is either a leaf, or unified, or a struct
+       @{ (label = T;)* } | // ';' is a field-seperator not a field-end
+       (Error base* T0*)
+
+   Multiple stacked T????s collapse
+*/
 
 public class HM {
   // Mapping from primitive name to PrimSyn
@@ -297,7 +312,7 @@ public class HM {
         if( fld==null ) throw unimpl("Missing term for field "+id);
         ids .push( id);
         flds.push(fld);
-        if( skipWS()==',' ) X++;
+        if( skipWS()==';' ) X++;
       }
       require('}');
       return new Struct(ids.asAry(),flds.asAry());

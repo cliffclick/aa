@@ -293,14 +293,14 @@ map ={fun parg -> (fun (cdr parg))};
 
   // Basic structure test
   @Test public void test25() {
-    rune("@{x=2, y=3}",
+    rune("@{x=2; y=3}",
          "*@{ x = 2; y = 3}",
          "*[7]@{^=any; x=2; y=3}",
          "[4,7]",null);
   }
 
   // Basic field test
-  @Test public void test26() { run("@{x =2, y =3}.x", "2", "2"); }
+  @Test public void test26() { run("@{x =2; y =3}.x", "2", "2"); }
 
   // Basic field test
   @Test public void test27() { run("5.x", "Missing field x in 5", "Scalar"); }
@@ -308,14 +308,14 @@ map ={fun parg -> (fun (cdr parg))};
   // Basic field test.
   @Test public void test28() { run("@{ y =3}.x", "Missing field x in *@{ y = 3}", "Scalar"); }
 
-  @Test public void test29() { rune("{ g -> @{x=g, y=g}}",
+  @Test public void test29() { rune("{ g -> @{x=g; y=g}}",
                                     "{ A -> *@{ x = A; y = A} }",
                                     "[19]{any,3 ->*[7]@{^=any; x=Scalar; y=Scalar} }",
                                     "[4,7]","[19]"); }
 
   // Load common field 'x', ignoring mismatched fields y and z
   @Test public void test30() {
-    rune("{ pred -> (if pred @{x=2,y=3} @{x=3,z= \"abc\"}) .x }",
+    rune("{ pred -> (if pred @{x=2; y=3} @{x=3; z= \"abc\"}) .x }",
          "{ A? -> nint8 }",
          "[23]{any,3 ->nint8 }",
          null,"[23]"); }
@@ -332,7 +332,7 @@ map ={fun parg -> (fun (cdr parg))};
   // no exit (it is an infinite loop, endlessly reading from an infinite input
   // and writing an infinite output), gcp gets a cyclic approximation.
   @Test public void test32() {
-    rune("map = { fcn lst -> @{ n1 = (map fcn lst.n0), v1 = (fcn lst.v0) } }; map",
+    rune("map = { fcn lst -> @{ n1 = (map fcn lst.n0); v1 = (fcn lst.v0) } }; map",
          "{ { A -> B } C:*@{ n0 = C; v0 = A; ...} -> D:*@{ n1 = D; v1 = B} }",
          "[19]{any,4 ->PA:*[7]@{^=any; n1=PA; v1=Scalar} }",
          "[4,7,10]","[19,21]");
@@ -342,7 +342,7 @@ map ={fun parg -> (fun (cdr parg))};
   // has the output memory alias, but not the input memory alias (which must be
   // made before calling 'map').
   @Test public void test33() {
-    rune("map = { fcn lst -> (if lst @{ n1=(map fcn lst.n0), v1=(fcn lst.v0) } 0) }; map",
+    rune("map = { fcn lst -> (if lst @{ n1=(map fcn lst.n0); v1=(fcn lst.v0) } 0) }; map",
          "{ { A -> B } C:*@{ n0 = C; v0 = A; ...}? -> D:*@{ n1 = D; v1 = B}? }",
          "[23]{any,4 ->PA:*[0,7]@{^=any; n1=PA; v1=Scalar} }",
          "[4,7,10]","[21,23]");
@@ -350,7 +350,7 @@ map ={fun parg -> (fun (cdr parg))};
 
   // Recursive linked-list discovery, applied
   @Test public void test34() {
-    rune("map = { fcn lst -> (if lst @{ n1 = (map fcn lst.n0), v1 = (fcn lst.v0) } 0) }; (map dec @{n0 = 0, v0 = 5})",
+    rune("map = { fcn lst -> (if lst @{ n1 = (map fcn lst.n0); v1 = (fcn lst.v0) } 0) }; (map dec @{n0 = 0; v0 = 5})",
          "A:*@{ n1 = A; v1 = int64}?",
          "PA:*[0,7]@{^=any; n1=PA; v1=4}",
          "[4,7]",null);
@@ -359,7 +359,7 @@ map ={fun parg -> (fun (cdr parg))};
   // Need to see if a map call, inlined a few times, 'rolls up'.  Sometimes
   // rolls up, sometimes not; depends on worklist visitation order.
   @Test public void test36() {
-    rune("map = { lst -> (if lst @{ n1= arg= lst.n0; (if arg @{ n1=(map arg.n0), v1=(str arg.v0)} 0), v1=(str lst.v0) } 0) }; map",
+    rune("map = { lst -> (if lst @{ n1= arg= lst.n0; (if arg @{ n1=(map arg.n0); v1=(str arg.v0)} 0); v1=(str lst.v0) } 0) }; map",
          "{ A:*@{ n0 = *@{ n0 = A; v0 = int64; ...}?; v0 = int64; ...}? -> B:*@{ n1 = *@{ n1 = B; v1 = *str:(int8)}?; v1 = *str:(int8)}? }",
          "[29]{any,3 ->PA:*[0,8]@{FA:^=any; n1=*[0,7]@{FA; n1=PA; FB:v1=*[4]str:(FA, int8)}; FB} }",
          "[4,7,8,10]","[29]" );
@@ -549,12 +549,12 @@ loop = { name cnt ->
          "};"+
          "forceSubtyping ={b ->(if b true false)};"+ // A unified version
          // Trying really hard here to unify 'true' and 'false'
-         "bool=@{true=(forceSubtyping 1), false=(forceSubtyping 0), force=forceSubtyping};"+
+         "bool=@{true=(forceSubtyping 1); false=(forceSubtyping 0); force=forceSubtyping};"+
          // Apply the unified 'false' to two different return contexts
          "testa=(bool.false.then { x-> 3 } { y-> 4 });"+
          "testb=(bool.false.then { z->@{}} { z->@{}});"+
          // Look at the results
-         "@{a=testa, b=testb, bool=bool}"+
+         "@{a=testa; b=testb; bool=bool}"+
          "",
          "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
          "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
@@ -629,15 +629,15 @@ boolSub ={b ->(if b true false)};
     rune("""
 all =
 true = @{
-  not = {unused -> all.false},
+  not = {unused -> all.false};
   then = {then else->(then 7) }
 };
 false = @{
-  not = {unused -> all.true},
+  not = {unused -> all.true};
   then = {then else->(else 7) }
 };
 boolSub ={b ->(if b true false)};
-@{true=true, false=false, boolSub=boolSub};
+@{true=true; false=false; boolSub=boolSub};
 all
 """,
         "*@{ boolSub = { A? -> *@{ not = { B -> C:*@{ not = { D -> C }; then = { { 7 -> E } { 7 -> E } -> E }} }; then = { { 7 -> F } { 7 -> F } -> F }} }; false = C; true = C}",
@@ -671,36 +671,36 @@ b=
     or__ = {o -> o}        // false OR  anything is that thing
     then = {then else->(else void) }
   };
-  @{true=true, false=false};
+  @{true=true; false=false};
 // Natural numbers are formed from zero (z) and succ (s).
 // They are structs which support zero, pred, succ and add.
 n=
 // Zero, is a struct supporting functions "zero" (always true), "pred"
 // (error; no predecessor of zero), "succ" successor, and "add_" which is a no-op.
   z = @{
-    zero = {unused ->b.true},
+    zero = {unused ->b.true};
     pred = err
-    succ = {unused -> (n.s n.z)},
+    succ = {unused -> (n.s n.z)};
     add_ = {o-> o}
   };
 // Successor, is a function taking a natural number and returning the successor
 // (which is just a struct supporting the functions of natural numbers).
   s = { pred ->
     self=@{
-      zero = {unused ->b.false},  // zero is always false for anything other than zero
-      pred = {unused -> pred },   // careful! 'pred=' is a label, the returned 'pred' was given as the argument 'pred->'
-      succ = {unused -> (n.s self)},
+      zero = {unused ->b.false};  // zero is always false for anything other than zero
+      pred = {unused -> pred };   // careful! 'pred=' is a label, the returned 'pred' was given as the argument 'pred->'
+      succ = {unused -> (n.s self)};
       add_ = {m -> ((pred.add_ m).succ void)} // a little odd, but really this counts down (via recursion) on the LHS and applies that many succ on the RHS
     };
     self
   };
-  @{s=s, z=z};
+  @{s=s; z=z};
 // Do some Maths
 one = (n.s n.z);      // One is the successor of zero
 two = (one.add_ one); // Two is one plus one
 three =(n.s two);     // Three is the successor of two
 // Return a result, so things are not dead.
-@{b=b,n=n, one=one,two=two,three=three}
+@{b=b;n=n; one=one;two=two;three=three}
 """,
         "*@{" +
         // Booleans, support AND, OR, THEN/ELSE.  Eg. b.false.and is a function which
@@ -842,7 +842,7 @@ three =(n.s two);     // Three is the successor of two
   // Checking an AA example
   @Test public void test59() {
     run("prod = { x -> (if x (i* (prod x.n) x.v) 1)};"+
-        "(prod @{n= @{n=0, v=3}, v=2})"+
+        "(prod @{n= @{n=0; v=3}; v=2})"+
         "",
         "int64",
         "int64");
@@ -854,7 +854,7 @@ three =(n.s two);     // Three is the successor of two
          "  self0=@{ succ = (sx self0)}; "+
          "  self0 "+
          "};"+
-         "self1=@{ succ = self1, nope=7 };"+
+         "self1=@{ succ = self1; nope=7 };"+
          "(sx self1)"+
          "",
          "A:*@{ succ=A}",
@@ -878,8 +878,8 @@ three =(n.s two);     // Three is the successor of two
                                    "Scalar");  }
 
   @Test public void test63() {
-    rune("A=@{x=3, y=3.2};"+
-         "B=@{x=4, z=\"abc\"};"+
+    rune("A=@{x=3; y=3.2};"+
+         "B=@{x=4; z=\"abc\"};"+
          "rez = { pred -> (if pred A B)};"+
          "rez"+
          "",
@@ -892,9 +892,9 @@ three =(n.s two);     // Three is the successor of two
   // pass in a field 'a'... and still no error.  Fixed.
   @Test public void test64() {
     rune("f = { p1 p2 -> (if p2.a p1 p2)};"+
-         "res1 = (f @{a=2,      c=\"def\"} @{    b=2.3,d=\"abc\"});"+
-         "res2 = (f @{a=2,b=1.2,c=\"def\"} @{a=3,b=2.3,d=\"abc\"});"+
-         "@{f=f,res1=res1,res2=res2}",
+         "res1 = (f @{a=2;      c=\"def\"} @{    b=2.3;d=\"abc\"});"+
+         "res2 = (f @{a=2;b=1.2;c=\"def\"} @{a=3;b=2.3;d=\"abc\"});"+
+         "@{f=f;res1=res1;res2=res2}",
 
          "*@{ f    =  { A:*@{ a=B;... } A -> A };"+
          "    res1 = *@{ a = Missing field a };"+
@@ -1041,14 +1041,14 @@ all
 rand = (factor 1.2);
 cage = { ->
   put = { pet ->
-    @{ put = put,
+    @{ put = put;
        get = pet
      }
   };
   (put 0)
 };
-cat = @{ name="Pete", purr_vol=1.2 };
-dog = @{ name="Spot", wag_rate=2.3 };
+cat = @{ name="Pete"; purr_vol=1.2 };
+dog = @{ name="Spot"; wag_rate=2.3 };
 cage1 = (cage);
 cage2 = (cage);
 catcage = (cage1.put cat);
@@ -1072,7 +1072,7 @@ maybepet = petcage.get;
   @Test public void test67() {
     rune("""
 all = @{
-  is_even = { dsp n -> (if (eq0 n) 0 (dsp.is_odd  dsp (dec n)))},
+  is_even = { dsp n -> (if (eq0 n) 0 (dsp.is_odd  dsp (dec n)))};
   is_odd  = { dsp n -> (if (eq0 n) 1 (dsp.is_even dsp (dec n)))}
 };
 { x -> (all.is_even all x)}
@@ -1102,7 +1102,7 @@ all = @{
 
   // Test example from AA with expanded ints
   @Test public void test71() {
-    rune("int = { i -> @{ i=i, add={ x y -> (int (+ x.i y.i))} } }; x=(int 3); y=(int 4); (x.add x y)",
+    rune("int = { i -> @{ i=i; add={ x y -> (int (+ x.i y.i))} } }; x=(int 3); y=(int 4); (x.add x y)",
         """
 A:*@{
   add={
@@ -1151,8 +1151,6 @@ A:*@{
          "[4,7,8,9,12]","[20]");
   }
 
-// CNC - Probably incorrectly typed from AA; Haskel gets a (slightly) different
-// type with no self-recursive infinite type
   @Test public void test78() {
     rune("I = {x->x};"+
          "K = {x->{y->x}};"+
@@ -1188,12 +1186,12 @@ A:*@{
     rune(
 """
 iwrap = { ii ->
-  @{ i = ii,
+  @{ i = ii;
      _*_ = { y -> (iwrap (i* ii y.i)) }
    }
 };
 fwrap = { ff ->
-  @{ f = ff,
+  @{ f = ff;
      _*_ = { y -> (fwrap (f* ff (i2f y.i))) }
    }
 };
