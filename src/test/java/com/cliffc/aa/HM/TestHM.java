@@ -25,10 +25,10 @@ public class TestHM {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_HMT=false;
-    DO_GCP=true;
-    RSEED=2;
-    test81();
+    DO_HMT=true;
+    DO_GCP=false;
+    RSEED=0;
+    test82();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -1196,10 +1196,20 @@ A:*@{
          "[4,7]",null);
   }
 
+
+  @Test public void test82() {
+    run("(&["                  +  // Define overloaded fcns 
+        "   { x -> (i* x 2) };"+  // Arg is 'int'
+        "   { x -> (i* x 3) };"+  // Arg is 'int'
+        "  ] 4)",                 // Error, ambiguous
+        "Ambiguous overloads: &[ { int64 -> %int64 }; { int64 -> %int64} ]", "~int64");
+  }
+
+
 // CNC test case here is trying to get HM to do some overload resolution.
 // Without, many simple int/flt tests in main AA using HM alone fail to find a
 // useful type.
-  @Test public void test82() {
+  @Test public void test84() {
     rune(
 """
 iwrap = { ii ->

@@ -210,13 +210,21 @@ public class HM {
   static void pass_err( Root prog) {
     prog.visit( syn -> {
         T2 self = syn.find();
+        // Nil check on fields
         if( syn instanceof Field fld ) {
-          T2 ptr = fld._ptr.find(), rec;
+          T2 ptr = fld._ptr.find();
           if( ptr.is_nil() || ptr._may_nil )
             self._err = "May be nil when loading field "+fld._id;
           if( self._err!=null && self._err.equals("Missing field") )
             self._err = "Missing field "+fld._id+" in "+ptr;
         }
+        // Check all Applys have resolved overloads
+        if( syn instanceof Apply apl ) {
+          T2 fover = apl._fun.find();
+          if( fover.is_over() && fover._unify_over( apl.make_nfun() ) == null )
+            self._err = "Ambiguous overloads: "+fover;
+        }
+        
         if( self.is_err2() && self.has_nil() )
           // If any contain nil, then we may have folded in a not-nil.
           // To preserve monotonicity, we make them all nil.
@@ -798,16 +806,13 @@ public class HM {
       //   any arg-pair-unifies make progress
       //   this-unify-_fun.return makes progress
       T2 tfun = _fun.find();
-      if( tfun.is_over() ) {
-        throw unimpl();
-      } else if( !tfun.is_fun() ) {    // Not a function, so progress
-        if( work==null ) return true; // Will-progress & just-testing
-        T2[] targs = new T2[_args.length+1];
-        for( int i=0; i<_args.length; i++ )
-          targs[i] = _args[i].find();
-        targs[_args.length] = find(); // Return
-        T2 nfun = T2.make_fun(targs);
-        progress = tfun.unify(nfun,work);
+      
+      if( !tfun.is_fun() ) {    // Not a function, so progress
+        T2 nfun = make_nfun();
+        progress = tfun.unify(nfun,work); // Unify.  If tfun is an Overload this is a trial unify
+        if( work==null )                  // Just testing, but did an allocation for the trial
+          { nfun.free(); return progress; }
+        tfun = nfun.find();
 
       } else {
         // Check for progress amongst arg pairs
@@ -838,6 +843,14 @@ public class HM {
       }
 
       return progress;
+    }
+    // Make a new T2 fun for the apply
+    private T2 make_nfun() {
+      T2[] targs = new T2[_args.length+1];
+      for( int i=0; i<_args.length; i++ )
+        targs[i] = _args[i].find();
+      targs[_args.length] = find(); // Return
+      return T2.make_fun(targs);
     }
     private boolean bad_arg_cnt(Work<Syntax> work) {
       if( find().is_err() ) return false;
@@ -2039,6 +2052,14 @@ public class HM {
       return new T2(new NonBlockingHashMap<>());      
     }
 
+    void free() {
+      if( _args!=null ) _args.clear();
+      _tflow = _eflow = null;
+      _is_fun = _is_obj = _may_nil = _open = false;
+      _is_copy = true;
+      _deps = null;
+      _err  = null;
+    }
     
     T2 debug_find() {// Find, without the roll-up
       if( !unified() ) return this; // Shortcut
@@ -2363,11 +2384,12 @@ public class HM {
       if( rez!=null ) return false; // Been there, done that
       DUPS.put(luid,that);          // Close cycles
 
+      if( is_over() ) return _unify_over(that,work);
+      if( that.is_over() )
+        throw unimpl();
+
       if( work==null ) return true; // Here we definitely make progress; bail out early if just testing
 
-      if( is_over() || that.is_over() )
-        throw unimpl();
-      
       // Structural recursion unification.
       if( (is_obj() && that.is_obj()) ||
           (is_fun() && that.is_fun()) ||
@@ -2473,8 +2495,7 @@ public class HM {
 
       // Check for mismatched LHS and RHS
       if( work==null ) {
-        if( is_over() && that.is_fun() )
-          return fresh_unify_over(that,nongen,null);
+        if( is_over() && that.is_fun() ) return _fresh_unify_over(that,nongen,null);
         if( _may_nil && !that._may_nil ) return true;
         if( is_ptr() && !that.is_ptr() ) return true;
         if( is_over()&& !that.is_over()) return true;
@@ -2503,7 +2524,7 @@ public class HM {
       // Both same (probably both nil)
       if( _args==that._args ) return progress;
 
-      if( this.is_over() ) return fresh_unify_over(that,nongen,work);
+      if( this.is_over() ) return _fresh_unify_over(that,nongen,work);
       if( that.is_over() ) throw unimpl();
 
       
@@ -2599,21 +2620,33 @@ public class HM {
       return t;
     }
 
-    // Fresh-unify an ad-hoc polymorphic overload to a function
-    private boolean fresh_unify_over( T2 that, VStack nongen, Work<Syntax> work ) {
+    // Fresh-unify with an ad-hoc polymorphic overload to a function
+    private boolean _unify_over( T2 that, Work<Syntax> work) {
+      T2 tover = _unify_over(that);
+      return tover != null && tover._unify(that, work);
+    }
+    // Fresh-unify with an ad-hoc polymorphic overload to a function
+    private boolean _fresh_unify_over( T2 that, VStack nongen, Work<Syntax> work) {
+      T2 tover = _unify_over(that);
+      return tover != null && tover._fresh_unify(that, nongen, work);
+    }
+    // Select an ad-hoc polymorphic overload to a function.  Picks the exact
+    // one which unifies without error, or 
+    private T2 _unify_over( T2 that ) {
+      assert is_over();
       if( !that.is_fun() ) throw unimpl();
 
       // Require exactly one of the overloads can unify without error.  If
       // there is more than one, then no progress (and no unification and the
       // program is ambiguous still).
       T2 no_err=null;
-      for( T2 overfun : _args.values() ) {
-        if( overfun.trial_unify(that) ) ;         // Error, ignore
-        else if( no_err==null ) no_err = overfun; // Collect non-errors
-        else return false;      // Two or more no-errors
-      }
+      for( T2 overfun : _args.values() )
+        if( !overfun.trial_unify(that) ) {  // If no error
+          if( no_err!=null ) return null;   // Two or more no-errors
+          no_err = overfun; // Collect non-errors
+        }
       if( no_err==null ) throw unimpl(); // All folks have error
-      return no_err._fresh_unify(that,nongen,work); // Exactly one non-error
+      return no_err; // Exactly 1 non-error
     }
 
     // Do a trial unification between this and that.  Report back if any error
