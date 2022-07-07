@@ -2687,10 +2687,9 @@ public class HM {
           T2 rhs = that.arg(id);
           if( rhs!=null && lhs._trial_unify(rhs) ) return true;
         }
-        if( this.mismatched_child(that) ) return true;
-        if( that.mismatched_child(this) ) return true;
-        return false;
+        return this.mismatched_child(that) || that.mismatched_child(this);
       }
+      if( is_over() && that.is_fun() ) return true;
       throw unimpl();
     }
     private boolean mismatched_child( T2 that ) {
