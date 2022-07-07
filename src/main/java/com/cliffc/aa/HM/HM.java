@@ -221,7 +221,7 @@ public class HM {
         // Check all Applys have resolved overloads
         if( syn instanceof Apply apl ) {
           T2 fover = apl._fun.find();
-          if( fover.is_over() && fover._unify_over( apl.make_nfun() ) == null )
+          if( fover.is_over() && fover._unify_over_fun( apl.make_nfun() ) == null )
             self._err = "Ambiguous overloads: "+fover;
         }
         
@@ -2384,9 +2384,16 @@ public class HM {
       if( rez!=null ) return false; // Been there, done that
       DUPS.put(luid,that);          // Close cycles
 
-      if( is_over() ) return _unify_over(that,work);
-      if( that.is_over() )
-        throw unimpl();
+      // Special case: overload vs function
+      if( is_over() && that.is_fun() ) {
+        T2 tover = _unify_over_fun(that);
+        if( tover==null ) return false; // No single overload
+        if( work==null ) return true;   // Progress!
+        tover._unify(that, work);       // Single overload normal unifies
+        return _union(that,work); // The overload is resolved and removed; hard-unioned into the result
+      }
+      if( this.is_over() ) throw unimpl();
+      if( that.is_over() ) throw unimpl();
 
       if( work==null ) return true; // Here we definitely make progress; bail out early if just testing
 
@@ -2489,13 +2496,26 @@ public class HM {
       if( that.is_nil() && !this.is_nil() )
         return unify_nil(that,work,nongen);
 
+
+      // Fresh-unify with an ad-hoc polymorphic overload to a function
+      if( this.is_over() && that.is_fun() ) {
+        T2 tover = this._unify_over_fun(that); // Select from the overload
+        return tover!=null && tover._fresh_unify(that, nongen, work);
+      }
+      if( that.is_over() && this.is_fun() ) {
+        T2 tover = that._unify_over_fun(this);
+        if( tover==null ) return false; // No resolved overload yet
+        if( work==null ) return true;   // Resolved overload
+        this._fresh_unify(tover,nongen,work);
+        return that._union(tover,work); // Overload is resolved and removed
+      }
+
       // Progress on the parts
       boolean progress = false;
       if( _tflow !=null ) progress = unify_base(that, work);
 
       // Check for mismatched LHS and RHS
       if( work==null ) {
-        if( is_over() && that.is_fun() ) return _fresh_unify_over(that,nongen,null);
         if( _may_nil && !that._may_nil ) return true;
         if( is_ptr() && !that.is_ptr() ) return true;
         if( is_over()&& !that.is_over()) return true;
@@ -2509,6 +2529,8 @@ public class HM {
           throw unimpl();         // TODO: direct fresh-unify?
         if( is_fun() && !that.is_fun() ) // Error, fresh_unify a fun into a non-fun non-leaf
           that.cp_args(_args)._is_fun=progress=true;
+        if( is_over() && !that.is_over() )
+          throw unimpl();
         if( is_obj() && !that.is_obj() ) // Error, fresh_unify a struct into a non-struct non-leaf
           that.cp_args(_args)._is_obj=progress=true;
         if( _err!=null && !Util.eq(_err,that._err) ) {
@@ -2524,10 +2546,6 @@ public class HM {
       // Both same (probably both nil)
       if( _args==that._args ) return progress;
 
-      if( this.is_over() ) return _fresh_unify_over(that,nongen,work);
-      if( that.is_over() ) throw unimpl();
-
-      
       // Structural recursion unification, lazy on LHS
       boolean missing = size()!= that.size();
       if( _args != null )
@@ -2620,61 +2638,68 @@ public class HM {
       return t;
     }
 
-    // Fresh-unify with an ad-hoc polymorphic overload to a function
-    private boolean _unify_over( T2 that, Work<Syntax> work) {
-      T2 tover = _unify_over(that);
-      return tover != null && tover._unify(that, work);
-    }
-    // Fresh-unify with an ad-hoc polymorphic overload to a function
-    private boolean _fresh_unify_over( T2 that, VStack nongen, Work<Syntax> work) {
-      T2 tover = _unify_over(that);
-      return tover != null && tover._fresh_unify(that, nongen, work);
-    }
-    // Select an ad-hoc polymorphic overload to a function.  Picks the exact
-    // one which unifies without error, or 
-    private T2 _unify_over( T2 that ) {
-      assert is_over();
-      if( !that.is_fun() ) throw unimpl();
-
+    // Given an overload &[ A, B, C, ...] and a fun F, return the single match
+    // from the overload (one of A, B, C, ...) or null if not zero matches or
+    // two or more matches.
+    private T2 _unify_over_fun( T2 that ) {
+      assert is_over() && that.is_fun();
       // Require exactly one of the overloads can unify without error.  If
       // there is more than one, then no progress (and no unification and the
       // program is ambiguous still).
       T2 no_err=null;
-      for( T2 overfun : _args.values() )
+      for( String id : _args.keySet() ) {
+        T2 overfun = arg(id);
         if( !overfun.trial_unify(that) ) {  // If no error
           if( no_err!=null ) return null;   // Two or more no-errors
           no_err = overfun; // Collect non-errors
         }
-      if( no_err==null ) throw unimpl(); // All folks have error
-      return no_err; // Exactly 1 non-error
+      }
+      return no_err; // Non-null if exactly 1 non-error
     }
 
     // Do a trial unification between this and that.  Report back if any error
     // happens.  No change to either side, this is a trial only.
+    private static final NonBlockingHashMapLong<T2> TDUPS = new NonBlockingHashMapLong<>();
     private boolean trial_unify(T2 that) {
+      TDUPS.clear();
       return _trial_unify(that);
     }
     private boolean _trial_unify(T2 that) {
       assert !unified() && !that.unified();
-      if( this==that ) return false;
-      if( this.is_leaf() ) return false;
-      if( that.is_leaf() ) return false;
+      long duid = dbl_uid(that._uid);
+      if( TDUPS.putIfAbsent(duid,this)!=null )
+        return false; // Visit only once
+      if( this==that ) return false;     // No error
+      if( this.is_leaf() ) return false; // No error
+      if( that.is_leaf() ) return false; // No error
       if( this.is_base() && that.is_base() )
         // No error if same base class.  Might be progress, but no error.
         // Note: still too weak if looking at trial unify of errors,
         // as might have same class in one of the error types.
         return _tflow.getClass()!=that._tflow.getClass();
-
-      if( is_fun() && that.is_fun() ) {
+      // Same basic tvar class checks children
+      if( is_fun() && that.is_fun() ||
+          is_ptr() && that.is_ptr() ||
+          is_over()&& that.is_over()||
+          is_obj() && that.is_obj() ) {
         for( String id : _args.keySet() ) {
           T2 lhs = this.arg(id);
           T2 rhs = that.arg(id);
-          if( rhs==null || lhs._trial_unify(rhs) ) return true;
+          if( rhs!=null && lhs._trial_unify(rhs) ) return true;
         }
+        if( this.mismatched_child(that) ) return true;
+        if( that.mismatched_child(this) ) return true;
         return false;
       }
       throw unimpl();
-    }    
+    }
+    private boolean mismatched_child( T2 that ) {
+      if( !that.is_open() )   // If RHS is closed
+        for( String id : _args.keySet() )
+          if( that.arg(id)==null ) // And missing key in RHS
+            return true;           // Trial unification failed
+      return false;
+    }
 
     // -----------------
     private static final VBitSet ODUPS = new VBitSet();

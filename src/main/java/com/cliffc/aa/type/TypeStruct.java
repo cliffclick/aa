@@ -704,6 +704,10 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
           fld = TypeFld.valueOfArg(P, fid);
           if( fld==null ) aidx++; // Parse "(int64)" correct; tuple with leading id not field name
         }
+        if( fld==null && P.peek("...") ) {
+          ts._def=ANY;
+          break;
+        }
         if( fld==null )         // Parse a field
           fld = is_tup ? TypeFld.valueOfTup(P,fid,aidx) : TypeFld.valueOfArg(P,fid);
 

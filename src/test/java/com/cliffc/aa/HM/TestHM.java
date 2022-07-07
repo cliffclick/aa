@@ -28,7 +28,7 @@ public class TestHM {
     DO_HMT=true;
     DO_GCP=false;
     RSEED=0;
-    test82();
+    test83();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -1206,29 +1206,81 @@ A:*@{
   }
 
 
-// CNC test case here is trying to get HM to do some overload resolution.
-// Without, many simple int/flt tests in main AA using HM alone fail to find a
-// useful type.
-  @Test public void test84() {
+
+  // CNC test case here is trying to get HM to do some overload resolution.
+  // Without, many simple int/flt tests in main AA using HM alone fail to find
+  // a useful type.
+  @Test public void test83() {
     rune(
 """
-iwrap = { ii ->
-  @{ i = ii;
-     _*_ = { y -> (iwrap (i* ii y.i)) }
-   }
-};
 fwrap = { ff ->
   @{ f = ff;
-     _*_ = { y -> (fwrap (f* ff (i2f y.i))) }
+     _*_ = &[
+       { y -> (fwrap (f* ff (i2f y.i))) };
+       { y -> (fwrap (f* ff      y.f)) }
+     ]
+   }
+};
+iwrap = { ii ->
+  @{ i = ii;
+     _*_ = &[
+       { y -> (iwrap (i*      ii  y.i)) };
+       { y -> (fwrap (f* (i2f ii) y.f)) }
+     ]
    }
 };
 
-mul2 = { x -> (x._*_ (iwrap 2))};
-(mul2 (fwrap 2.1))
+con2   = (iwrap 2  );
+con2_1 = (fwrap 2.1);
+(con2._*_ con2)
 """,
-        "A:*@{ _*_ = { B:*@{ _*_ = { *@{i=int64;...} -> B }; i=int64 } -> A }; f=flt64}",
-        "PA:*[8]@{^=any; _*_ = [26]{any,3 ->PA }; f=flt64}",
-        "[4,8,10]","[26]");
+"""
+A:*@{_*_ = { B:*@{_*_=&[{*@{i=int64;...}->B};{*@{f=flt64;...}->C:*@{_*_=&[{*@{i=int64;...}->C};{*@{f=flt64;...}->C}];f=flt64}}];i=int64}
+            -> A };
+     i=int64
+}
+""",
+        "*[](...)",
+        null,null);
+  }
+
+
+
+  // CNC test case here is trying to get HM to do some overload resolution.
+  // Without, many simple int/flt tests in main AA using HM alone fail to find
+  // a useful type.
+  @Test public void test84() {
+    rune(
+"""
+fwrap = { ff ->
+  @{ f = ff;
+     _*_ = &[
+       { y -> (fwrap (f* ff (i2f y.i))) };
+       { y -> (fwrap (f* ff      y.f)) }
+     ]
+   }
+};
+iwrap = { ii ->
+  @{ i = ii;
+     _*_ = &[
+       { y -> (iwrap (i*      ii  y.i)) };
+       { y -> (fwrap (f* (i2f ii) y.f)) }
+     ]
+   }
+};
+
+con2   = (iwrap 2  );
+con2_1 = (fwrap 2.1);
+mul2 = { x -> (x._*_ con2)};
+(triple (mul2 con2_1)  (con2._*_ con2) (con2_1._*_ con2_1))
+""",
+        "*("+
+"A:*@{_*_={B:*@{_*_=&[{*@{i=int64;...}->B};{*@{f=flt64;...}->C:*@{_*_=&[{*@{i=int64;...}->C};{*@{f=flt64;...}->C}];f=flt64}}];i=int64}->A};f=flt64},"+
+"D:*@{_*_={E:*@{_*_=&[{*@{i=int64;...}->E};{*@{f=flt64;...}->F:*@{_*_=&[{*@{i=int64;...}->F};{*@{f=flt64;...}->F}];f=flt64}}];i=int64}->D};i=int64},"+
+"G:*@{_*_={H:*@{_*_=&[{*@{i=int64;...}->H};{*@{f=flt64;...}->H}];f=flt64}->G};f=flt64}"+
+")",
+        "*[9](FA:^=any, PA:*[7]@{FA; _*_=[~21+23]{any,3 ->PA }; f=flt64}, *[](...), PA)",
+        "[4,7,9,10,11]","[21,23]");
   }
 }
 

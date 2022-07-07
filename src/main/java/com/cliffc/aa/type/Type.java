@@ -812,6 +812,13 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       if( skipWS()==c ) { _x++; return true; }
       else return false;
     }
+    boolean peek(String s) {
+      if( skipWS()!=s.charAt(0) ) return false;
+      for( int i=1; i<s.length(); i++ )
+        if( at(_x+i)!=s.charAt(i) ) return false;
+      _x+= s.length();
+      return true;
+    }
     boolean eos() { return _x >= _str.length(); }
     // A number.  Either a pure integer, or contains a '.' and a double.
     // Possibly followed by a 'f' for a float.
@@ -851,10 +858,11 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     <B extends Bits<B>> B bits( B b ) {
       require('[');
       if( peek(']') ) return b; // Empty
+      boolean dual = peek('~');
       do b = b.set(is_all() ? 1 : (int)num());
-      while( peek(',') );
+      while( peek(dual ? '+' : ',') );
       require(']');
-      return b;
+      return dual ? b.dual() : b;
     }
     private boolean is_all() { if( _str.startsWith("ALL", _x) ) { _x +=3; return true; } else return false; }
     // Demand
