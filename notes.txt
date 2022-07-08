@@ -1,4 +1,19 @@
 =======================================
+7/8/2022
+
+Overloads in HM mostly working.
+
+- Overload entries are named (ordered).
+- Unification of overloads is by name (order).
+- No good AA syntax for naming, just ordering.
+- Mostly fine for the primitives.
+
+- GCP still needs to handle the sum-of-products for FIDXS.
+- Currently mixing unions of joins gives me the BitsFun.EMPTY set,
+  which means GCP reports a REALLY bad answer for Apply results.
+
+
+=======================================
 6/28/2022
 
 Much progress on primitives and HM.

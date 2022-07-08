@@ -868,34 +868,35 @@ public class HM {
     @Override Type val(Work<Syntax> work) {
       Type flow = _fun._flow;
       if( !(flow instanceof TypeFunPtr tfp) ) return flow.oob(TypeNil.SCALAR);
-      if( tfp._fidxs == BitsFun.EMPTY )  return TypeNil.XSCALAR;  // Nothing being called, stay high
-      // If the input function is an overloaded function, and resolved by HMT
-      // trim the functions down (and sharpen the return type).
-      T2 t2fun = _fun.find();
-      if( tfp._fidxs.above_center() && t2fun.is_fun() ) {
-        int xfdx=0;
-        for( int fidx : tfp._fidxs ) {
-          Func lam = Lambda.FUNS.get(fidx);
-          T2 ffun = lam.as_fun();
-          if( t2fun.cycle_equals(ffun) )
-            if( xfdx==0 ) xfdx=fidx;
-            else throw unimpl();
+      if( tfp._fidxs != BitsFun.EMPTY ) { // Nothing being called
+        // If the input function is an overloaded function, and resolved by HMT
+        // trim the functions down (and sharpen the return type).
+        T2 t2fun = _fun.find();
+        if( tfp._fidxs.above_center() && t2fun.is_fun() ) {
+          Func lam1=null;
+          for( int fidx : tfp._fidxs ) {
+            Func lam = Lambda.FUNS.get(fidx);
+            T2 ffun = lam.as_fun();
+            if( t2fun.cycle_equals(ffun) )
+              if( lam1==null ) lam1=lam;
+              else throw unimpl();
+          }
+          if( lam1!=null ) // Found exactly one resolvable HMT choice
+            tfp = (TypeFunPtr)((Lambda)lam1)._flow;
         }
-        if( xfdx!=0 ) // Found exactly one resolvable HMT choice
-          tfp = (TypeFunPtr)((Lambda)Lambda.FUNS.get(xfdx))._flow;
+        // Meet all calling arguments over all called function args.  Lazily
+        // building a call-graph, needed to track arg_meet.  We got here
+        // because, e.g. _fun._flow added some more functions, all those new
+        // functions need the arg_meet.
+        if( !tfp._fidxs.above_center() && work!=null && tfp._fidxs != BitsFun.NALL )
+          for( int fidx : tfp._fidxs ) {
+            Func lambda = Lambda.FUNS.get(fidx);
+            // new call site for lambda; all args must meet into this lambda;
+            lambda.apply_push(this);
+            for( int i=0; i<_args.length; i++ )
+              lambda.arg_meet(i,_args[i]._flow,work);
+          }
       }
-      // Meet all calling arguments over all called function args.
-      // Lazily building a call-graph, needed to track arg_meet.
-      // We got here because, e.g. _fun._flow added some more functions, all those
-      // new functions need the arg_meet.
-      if( work!=null && tfp._fidxs != BitsFun.NALL && !tfp._fidxs.above_center() )
-        for( int fidx : tfp._fidxs ) {
-          Func lambda = Lambda.FUNS.get(fidx);
-          // new call site for lambda; all args must meet into this lambda;
-          lambda.apply_push(this);
-          for( int i=0; i<_args.length; i++ )
-            lambda.arg_meet(i,_args[i]._flow,work);
-        }
 
       // Attempt to lift the result, based on HM types.
       Type lifted = do_apply_lift(find(),tfp._ret, work==null);
@@ -2392,8 +2393,8 @@ public class HM {
         tover._unify(that, work);       // Single overload normal unifies
         return _union(that,work); // The overload is resolved and removed; hard-unioned into the result
       }
-      if( this.is_over() ) throw unimpl();
-      if( that.is_over() ) throw unimpl();
+      if( is_over() && !that.is_over() ) throw unimpl();
+      if( that.is_over() && !that.is_over() ) throw unimpl();
 
       if( work==null ) return true; // Here we definitely make progress; bail out early if just testing
 
@@ -2401,7 +2402,8 @@ public class HM {
       if( (is_obj() && that.is_obj()) ||
           (is_fun() && that.is_fun()) ||
           (is_nil() && that.is_nil()) ||
-          (is_ptr() && that.is_ptr()) )
+          (is_ptr() && that.is_ptr()) ||
+          (is_over()&& that.is_over()) )
         unify_flds(this,that,work);
       // Union the top-level part
       return find().union(that.find(),work);
@@ -2525,8 +2527,7 @@ public class HM {
       } else {
         if( _may_nil && !that._may_nil ) { progress = that._may_nil = true; }
         if( is_ptr() && !that.is_ptr() ) // Error, fresh_unify a ptr into a non-ptr non-leaf
-          //return vput(that,that._unify(_fresh(nongen),work));
-          throw unimpl();         // TODO: direct fresh-unify?
+          { that.cp_args(_args); progress=true; }
         if( is_fun() && !that.is_fun() ) // Error, fresh_unify a fun into a non-fun non-leaf
           that.cp_args(_args)._is_fun=progress=true;
         if( is_over() && !that.is_over() )
@@ -2640,7 +2641,7 @@ public class HM {
 
     // Given an overload &[ A, B, C, ...] and a fun F, return the single match
     // from the overload (one of A, B, C, ...) or null if not zero matches or
-    // two or more matches.
+    // two or more matches.  Never modifies anything.
     private T2 _unify_over_fun( T2 that ) {
       assert is_over() && that.is_fun();
       // Require exactly one of the overloads can unify without error.  If
@@ -2689,8 +2690,7 @@ public class HM {
         }
         return this.mismatched_child(that) || that.mismatched_child(this);
       }
-      if( is_over() && that.is_fun() ) return true;
-      throw unimpl();
+      return true;
     }
     private boolean mismatched_child( T2 that ) {
       if( !that.is_open() )   // If RHS is closed

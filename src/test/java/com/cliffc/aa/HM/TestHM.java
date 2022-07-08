@@ -27,8 +27,8 @@ public class TestHM {
 
     DO_HMT=true;
     DO_GCP=false;
-    RSEED=0;
-    test83();
+    RSEED=2;
+    test84();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -1214,10 +1214,25 @@ A:*@{
          null,null);
   }
 
+  // Mixing unrelated overloads
+  @Test public void test84() {
+    rune("""
+fx = &[ { x -> 3     }; { y -> "abc" }; ];
+fy = &[ { z -> "def" }; { a -> 4     }; ];
+fz = (if (rand 2) fx fy);
+(isempty (fz 1.2))
+""",
+         "int1",
+         "~Scalar",
+         null,null);
+  }
+
+
+
   // CNC test case here is trying to get HM to do some overload resolution.
   // Without, many simple int/flt tests in main AA using HM alone fail to find
   // a useful type.
-  @Test public void test84() {
+  @Test public void test85() {
     rune(
 """
 fwrap = { ff ->
