@@ -26,9 +26,9 @@ public class TestHM {
     JIG=true;
 
     DO_HMT=true;
-    DO_GCP=false;
-    RSEED=2;
-    test84();
+    DO_GCP=true;
+    RSEED=0;
+    test65();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -41,7 +41,7 @@ public class TestHM {
       String esc_ptrs2 = "*"+esc_ptrs+"()";
       String esc_funs2 =     esc_funs+"{any,3->Scalar}";
       BitsAlias aliases = esc_ptrs==null ? BitsAlias.EMPTY : ((TypeMemPtr)Type.valueOf(esc_ptrs2))._aliases;
-      BitsFun   fidxs   = esc_funs==null ? BitsFun  .EMPTY : ((TypeFunPtr)Type.valueOf(esc_funs2))._fidxs  ;
+      BitsFun   fidxs   = esc_funs==null ? BitsFun  .EMPTY : ((TypeFunPtr)Type.valueOf(esc_funs2)).fidxs() ;
       aliases = aliases.meet(TypeMemPtr.STRPTR._aliases); // Always string alias
       assertEquals(aliases,Root.EXT_ALIASES);
       assertEquals(fidxs  ,Root.EXT_FIDXS  );
@@ -1199,7 +1199,7 @@ A:*@{
 
   // Ambiguous overload, {int->int}, cannot select
   @Test public void test82() {
-    run("(&["                  +  // Define overloaded fcns 
+    run("(&["                  +  // Define overloaded fcns
         "   { x -> (i* x 2) };"+  // Arg is 'int'
         "   { x -> (i* x 3) };"+  // Arg is 'int'
         "  ] 4)",                 // Error, ambiguous

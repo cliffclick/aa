@@ -160,11 +160,13 @@ public class Env implements AutoCloseable {
     Type mem = Env.ROOT.in(MEM_IDX)._val;
     TypeStruct formals = null;
     if( rez._val instanceof TypeFunPtr tfp ) {
-      RetNode ret = RetNode.get(tfp._fidxs);
-      if( ret != null ) formals = ret.formals();
+      // Need to return the meet of all formals
+      //RetNode ret = RetNode.get(tfp.fidx()); 
+      //if( ret != null ) formals = ret.formals();
+      throw unimpl();
     }
     TypeTuple ttroot = (TypeTuple)Env.ROOT._val;
-    BitsFun   fidxs   = ((TypeFunPtr)ttroot.at(3))._fidxs  ;
+    BitsFun   fidxs   = ((TypeFunPtr)ttroot.at(3)).fidxs(); // Can return a meet-of-joins?
     BitsAlias aliases = ((TypeMemPtr)ttroot.at(4))._aliases;
     return new TypeEnv(rez._val,
                        fidxs,   // Escaping FIDXS

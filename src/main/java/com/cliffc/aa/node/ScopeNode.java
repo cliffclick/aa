@@ -131,7 +131,7 @@ public class ScopeNode extends Node {
       for( int i=ARG_IDX+1 ; i<scope._defs._len; i++ ) {
         if( !(scope.in(i) instanceof RetNode ret) ) continue;
         int fidx = ret.fidx();
-        if( ret._val instanceof TypeTuple tret && tfp._fidxs.test(fidx) ) {
+        if( ret._val instanceof TypeTuple tret && tfp.test(fidx) ) {
           TypeMem post_call = (TypeMem)tret.at(MEM_IDX);
           TypeMem cepi_out;
           if( tmem0==post_call ) {

@@ -44,11 +44,16 @@ HM includes polymorphic structures and fields (structural typing not duck
 typing), polymorphic nil-checking, constant bases and an error type-var.  Both
 HM and GCP types fully support recursive/cyclic types.
 
-HM errors keep all the not-unifiable types, all at once.  Further unifications
-with the error either add a new not-unifiable type, or unify with one of the
-prior types.  These means that types can ALWAYS unify, including nonsensical
-unifications between e.g. the constant 5 and a struct @{ x,y }.  The errors are
-reported when a type prints.
+HM includes ad-hoc polymorphims via overloaded functions.  A set of overloads
+are unambiguously resolved to a single function, or else error-typed as
+ambiguous.  This is done by doing *trial-unifications* until only a single
+overload target resolves without an error.  
+
+HM errors keep all the not-unifiable types, all at once, as a special case of a
+union type.  Further unifications with the error either add a new not-unifiable
+type, or unify with one of the prior types.  These means that types can ALWAYS
+unify, including nonsensical unifications between e.g. the constant 5 and a
+struct @{ x,y }.  The errors are reported when a type prints.
 
 Unification typically makes many temporary type-vars and immediately unifies
 them.  For efficiency, this algorithm checks to see if unification requires an
@@ -57,8 +62,8 @@ happens is identifiers, which normally make a "fresh" copy of their type-var,
 then unify.  I use a combined "make-fresh-and-unify" unification algorithm
 there.  It is a structural clone of the normal unify, except that it lazily
 makes a fresh-copy of the left-hand-side on demand only; typically discovering
-that no fresh-copy is required.  This appears to reduce some worse-case
-examples to near-linear time.
+that no fresh-copy is required.  This appears to reduce some worst case
+examples to near linear time.
 
 To engineer and debug the algorithm, the unification step includes a flag to
 mean "actually unify, and report a progress flag" vs "report if progress".  The
@@ -835,7 +840,7 @@ public class HM {
       // Flag HMT result as widening, if GCP falls to a TFP which widens in HMT.
       T2 tret = tfun.find().arg("ret");
       if( tret._is_copy && _fun._flow instanceof TypeFunPtr tfp ) {
-        for( int fidx : tfp._fidxs )
+        for( int fidx : tfp.fidxs() )
           if( fidx!=0 && !Lambda.FUNS.get(fidx).as_fun().arg("ret")._is_copy ) {
             if( work!=null ) tret.clr_cp();
             return true;
@@ -868,13 +873,13 @@ public class HM {
     @Override Type val(Work<Syntax> work) {
       Type flow = _fun._flow;
       if( !(flow instanceof TypeFunPtr tfp) ) return flow.oob(TypeNil.SCALAR);
-      if( tfp._fidxs != BitsFun.EMPTY ) { // Nothing being called
+      if( !tfp.is_empty() ) {   // Nothing being called
         // If the input function is an overloaded function, and resolved by HMT
         // trim the functions down (and sharpen the return type).
         T2 t2fun = _fun.find();
-        if( tfp._fidxs.above_center() && t2fun.is_fun() ) {
+        if( tfp.above_center() && t2fun.is_fun() ) {
           Func lam1=null;
-          for( int fidx : tfp._fidxs ) {
+          for( int fidx : tfp.fidxs() ) {
             Func lam = Lambda.FUNS.get(fidx);
             T2 ffun = lam.as_fun();
             if( t2fun.cycle_equals(ffun) )
@@ -888,8 +893,8 @@ public class HM {
         // building a call-graph, needed to track arg_meet.  We got here
         // because, e.g. _fun._flow added some more functions, all those new
         // functions need the arg_meet.
-        if( !tfp._fidxs.above_center() && work!=null && tfp._fidxs != BitsFun.NALL )
-          for( int fidx : tfp._fidxs ) {
+        if( !tfp.above_center() && work!=null && !tfp.is_full() )
+          for( int fidx : tfp.fidxs() ) {
             Func lambda = Lambda.FUNS.get(fidx);
             // new call site for lambda; all args must meet into this lambda;
             lambda.apply_push(this);
@@ -970,8 +975,8 @@ public class HM {
       // child arg to a call-site changed; find the arg#;
       int argn = Util.find(_args,child);
       // visit all Lambdas; meet the child flow into the Lambda arg#
-      if( argn != -1 && tfp._fidxs != BitsFun.NALL && !tfp._fidxs.above_center() )
-        for( int fidx : tfp._fidxs )
+      if( argn != -1 && !tfp.is_full() && !tfp.above_center() )
+        for( int fidx : tfp.fidxs() )
           Lambda.FUNS.get(fidx).arg_meet(argn,child._flow,work);
     }
 
@@ -1067,10 +1072,9 @@ public class HM {
       if( t instanceof TypeFunPtr tfp && !ESCF.tset(tfp._uid) ) {
         // Walk all escaped function args, and call them (like an external
         // Apply might) with the most conservative flow arguments possible.
-        for( int fidx : tfp._fidxs ) {
-          if( fidx==0 ) continue;
-          do_fidx(fidx, work);
-        }
+        for( int fidx : tfp.fidxs() )
+          if( fidx!=0 ) 
+            do_fidx(fidx, work);
         // The flow return also escapes
         _escapes(tfp._ret,work);
       }
@@ -1435,7 +1439,7 @@ public class HM {
         if( !tf.above_center() ) { // Input is still falling
           if( !(tf instanceof TypeFunPtr tfp) )
             return TypeNil.SCALAR; // Some fun is below any function, so are we
-          tf = tfp.make_from(tfp._fidxs.dual()); // Use the high TFP for choice
+          tf = tfp.make_from(tfp.fidxs().dual()); // Use the high TFP for choice
         }
         t = t.join(tf);
       }
@@ -2886,13 +2890,13 @@ public class HM {
 
       if( is_fun() ) {          // Walk returns not arguments
         Type tret = t instanceof TypeFunPtr tfp ? tfp._ret  : t.oob(TypeNil.SCALAR);
-        BitsFun fidxs = t instanceof TypeFunPtr tfp ? tfp._fidxs  : (t.above_center() ? BitsFun.EMPTY : BitsFun.NALL);
-        Type tdsp = Type.ANY;
         if( WDUPS.get(_uid)!=null ) return t;
         WDUPS.put(_uid,t);
         Type trlift = arg("ret").walk_types_out(tret, apply, test);
         WDUPS.remove(_uid);
-        return TypeFunPtr.makex( fidxs,size()-1+DSP_IDX, tdsp, trlift);
+        return t instanceof TypeFunPtr tfp
+          ? tfp.make_from(Type.ANY,trlift)
+          : TypeFunPtr.makex((t.above_center() ? BitsFun.EMPTY : BitsFun.NALL),size()-1+DSP_IDX, Type.ANY, trlift);
       }
 
       if( is_obj() ) return t; // expect ptrs to be simple, so t is ISUSED

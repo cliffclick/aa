@@ -3,54 +3,30 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.util.*;
 import java.util.Arrays;
 
-// Class to make hash-cons TypeFld[].  Fields are unordered - so really
-// alpha-sorted to be canonical.  Bug to change after interning.
-public class TypeFlds {
-  // Lazy expanding list of Ary<TypeFld> customized to handle various TypeFld[] lengths.
-  private static final Ary<TypeFlds> TYPEARY = new Ary<>(new TypeFlds[1],0);
-
-  private static final TypeFld DEAD = null;
-
-  // Make a Ary<Type> to handle Type[] of length 'len'
-  private static TypeFlds tary( int len) {
-    TypeFlds tary = TYPEARY.atX(len);
-    return tary==null ? TYPEARY.setX(len,new TypeFlds(len)) : tary;
+// An AryI generified to TypeFld
+public class TypeFlds extends AryI<TypeFld> {
+  private static final TypeFlds TYPEFLDS = new TypeFlds(-1);
+  @Override Ary<AryI<TypeFld>> clinit() { return new Ary<>(new TypeFlds[1],0); }
+  @Override TypeFlds make_holder(int len) { return new TypeFlds(len); }
+  @Override TypeFld[] make_ary(int len) { return new TypeFld[len]; }
+  @Override TypeFld[][] make_arys(int len) { return new TypeFld[len][]; }
+  @Override int compute_hash(TypeFld[] ts) {
+    for( TypeFld t : ts ) Util.add_hash( t._hash );
+    return (int)Util.get_hash();
   }
-
-  private static final Key K = new Key(null,0);
+  TypeFlds(int len) { super(len); }
+  // Static forwards
+  public static TypeFld[] get(int len) { return TYPEFLDS._get(len); }
+  public static TypeFld[] hash_cons(TypeFld[] ts) { return TYPEFLDS._hash_cons(ts); }
+  public static boolean   interned (TypeFld[] ts) { return TYPEFLDS._interned (ts); }
+  public static void free(TypeFld[] ts) { TYPEFLDS._free(ts); }
+  public static TypeFld[] make(TypeFld t0) { return hash_cons(TYPEFLDS._ts(t0)); }
+  public static TypeFld[] make(TypeFld t0, TypeFld t1) { return hash_cons(TYPEFLDS._ts(t0,t1)); }
+  public static TypeFld[] clone(TypeFld[] ts) { return TYPEFLDS._clone(ts); }
+  public static TypeFld[] copyOf(TypeFld[] ts, int len) { return TYPEFLDS._copyOf(ts,len); }
 
   public static final TypeFld[] EMPTY = hash_cons(get(0));
 
-  // Wrapper to customize array.equals
-  private static class Key {
-    TypeFld[] _ts;
-    int _hash;
-    private Key(TypeFld[] ts, int hash) {
-      _ts=ts;
-      _hash = hash;
-      // Only handed sorted fields
-      if( ts!=null )
-        for( int i=0; i<ts.length-1; i++ )
-          assert sbefore(ts[i]._fld,ts[i+1]._fld);
-    }
-    private static int hash( TypeFld[] ts ) {
-      for( Type t : ts ) Util.add_hash( t._hash);
-      return (int)Util.get_hash();
-    }
-    @Override public int hashCode() { return _hash; }
-    @Override public boolean equals(Object o) {
-      if( !(o instanceof Key key) ) return false;
-      TypeFld[] ts = key._ts;
-      // This series of tests is NOT the same as Arrays.equals(), since it
-      // bottoms out in a pointer-equality test instead of 'equals'.
-      if( _ts==ts ) return true;
-      if( _ts.length != ts.length ) return false;
-      for( int i=0; i<ts.length; i++ )
-        if( _ts[i]!=ts[i] )
-          return false;
-      return true;
-    }
-  }
   // Are the fields in order?
   public static boolean sbefore(String s0, String s1) {
     if( Util.eq(s0,"^") ) return true;
@@ -58,111 +34,9 @@ public class TypeFlds {
     return s0.compareTo(s1) < 0;
   }
 
-  private int _cnt;             // Count of new allocations
-  private final int _len;       // Length of arrays being handled
-  private final IHashMap _intern = new IHashMap();
-  private final Ary<TypeFld[]> _free = new Ary<>(new TypeFld[1][],0);
-  private TypeFlds( int len ) { _len=len; }
-
-  // Return a free TypeFld[]
-  private TypeFld[] get() {
-    if( _free.isEmpty() ) {
-      _cnt++;  assert _cnt<1000;
-      _free.push(new TypeFld[_len]);
-    }
-    return _free.pop();
-  }
-
-  private TypeFld[] hash_cons_(TypeFld[] ts) {
-    if( Type.RECURSIVE_MEET > 0 ) {
-      if( !check(ts) ) return ts; // Cannot intern yet
-    } else assert check(ts);
-    K._ts=ts;
-    K._hash = Key.hash(ts);
-    Key k2 = _intern.get(K);
-    if( k2 != null ) {
-      if( k2._ts!=ts ) _free.push(ts);
-      return k2._ts;
-    }
-    _intern.put(new Key(ts,K._hash));
-    return ts;
-  }
-  private boolean check(TypeFld[]ts) {
-    for( TypeFld fld : ts )
-      if( fld.un_interned() )
-        return false;
-    return true;
-  }
-  private boolean interned_(TypeFld[] ts) {
-    K._ts=ts;
-    K._hash = Key.hash(ts);
-    Key k2 = _intern.get(K);
-    return k2!=null && k2._ts==ts;
-  }
-
-  public static TypeFld[] get(int len) { return tary(len).get(); }
-  public static void free(TypeFld[] ts) {
-    Arrays.fill(ts,null);
-    if( ts.length>0 ) ts[0] = DEAD;
-    tary(ts.length)._free.push(ts);
-  }
-  public static TypeFld[] hash_cons(TypeFld[] ts) { return tary(ts.length).hash_cons_(ts); }
-  public static boolean   interned (TypeFld[] ts) { return tary(ts.length).interned_ (ts); }
-
-  // Result not interned; suitable for direct hacking.
-  // Original assumed in-use, not freed.
-  public static TypeFld[] clone(TypeFld[] ts) {
-    TypeFld[] ts2 = tary(ts.length).get();
-    System.arraycopy(ts,0,ts2,0,ts.length);
-    return ts2;
-  }
-  // Result not interned; suitable for direct hacking.
-  // Original assumed in-use, not freed.
-  public static TypeFld[] copyOf(TypeFld[] ts, int len) {
-    TypeFld[] ts2 = tary(len).get();
-    int minlen = Math.min(len,ts.length);
-    System.arraycopy(ts,0,ts2,0,minlen);
-    Arrays.fill(ts2,minlen,len,null);
-    return ts2;
-  }
-  public static boolean eq( TypeFld[] ts0, TypeFld[] ts1 ) {
-    if( ts0==ts1 ) return true;
-    if( ts0==null || ts1==null ) return false;
-    assert !_eq(ts0,ts1);       // Check: Pointer-eq === deep-eq Arrays
-    return false;               // No need for deep check, since interned
-  }
-  private static boolean _eq( TypeFld[] ts0, TypeFld[] ts1 ) {
-    if( ts0.length!=ts1.length ) return false;
-    for( int i=0; i<ts0.length; i++ )
-      if( ts0[i]!=ts1[i] ) return false;
-    return true;
-  }
-
-  // Make a 1-field TypeFlds
-  public static TypeFld[] make(TypeFld fld) {
-    TypeFld[] tfs = get(1);
-    tfs[0] = fld;
-    return hash_cons(tfs);
-  }
-  // Make a 2-field TypeFlds
-  public static TypeFld[] make(TypeFld fld0, TypeFld fld1) {
-    TypeFld[] tfs = get(2);
-    tfs[0] = fld0;
-    tfs[1] = fld1;
-    return hash_cons(tfs);
-  }
-  // Make a 3-field TypeFlds
-  public static TypeFld[] make(TypeFld fld0, TypeFld fld1, TypeFld fld2) {
-    TypeFld[] tfs = get(3);
-    tfs[0] = fld0;
-    tfs[1] = fld1;
-    tfs[2] = fld2;
-    return hash_cons(tfs);
-  }
-
-  // Does not hash-cons
+  // Change a field.  Preserves the original.  Does not hash-cons
   public static TypeFld[] make_from(TypeFld[] flds, int idx, TypeFld fld) {
-    TypeFld[] tfs = flds.clone();
+    TypeFld[] tfs = clone(flds);
     tfs[idx] = fld;
     return tfs;
   }
@@ -179,13 +53,16 @@ public class TypeFlds {
     return fs;
   }
 
+  // Pop the last field.  Defensive copy, hash_consed
   public static TypeFld[] pop( TypeFld[] flds ) {
     return hash_cons(copyOf(flds,flds.length-1));
   }
+  // Remove the ith field; defensive copy, hash_consed
   public static TypeFld[] remove( TypeFld[] flds, int idx ) {
     TypeFld[] fs = get(flds.length-1);
     if( idx >= 0 ) System.arraycopy(flds, 0, fs, 0, idx);
     for( int i=idx+1; i<flds.length; i++ ) fs[i-1] = flds[i];
     return hash_cons(fs);
   }
+
 }

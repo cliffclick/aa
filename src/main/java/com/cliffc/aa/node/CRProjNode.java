@@ -21,6 +21,6 @@ public class CRProjNode extends CEProjNode {
     TypeTuple tt = (TypeTuple)val(0);
     TypeFunPtr tfp = (TypeFunPtr)tt.at(3);
     // On or off, according to if the fidx escaped.
-    return Type.XCTRL.oob(tfp._fidxs.test_recur(_idx));
+    return Type.XCTRL.oob(tfp.test(_idx));
   }
 }

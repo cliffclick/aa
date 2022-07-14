@@ -908,7 +908,7 @@ HashTable = {@{
       String esc_ptrs2 = "*"+esc_ptrs+"()";
       String esc_funs2 =     esc_funs+"{any,3->Scalar}";
       BitsAlias aliases = esc_ptrs==null ? BitsAlias.EMPTY : ((TypeMemPtr)Type.valueOf(esc_ptrs2))._aliases;
-      BitsFun   fidxs   = esc_funs==null ? BitsFun  .EMPTY : ((TypeFunPtr)Type.valueOf(esc_funs2))._fidxs  ;
+      BitsFun   fidxs   = esc_funs==null ? BitsFun  .EMPTY : ((TypeFunPtr)Type.valueOf(esc_funs2)).fidxs() ;
       assertEquals(fidxs  ,te._fidxs  );
       assertEquals(aliases,te._aliases);
     }

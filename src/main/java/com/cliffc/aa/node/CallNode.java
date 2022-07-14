@@ -458,9 +458,8 @@ public class CallNode extends Node {
   @Override public ErrMsg err( boolean fast ) {
     // Expect a function pointer
     TypeFunPtr tfp = ttfp(_val);
-    if( tfp._fidxs==BitsFun.NALL ) {
+    if( tfp.is_full() )
       return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"A function is being called, but "+fdx()._val+" is not a function");
-    }
 
     BitsFun fidxs = tfp.fidxs();
     if( fidxs.above_center() ) return null; // Not resolved (yet)
@@ -470,7 +469,7 @@ public class CallNode extends Node {
     // bad-arg-count
     if( tfp.nargs() != nargs() ) {
       if( fast ) return ErrMsg.FAST;
-      RetNode ret = RetNode.get(tfp._fidxs);
+      RetNode ret = RetNode.get(tfp.fidxs());
       return ErrMsg.syntax(_badargs[0],err_arg_cnt(ret.fun()._name,tfp));
     }
 

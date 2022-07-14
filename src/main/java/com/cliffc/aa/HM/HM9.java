@@ -659,10 +659,11 @@ public class HM9 {
       TypeFunPtr tfp = (TypeFunPtr)flow;
       // Have some functions, meet over their returns.
       Type rez = TypeNil.XSCALAR;
-      if( tfp._fidxs==BitsFun.NALL ) rez = TypeNil.SCALAR;
+      if( tfp.is_full() ) rez = TypeNil.SCALAR;
       else
-        for( int fidx : tfp._fidxs )
-          rez = rez.meet(Lambda.FUNS.get(fidx).apply(_args));
+        //for( int fidx : tfp._fidxs )
+        //  rez = rez.meet(Lambda.FUNS.get(fidx).apply(_args));
+        throw unimpl();
       if( rez==TypeNil.XSCALAR ) // Fast path cutout, no improvement possible
         return rez;
 
@@ -690,25 +691,26 @@ public class HM9 {
       // If an argument changes type, adjust the lambda arg types
       Type flow = _fun._flow;
       if( flow.above_center() ) return;
-      if( !(flow instanceof TypeFunPtr) ) return;
+      if( !(flow instanceof TypeFunPtr tfp) ) return;
       // Meet the actuals over the formals.
-      for( int fidx : ((TypeFunPtr)flow)._fidxs ) {
-        Lambda fun = Lambda.FUNS.get(fidx);
-        if( fun!=null ) {
-          fun.find().push_update(this); // Discovered as call-site; if the Lambda changes the Apply needs to be revisited.
-          for( int i=0; i<fun._types.length; i++ ) {
-            Type formal = fun._types[i];
-            Type actual = this instanceof Root ? Root.widen(fun.targ(i)) : _args[i]._flow;
-            Type rez = formal.meet(actual);
-            if( formal != rez ) {
-              fun._types[i] = rez;
-              work.addAll(fun.targ(i)._deps);
-              work.push(fun._body);
-              if( i==0 && fun instanceof If ) work.push(fun); // Specifically If might need more unification
-            }
-          }
-        }
-      }
+      //for( int fidx : tfp._fidxs ) {
+      //  Lambda fun = Lambda.FUNS.get(fidx);
+      //  if( fun!=null ) {
+      //    fun.find().push_update(this); // Discovered as call-site; if the Lambda changes the Apply needs to be revisited.
+      //    for( int i=0; i<fun._types.length; i++ ) {
+      //      Type formal = fun._types[i];
+      //      Type actual = this instanceof Root ? Root.widen(fun.targ(i)) : _args[i]._flow;
+      //      Type rez = formal.meet(actual);
+      //      if( formal != rez ) {
+      //        fun._types[i] = rez;
+      //        work.addAll(fun.targ(i)._deps);
+      //        work.push(fun._body);
+      //        if( i==0 && fun instanceof If ) work.push(fun); // Specifically If might need more unification
+      //      }
+      //    }
+      //  }
+      //}
+      throw unimpl();
     }
 
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
@@ -742,9 +744,10 @@ public class HM9 {
     static Type widen(T2 t2) { return t2.as_flow(); }
     private static Type xval(TypeFunPtr fun) {
       Type rez = TypeNil.XSCALAR;
-      for( int fidx : fun._fidxs )
-        rez = rez.meet(Lambda.FUNS.get(fidx).apply(null));
-      return rez;
+      //for( int fidx : fun._fidxs )
+      //  rez = rez.meet(Lambda.FUNS.get(fidx).apply(null));
+      //return rez;
+      throw unimpl();
     }
     @Override Type val(Worklist work) {
       // Here we do some extra work, "as if" our arguments (which only lazily exist)
@@ -1927,18 +1930,19 @@ public class HM9 {
         // TODO: PAIR1 should report better
         TypeFunPtr tfp = (TypeFunPtr)t;
         T2 ret = args(_args.length-1);
-        if( tfp._fidxs==BitsFun.NALL        ) return ret.walk_types_in(TypeNil. SCALAR);
-        if( tfp._fidxs==BitsFun.NALL.dual() ) return ret.walk_types_in(TypeNil.XSCALAR);
-        for( int fidx : ((TypeFunPtr)t)._fidxs ) {
-          Lambda lambda = Lambda.FUNS.get(fidx);
-          Type body = lambda.find().is_err()
-            ? TypeNil.SCALAR           // Error, no lift
-            : (lambda._body == null // Null only for primitives
-               ? lambda.find().args(lambda._targs.length).as_flow() // Get primitive return type
-               : lambda._body._flow); // Else use body type
-          ret.walk_types_in(body);
-        }
-        return t;
+        if( tfp.is_full() ) return ret.walk_types_in(TypeNil. SCALAR);
+        //if( tfp._fidxs==BitsFun.NALL.dual() ) return ret.walk_types_in(TypeNil.XSCALAR);
+        //for( int fidx : tfp._fidxs ) {
+        //  Lambda lambda = Lambda.FUNS.get(fidx);
+        //  Type body = lambda.find().is_err()
+        //    ? TypeNil.SCALAR           // Error, no lift
+        //    : (lambda._body == null // Null only for primitives
+        //       ? lambda.find().args(lambda._targs.length).as_flow() // Get primitive return type
+        //       : lambda._body._flow); // Else use body type
+        //  ret.walk_types_in(body);
+        //}
+        //return t;
+        throw unimpl();
       }
 
       if( is_struct() ) {

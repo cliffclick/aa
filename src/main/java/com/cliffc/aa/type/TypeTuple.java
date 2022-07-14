@@ -30,7 +30,7 @@ public class TypeTuple extends Type<TypeTuple> {
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeTuple t) ) return false;
-    return _any==t._any && _hash == t._hash && Types.eq(_ts,t._ts);
+    return _any==t._any && _hash == t._hash && _ts==t._ts;
   }
   // Never part of a cycle so the normal equals works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
@@ -72,17 +72,6 @@ public class TypeTuple extends Type<TypeTuple> {
   public static TypeTuple make( Type t0, Type t1, Type t2, Type t3 ) { return make0(false,Types.ts(t0,t1,t2,t3)); }
   public static TypeTuple make( Type t0, Type t1, Type t2, Type t3, Type t4 ) { return make0(false,Types.ts(t0,t1,t2,t3,t4)); }
   public static TypeTuple make( Type t0, Type t1, Type t2, Type t3, Type t4, Type t5 ) { return make0(false,Types.ts(t0,t1,t2,t3,t4,t5)); }
-
-  // Make a Call args tuple from a Struct by adding Memory up front
-  //public static TypeTuple make(TypeStruct ts) {
-  //  // TypeStruct includes a display/DSP_IDX, but what comes before
-  //  Type[] ts2 = Types.get(ts.len()+DSP_IDX);
-  //  ts2[CTL_IDX] = Type.CTRL;
-  //  ts2[MEM_IDX] = TypeMem.ALLMEM;
-  //  for( int i=0; i<ts.len(); i++ )
-  //    ts2[DSP_IDX+i] = ts.at(i);
-  //  return make(ts2);
-  //}
 
   public  static final TypeTuple IF_ALL  = make(CTRL ,CTRL );
   public  static final TypeTuple IF_ANY  = IF_ALL.dual();

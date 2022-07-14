@@ -80,7 +80,7 @@ public class RootNode extends Node {
     if( t instanceof TypeFunPtr tfp && !ESCF.tset(tfp._uid) ) {
       // Walk all escaped function args, and call them (like an external
       // Apply might) with the most conservative flow arguments possible.
-      for( int fidx : tfp._fidxs ) {
+      for( int fidx : tfp.fidxs() ) {
         if( fidx==0 ) continue;
         RetNode ret = RetNode.FUNS.at(fidx);
         if( ret!=null && !EXT_FIDXS.test(fidx) ) {

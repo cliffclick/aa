@@ -64,12 +64,12 @@ public class UnresolvedNode extends Node {
   // monotonic, as it is used by CallNode.
   static TypeFunPtr resolve_value( Type[] tcall ) {
     TypeFunPtr tfp = (TypeFunPtr)tcall[tcall.length-1], tfp2=null;
-    if( tfp._fidxs==BitsFun.NALL || // Too low , will not resolve.  Might lift to OK
-        tfp.above_center() ||       // Too high, will not resolve.  Might fall to OK
-        tfp._fidxs.abit() != -1 )   // Already resolved to single target
+    if( tfp.is_full() ||       // Too low , will not resolve.  Might lift to OK
+        tfp.above_center() ||  // Too high, will not resolve.  Might fall to OK
+        tfp.is_fidx() )        // Already resolved to single target
       return tfp;
     boolean high = false;       // True if args too high to resolve
-    for( int fidx : tfp._fidxs ) {
+    for( int fidx : tfp.fidxs() ) {
       RetNode ret = RetNode.get(fidx);
       if( ret._nargs == tcall.length-1 ) { // Ignore if wrong arg count
         Type actual = tcall[ARG_IDX];      // TODO: Looking at first arg only

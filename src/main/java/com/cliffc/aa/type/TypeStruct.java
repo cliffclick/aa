@@ -140,7 +140,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     // cycle bit set.  Which means that if both bits are cleared, at least one
     // if these types is not cyclic, and a simple recursive-descent test works.
     if( cyclic()==null && t.cyclic()==null )
-      return super.equals(t) && TypeFlds.eq(_flds,t._flds) && Util.eq(_clz,t._clz) && _def==t._def;
+      return super.equals(t) && _flds==t._flds && Util.eq(_clz,t._clz) && _def==t._def;
 
     int x = cmp(t);
     if( x != -1 ) return x == 1;

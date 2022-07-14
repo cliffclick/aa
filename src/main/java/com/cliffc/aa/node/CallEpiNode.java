@@ -212,15 +212,15 @@ public final class CallEpiNode extends Node {
     CallNode call = call();
     Type tcall = call._val;
     if( !(tcall instanceof TypeTuple) ) return false;
-    BitsFun fidxs = CallNode.ttfp(tcall)._fidxs;
-    if( fidxs.test(BitsFun.ALLX) ) return false; // Error call
-    if( fidxs.above_center() )  return false; // Still choices to be made during GCP.
+    TypeFunPtr tfp = CallNode.ttfp(tcall);
+    if( tfp.is_full() ) return false; // Error call
+    if( tfp.above_center() )  return false; // Still choices to be made during GCP.
 
     // Check all fidxs for being wirable
     boolean progress = false;
-    for( int fidx : fidxs ) {                 // For all fidxs
+    for( int fidx : tfp.fidxs() ) { // For all fidxs
       if( BitsFun.is_parent(fidx) ) continue; // Do not wire parents, as they will eventually settle out
-      RetNode ret = RetNode.get(fidx);       // Lookup, even if not wired
+      RetNode ret = RetNode.get(fidx);        // Lookup, even if not wired
       if( _defs.find(ret) != -1 ) continue;   // Wired already
       FunNode fun = ret.fun();
       if( !CEProjNode.wired_arg_check(tcall,fun) ) continue; // Args fail basic sanity
@@ -538,19 +538,17 @@ public final class CallEpiNode extends Node {
     // Flag HMT result as widening, if GCP falls to a TFP which widens in HMT.
     TV2 tret = tfun.find().arg(" ret");
     if( tret.is_copy() && fdx._val instanceof TypeFunPtr tfp ) {
-      for( int fidx : tfp._fidxs )
-        if( fidx!=0 ) {
-          RetNode ret = RetNode.FUNS.at(fidx);
-          if( ret!=null ) {
-            FunPtrNode fptr = ret.funptr();
-            TV2 tfun2 = fptr.tvar();
-            if( !tfun2.is_fun() ) tfun2.push_dep(this); // Come back around when this becomes a function
-            else if( tfun2.arg(" ret").is_copy() ) {
-              if( !test ) tret.clr_cp();
-              return true;
-            }
-          }
+      for( int fidx : tfp.fidxs() ) {
+        if( fidx==0 ) continue;
+        RetNode ret = RetNode.FUNS.at(fidx);
+        FunPtrNode fptr = ret.funptr();
+        TV2 tfun2 = fptr.tvar();
+        if( !tfun2.is_fun() ) tfun2.push_dep(this); // Come back around when this becomes a function
+        else if( tfun2.arg(" ret").is_copy() ) {
+          if( !test ) tret.clr_cp();
+          return true;
         }
+      }
     }
 
     return progress;

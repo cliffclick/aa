@@ -784,7 +784,7 @@ public class HM10 {
       Type flow = _fun._flow;
       if( !(flow instanceof TypeFunPtr) ) return flow.oob(TypeNil.SCALAR);
       TypeFunPtr tfp = (TypeFunPtr)flow;
-      if( tfp._fidxs == BitsFun.EMPTY )
+      if( tfp.is_empty() )
         return TypeNil.XSCALAR; // Nothing being called, stay high
       // Have some functions, meet over their returns.
       Type rez = tfp._ret;
@@ -854,31 +854,32 @@ public class HM10 {
       boolean progress=false;
       if( RVISIT.tset(flow._uid) ) return false;
       // Find any functions
-      if( flow instanceof TypeFunPtr ) {
-        if( ((TypeFunPtr)flow)._fidxs.test(1) ) return false; // All of them
+      if( flow instanceof TypeFunPtr tfp ) {
+        if( tfp.test(1) ) return false; // All of them
         // Meet the actuals over the formals.
-        for( int fidx : ((TypeFunPtr)flow)._fidxs ) {
-          Lambda fun = Lambda.FUNS.get(fidx);
-          fun.find().push_update(this); // Discovered as call-site; if the Lambda changes the Apply needs to be revisited.
-          for( int i=0; i<fun._types.length; i++ ) {
-            Type formal = fun._types[i];
-            Type actual = this instanceof Root
-              ? Root.widen(fun.targ(i)) // Root assumed args
-              : _args[i]._flow;         // Actual observed args
-            Type rez = formal.meet(actual);
-            if( formal != rez ) {
-              if( work==null ) return true;
-              progress = true;
-              fun._types[i] = rez; // The key change being tracked
-              fun.targ(i).add_deps_work(work);
-              work.push(fun._body);
-              // One formal update might lead to more formal updates
-              for( Syntax s : fun.targ(i)._deps )  if( s instanceof Apply )  AFWORK.push(s);
-              if( i==0 && fun instanceof If ) work.push(fun); // Specifically If might need more unification
-            }
-          }
-        }
-        return progress;
+        //for( int fidx : tfp._fidxs ) {
+        //  Lambda fun = Lambda.FUNS.get(fidx);
+        //  fun.find().push_update(this); // Discovered as call-site; if the Lambda changes the Apply needs to be revisited.
+        //  for( int i=0; i<fun._types.length; i++ ) {
+        //    Type formal = fun._types[i];
+        //    Type actual = this instanceof Root
+        //      ? Root.widen(fun.targ(i)) // Root assumed args
+        //      : _args[i]._flow;         // Actual observed args
+        //    Type rez = formal.meet(actual);
+        //    if( formal != rez ) {
+        //      if( work==null ) return true;
+        //      progress = true;
+        //      fun._types[i] = rez; // The key change being tracked
+        //      fun.targ(i).add_deps_work(work);
+        //      work.push(fun._body);
+        //      // One formal update might lead to more formal updates
+        //      for( Syntax s : fun.targ(i)._deps )  if( s instanceof Apply )  AFWORK.push(s);
+        //      if( i==0 && fun instanceof If ) work.push(fun); // Specifically If might need more unification
+        //    }
+        //  }
+        //}
+        //return progress;
+        throw unimpl();
       }
       // For Root, recursively walk structures
       if( flow instanceof TypeMemPtr ) {
@@ -956,10 +957,11 @@ public class HM10 {
       if( t instanceof TypeFunPtr ) {
         TypeFunPtr fun = (TypeFunPtr)t;
         Type rez = TypeNil.XSCALAR;
-        if( fun._fidxs.test(1) ) rez = TypeNil.SCALAR;
+        if( fun.test(1) ) rez = TypeNil.SCALAR;
         else
-          for( int fidx : fun._fidxs )
-            rez = rez.meet(Lambda.FUNS.get(fidx).apply(FLOWS));
+          //for( int fidx : fun._fidxs )
+          //  rez = rez.meet(Lambda.FUNS.get(fidx).apply(FLOWS));
+          throw unimpl();
         Type rez2 = add_sig(rez);
         //return TypeFunSig.make(TypeStruct.EMPTY,rez2);
         throw unimpl();
@@ -2164,13 +2166,14 @@ public class HM10 {
         if( t==TypeNil.SCALAR || t==Type.ALL ) t = TypeFunPtr.GENERIC_FUNPTR;
         if( t instanceof TypeFunPtr ) {
           TypeFunPtr tfp = (TypeFunPtr)t;
-          for( int fidx : tfp._fidxs ) if( WBS.get(fidx) ) return t; // Recursive function return, no more lifting
-          for( int fidx : tfp._fidxs ) WBS.set(fidx);                // Guard against recursive functions
-          Type tret = tfp._ret;
-          Type trlift = arg("ret").walk_types_out(tret, jt, apply);
-          Type rez = TypeFunPtr.makex( tfp._fidxs,tfp.nargs(),tfp.dsp(),trlift);
-          for( int fidx : tfp._fidxs ) WBS.clear(fidx); // Clear fidxs
-          return rez;
+          //for( int fidx : tfp._fidxs ) if( WBS.get(fidx) ) return t; // Recursive function return, no more lifting
+          //for( int fidx : tfp._fidxs ) WBS.set(fidx);                // Guard against recursive functions
+          //Type tret = tfp._ret;
+          //Type trlift = arg("ret").walk_types_out(tret, jt, apply);
+          //Type rez = tfp.make_from(tfp.dsp(),trlift);
+          //for( int fidx : tfp._fidxs ) WBS.clear(fidx); // Clear fidxs
+          //return rez;
+          throw unimpl();
         }
         // TODO: Flow Scalar is OK, will lift to a TFP->Scalar
         throw unimpl();
