@@ -40,37 +40,33 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   // Cannot just use a meet of overloaded functions, because as resolution
   // proceeds the set of functions shrinks not grows as Combo proceeds.  Thus
   // overloads are above-center, while Phi meets are below center.
-
-  // Ponder data structure as
-  // - local to TFP for now
-  // - a BitsFun[], where the BitsFun are JOINs internally and MEET across.
-  // - dual is BitsFun MEET internally and JOIN across?  dual uses _any bit.
-  // - Zero length array is empty
-
-  private BitsFun[] _fidxss;    // Known function bits
+  private BitsFun _fidxs;       // Known function bits
+  private BitsFun _choices;     // Sets of overload choices
 
   private int _nargs;           // Number of formals, including the ctrl, mem, display
   public Type _ret;             // Return scalar type
   private Type _dsp;            // Display; often a TMP to a TS; ANY is dead (not live, nobody uses).
 
-  private TypeFunPtr _init(BitsFun[] fidxss, int nargs, Type dsp, Type ret) {
-    assert fidxss.length==0 || _any== fidxss[0].above_center();
-    for( BitsFun fidxs : fidxss )
-      assert fidxs!=BitsFun.EMPTY && _any==fidxs.above_center() && !fidxs.test(0);
-    assert BitsFuns.interned(fidxss);
+  private TypeFunPtr _init(BitsFun fidxs, BitsFun choices, int nargs, Type dsp, Type ret) {
+    assert !fidxs.test(0);
+    assert fidxs==BitsFun.EMPTY || (_any==fidxs.above_center());
+    // Choices are never nil and never a non-choice
+    assert choices==BitsFun.EMPTY || (!choices.test(0) && !choices.overlaps(fidxs));
+    assert choices==BitsFun.EMPTY || fidxs!=BitsFun.NALL; // Cannot have choices with ALL
     assert !(dsp instanceof TypeFld);
-    _fidxss = fidxss; _nargs=nargs; _dsp=dsp; _ret=ret;
+    _fidxs = fidxs; _choices = choices;
+    _nargs=nargs; _dsp=dsp; _ret=ret;
     return this;
   }
-  private TypeFunPtr init(boolean any, boolean nil, BitsFun[] fidxss, int nargs, Type dsp, Type ret ) {
+  private TypeFunPtr init(boolean any, boolean nil, BitsFun fidxs, BitsFun choices, int nargs, Type dsp, Type ret ) {
     super.init(any,nil);
-    return _init(fidxss,nargs,dsp,ret);
+    return _init(fidxs,choices,nargs,dsp,ret);
   }
-  private TypeFunPtr init(boolean any, boolean nil, boolean sub, BitsFun[] fidxss, int nargs, Type dsp, Type ret ) {
+  private TypeFunPtr init(boolean any, boolean nil, boolean sub, BitsFun fidxs, BitsFun choices, int nargs, Type dsp, Type ret ) {
     super.init(any,nil,sub);
-    return _init(fidxss,nargs,dsp,ret);
+    return _init(fidxs,choices,nargs,dsp,ret);
   }
-  @Override TypeFunPtr copy() { return _copy().init(_any,_nil,_sub,_fidxss,_nargs,_dsp,_ret); }
+  @Override TypeFunPtr copy() { return _copy().init(_any,_nil,_sub,_fidxs,_choices,_nargs,_dsp,_ret); }
   @Override public TypeMemPtr walk( TypeStrMap map, BinaryOperator<TypeMemPtr> reduce ) { return reduce.apply(map.map(_dsp,"dsp"), map.map(_ret,"ret")); }
   @Override public long lwalk( LongStringFunc map, LongOp reduce ) { return reduce.run(map.run(_dsp,"dsp"), map.run(_ret,"ret")); }
   @Override public void walk( TypeStrRun map ) { map.run(_dsp,"dsp"); map.run(_ret,"ret"); }
@@ -88,22 +84,14 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
 
   // Static properties hashcode, no edge hashes
   @Override long static_hash() {
-    long hash = 0;
-    for( BitsFun fidxs : _fidxss ) hash ^= fidxs.hashCode();
-    return Util.mix_hash(super.static_hash(),hash,_nargs^_dsp._type^_ret._type);
+    return Util.mix_hash(super.static_hash(),_fidxs._hash,_choices._hash,_nargs^_dsp._type^_ret._type);
   }
 
-  private boolean fxeq(TypeFunPtr t) {
-    if( _fidxss == t._fidxss ) return true;
-    if( _fidxss.length != t._fidxss.length ) return false;
-    for( int i=0; i<_fidxss.length; i++ )
-      if( _fidxss[i]!=t._fidxss[i] ) return false;
-    return true;
-  }
   // Static properties equals, no edges.  Already known to be the same class
   // and not-equals.
   @Override boolean static_eq(TypeFunPtr t) {
-    return super.static_eq(t) && _nargs == t._nargs && _dsp._type == t._dsp._type && _ret._type == t._ret._type && fxeq(t);
+    return super.static_eq(t) && _nargs == t._nargs && _dsp._type == t._dsp._type &&
+      _ret._type == t._ret._type && _fidxs==t._fidxs && _choices==t._choices;
   }
 
   @Override public boolean equals( Object o ) {
@@ -123,7 +111,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     if( this==o ) return true;
     if( !(o instanceof TypeFunPtr tf) ) return false;
     if( !super.equals(tf) ) return false;
-    if( !fxeq(tf) || _nargs != tf._nargs ) return false;
+    if( _fidxs!=tf._fidxs || _choices!=tf._choices || _nargs != tf._nargs ) return false;
     if( _dsp!=tf._dsp && !_dsp.cycle_equals(tf._dsp) ) return false;
     if( _ret==tf._ret ) return true;
     if( _ret==null ) return false; // One if partially built, the other is fully built
@@ -152,7 +140,8 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
 
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    str_fidxs(sb);
+    _fidxs.str(sb);
+    if( _choices!=BitsFun.EMPTY ) _choices.str(sb.p("+"));
     sb.p('{');                  // Arg list start
     if( debug ) _dsp._str(visit,dups, sb, true, indent).p(",");
     sb.p(_nargs).p(" ->");
@@ -165,17 +154,11 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
 
   @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return _ret._str_complex(visit,dups); }
 
-  // String print fancy fidxs
-  public SB str_fidxs(SB sb) {
-    assert _fidxss.length==1; // TODO: fix me!
-    return _fidxss[0].str(sb);
-  }
-
   static TypeFunPtr valueOf(Parse P, String cid) {
     BitsFun fidxs = P.bits(BitsFun.EMPTY);
-    BitsFun[] fidxss = BitsFuns.make(fidxs);
+    if( P.peek('+') ) throw unimpl();
     P.require('{');
-    TypeFunPtr tfp = malloc(fidxss,0,null,null);
+    TypeFunPtr tfp = malloc(fidxs,BitsFun.EMPTY,0,null,null);
     if( cid!=null ) P._dups.put(cid,tfp);
     tfp.set_dsp(P.type());
     P.require(',');
@@ -208,8 +191,8 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     // Make sure a FIDX appears only once, up to an ending self-cycle.
     CHK2.clear();
     while( tfp._ret!=tfp ) {      // Break if self-cycle, which can have anything
-      for( BitsFun fidxs : tfp._fidxss )
-        for( int fidx : fidxs ) if( CHK2.tset(fidx) ) return false;
+      for( int fidx : tfp._fidxs ) if( CHK2.tset(fidx) ) return false;
+      if( tfp._choices!=BitsFun.EMPTY ) throw unimpl();
       if( !(tfp._ret instanceof TypeFunPtr ret) ) break;
       tfp = ret;
     }
@@ -218,8 +201,8 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
 
   // Functions can grow indefinitely, if being built in a recursive loop.
   // We check that fidx return invariant holds.
-  public static TypeFunPtr make ( boolean any, boolean nil, boolean sub, BitsFun[] fidxss, int nargs, Type dsp, Type ret ) {
-    TypeFunPtr tfp = malloc(any, nil, sub, fidxss, nargs,dsp,ret).hashcons_free();
+  public static TypeFunPtr make( boolean any, boolean nil, boolean sub, BitsFun fidxs, int nargs, Type dsp, Type ret ) {
+    TypeFunPtr tfp = malloc(any, nil, sub, fidxs, BitsFun.EMPTY, nargs,dsp,ret).hashcons_free();
     assert check2(tfp);          // Assert new return-chain is valid
     return tfp;
   }
@@ -228,12 +211,12 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   // Make the TFP, which might not have the invariant.
   // Call _rule2; the result has the invariant.
   // Check and return.
-  public static TypeFunPtr makex( boolean any, boolean nil, boolean sub, BitsFun[] fidxss, int nargs, Type dsp, Type ret ) {
+  public static TypeFunPtr makex( boolean any, boolean nil, boolean sub, BitsFun fidxs, int nargs, Type dsp, Type ret ) {
     assert !(ret instanceof TypeFunPtr rtfp) || check2(rtfp); // Assert old return-chain is valid
     // Make the TFP, but it may NOT pass the invariant
-    TypeFunPtr tfp = malloc(any, nil, sub, fidxss, nargs,dsp,ret).hashcons_free();
+    TypeFunPtr tfp = malloc(any, nil, sub, fidxs, BitsFun.EMPTY, nargs,dsp,ret).hashcons_free();
     CHK2.clear();
-    TypeFunPtr tfp2 = tfp._rule2(fidxss,true); // Approx
+    TypeFunPtr tfp2 = tfp._rule2(fidxs,true); // Approx
     assert check2(tfp2);         // Assert new return-chain is valid
     return tfp2;
   }
@@ -266,18 +249,18 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   // (3) a -> b -> Scalar // If end in a below-TFP, NO REPEATS....
 
   // Rule2: roll forwards and check that new_fidxs do not appear anywhere
-  private TypeFunPtr _rule2(BitsFun[] new_fidxss, boolean first) {
+  private TypeFunPtr _rule2(BitsFun new_fidxs, boolean first) {
     if( this==_ret ) return this; // Self-cycle, end is fine
-    if( overlaps(new_fidxss,_fidxss) && !first )
+    if( new_fidxs.overlaps(_fidxs) && !first )
       return _rule2_apx(); // Overlaps, so do hard approximation
 
     if( !(_ret instanceof TypeFunPtr rtfp) || rtfp==this )
       return this;              // End is fine, either self-cycle or a non-TFP
 
-    TypeFunPtr tfp = rtfp._rule2(new_fidxss,false);
+    TypeFunPtr tfp = rtfp._rule2(new_fidxs,false);
     if( tfp==_ret ) return this; // Return was fine, so i am fine
     if( tfp==null ) return make_from(_dsp,rtfp._ret); // Hard fail
-    if( overlaps(new_fidxss,tfp._fidxss) ) return make_from(_dsp,tfp._ret);
+    if( new_fidxs.overlaps(tfp._fidxs) ) return make_from(_dsp,tfp._ret);
     return make_from(_dsp,tfp);  // Wrap the return
   }
 
@@ -285,21 +268,18 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     if( this==_ret ) return this; // I am my own self-cycle
     if( !(_ret instanceof TypeFunPtr rtfp) ) { // make a self cycle
       if( _ret.isa(GENERIC_FUNPTR) )           // Falls to a cycle?
-        return make_cycle(_any,_nil,_sub,_fidxss,_nargs,_dsp);
+        return make_cycle(_any,_nil,_sub,_fidxs,_nargs,_dsp);
       return null;              // Hard fail, return low self
     }
     TypeFunPtr apx = rtfp._rule2_apx();
     if( apx==null ) return make_from(_dsp,rtfp._ret);
     // Fold my _fidxs into return cycle and return
-    return make_cycle(_any,_nil,_sub,meet(_fidxss,apx._fidxss),_nargs,_dsp);
+    return make_cycle(_any,_nil,_sub,_fidxs.meet(apx._fidxs),_nargs,_dsp);
   }
 
   // Install a length-1 self-cycle
   static TypeFunPtr make_cycle( boolean any, boolean nil, boolean sub, BitsFun fidxs, int nargs, Type dsp ) {
-    return make_cycle(any,nil,sub,BitsFuns.make(fidxs),nargs,dsp);
-  }
-  static TypeFunPtr make_cycle( boolean any, boolean nil, boolean sub, BitsFun[] fidxss, int nargs, Type dsp ) {
-    TypeFunPtr tfp = malloc(any,nil,sub,fidxss,nargs,dsp,null);
+    TypeFunPtr tfp = malloc(any,nil,sub,fidxs, BitsFun.EMPTY,nargs,dsp,null);
     tfp._ret = tfp;             // Make a self-cycle of length 1
     assert dsp._hash!=0;        // Can be 'compute_hash'
     tfp._hash = tfp.compute_hash();
@@ -313,59 +293,30 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     return tfp.retern()._dual.retern().dual();     // Install self-cycle
   }
 
-  // The original overlaps question is to provide a monotonic approximation for
-  // functions returning functions.  Fidxss are expanded to include unions of
-  // joins; I do not understand if this breaks the monotonicity.
-  private static boolean overlaps( BitsFun[] f0ss, BitsFun[] f1ss ) {
-    for( BitsFun fidx0s : f0ss )
-      for( BitsFun fidx1s : f1ss )
-        if( fidx0s.overlaps(fidx1s) )
-          return true;
-    return false;
-  }
-  private static BitsFun[] meet( BitsFun[] f0ss, BitsFun[] f1ss ) {
-    if( f0ss.length==0 ) return f1ss;
-    if( f1ss.length==0 ) return f0ss;
-    if( f0ss.length!=f1ss.length ) throw unimpl();
-    BitsFun[] fmss = BitsFuns.get(f0ss.length);
-    for( int i=0; i<f0ss.length; i++ )
-      fmss[i] = f0ss[i].meet(f1ss[i]);
-    return fmss;
-  }
-
   // Allocate and init
-  private static TypeFunPtr malloc(boolean any, boolean nil, boolean sub, BitsFun[] fidxss, int nargs, Type dsp, Type ret ) {
+  private static TypeFunPtr malloc(boolean any, boolean nil, boolean sub, BitsFun fidxs, BitsFun choices, int nargs, Type dsp, Type ret ) {
     TypeFunPtr t1 = POOLS[TFUNPTR].malloc();
-    return t1.init(any,nil,sub,BitsFuns.hash_cons(fidxss),nargs,dsp,ret);
+    return t1.init(any,nil,sub,fidxs,choices,nargs,dsp,ret);
   }
-  private static TypeFunPtr malloc(BitsFun[] fidxss, int nargs, Type dsp, Type ret ) {
+  private static TypeFunPtr malloc(BitsFun fidxs, BitsFun choices, int nargs, Type dsp, Type ret ) {
     TypeFunPtr t1 = POOLS[TFUNPTR].malloc();
-    BitsFun fidxs0 = fidxss[0];
-    assert !fidxs0.test(0);      // TODO: Fix side-effect, or intern
-    fidxss[0] = fidxs0.clear(0); // Side-effects
-    return t1.init(fidxs0.above_center(),fidxs0.test(0),fidxss,nargs,dsp,ret);
+    return t1.init(fidxs.above_center(),fidxs.test(0),fidxs.clear(0),choices,nargs,dsp,ret);
   }
 
-  public static TypeFunPtr make ( BitsFun fidxs, int nargs, Type dsp, Type ret ) {
-    return make(BitsFuns.make(fidxs),nargs,dsp,ret);
-  }
-  public static TypeFunPtr make ( BitsFun[] fidxss, int nargs, Type dsp, Type ret ) {
-    boolean haz_nil = fidxss.length>0 && fidxss[0].test(0);
-    boolean any = fidxss.length==0 || fidxss[0].above_center();
+  public static TypeFunPtr make( BitsFun fidxs, int nargs, Type dsp, Type ret ) {
+    boolean haz_nil = fidxs.test(0);
+    boolean any = fidxs.above_center();
     boolean nil = any &&  haz_nil;
     boolean sub = any || !haz_nil;
     assert !haz_nil;             // TODO: Fix side-effect, or intern
-    return make(any, nil, sub, fidxss,nargs,dsp,ret);
+    return make(any, nil, sub, fidxs, nargs,dsp,ret);
   }
   public static TypeFunPtr makex( BitsFun fidxs, int nargs, Type dsp, Type ret ) {
-    return makex(BitsFuns.make(fidxs),nargs,dsp,ret);
-  }
-  public static TypeFunPtr makex( BitsFun[] fidxss, int nargs, Type dsp, Type ret ) {
-    boolean haz_nil = fidxss.length>0 && fidxss[0].test(0);
-    boolean any = fidxss.length==0 || fidxss[0].above_center();
+    boolean haz_nil = fidxs.test(0);
+    boolean any = fidxs.above_center();
     boolean nil = any &&  haz_nil;
     boolean sub = any || !haz_nil;
-    return makex(any, nil, sub, fidxss, nargs,dsp,ret);
+    return makex(any, nil, sub, fidxs.clear(0), nargs,dsp,ret);
   }
   public static TypeFunPtr make( int fidx, int nargs, Type dsp, Type ret ) {
     return make(BitsFun.make0(fidx),nargs,dsp,ret);
@@ -376,27 +327,26 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   public static TypeFunPtr make( BitsFun fidxs, int nargs) {
     return make(fidxs,nargs,TypeMemPtr.NO_DISP,TypeNil.SCALAR);
   }
-  public        TypeFunPtr make_from( Type dsp ) { return make(_fidxss,_nargs, dsp,_ret); }
-  public        TypeFunPtr make_from( BitsFun fidxs  ) {
-    throw unimpl();
-    //return fidxss==_fidxss ? this : make( fidxss,_nargs,_dsp,_ret);
+  public TypeFunPtr make_from( Type dsp ) { return make(_fidxs,_nargs, dsp,_ret); }
+  public TypeFunPtr make_from( BitsFun fidxs  ) {
+    return fidxs==_fidxs ? this : make( fidxs,_nargs,_dsp,_ret);
   }
 
-  public        TypeFunPtr make_from( Type dsp, Type ret ) { return dsp==_dsp && ret==_ret ? this : make(_fidxss,_nargs, dsp,ret); }
+  public TypeFunPtr make_from( Type dsp, Type ret ) { return dsp==_dsp && ret==_ret ? this : make(_fidxs,_nargs, dsp,ret); }
   @Override TypeFunPtr make_from( boolean any, boolean nil, boolean sub ) {
     if( any == _any && nil == _nil && sub == _sub ) return this;
-    return makex(any,nil,sub,_fidxss,_nargs,_dsp,_ret);
+    return makex(any,nil,sub,_fidxs,_nargs,_dsp,_ret);
   }
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.NALL ,1,Type.ALL,Type.ALL);
   public  static final TypeFunPtr ARG2   =         make(BitsFun.NALL ,2,Type.ALL,Type.ALL);
   public  static final TypeFunPtr THUNK  = (TypeFunPtr)make(BitsFun.NALL ,3,Type.ALL,Type.ALL).meet(TypeNil.XNIL); // zero-arg function (plus ctrl, mem, display)
-  public  static final TypeFunPtr EMPTY  =         make(new BitsFun[0],1,Type.ANY,Type.ANY);
+  public  static final TypeFunPtr EMPTY  =         make(BitsFun.EMPTY,1,Type.ANY,Type.ANY);
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,ARG2,THUNK};
 
   @Override protected TypeFunPtr xdual() {
     boolean xor = _nil == _sub;
-    return malloc(!_any,_nil^xor,_sub^xor,BitsFuns.dual(_fidxss),-_nargs,_dsp.dual(),_ret.dual());
+    return malloc(!_any,_nil^xor,_sub^xor,_fidxs.dual(),_choices.dual(),-_nargs,_dsp.dual(),_ret.dual());
   }
   @Override void rdual() { _dual._dsp = _dsp._dual;  _dual._ret = _ret._dual; }
 
@@ -407,36 +357,29 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     boolean nil = _nil & tf._nil;
     boolean sub = _sub & tf._sub;
     // Meet of non-return parts
-    BitsFun[] fidxss = meet(_fidxss,tf._fidxss);
+    BitsFun fidxs = _fidxs.meet(tf._fidxs);
+    BitsFun choices = _choices.meet(tf._choices);
+    if( choices!=BitsFun.EMPTY ) throw unimpl();
     int nargs = (_nargs ^ tf._nargs) > 0 ? Math.min(_nargs,tf._nargs) : Math.max(_nargs,tf._nargs);
     Type dsp = _dsp.meet(tf._dsp);
 
     // If both are short cycles, the result is a short cycle
     if( _ret==this && tf._ret==tf )
-      return make_cycle(any,nil,sub,fidxss,nargs,dsp);
+      return make_cycle(any,nil,sub,fidxs,nargs,dsp);
 
     // Otherwise, recursively find the return
     Type ret = _ret.meet(tf._ret);
 
-    return makex(any,nil,sub,fidxss,nargs,dsp,ret);
+    return makex(any,nil,sub,fidxs,nargs,dsp,ret);
   }
 
   // All fidxs, whether meet or join
-  public BitsFun fidxs() {
-    if( _fidxss.length==0 ) return BitsFun.EMPTY;
-    assert _fidxss.length==1;
-    return _fidxss[0];
-  }
-  public int fidx() { return _fidxss[0].getbit(); } // Asserts internally single-bit
-  public boolean is_fidx() { return _fidxss[0].abit() > 1; } // Single-bit TFP
-  public boolean test(int fidx) {
-    throw unimpl();
-    //return _fidxss[0].test_recur(fidx);
-  }
-  public boolean is_empty() { return _fidxss.length==0; }
-  public boolean is_full() {
-    return _fidxss.length==1 && _fidxss[0]==BitsFun.NALL;
-  }
+  public BitsFun fidxs() { return _fidxs; }
+  public int fidx() { return _fidxs.getbit(); } // Asserts internally single-bit
+  public boolean is_fidx() { return _fidxs.abit() > 1; } // Single-bit TFP
+  public boolean test(int fidx) { return _fidxs.test_recur(fidx); }
+  public boolean is_empty() { return _fidxs==BitsFun.EMPTY && _choices==BitsFun.EMPTY; }
+  public boolean is_full() { return _fidxs==BitsFun.NALL; }
   public int nargs() { return Math.abs(_nargs); }
 
   // Widens, not lowers.

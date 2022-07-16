@@ -17,7 +17,6 @@ public class TypeFlds extends AryI<TypeFld> {
   TypeFlds(int len) { super(len); }
   // Static forwards
   public static TypeFld[] get(int len) { return TYPEFLDS._get(len); }
-  public static TypeFld[] hash_cons(TypeFld[] ts) { return TYPEFLDS._hash_cons(ts); }
   public static boolean   interned (TypeFld[] ts) { return TYPEFLDS._interned (ts); }
   public static void free(TypeFld[] ts) { TYPEFLDS._free(ts); }
   public static TypeFld[] make(TypeFld t0) { return hash_cons(TYPEFLDS._ts(t0)); }
@@ -25,6 +24,20 @@ public class TypeFlds extends AryI<TypeFld> {
   public static TypeFld[] clone(TypeFld[] ts) { return TYPEFLDS._clone(ts); }
   public static TypeFld[] copyOf(TypeFld[] ts, int len) { return TYPEFLDS._copyOf(ts,len); }
 
+  public static TypeFld[] hash_cons(TypeFld[] ts) {
+    // Delayed hash-consing during RECURSIVE_MEET install
+    if( Type.RECURSIVE_MEET > 0 ) {
+      if( !check(ts) ) return ts; // Cannot intern yet
+    } else assert check(ts);
+    return TYPEFLDS._hash_cons(ts);
+  }
+  private static boolean check(TypeFld[]ts) {
+    for( TypeFld fld : ts )
+      if( fld.un_interned() )
+        return false;
+    return true;
+  }  
+  
   public static final TypeFld[] EMPTY = hash_cons(get(0));
 
   // Are the fields in order?

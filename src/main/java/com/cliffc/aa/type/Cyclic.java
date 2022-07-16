@@ -366,7 +366,7 @@ public interface Cyclic {
       case Type.TMEMPTR -> _uid((((TypeMemPtr) h)._aliases.str(sb.p('*')).p(": ")), ((TypeMemPtr) h)._obj);
       case Type.TFUNPTR -> {
         TypeFunPtr tfp = (TypeFunPtr) h;
-        _uid(_uid(tfp.str_fidxs(sb).p("{ "), tfp.dsp()).p(" -> "), tfp._ret).p(" }");
+        _uid(_uid(tfp.fidxs().str(sb).p("{ "), tfp.dsp()).p(" -> "), tfp._ret).p(" }");
       }
       case Type.TARY -> throw unimpl();
       default -> h.str(sb, false, false);
