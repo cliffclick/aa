@@ -12,32 +12,17 @@ import static org.junit.Assert.assertTrue;
 public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
-    // (1) b -> a -> x
-    // (2) b -> ab*
-    // Assert (1) isa (2)
-    // Wrap with a & approx
-    // (1a) a -> b -> a -> x ==>> a -> ab -> ab*
-    // (2a) a -> b -> ab*    ==>> a ->  b -> ab*
-    // Assert (1a) isa (2a)
     int a = BitsFun.new_fidx();
     int b = BitsFun.new_fidx();
-    BitsFun fa = BitsFun.make0(a);
-    BitsFun fb = BitsFun.make0(b);
-    BitsFun fab = BitsFun.make0(a,b);
+    int c = BitsFun.new_fidx();
+    int d = BitsFun.new_fidx();
+    BitsFun ab = BitsFun.make0(a,b).dual();
+    BitsFun ac = BitsFun.make0(a,c).dual();
+    BitsFun mt = ab.meet(ac);   // Since both high, keeps intersection
+    BitsFun jn = (BitsFun)ab.join(ac);
+    BitsFun diff = (BitsFun)jn.subtract(mt).dual();
 
-    // (1)
-    TypeFunPtr tfp_a_x   = TypeFunPtr.make(fa,2,Type.ANY,TypeNil.XSCALAR);
-    TypeFunPtr tfp_b_a_x = TypeFunPtr.make(fb,2,Type.ANY,tfp_a_x);
-    // (2)
-    TypeFunPtr tfp_abc   = TypeFunPtr.make_cycle(false,false,true,fab,2,Type.ANY);
-    TypeFunPtr tfp_b_abc = TypeFunPtr.makex(fb,2,Type.ANY,tfp_abc);
-    // Assert (1) isa (2)
-    assertTrue( tfp_b_a_x.isa( tfp_b_abc ) );
-    // Wrap with a & approx
-    TypeFunPtr tfp_a_b_a_x = TypeFunPtr.makex(fa,2,Type.ANY,tfp_b_a_x);
-    TypeFunPtr tfp_a_b_abc = TypeFunPtr.makex(fa,2,Type.ANY,tfp_b_abc);
-
-    assertTrue( tfp_a_b_a_x.isa( tfp_a_b_abc ) );
+    //assertTrue(mt==jn);
   }
 
   @Test public void testTFPChain() {

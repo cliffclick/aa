@@ -28,7 +28,7 @@ public class TestHM {
     DO_HMT=true;
     DO_GCP=true;
     RSEED=0;
-    test65();
+    test78();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -1184,8 +1184,19 @@ A:*@{
   }
 
 
-  // Simple overloaded function test.
+  // Ambiguous overload, {int->int}, cannot select
   @Test public void test81() {
+    rune("&["                    +  // Define overloaded fcns
+         "  { x -> (i* x 2  ) };"+  // Arg is 'int'
+         "  { x -> (f* x 3.0) };"+  // Arg is 'flt'
+         " ]",
+         "Ambiguous overloads: &[ { int64 -> %int64 }; { flt64 -> %flt64} ]", "[~20+22]{any,3 ->~Scalar0 }",
+         null,"[20,22]"
+        );
+  }
+
+  // Simple overloaded function test.
+  @Test public void test82() {
     rune("f = &["                +  // Define overloaded fcns 'f'
          "  { x -> (i* x 2  ) };"+  // Arg is 'int'
          "  { x -> (f* x 3.0) };"+  // Arg is 'flt'
@@ -1198,7 +1209,7 @@ A:*@{
 
 
   // Ambiguous overload, {int->int}, cannot select
-  @Test public void test82() {
+  @Test public void test83() {
     run("(&["                  +  // Define overloaded fcns
         "   { x -> (i* x 2) };"+  // Arg is 'int'
         "   { x -> (i* x 3) };"+  // Arg is 'int'
@@ -1207,7 +1218,7 @@ A:*@{
   }
 
   // Wrong args for all overloads
-  @Test public void test83() {
+  @Test public void test84() {
     rune("(&[ { x y -> (i* x y) }; { x y z -> (i* y z) };] 4)",
          "Ambiguous overloads:&[ {int64 int64 -> %int64}; {V172 int64 int64 -> %int64 } ]",
          "~int64",
@@ -1215,10 +1226,10 @@ A:*@{
   }
 
   // Mixing unrelated overloads
-  @Test public void test84() {
+  @Test public void test85() {
     rune("""
 fx = &[ { x -> 3     }; { y -> "abc" }; ];
-fy = &[ { z -> "def" }; { a -> 4     }; ];
+fy = &[ { a -> 4     }; { z -> "def" }; ];
 fz = (if (rand 2) fx fy);
 (isempty (fz 1.2))
 """,
@@ -1232,7 +1243,7 @@ fz = (if (rand 2) fx fy);
   // CNC test case here is trying to get HM to do some overload resolution.
   // Without, many simple int/flt tests in main AA using HM alone fail to find
   // a useful type.
-  @Test public void test85() {
+  @Test public void test86() {
     rune(
 """
 fwrap = { ff ->

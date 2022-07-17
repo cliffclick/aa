@@ -47,7 +47,7 @@ HM and GCP types fully support recursive/cyclic types.
 HM includes ad-hoc polymorphims via overloaded functions.  A set of overloads
 are unambiguously resolved to a single function, or else error-typed as
 ambiguous.  This is done by doing *trial-unifications* until only a single
-overload target resolves without an error.  
+overload target resolves without an error.
 
 HM errors keep all the not-unifiable types, all at once, as a special case of a
 union type.  Further unifications with the error either add a new not-unifiable
@@ -111,7 +111,7 @@ BNF for the "core AA" syntax:
         { id* -> fe0 } | // Lambda.  Multiple args are allowed and tracked.  Numbered uniquely
         id             | // Use of an id, either a lambda arg or in a Let/In
         id = fe0; fe1  | // Eqv: letrec ld = fe0 in fe1
-        @{ (label = fe0;)* } | Structures.  Numbered uniquely.  ';' is a field-seperator not a field-end
+        @{ (label = fe0;)* } | Structures.  Numbered uniquely.  ';' is a field-separator not a field-end
         fe = e         | // No  field after expression
         fe.label       | // Yes field after expression
         &[ (fe0;)* ]     // A collection of ad-hoc polymorphism lambdas.
@@ -123,7 +123,7 @@ BNF for the "core AA" pretty-printed types:
        T0?T1              | // T1 is a not-nil T0
        { T* -> Tret }     | // Lambda, arg count is significant
        *T0                | // Ptr-to-struct; T0 is either a leaf, or unified, or a struct
-       @{ (label = T;)* } | // ';' is a field-seperator not a field-end
+       @{ (label = T;)* } | // ';' is a field-separator not a field-end
        &[ (e0;)* ]        | // Collection of ad-hoc poly lambdas; e0 is base, unified, or a lambda
        (Error base* T0*)
 
@@ -229,7 +229,7 @@ public class HM {
           if( fover.is_over() && fover._unify_over_fun( apl.make_nfun() ) == null )
             self._err = "Ambiguous overloads: "+fover;
         }
-        
+
         if( self.is_err2() && self.has_nil() )
           // If any contain nil, then we may have folded in a not-nil.
           // To preserve monotonicity, we make them all nil.
@@ -347,7 +347,7 @@ public class HM {
       require(']');
       return new Overload(funs.asAry());
     }
-    
+
     throw unimpl("Unknown syntax");
   }
   // Parse a term with an optional following field.
@@ -811,7 +811,7 @@ public class HM {
       //   any arg-pair-unifies make progress
       //   this-unify-_fun.return makes progress
       T2 tfun = _fun.find();
-      
+
       if( !tfun.is_fun() ) {    // Not a function, so progress
         T2 nfun = make_nfun();
         progress = tfun.unify(nfun,work); // Unify.  If tfun is an Overload this is a trial unify
@@ -1073,7 +1073,7 @@ public class HM {
         // Walk all escaped function args, and call them (like an external
         // Apply might) with the most conservative flow arguments possible.
         for( int fidx : tfp.fidxs() )
-          if( fidx!=0 ) 
+          if( fidx!=0 )
             do_fidx(fidx, work);
         // The flow return also escapes
         _escapes(tfp._ret,work);
@@ -2054,7 +2054,7 @@ public class HM {
     }
     // No fields (yet), filled in during prep-tree
     static T2 make_overload() {
-      return new T2(new NonBlockingHashMap<>());      
+      return new T2(new NonBlockingHashMap<>());
     }
 
     void free() {
@@ -2065,7 +2065,7 @@ public class HM {
       _deps = null;
       _err  = null;
     }
-    
+
     T2 debug_find() {// Find, without the roll-up
       if( !unified() ) return this; // Shortcut
       if( _args==null ) return this;
@@ -2546,7 +2546,7 @@ public class HM {
           }
         }
       }
-      
+
       vput(that,progress);      // Early set, to stop cycles
       // Both same (probably both nil)
       if( _args==that._args ) return progress;
@@ -2611,7 +2611,7 @@ public class HM {
         _args = (NonBlockingHashMap<String,T2>)args.clone(); // Error case; bring over the args
       return this;
     }
-    
+
     // Return a fresh copy of 'this'
     T2 fresh() {
       assert VARS.isEmpty();
