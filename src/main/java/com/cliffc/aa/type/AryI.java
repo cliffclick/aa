@@ -12,7 +12,7 @@ public abstract class AryI<T> {
   abstract AryI<T> make_holder(int len);
   abstract T[] make_ary(int len);
   abstract T[][] make_arys(int len);
-  abstract int compute_hash(T[] ts);
+  abstract int _compute_hash(T[] ts);
 
   // Lazy expanding list of AryI customized to handle various T[] lengths.
   private final Ary<AryI<T>> ARYS = clinit();
@@ -62,7 +62,7 @@ public abstract class AryI<T> {
 
   private T[] hash_cons_(T[] ts) {
     K._ts=ts;
-    K._hash = compute_hash(ts);
+    K._hash = _compute_hash(ts);
     Key k2 = _intern.get(K);
     if( k2 != null ) {
       if( k2._ts!=ts ) _free.push(ts);
@@ -73,7 +73,7 @@ public abstract class AryI<T> {
   }
   private boolean interned_(T[] ts) {
     K._ts=ts;
-    K._hash = compute_hash(ts);
+    K._hash = _compute_hash(ts);
     Key k2 = _intern.get(K);
     return k2!=null && k2._ts==ts;
   }
@@ -153,4 +153,5 @@ public abstract class AryI<T> {
     Arrays.fill(ts2,minlen,len,null);
     return ts2;
   }
+
 }

@@ -20,7 +20,7 @@ public class TestType {
     BitsFun ac = BitsFun.make0(a,c).dual();
     BitsFun mt = ab.meet(ac);   // Since both high, keeps intersection
     BitsFun jn = (BitsFun)ab.join(ac);
-    BitsFun diff = (BitsFun)jn.subtract(mt).dual();
+    //BitsFun diff = (BitsFun)jn.subtract(mt).dual();
 
     //assertTrue(mt==jn);
   }
@@ -59,7 +59,7 @@ public class TestType {
     assertTrue(wx1.isa(wx2));
     assertTrue(wx2.isa(wx3));  // CHECK MONOTONIC
   }
-  static TypeFunPtr make( BitsFun fidxs, Type ret) { return TypeFunPtr.makex(fidxs,1,TypeMemPtr.NO_DISP,ret); }
+  static TypeFunPtr make( BitsFun fidxs, Type ret) { return TypeFunPtr.makex(ProdOfSums.make(fidxs),1,TypeMemPtr.NO_DISP,ret); }
 
   @Test public void testBits0() {
 
@@ -367,13 +367,13 @@ public class TestType {
     int fidx0 = f1i2i.fidx();
     int fidx1 = f1f2f.fidx();
     BitsFun funs = BitsFun.make0(fidx0).meet(BitsFun.make0(fidx1));
-    TypeFunPtr f3i2r = TypeFunPtr.make(funs,2,NO_DISP,TypeNil.SCALAR);
+    TypeFunPtr f3i2r = TypeFunPtr.make(ProdOfSums.make(funs),2,NO_DISP,TypeNil.SCALAR);
     assertEquals(f3i2r,mt);
     assertTrue(f3i2r.isa(gf));
     assertTrue(f1i2i.isa(f3i2r));
     assertTrue(f1f2f.isa(f3i2r));
 
-    TypeFunPtr f2 = TypeFunPtr.make(BitsFun.make0(fidx1),2,NO_DISP,TypeInt.INT64); // Some generic function (happens to be #23, '&')
+    TypeFunPtr f2 = TypeFunPtr.make(ProdOfSums.make(fidx1),2,NO_DISP,TypeInt.INT64); // Some generic function (happens to be #23, '&')
     assertTrue(f2.isa(gf));
   }
 

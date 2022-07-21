@@ -646,7 +646,7 @@ public class HM10 {
       assert _body!=null;
       // Body flow is null during init
       Type tret = _body._flow==null ? TypeNil.XSCALAR : _body._flow;
-      return TypeFunPtr.makex(BitsFun.make0(_fidx),_args.length,Type.ANY,tret);
+      return TypeFunPtr.makex(ProdOfSums.make(_fidx),_args.length,Type.ANY,tret);
     }
     // Ignore arguments, and return body type for a particular call site.  Very conservative.
     Type apply(Type[] flows) { return _body._flow; }
@@ -1172,7 +1172,7 @@ public class HM10 {
     @Override Type val(Worklist work) {
       assert _body==null;
       Type ret = apply(_types);
-      return TypeFunPtr.makex(BitsFun.make0(_fidx),_args.length,Type.ANY,ret);
+      return TypeFunPtr.makex(ProdOfSums.make(_fidx),_args.length,Type.ANY,ret);
     }
 
     @Override boolean more_work(Worklist work) { return more_work_impl(work); }
@@ -1634,7 +1634,7 @@ public class HM10 {
         if( tfun != null ) return tfun;  // TODO: Returning recursive flow-type functions
         ADUPS.put(_uid, TypeNil.XSCALAR);
         Type rez = arg("ret")._as_flow();
-        return TypeFunPtr.make(ROOT_FREEZE ? BitsFun.NALL : _fidxs,size()-1,Type.ANY,rez);
+        return TypeFunPtr.make(ROOT_FREEZE ? ProdOfSums.NALL : ProdOfSums.make(_fidxs),size()-1,Type.ANY,rez);
       }
       if( is_struct() ) {
         TypeStruct tstr = (TypeStruct)ADUPS.get(_uid);

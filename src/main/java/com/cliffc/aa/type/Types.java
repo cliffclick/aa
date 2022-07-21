@@ -10,7 +10,7 @@ public class Types extends AryI<Type> {
   @Override Types make_holder(int len) { return new Types(len); }
   @Override Type[] make_ary(int len) { return new Type[len]; }
   @Override Type[][] make_arys(int len) { return new Type[len][]; }
-  @Override int compute_hash(Type[] ts) {
+  @Override int _compute_hash(Type[] ts) {
     for( Type t : ts ) Util.add_hash( t._hash );
     return (int)Util.get_hash();
   }

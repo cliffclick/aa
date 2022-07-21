@@ -10,7 +10,7 @@ public class TypeFlds extends AryI<TypeFld> {
   @Override TypeFlds make_holder(int len) { return new TypeFlds(len); }
   @Override TypeFld[] make_ary(int len) { return new TypeFld[len]; }
   @Override TypeFld[][] make_arys(int len) { return new TypeFld[len][]; }
-  @Override int compute_hash(TypeFld[] ts) {
+  @Override int _compute_hash(TypeFld[] ts) {
     for( TypeFld t : ts ) Util.add_hash( t._hash );
     return (int)Util.get_hash();
   }

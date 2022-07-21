@@ -42,7 +42,7 @@ public class RootNode extends Node {
     return (_cache_val = TypeTuple.make(Type.CTRL,
                                         _def_mem,
                                         TypeRPC.ALL_CALL,
-                                        TypeFunPtr.make(EXT_FIDXS,1),
+                                        TypeFunPtr.make(ProdOfSums.make(EXT_FIDXS),1),
                                         TypeMemPtr.make(false,EXT_ALIASES,TypeStruct.ISUSED)));
   }
 

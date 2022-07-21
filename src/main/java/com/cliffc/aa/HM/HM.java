@@ -631,7 +631,7 @@ public class HM {
       // A unique FIDX for this Lambda
       _fidx = BitsFun.new_fidx();
       FUNS.put(_fidx,this);
-      _flow = TypeFunPtr.makex(BitsFun.make0(_fidx),_args.length+DSP_IDX,Type.ANY,TypeNil.XSCALAR);
+      _flow = TypeFunPtr.makex(ProdOfSums.make(_fidx),_args.length+DSP_IDX,Type.ANY,TypeNil.XSCALAR);
     }
     @Override SB str(SB sb) {
       sb.p("{ ");
@@ -670,7 +670,7 @@ public class HM {
     @Override void add_hm_work( @NotNull Work<Syntax> work) { throw unimpl(); }
     @Override Type val(Work<Syntax> work) {
       // Just wrap a function around the body return
-      return TypeFunPtr.makex(BitsFun.make0(_fidx),_args.length+DSP_IDX,Type.ANY,_body._flow);
+      return TypeFunPtr.makex(ProdOfSums.make(_fidx),_args.length+DSP_IDX,Type.ANY,_body._flow);
     }
     // Meet the formal argument# with a new Apply call site actual arg.
     @Override public boolean arg_meet(int argn, Type cflow, Work<Syntax> work) {
@@ -840,7 +840,7 @@ public class HM {
       // Flag HMT result as widening, if GCP falls to a TFP which widens in HMT.
       T2 tret = tfun.find().arg("ret");
       if( tret._is_copy && _fun._flow instanceof TypeFunPtr tfp ) {
-        for( int fidx : tfp.fidxs() )
+        for( int fidx : tfp.pos()._fidxs )
           if( fidx!=0 && !Lambda.FUNS.get(fidx).as_fun().arg("ret")._is_copy ) {
             if( work!=null ) tret.clr_cp();
             return true;
@@ -877,17 +877,20 @@ public class HM {
         // If the input function is an overloaded function, and resolved by HMT
         // trim the functions down (and sharpen the return type).
         T2 t2fun = _fun.find();
-        if( tfp.above_center() && t2fun.is_fun() ) {
-          Func lam1=null;
-          for( int fidx : tfp.fidxs() ) {
-            Func lam = Lambda.FUNS.get(fidx);
-            T2 ffun = lam.as_fun();
-            if( t2fun.cycle_equals(ffun) )
-              if( lam1==null ) lam1=lam;
-              else throw unimpl();
+        if( t2fun.is_fun() ) {
+          // Look at the overloaded choices and see if we can resolve
+          for( BitsFun overs : tfp.pos()._overs ) {
+            Func lam1=null;
+            for( int fidx : overs ) {
+              Func lam = Lambda.FUNS.get(fidx);
+              T2 ffun = lam.as_fun();
+              if( !t2fun.trial_unify(ffun) )
+                if( lam1==null ) lam1=lam;
+                else { lam1=null; break; } // Not resolved yet
+            }
+            if( lam1!=null ) // Found exactly one resolvable HMT choice
+              tfp = (TypeFunPtr)tfp.meet(((Lambda)lam1)._flow);
           }
-          if( lam1!=null ) // Found exactly one resolvable HMT choice
-            tfp = (TypeFunPtr)((Lambda)lam1)._flow;
         }
         // Meet all calling arguments over all called function args.  Lazily
         // building a call-graph, needed to track arg_meet.  We got here
@@ -978,6 +981,9 @@ public class HM {
       if( argn != -1 && !tfp.is_full() && !tfp.above_center() )
         for( int fidx : tfp.fidxs() )
           Lambda.FUNS.get(fidx).arg_meet(argn,child._flow,work);
+      // Overloads mean any function anywhere might sharpen an Apply
+      if( child instanceof Lambda lam )
+        work.addAll(lam._applys);
     }
 
     @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
@@ -1072,9 +1078,13 @@ public class HM {
       if( t instanceof TypeFunPtr tfp && !ESCF.tset(tfp._uid) ) {
         // Walk all escaped function args, and call them (like an external
         // Apply might) with the most conservative flow arguments possible.
-        for( int fidx : tfp.fidxs() )
-          if( fidx!=0 )
-            do_fidx(fidx, work);
+        for( int fidx : tfp.pos()._fidxs )
+          do_fidx(fidx, work);
+        // Escaping overloads only count after freezing
+        if( HM_FREEZE )
+          for( BitsFun overs : tfp.pos()._overs )
+            for( int fidx : overs )
+              do_fidx(fidx, work);
         // The flow return also escapes
         _escapes(tfp._ret,work);
       }
@@ -1434,15 +1444,19 @@ public class HM {
       // Join (choice) of all children.  If some child is below any function,
       // we fall to Scalar and force reporting an error.
       Type t = TypeNil.SCALAR;
+      BitsFun overs = BitsFun.EMPTY;
       for( Syntax fun : _funs ) {
         Type tf = fun._flow;
         if( !tf.above_center() ) { // Input is still falling
           if( !(tf instanceof TypeFunPtr tfp) )
             return TypeNil.SCALAR; // Some fun is below any function, so are we
-          tf = tfp.make_from(tfp.fidxs().dual()); // Use the high TFP for choice
+          tf = tfp.make_from(ProdOfSums.EMPTY); // Use the high TFP for choice
+          overs = (BitsFun)overs.join(tfp.pos().overload());
         }
         t = t.join(tf);
       }
+      if( t instanceof TypeFunPtr tfp )
+        t = tfp.make_from(ProdOfSums.make(BitsFun.EMPTY,BitsFuns.make(overs)));
       return t;
     }
     @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) {
@@ -1513,7 +1527,7 @@ public class HM {
     @Override Type val(Work<Syntax> work) {
       assert _body==null;
       Type ret = apply(_types);
-      return TypeFunPtr.makex(BitsFun.make0(_fidx),_args.length+DSP_IDX,Type.ANY,ret);
+      return TypeFunPtr.makex(ProdOfSums.make(_fidx),_args.length+DSP_IDX,Type.ANY,ret);
     }
 
     @Override boolean more_work(Work<Syntax> work) { return more_work_impl(work); }
@@ -2201,7 +2215,7 @@ public class HM {
         if( tfun != null ) return tfun;  // TODO: Returning recursive flow-type functions
         ADUPS.put(_uid, TypeNil.XSCALAR);
         Type rez = arg("ret")._as_flow(deep);
-        return TypeFunPtr.makex(fidxs,size()-1+DSP_IDX,Type.ANY,rez);
+        return TypeFunPtr.makex(ProdOfSums.make(fidxs),size()-1+DSP_IDX,Type.ANY,rez);
       }
       if( is_obj() ) {
         assert HM_FREEZE && deep; // Only for final reporting
@@ -2694,6 +2708,18 @@ public class HM {
         }
         return this.mismatched_child(that) || that.mismatched_child(this);
       }
+      if( is_over() && that.is_fun() ) {
+        for( T2 t2 : _args.values() )
+          if( !t2._trial_unify(that) )
+            return false;
+        return true;
+      }
+      if( that.is_over() && is_fun() ) {
+        for( T2 t2 : that._args.values() )
+          if( !t2._trial_unify(this) )
+            return false;
+        return true;
+      }
       return true;
     }
     private boolean mismatched_child( T2 that ) {
@@ -2896,7 +2922,7 @@ public class HM {
         WDUPS.remove(_uid);
         return t instanceof TypeFunPtr tfp
           ? tfp.make_from(Type.ANY,trlift)
-          : TypeFunPtr.makex((t.above_center() ? BitsFun.EMPTY : BitsFun.NALL),size()-1+DSP_IDX, Type.ANY, trlift);
+          : TypeFunPtr.makex((t.above_center() ? ProdOfSums.EMPTY : ProdOfSums.NALL),size()-1+DSP_IDX, Type.ANY, trlift);
       }
 
       if( is_obj() ) return t; // expect ptrs to be simple, so t is ISUSED

@@ -7,6 +7,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
 import java.util.Iterator;
+import java.lang.Long;
 
 // Bits supporting a lattice; immutable; hash-cons'd.  Bits can be *split* in
 // twain, basically a single Bit is really set of all possible future splits.
@@ -55,7 +56,7 @@ import java.util.Iterator;
 // parent (as opposed to the meet of 2 unrelated FIDXS going immediately to the
 // Most General FIDX).
 
-public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
+public abstract class Bits<B extends Bits<B>> implements Iterable<Integer>, Comparable<Bits> {
   // Holds a set of bits meet'd together, or join'd together, along
   // with a single bit choice.
   // If _bits is NULL and _con is 0, this is the EMPTY state.
@@ -126,6 +127,18 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     for( int i=0; i<_bits.length; i++ )
       if( _bits[i]!=bs._bits[i] ) return false;
     return true;
+  }
+  @Override public int compareTo(@NotNull Bits b) {
+    if( this==b ) return 0;     // Interning works
+    if(   _bits==null ) throw com.cliffc.aa.AA.unimpl();
+    if( b._bits==null ) throw com.cliffc.aa.AA.unimpl();
+    if( _con != b._con ) return _con - b._con; // join is always LT meet
+    for( int i=0; i<_bits.length; i++ ) {
+      if( i>=b._bits.length ) return -1; // Tied, up to LHS is shorter, so lessor
+      if( _bits[i]!=b._bits[i] )
+        return Long.compare(_bits[i],b._bits[i]);
+    }
+    throw com.cliffc.aa.AA.unimpl(); // Should not reach here
   }
   @Override public String toString() { return str(new SB()).toString(); }
   public SB str(SB sb) {

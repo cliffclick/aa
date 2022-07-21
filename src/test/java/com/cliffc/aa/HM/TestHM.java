@@ -27,8 +27,8 @@ public class TestHM {
 
     DO_HMT=true;
     DO_GCP=true;
-    RSEED=0;
-    test78();
+    RSEED=29;
+    test86();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -1190,8 +1190,8 @@ A:*@{
          "  { x -> (i* x 2  ) };"+  // Arg is 'int'
          "  { x -> (f* x 3.0) };"+  // Arg is 'flt'
          " ]",
-         "Ambiguous overloads: &[ { int64 -> %int64 }; { flt64 -> %flt64} ]", "[~20+22]{any,3 ->~Scalar0 }",
-         null,"[20,22]"
+         "Ambiguous overloads: &[ { int64 -> %int64 }; { flt64 -> %flt64} ]", "[]&[~20+23]{any,3 ->~Scalar0 }",
+         null,"[20,23]"
         );
   }
 
@@ -1229,21 +1229,39 @@ A:*@{
   @Test public void test85() {
     rune("""
 fx = &[ { x -> 3     }; { y -> "abc" }; ];
-fy = &[ { a -> 4     }; { z -> "def" }; ];
+fy = &[ { z -> "def" }; { a -> 4     }; ];
 fz = (if (rand 2) fx fy);
 (isempty (fz 1.2))
 """,
          "int1",
-         "~Scalar",
+         "xnil",
          null,null);
   }
 
-
+  @Ignore @Test public void test86() {
+    rune("""
+{ pred ->
+  fx = &[ (if pred { x -> (i* x 2)} { x -> (i* x 3)});
+          { x -> (f* x 2.3) }
+        ];
+  (pair (fx 2) (fx 2.1))
+}
+""",
+         "{A? -> *(int64,flt64) }",
+         "[29]{any,3 ->*[7](^=any, ~Scalar, ~Scalar) }",
+         null,null);
+  }
 
   // CNC test case here is trying to get HM to do some overload resolution.
   // Without, many simple int/flt tests in main AA using HM alone fail to find
   // a useful type.
-  @Test public void test86() {
+  @Test public void test87() {
+    String hm_rez =  "*("+
+      "A:*@{_*_={B:*@{_*_=&[{*@{i=int64;...}->B};{*@{f=flt64;...}->C:*@{_*_=&[{*@{i=int64;...}->C};{*@{f=flt64;...}->C}];f=flt64}}];i=int64}->A};f=flt64},"+
+      "D:*@{_*_={E:*@{_*_=&[{*@{i=int64;...}->E};{*@{f=flt64;...}->F:*@{_*_=&[{*@{i=int64;...}->F};{*@{f=flt64;...}->F}];f=flt64}}];i=int64}->D};i=int64},"+
+      "G:*@{_*_={H:*@{_*_=&[{*@{i=int64;...}->H};{*@{f=flt64;...}->H}];f=flt64}->G};f=flt64}"+
+      ")";
+
     rune(
 """
 fwrap = { ff ->
@@ -1268,13 +1286,10 @@ con2_1 = (fwrap 2.1);
 mul2 = { x -> (x._*_ con2)};
 (triple (mul2 con2_1)  (con2._*_ con2) (con2_1._*_ con2_1))
 """,
-        "*("+
-"A:*@{_*_={B:*@{_*_=&[{*@{i=int64;...}->B};{*@{f=flt64;...}->C:*@{_*_=&[{*@{i=int64;...}->C};{*@{f=flt64;...}->C}];f=flt64}}];i=int64}->A};f=flt64},"+
-"D:*@{_*_={E:*@{_*_=&[{*@{i=int64;...}->E};{*@{f=flt64;...}->F:*@{_*_=&[{*@{i=int64;...}->F};{*@{f=flt64;...}->F}];f=flt64}}];i=int64}->D};i=int64},"+
-"G:*@{_*_={H:*@{_*_=&[{*@{i=int64;...}->H};{*@{f=flt64;...}->H}];f=flt64}->G};f=flt64}"+
-")",
-        "*[9](FA:^=any, PA:*[7]@{FA; _*_=[~22+24]{any,3 ->PA }; f=flt64}, *[](...), PA)",
-        "[4,7,9,10,11]","[22,24]");
+        hm_rez, hm_rez,
+        "*[9](FA:^=any, PA:*[7]@{FA; _*_=[]&[~22+24]{any,3 ->PA }; f=flt64}, *[8]@{FA; _*_=[]&[~28+31]{any,3 ->*[]( ...) }; i=int64}, PA)",
+        "*[9](FA:^=any, PA:*[7]@{FA; _*_=[]&[~22+24]{any,3 ->PA }; f=flt64}, *[]( ...), PA)",
+        "[4,7,8,9,10,11,17,18]","[22,24,28,31]");
   }
 }
 
