@@ -186,7 +186,7 @@ public class HM {
 
     // Error propagation, no types change.
     pass_err(prog, work);
-    
+
     return prog;
   }
 
@@ -197,7 +197,7 @@ public class HM {
       while( work.len()>0 ) {     // While work
         cnt++; assert cnt<10000;  // Check for infinite loops
         Syntax syn = work.pop();  // Get work
-  
+
         // Do Hindley-Milner work
         if( DO_HM ) {
           T2 old = syn._hmt;      // Old value for progress assert
@@ -217,7 +217,7 @@ public class HM {
               syn._par.add_val_work(syn,work);
           }
         }
-  
+
         // VERY EXPENSIVE ASSERT: O(n^2).  Every Syntax that makes progress is on the worklist
         assert prog.more_work(work);
       }
@@ -263,7 +263,13 @@ public class HM {
       }
       return null;
     }
-    
+    public static boolean find(T2 over, T2 that) {
+      for( DelayedOverload delay : _delays )
+        if( delay.over()==over && delay.that()==that )
+          return true;
+      return false;
+    }
+
     private T2 _over;
     private T2 _that;
     private final VStack _nongen;
@@ -313,7 +319,7 @@ public class HM {
       else        over().      unify(that(),          work);
     }
   }
-  
+
   static void pass_err( Root prog, Work<Syntax> work ) {
     prog.visit( syn -> {
         T2 self = syn.find();
@@ -923,9 +929,22 @@ public class HM {
       //   this-unify-_fun.return makes progress
       T2 tfun = _fun.find();
 
-      if( !tfun.is_fun() ) {    // Not a function, so progress
+      // If overload, trial unify with function
+      if( tfun.is_over() ) {
         T2 nfun = make_nfun();
-        progress = tfun.unify(nfun,work); // Unify.  If tfun is an Overload this is a trial unify
+        progress = tfun.unify(nfun,work); // Trial Unify.
+        // results might be:
+        // no-progress: 2+ choices.  At pass_err, need to check for this
+        // no-progress: 1 choice , already unified
+        // no-progress: 0 choices, already error-unified
+        // progress: 1 choice , first time unify
+        // progress: 0 choices, first time error unify
+        
+        throw unimpl();
+        
+      } else if( !tfun.is_fun() ) { // Not a function, so progress
+        T2 nfun = make_nfun();
+        progress = tfun.unify(nfun,work); // Unify.
         if( work==null )                  // Just testing, but did an allocation for the trial
           { nfun.free(); return progress; }
         tfun = nfun.find();
@@ -952,8 +971,8 @@ public class HM {
       // Errors are poisonous
       if( tfun._err!=null )
         progress |= find().unify_errs(tfun._err,work);
-      if( tfun.is_err() )
-        progress |= find().unify(tfun,work);
+      //if( tfun.is_err() )
+      //  progress |= find().unify(tfun,work);
 
       // Flag HMT result as widening, if GCP falls to a TFP which widens in HMT.
       T2 tret = tfun.arg("ret");
@@ -1111,17 +1130,6 @@ public class HM {
       prep_tree_impl(par,nongen,work,T2.make_leaf());
       int cnt = 1+_fun.prep_tree(this,nongen,work);
       for( Syntax arg : _args ) cnt += arg.prep_tree(this,nongen,work);
-
-      // Unify _fun with appropriate function
-      T2[] targs = new T2[_args.length+1];
-      for( int i=0; i<_args.length; i++ )
-        targs[i] = _args[i].find();
-      targs[_args.length] = find(); // Return
-      T2 nfun = T2.make_fun(targs);
-      T2 tfun = _fun.find();
-      if( tfun.is_fun() && tfun.size() != nfun.size() )
-        find()._err = "Bad argument count"; // Blame this Apply, not the function later
-      _fun.find().unify(nfun, work);
       return cnt;
     }
     @Override boolean more_work(Work<Syntax> work) {
@@ -1651,7 +1659,7 @@ public class HM {
       }
       return progress;
     }
-    
+
     @Override void add_hm_work( @NotNull Work<Syntax> work) {
       work.add(_par);
     }
@@ -2435,7 +2443,7 @@ public class HM {
       add_deps_work(work);
       return !DO_AMBI;
     }
-    
+
     // Unify this._flow into that._flow.  Flow is limited to only one of
     // {int,flt,ptr} and a 2nd unrelated flow type is kept as an error in
     // that._eflow.  Basically a pick the max 2 of 4 values, and each value is
@@ -2657,7 +2665,7 @@ public class HM {
       if( this.is_over() ) return this._unify_over(that,nongen,true,work);
       if( that.is_over() )
         throw unimpl();
-      
+
       //if( that.is_over() && this.is_fun() ) {
       //  T2 tover = that._unify_over_fun(this);
       //  if( tover==null ) return false; // No resolved overload yet
@@ -2845,7 +2853,7 @@ public class HM {
       // Overloads (recursively) check all children
       if( this.is_over() ) return this._trial_unify_over(that);
       if( that.is_over() ) return that._trial_unify_over(this);
-      
+
       // Same basic tvar class checks children
       if( is_fun() && that.is_fun() ||
           is_ptr() && that.is_ptr() ||
@@ -2883,7 +2891,7 @@ public class HM {
             return true;           // Trial unification failed
       return false;
     }
-    
+
     // -----------------
     private static final VBitSet ODUPS = new VBitSet();
 
