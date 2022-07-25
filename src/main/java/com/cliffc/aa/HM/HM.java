@@ -142,12 +142,14 @@ public class HM {
   static boolean DO_GCP;
 
   static boolean HM_FREEZE;
+  static boolean DO_AMBI;
   static boolean DO_LIFT=true;
   public static Root hm( String sprog, int rseed, boolean do_hm, boolean do_gcp ) {
     Type.RECURSIVE_MEET=0;      // Reset between failed tests
     DO_HM  = do_hm ;
     DO_GCP = do_gcp;
 
+    // Initialize the primitives
     for( PrimSyn prim : new PrimSyn[]{ new If(), new Pair(), new EQ(), new EQ0(), new IMul(), new FMul(), new I2F(), new Add(), new Dec(), new IRand(), new Str(), new Triple(), new Factor(), new IsEmpty(), new NotNil()} )
       PRIMSYNS.put(prim.name(),prim);
     new EXTStruct(T2.make_str(TypeMemPtr.STRPTR),TypeMemPtr.STR_ALIAS);
@@ -161,6 +163,7 @@ public class HM {
 
     // Pass 1: Everything starts high/top/leaf and falls; escaping function args are assumed high
     HM_FREEZE = false;
+    DO_AMBI = false;
     main_work_loop(prog,work);
     assert prog.more_work(work);
 
@@ -174,45 +177,144 @@ public class HM {
     assert prog.more_work(work);
     Root.escapes(prog._flow,work); // Add any fresh escapes
 
-    // Error propagation, no types change.
-    pass_err(prog);
+    // Pass 3: failed overloads propagate errors
+    DO_AMBI = true;           // Allow HM work to propagate errors
+    for( DelayedOverload delay : DelayedOverload._delays )
+      delay.that().add_deps_work(work);
+    main_work_loop(prog,work);
+    assert prog.more_work(work);
 
+    // Error propagation, no types change.
+    pass_err(prog, work);
+    
     return prog;
   }
 
   static void main_work_loop( Root prog, Work<Syntax> work) {
 
     int cnt=0;
-    while( work.len()>0 ) {     // While work
-      cnt++; assert cnt<10000;  // Check for infinite loops
-      Syntax syn = work.pop();  // Get work
-
-      // Do Hindley-Milner work
-      if( DO_HM ) {
-        T2 old = syn._hmt;      // Old value for progress assert
-        if( syn.hm(work) ) {
-          assert syn.debug_find()==old.debug_find(); // monotonic: unifying with the result is no-progress
-          syn.add_hm_work(work);// Push affected neighbors on worklist
+    while( true ) {
+      while( work.len()>0 ) {     // While work
+        cnt++; assert cnt<10000;  // Check for infinite loops
+        Syntax syn = work.pop();  // Get work
+  
+        // Do Hindley-Milner work
+        if( DO_HM ) {
+          T2 old = syn._hmt;      // Old value for progress assert
+          if( syn.hm(work) ) {
+            assert syn.debug_find()==old.debug_find(); // monotonic: unifying with the result is no-progress
+            syn.add_hm_work(work);// Push affected neighbors on worklist
+          }
         }
-      }
-      // Do Global Constant Propagation work
-      if( DO_GCP ) {
-        Type old = syn._flow;
-        Type t = syn.val(work);
-        if( t!=old ) {           // Progress
-          assert old.isa(t);     // Monotonic falling
-          syn._flow = t;         // Update type
-          if( syn._par!=null )   // Push affected neighbors on worklist
-            syn._par.add_val_work(syn,work);
+        // Do Global Constant Propagation work
+        if( DO_GCP ) {
+          Type old = syn._flow;
+          Type t = syn.val(work);
+          if( t!=old ) {           // Progress
+            assert old.isa(t);     // Monotonic falling
+            syn._flow = t;         // Update type
+            if( syn._par!=null )   // Push affected neighbors on worklist
+              syn._par.add_val_work(syn,work);
+          }
         }
+  
+        // VERY EXPENSIVE ASSERT: O(n^2).  Every Syntax that makes progress is on the worklist
+        assert prog.more_work(work);
       }
-
-      // VERY EXPENSIVE ASSERT: O(n^2).  Every Syntax that makes progress is on the worklist
-      assert prog.more_work(work);
+      // If we have any delayed overload resolution, attempt to resolve now.
+      // If we have progress, go drain the main work loop and then check
+      // progress again.
+      if( !DelayedOverload.unify_delays(work) )
+        break;                  // No progress
     }
   }
 
-  static void pass_err( Root prog) {
+  // A collection of delayed overload resolutions.
+  static class DelayedOverload {
+    public static final Ary<DelayedOverload> _delays = new Ary<>(new DelayedOverload[1],0);
+    private static DelayedOverload _trial;
+    private static boolean _resolved;
+
+    // Attempt to bulk overload-resolve during the main work loop
+    public static boolean unify_delays(Work<Syntax> work) {
+      boolean progress = false;
+      for( int i=0; i<_delays._len; i++ ) {
+        // Make a trial
+        _resolved = true;
+        _trial = _delays.at(i); // Flag that we are doing a trial resolution
+        // Unify might return false, because overload resolution worked but
+        // needed no changes in 'that', or because overload resolution failed
+        // and needed to be delayed again.  Look at the _failed bit instead of
+        // the return result.
+        _trial.unify(work);     // Ignore return result
+        if( _resolved ) {       // See if resolution worked
+          progress = true;
+          _delays.del(i--);     // No need to resolve again
+        }
+      }
+      _trial = null;
+      return progress;
+    }
+    // Check for unresolved overloads at the end of typing
+    public static T2 ambiguous_errs(T2 t2) {
+      for( DelayedOverload delay : _delays ) {
+        if( delay.over()==t2 ) return t2;
+        if( delay.that()==t2 ) return delay.over();
+      }
+      return null;
+    }
+    
+    private T2 _over;
+    private T2 _that;
+    private final VStack _nongen;
+    private final boolean _fresh;
+
+    // Delay overload resolution of this pair
+    public static void delay( T2 over, T2 that, VStack nongen, boolean fresh ) {
+      // This is a top-level main work loop test, and resolution failed and
+      // needs to delay again.
+      if( _trial!=null ) {
+        assert _trial.over()==over && _trial.that()==that;
+        _resolved = false;      // Failed resolution
+        return;
+      }
+      // Create a new delayed overload
+      DelayedOverload delay0 = new DelayedOverload(over,that,nongen,fresh);
+      // Dup check, made complicated by needing a U-F effect
+      for( DelayedOverload delay : _delays )
+        if( delay0.equals(delay) ) return; // Dup, ignore
+      _delays.add(delay0);
+    }
+    private DelayedOverload( T2 over, T2 that, VStack nongen, boolean fresh ) {
+      assert over.is_over();
+      _over = over;
+      _that = that;
+      _nongen = nongen;
+      _fresh = fresh;
+    }
+    // Two delays are the same, modulo the U-F effect
+    @Override public boolean equals( Object o ) {
+      if( this==o ) return true;
+      if( !(o instanceof DelayedOverload delay) ) return false;
+      return over()==delay.over() && that()==delay.that();
+    }
+    @Override public int hashCode() { return super.hashCode(); }
+    T2 over() {
+      if( _over.unified() ) throw unimpl();
+      return _over;
+    }
+    T2 that() {
+      if( _that.unified() ) throw unimpl();
+      return _that;
+    }
+
+    private void unify(Work<Syntax> work) {
+      if (_fresh) over().fresh_unify(that(), _nongen, work);
+      else        over().      unify(that(),          work);
+    }
+  }
+  
+  static void pass_err( Root prog, Work<Syntax> work ) {
     prog.visit( syn -> {
         T2 self = syn.find();
         // Nil check on fields
@@ -223,12 +325,21 @@ public class HM {
           if( self._err!=null && self._err.equals("Missing field") )
             self._err = "Missing field "+fld._id+" in "+ptr;
         }
-        // Check all Applys have resolved overloads
-        if( syn instanceof Apply apl ) {
-          T2 fover = apl._fun.find();
-          if( fover.is_over() && fover._unify_over_fun( apl.make_nfun() ) == null )
-            self._err = "Ambiguous overloads: "+fover;
-        }
+
+        //// Check all Applys have resolved overloads
+        //if( syn instanceof Apply apl ) {
+        //  T2 fover = apl._fun.find();
+        //  if( (fover=DelayedOverload.ambiguous_errs(fover))!=null ) {
+        //    self._err = "Ambiguous overloads: "+fover;
+        //    self.add_deps_work(work);
+        //  }
+        //}
+        //T2 delay = DelayedOverload.ambiguous_errs(self);
+        //if( delay!=null && self._err==null ) {
+        //  self._err = delay._err==null ? "Ambiguous overloads: "+delay.p() : delay._err;
+        //  self.add_deps_work(work);
+        //  syn.add_hm_work(work);
+        //}
 
         if( self.is_err2() && self.has_nil() )
           // If any contain nil, then we may have folded in a not-nil.
@@ -494,7 +605,7 @@ public class HM {
     // Giant Assert: True if OK; all Syntaxs off worklist do not make progress
     abstract boolean more_work(Work<Syntax> work);
     final boolean more_work_impl(Work<Syntax> work) {
-      if( DO_HM && (!work.on(this) || HM_FREEZE) && hm(null) ) // Any more HM work?
+      if( DO_HM && (!work.on(this) || (HM_FREEZE && !DO_AMBI)) && hm(null) ) // Any more HM work?
         return false;           // Found HM work not on worklist or when frozen
       if( DO_GCP ) {            // Doing GCP AND
         Type t = val(null);
@@ -802,8 +913,8 @@ public class HM {
       return sb;
     }
 
-    // Unifiying these: make_fun(this.arg0 this.arg1 -> new     )
-    //                      _fun{_fun.arg0 _fun.arg1 -> _fun.rez}
+    // Unifying these: make_fun(this.arg0 this.arg1 -> new     )
+    //                     _fun{_fun.arg0 _fun.arg1 -> _fun.rez}
     @Override boolean hm(Work<Syntax> work) {
       boolean progress = false;
       // Progress if:
@@ -835,13 +946,20 @@ public class HM {
           progress |= bad_arg_cnt(work);
         // Check for progress on the return
         progress |= find().unify(tfun.arg("ret"),work);
+        tfun=tfun.find();
       }
 
+      // Errors are poisonous
+      if( tfun._err!=null )
+        progress |= find().unify_errs(tfun._err,work);
+      if( tfun.is_err() )
+        progress |= find().unify(tfun,work);
+
       // Flag HMT result as widening, if GCP falls to a TFP which widens in HMT.
-      T2 tret = tfun.find().arg("ret");
+      T2 tret = tfun.arg("ret");
       if( tret._is_copy && _fun._flow instanceof TypeFunPtr tfp ) {
         for( int fidx : tfp.pos()._fidxs )
-          if( fidx!=0 && !Lambda.FUNS.get(fidx).as_fun().arg("ret")._is_copy ) {
+          if( !Lambda.FUNS.get(fidx).as_fun().arg("ret")._is_copy ) {
             if( work!=null ) tret.clr_cp();
             return true;
           }
@@ -855,7 +973,10 @@ public class HM {
       for( int i=0; i<_args.length; i++ )
         targs[i] = _args[i].find();
       targs[_args.length] = find(); // Return
-      return T2.make_fun(targs);
+      T2 fun = T2.make_fun(targs);
+      fun._err = find()._err;
+      fun.push_update(this); // TODO
+      return fun; // TODO
     }
     private boolean bad_arg_cnt(Work<Syntax> work) {
       if( find().is_err() ) return false;
@@ -1439,7 +1560,9 @@ public class HM {
       return sb;
     }
     @Override boolean hm(Work<Syntax> work) { return false; }
-    @Override void add_hm_work( @NotNull Work<Syntax> work) { throw unimpl(); }
+    @Override void add_hm_work( @NotNull Work<Syntax> work) {
+      work.add(_par);
+    }
     @Override Type val(Work<Syntax> work) {
       // Join (choice) of all children.  If some child is below any function,
       // we fall to Scalar and force reporting an error.
@@ -1517,11 +1640,19 @@ public class HM {
       return 1;
     }
     @Override boolean hm(Work<Syntax> work) {
-      return false;
+      // For most primitives, they do math on the inputs.  Hence if the input
+      // is an error, so is the output.  Primitives like Pair and Triple carry
+      // their inputs directly through, and thus can represent partial errors
+      // in the result.  The If primitive can ignore some (error) inputs.
+      boolean progress = false;
+      for( int i=0; i<_targs.length; i++ ) {
+        progress |= find().unify_errs(targ(i)._err,work);
+        if( work==null && progress ) return true;
+      }
+      return progress;
     }
+    
     @Override void add_hm_work( @NotNull Work<Syntax> work) {
-      if( find().is_err() )
-        throw unimpl();         // Untested; should be ok
       work.add(_par);
     }
     @Override Type val(Work<Syntax> work) {
@@ -1571,6 +1702,7 @@ public class HM {
     }
     @Override public void push(Syntax f) { if( _rflds.find(f)==-1 ) _rflds.push(f);  }
     @Override PrimSyn make() { return new Pair(); }
+    @Override boolean hm(Work<Syntax> work) { return false; }
     @Override Type apply(Type[] flows) { return TypeMemPtr.make(_alias,TypeStruct.ISUSED); }
     @Override public boolean arg_meet(int argn, Type t, Work<Syntax> work) {
       if( !super.arg_meet(argn,t,work) ) return false;
@@ -1604,6 +1736,7 @@ public class HM {
     }
     @Override public void push(Syntax f) { if( _rflds.find(f)==-1 ) _rflds.push(f);  }
     @Override PrimSyn make() { return new Triple(); }
+    @Override boolean hm(Work<Syntax> work) { return false; }
     @Override Type apply(Type[] flows) { return TypeMemPtr.make(_alias,TypeStruct.ISUSED);  }
     @Override public boolean arg_meet(int argn, Type t, Work<Syntax> work) {
       if( !super.arg_meet(argn,t,work) ) return false;
@@ -2266,9 +2399,7 @@ public class HM {
         if( that._args==null ) { that._args = _args; _args=null; }
         else that._args.putAll(_args);
       }
-      if( _err!=null && that._err==null ) that._err = _err;
-      else if( _err!=null && !_err.equals(that._err) )
-        throw unimpl();         // TODO: Combine single errors
+      that.unify_errs(_err,work);
 
       // Work all the deps
       that.add_deps_work(work);
@@ -2293,6 +2424,18 @@ public class HM {
       return true;
     }
 
+    // Propagate error from left to right (if work).
+    // Remove dups.
+    boolean unify_errs(String err, Work<Syntax> work) {
+      assert !unified();
+      if( err==null || err.equals(_err) ) return false;
+      if( work==null ) return !DO_AMBI;// Would be progress
+      if( _err!=null ) throw unimpl(); // TODO: Combine single errors
+      _err = err;                      // Error is poisonous
+      add_deps_work(work);
+      return !DO_AMBI;
+    }
+    
     // Unify this._flow into that._flow.  Flow is limited to only one of
     // {int,flt,ptr} and a 2nd unrelated flow type is kept as an error in
     // that._eflow.  Basically a pick the max 2 of 4 values, and each value is
@@ -2396,6 +2539,10 @@ public class HM {
       if( this.is_nil() && !that.is_nil() ) return that.unify_nil(this,work);
       if( that.is_nil() && !this.is_nil() ) return this.unify_nil(that,work);
 
+      // Special case: overload vs other
+      if( this.is_over() ) return this._unify_over(that,null,false,work);
+      if( that.is_over() ) return that._unify_over(this,null,false,work);
+
       // Cycle check
       long luid = dbl_uid(that);    // long-unique-id formed from this and that
       T2 rez = DUPS.get(luid);
@@ -2403,25 +2550,13 @@ public class HM {
       if( rez!=null ) return false; // Been there, done that
       DUPS.put(luid,that);          // Close cycles
 
-      // Special case: overload vs function
-      if( is_over() && that.is_fun() ) {
-        T2 tover = _unify_over_fun(that);
-        if( tover==null ) return false; // No single overload
-        if( work==null ) return true;   // Progress!
-        tover._unify(that, work);       // Single overload normal unifies
-        return _union(that,work); // The overload is resolved and removed; hard-unioned into the result
-      }
-      if( is_over() && !that.is_over() ) throw unimpl();
-      if( that.is_over() && !that.is_over() ) throw unimpl();
-
       if( work==null ) return true; // Here we definitely make progress; bail out early if just testing
 
       // Structural recursion unification.
       if( (is_obj() && that.is_obj()) ||
           (is_fun() && that.is_fun()) ||
           (is_nil() && that.is_nil()) ||
-          (is_ptr() && that.is_ptr()) ||
-          (is_over()&& that.is_over()) )
+          (is_ptr() && that.is_ptr()) )
         unify_flds(this,that,work);
       // Union the top-level part
       return find().union(that.find(),work);
@@ -2429,6 +2564,7 @@ public class HM {
 
     // Structural recursion unification.
     static void unify_flds( T2 thsi, T2 that, Work<Syntax> work ) {
+      assert !thsi.is_over() && !that.is_over(); // Overloads do not unify field-by-field
       if( thsi._args==that._args ) return;  // Already equal (and probably both nil)
       for( String key : thsi._args.keySet() ) {
         T2 fthis = thsi.arg(key); // Field of this
@@ -2518,17 +2654,17 @@ public class HM {
 
 
       // Fresh-unify with an ad-hoc polymorphic overload to a function
-      if( this.is_over() && that.is_fun() ) {
-        T2 tover = this._unify_over_fun(that); // Select from the overload
-        return tover!=null && tover._fresh_unify(that, nongen, work);
-      }
-      if( that.is_over() && this.is_fun() ) {
-        T2 tover = that._unify_over_fun(this);
-        if( tover==null ) return false; // No resolved overload yet
-        if( work==null ) return true;   // Resolved overload
-        this._fresh_unify(tover,nongen,work);
-        return that._union(tover,work); // Overload is resolved and removed
-      }
+      if( this.is_over() ) return this._unify_over(that,nongen,true,work);
+      if( that.is_over() )
+        throw unimpl();
+      
+      //if( that.is_over() && this.is_fun() ) {
+      //  T2 tover = that._unify_over_fun(this);
+      //  if( tover==null ) return false; // No resolved overload yet
+      //  if( work==null ) return true;   // Resolved overload
+      //  this._fresh_unify(tover,nongen,work);
+      //  return that._union(tover,work); // Overload is resolved and removed
+      //}
 
       // Progress on the parts
       boolean progress = false;
@@ -2538,7 +2674,6 @@ public class HM {
       if( work==null ) {
         if( _may_nil && !that._may_nil ) return true;
         if( is_ptr() && !that.is_ptr() ) return true;
-        if( is_over()&& !that.is_over()) return true;
         if( is_fun() && !that.is_fun() ) return true;
         if( is_obj() && !that.is_obj() ) return true;
         if( _err!=null && !Util.eq(_err,that._err) ) return true;
@@ -2548,8 +2683,6 @@ public class HM {
           { that.cp_args(_args); progress=true; }
         if( is_fun() && !that.is_fun() ) // Error, fresh_unify a fun into a non-fun non-leaf
           that.cp_args(_args)._is_fun=progress=true;
-        if( is_over() && !that.is_over() )
-          throw unimpl();
         if( is_obj() && !that.is_obj() ) // Error, fresh_unify a struct into a non-struct non-leaf
           that.cp_args(_args)._is_obj=progress=true;
         if( _err!=null && !Util.eq(_err,that._err) ) {
@@ -2657,23 +2790,35 @@ public class HM {
       return t;
     }
 
-    // Given an overload &[ A, B, C, ...] and a fun F, return the single match
-    // from the overload (one of A, B, C, ...) or null if not zero matches or
-    // two or more matches.  Never modifies anything.
-    private T2 _unify_over_fun( T2 that ) {
-      assert is_over() && that.is_fun();
-      // Require exactly one of the overloads can unify without error.  If
-      // there is more than one, then no progress (and no unification and the
-      // program is ambiguous still).
+
+    // Given an overload &[ A, B, C, ...] and another type F, unify with a
+    // single match or return false if many matches and put on the delayed
+    // overload list, or unify with an ambiguous overload error.
+    private boolean _unify_over( T2 that, VStack nongen, boolean fresh, Work<Syntax> work ) {
+      assert is_over();
+      assert _err==null;        // Not sure why Overload itself gets errors
       T2 no_err=null;
       for( String id : _args.keySet() ) {
-        T2 overfun = arg(id);
-        if( !overfun.trial_unify(that) ) {  // If no error
-          if( no_err!=null ) return null;   // Two or more no-errors
-          no_err = overfun; // Collect non-errors
+        T2 over = arg(id);              // Get an overload
+        if( !over.trial_unify(that) ) { // If no error
+          if( no_err!=null ) {          // Two or more no-errors: need to delay
+            if( DO_AMBI )               // Ambiguous never resolved, report instead of stall
+              return that.unify_errs("Ambiguous overloads: " + p(), work);
+            // Stall ambiguous until things can be resolved
+            if( work!=null ) DelayedOverload.delay(this,that,nongen,fresh);
+            return false;    // No change if testing, or onto the delay list
+          }
+          no_err = over; // Collect non-errors
         }
       }
-      return no_err; // Non-null if exactly 1 non-error
+      if( no_err==null ) // All overloads are in-error
+        return union(that, work); // Hard union; both are broken
+      // Unify the one valid choice into that
+      if( fresh ) // Fresh overload: keep it around, unify the winner with that
+        return no_err._fresh_unify(that,nongen,work);
+      // Not fresh: remove the overload
+      no_err._unify(that,work);
+      return _union(that,work); // The overload is resolved and removed; hard-unioned into the result
     }
 
     // Do a trial unification between this and that.  Report back if any error
@@ -2687,7 +2832,7 @@ public class HM {
       assert !unified() && !that.unified();
       long duid = dbl_uid(that._uid);
       if( TDUPS.putIfAbsent(duid,this)!=null )
-        return false; // Visit only once
+        return false;                    // Visit only once, and assume will resolve
       if( this==that ) return false;     // No error
       if( this.is_leaf() ) return false; // No error
       if( that.is_leaf() ) return false; // No error
@@ -2696,32 +2841,41 @@ public class HM {
         // Note: still too weak if looking at trial unify of errors,
         // as might have same class in one of the error types.
         return _tflow.getClass()!=that._tflow.getClass();
+
+      // Overloads (recursively) check all children
+      if( this.is_over() ) return this._trial_unify_over(that);
+      if( that.is_over() ) return that._trial_unify_over(this);
+      
       // Same basic tvar class checks children
       if( is_fun() && that.is_fun() ||
           is_ptr() && that.is_ptr() ||
-          is_over()&& that.is_over()||
           is_obj() && that.is_obj() ) {
         for( String id : _args.keySet() ) {
+          if( Util.eq(id,"ret") ) continue; // Do not unify based on return types
           T2 lhs = this.arg(id);
           T2 rhs = that.arg(id);
           if( rhs!=null && lhs._trial_unify(rhs) ) return true;
         }
         return this.mismatched_child(that) || that.mismatched_child(this);
       }
-      if( is_over() && that.is_fun() ) {
-        for( T2 t2 : _args.values() )
-          if( !t2._trial_unify(that) )
-            return false;
-        return true;
-      }
-      if( that.is_over() && is_fun() ) {
-        for( T2 t2 : that._args.values() )
-          if( !t2._trial_unify(this) )
-            return false;
-        return true;
-      }
       return true;
     }
+    // Recursively expand overloads.  This is where I might go exponential.  If
+    // instead I succeed here I basically allow too many overloads to succeed,
+    // which stalls the top-level overload until this nested overload resolves.
+    // Doing so probably brings me back down to near-linear.
+    //
+    // In any given pass the visit bit prevents me from going exponential; it
+    // is however, quadratic (at least the product of 2 overloads unifying
+    // against each other, probably the sum-of-products).
+    private boolean _trial_unify_over( T2 that ) {
+      assert is_over();
+      for( T2 t2 : _args.values() )
+        if( !t2._trial_unify(that) )
+          return false;         // Something succeeds, so this whole trial succeeds
+      return true;
+    }
+    // True if 'this' has extra children and 'that' does not allow extras
     private boolean mismatched_child( T2 that ) {
       if( !that.is_open() )   // If RHS is closed
         for( String id : _args.keySet() )
@@ -2729,7 +2883,7 @@ public class HM {
             return true;           // Trial unification failed
       return false;
     }
-
+    
     // -----------------
     private static final VBitSet ODUPS = new VBitSet();
 
@@ -3039,11 +3193,12 @@ public class HM {
       if( is_err() ) {
         if( is_err2() ) {
           sb.p("Cannot unify ");
-          if( is_fun () ) str_fun (sb,visit,dups,debug).p(" and ");
+          if( is_fun () ) str_fun(sb,visit,dups,debug).p(" and ");
           if( is_base() ) str_base(sb)                 .p(" and ");
-          if( is_ptr () ) str_ptr (sb,visit,dups,debug, _tflow).p(" and ");
           if( _eflow!=null) sb.p(_eflow)               .p(" and ");
-          if( is_obj () ) str_obj (sb,visit,dups,debug).p(" and ");
+          if( is_ptr () ) str_ptr(sb,visit,dups,debug, _tflow).p(" and ");
+          if( is_over() ) str_ovr(sb,visit,dups,debug).p(" and ");
+          if( is_obj () ) str_obj(sb,visit,dups,debug).p(" and ");
           return sb.unchar(5);
         }
         return sb.p(_err);      // Just a simple error
@@ -3084,7 +3239,8 @@ public class HM {
       sb.p("&[ ");
       for( int i=0; i<_args.size(); i++ ) {
         T2 fun = _args.get("&"+i);
-        str0(sb,visit,fun,dups,debug).p("; ");
+        if( fun!=null )
+          str0(sb,visit,fun,dups,debug).p("; ");
       }
       return sb.unchar(2).p(" ]");
     }

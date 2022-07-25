@@ -26,9 +26,9 @@ public class TestHM {
     JIG=true;
 
     DO_HMT=true;
-    DO_GCP=true;
-    RSEED=29;
-    test86();
+    DO_GCP=false;
+    RSEED=0;
+    test85();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -1190,8 +1190,9 @@ A:*@{
          "  { x -> (i* x 2  ) };"+  // Arg is 'int'
          "  { x -> (f* x 3.0) };"+  // Arg is 'flt'
          " ]",
-         "Ambiguous overloads: &[ { int64 -> %int64 }; { flt64 -> %flt64} ]", "[]&[~20+23]{any,3 ->~Scalar0 }",
-         null,"[20,23]"
+         "&[ {int64 -> int64}; {flt64 -> flt64} ]",
+         "[]&[~20+22]{any,3 ->~Scalar0 }",
+         null,"[20,22]"
         );
   }
 
@@ -1214,13 +1215,15 @@ A:*@{
         "   { x -> (i* x 2) };"+  // Arg is 'int'
         "   { x -> (i* x 3) };"+  // Arg is 'int'
         "  ] 4)",                 // Error, ambiguous
-        "Ambiguous overloads: &[ { int64 -> %int64 }; { int64 -> %int64} ]", "~int64");
+        "Ambiguous overloads: &[ { int64 -> int64 }; { int64 -> int64} ]", "~int64");
   }
 
   // Wrong args for all overloads
   @Test public void test84() {
     rune("(&[ { x y -> (i* x y) }; { x y z -> (i* y z) };] 4)",
-         "Ambiguous overloads:&[ {int64 int64 -> %int64}; {V172 int64 int64 -> %int64 } ]",
+         "A:Cannot unify { 4 -> A } and &[ { int64 int64 -> int64 }; {B int64 int64 -> int64 } ]",
+         "A:Cannot unify { 4 -> A } and &[ { int64 int64 -> int64 }; {B int64 int64 -> int64 } ]",
+         "~Scalar",
          "~int64",
          null,null);
   }
@@ -1233,8 +1236,8 @@ fy = &[ { z -> "def" }; { a -> 4     }; ];
 fz = (if (rand 2) fx fy);
 (isempty (fz 1.2))
 """,
-         "int1",
-         "xnil",
+         "Ambiguous overloads: &[ {A->3}; {B->*str:(97)} ]","Ambiguous overloads: &[ {A->3}; {B->*str:(97)} ]",
+         "int1","~Scalar",
          null,null);
   }
 
@@ -1248,7 +1251,7 @@ fz = (if (rand 2) fx fy);
 }
 """,
          "{A? -> *(int64,flt64) }",
-         "[29]{any,3 ->*[7](^=any, ~Scalar, ~Scalar) }",
+         "[29]{any,3 ->*[7](^=any, int64, flt64) }",
          null,null);
   }
 
