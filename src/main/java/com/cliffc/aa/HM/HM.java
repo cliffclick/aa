@@ -11,7 +11,60 @@ import java.util.function.IntSupplier;
 
 import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.AA.DSP_IDX;
+/*
+NOTES:
 
+Algo design -
+- All changes tracked in the changing of types
+- Can compute a new valid type
+- - And confirm: on-worklist or no-change (test)
+
+New Issue:
+- Lazy discovery of dependencies, ala SSA form
+- Found during type-compute OR
+- Found during work-compute / but work-compute is only done on type-change
+
+Non-Solution
+- Find new deps on work-compute
+- Issue: work-compute filtered on type-change: no-type-change means
+  no-work-compute means no discovery of new deps
+
+Non-Solution
+- Find new deps on type-compute when not-work
+- Issue: Cannot report progress of deps when type-compute does not change
+
+Solution?
+- Always report new-deps as part of type
+- Find new deps on type-compute when not-work
+
+
+ROOT:
+- New Deps include ESC_FIDXS, ESC_ALIASES
+- - ESC_ALIASES appear as inputs to ESC_FIDX, as ESC_ALIASES field contents, and ESC_ALIASES fields are conservative
+- - ESC_FIDXS are called with conservative args, including other ESC_FIDXS and ESC_ALIASES
+- Drop ESC_FIDXS, ESC_ALIASES; instead just track as part of the type
+- Need a type for "conservative (SCALAR) but not INTERNAL types and yes EXTERNAL types"
+- - Basically: [int & flt & BitsFun.EXT & BitsAlias.EXT]
+- - And can add bits to the bit-sets
+- - With HM, can filter down to one of int/flt/BitsFun/BitsAlais; with GCP alone just use Scalar
+
+APPLY/LAMBDA:
+- For Apply , the _fun arg TFP tracks Lambdas
+- For Lambda, once Apply discovers, need to put the reverse edge in Lambda
+- Theory: Lambda returns Tuple: (TFP,TRPC-of-Apply-bits)
+
+- Fun child of Apply tracks fidxs via values (this is the normal tracking)
+- - Changes here trigger Apply on work
+- - Even if TFP return is unchanged
+- Apply val doing work discovers Lambdas.  
+- - May not have any progress to test.
+- - But will push_apply on Lambda
+
+
+----------
+
+
+*/
 /**
 Combined Hindley-Milner and Global Constant Propagation typing.
 
@@ -169,13 +222,12 @@ public class HM {
 
     // H-M types freeze, escaping function args are assumed called with lowest H-M compatible
     HM_FREEZE = true;
-    Root.escapes(prog._flow,work);
-    work.addAll(Root.EXT_DEPS);
+    prog.add_freeze_work(work);
     assert prog.more_work(work);
+
     // Pass 2: GCP types continue to run downhill.
     main_work_loop(prog,work);
     assert prog.more_work(work);
-    Root.escapes(prog._flow,work); // Add any fresh escapes
 
     // Pass 3: failed overloads propagate errors
     DO_AMBI = true;           // Allow HM work to propagate errors
@@ -213,8 +265,9 @@ public class HM {
           if( t!=old ) {           // Progress
             assert old.isa(t);     // Monotonic falling
             syn._flow = t;         // Update type
-            if( syn._par!=null )   // Push affected neighbors on worklist
-              syn._par.add_val_work(syn,work);
+            // Push affected neighbors on worklist
+            if( syn._par!=null ) syn._par.add_val_work(syn,work);
+            else                 prog    .add_val_work(old,work);
           }
         }
 
@@ -669,6 +722,14 @@ public class HM {
     private T2 _idt;            // Cached type var for the name in scope
     private boolean _fresh;     // True if fresh-unify; short-cut for common case of an id inside its def vs in a Let body.
     Ident(String name) { _name=name; }
+    Ident init(Syntax def, int idx, T2 idt, boolean fresh) {
+      _def = def;
+      _idx = idx;
+      _idt = idt;
+      _fresh = fresh;
+      _flow = TypeNil.XSCALAR;
+      return this;
+    }
     @Override SB str(SB sb) { return p1(sb,null); }
     @Override SB p1(SB sb, VBitSet dups) { return sb.p(_name); }
     @Override SB p2(SB sb, VBitSet dups) { return sb; }
@@ -690,26 +751,40 @@ public class HM {
     @Override Type val(Work<Syntax> work) {
       // Escaping Lambdas are called from Root by most conservative args.
       // Check if this is a parameter from an escaping Lambda.
-      if( work!=null &&
-          _def instanceof Lambda lam &&
-          Root.EXT_FIDXS.test(lam._fidx) ) {
-        Type x = lam.targ(_idx).as_flow(false); // Most conservative arg
-        lam.arg_meet(_idx, x, work); // Arg_meet for force conservative arg
+      if( _def instanceof Lambda lam ) {
+        if( work!=null &&                       // Not testing
+            Root.ext_fidxs().test(lam._fidx) && // defining Lambda escaped
+            find().is_fun() &&                  // this argument is HM typed as a function (so can be called with any compatible function)
+            !lam.extsetf(_idx) ) {              // And we've not made a compatible external fcn
+          new EXTLambda(find());
+          for( Apply apl : lam._applys ) // New external function for Root, so add to worklist
+            if( apl instanceof Root root ) work.add(root);
+        }
+        
+        for( Apply apl : lam._applys ) {
+          Type x = apl instanceof Root
+            ? lam.targ(_idx).as_flow(false) // Most conservative arg
+            : apl._args[_idx]._flow;
+          lam.arg_meet(_idx, x, work);
+        }
+        return lam._types[_idx];
       }
-      return _def instanceof Let let ? let._def._flow : ((Lambda)_def)._types[_idx];
+      // Else a Let
+      return ((Let)_def)._def._flow;
     }
     @Override int prep_tree( Syntax par, VStack nongen, Work<Syntax> work ) {
       prep_tree_impl(par,nongen,work,T2.make_leaf());
-      for( Syntax syn = par, prior=this; syn!=null; prior=syn, syn = syn._par )
-        if( (_idx=syn.prep_lookup_deps(this,prior)) != -99 ) {
-          assert (_idx >= 0 && syn instanceof Lambda) ||
-            (_idx <  0 && syn instanceof Let   );
-          _def = syn;
-          _fresh = _idx == -2;  // Fresh in body of Let, not-fresh in Let def or Lambda arg
-          _idt = (syn instanceof Lambda lam) ? lam.targ(_idx) : ((Let)syn).targ();
+      for( Syntax syn = par, prior=this; syn!=null; prior=syn, syn = syn._par ) {
+        int idx = syn.prep_lookup_deps(this,prior);
+        if( idx != -99 ) {
+          assert (idx >= 0 && syn instanceof Lambda) ||
+                 (idx <  0 && syn instanceof Let   );
+          T2 t2 = syn instanceof Lambda lam ? lam.targ(idx) : ((Let)syn).targ();
+          // Fresh in body of Let, not-fresh in Let def or Lambda arg
+          init(syn,idx,t2,idx == -2);
           return 1;
         }
-
+      }
       throw new RuntimeException("Parse error, "+_name+" is undefined in "+_par);
     }
     @Override boolean more_work(Work<Syntax> work) { return more_work_impl(work); }
@@ -768,9 +843,26 @@ public class HM {
     @Override SB p2(SB sb, VBitSet dups) { return _body.p0(sb,dups); }
     @Override public T2 as_fun() { return find(); }
     @Override public int nargs() { return _types.length; }
+    public Ident[] refs(int idx) {
+      if( _refs[idx]==null ) {
+        Ident id = new Ident(_args[idx]);
+        id.init(this,idx,targ(idx),false)._hmt = id._idt;
+        _refs[idx] = new Ident[]{id};
+      }
+      assert _refs[idx].length>0; // At least 1 referring to call arg_meet
+      return _refs[idx];
+    }
               public boolean extsetf(int argn) { boolean old = _extsetf[argn]; _extsetf[argn] = true; return old; }
               public boolean extsetp(int argn) { boolean old = _extsetp[argn]; _extsetp[argn] = true; return old; }
-    @Override public void apply_push(Apply apl) { if( _applys.find(apl) == -1 ) _applys.push(apl); }
+    @Override public void apply_push(Apply apl, Work<Syntax> work) {
+      if( _applys.find(apl) != -1 ) return;
+      if( work==null ) return;  // Progress
+      // New apply discovered
+      _applys.push(apl);
+      // First time arg_meet for new apply
+      for( int i=0; i<nargs(); i++ )
+        work.add(refs(i));      
+    }
     @Override public T2 targ(int i) { T2 targ = _targs[i].find(); return targ==_targs[i] ? targ : (_targs[i]=targ); }
     @Override boolean hm(Work<Syntax> work) {
       // The normal lambda work
@@ -795,6 +887,7 @@ public class HM {
       Type old = _types[argn];
       Type mt = old.meet(cflow);
       if( mt==old ) return false; // No change
+      if( work==null ) return true;
       _types[argn]=mt;          // Yes change, update
       work.add(_refs[argn]);    // And revisit referrers
       if( this instanceof PrimSyn ) work.add(this); // Primitives recompute
@@ -1037,13 +1130,9 @@ public class HM {
         // because, e.g. _fun._flow added some more functions, all those new
         // functions need the arg_meet.
         if( !tfp.above_center() && work!=null && !tfp.is_full() )
-          for( int fidx : tfp.fidxs() ) {
-            Func lambda = Lambda.FUNS.get(fidx);
+          for( int fidx : tfp.fidxs() )
             // new call site for lambda; all args must meet into this lambda;
-            lambda.apply_push(this);
-            for( int i=0; i<_args.length; i++ )
-              lambda.arg_meet(i,_args[i]._flow,work);
-          }
+            Lambda.FUNS.get(fidx).apply_push(this,work);
       }
 
       // Attempt to lift the result, based on HM types.
@@ -1107,10 +1196,16 @@ public class HM {
 
 
     @Override void add_val_work( Syntax child, @NotNull Work<Syntax> work) {
-      // push self, because self returns the changed-functions' ret
+      // push self, because self returns the changed-functions' ret.
+      // push self, because the changed-functions' FIDXS might need to notice new Call Graph edge.
       if( child==_fun ) { work.add(this); return; }
+      
       if( DO_LIFT && DO_HM ) work.add(this); // Child input fell, parent may lift less
 
+      // Overloads mean any function anywhere might sharpen an Apply
+      if( child instanceof Lambda lam )
+        work.addAll(lam._applys);
+      
       // Check for some Lambdas present
       Type flow = _fun._flow;
       if( !(flow instanceof TypeFunPtr tfp) ) return;
@@ -1120,10 +1215,8 @@ public class HM {
       // visit all Lambdas; meet the child flow into the Lambda arg#
       if( argn != -1 && !tfp.is_full() && !tfp.above_center() )
         for( int fidx : tfp.fidxs() )
-          Lambda.FUNS.get(fidx).arg_meet(argn,child._flow,work);
-      // Overloads mean any function anywhere might sharpen an Apply
-      if( child instanceof Lambda lam )
-        work.addAll(lam._applys);
+          if( Lambda.FUNS.get(fidx) instanceof Lambda lam )
+            work.add(lam.refs(argn));
     }
 
     @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
@@ -1158,43 +1251,96 @@ public class HM {
   //     external_args = (External prog_result);
   //   }
   static class Root extends Apply {
-    static BitsAlias EXT_ALIASES;
-    static BitsFun   EXT_FIDXS  ;
-    static Work<Syntax> EXT_DEPS;
-    static void reset() { EXT_ALIASES = BitsAlias.EMPTY;  EXT_FIDXS = BitsFun.EMPTY; EXT_DEPS = new Work<>();}
+    private static BitsAlias EXT_ALIASES = BitsAlias.EMPTY;
+    private static BitsFun   EXT_FIDXS   = BitsFun  .EMPTY;
+    static void reset() { EXT_ALIASES = BitsAlias.EMPTY; EXT_FIDXS = BitsFun.EMPTY; }
+    public static BitsAlias ext_aliases() { return EXT_ALIASES; }
+    public static BitsFun   ext_fidxs  () { return EXT_FIDXS  ; }
+    static void add_ext_alias(int alias) { EXT_ALIASES = EXT_ALIASES.set(alias); }
+    static void add_ext_fidx (int fidx ) { EXT_FIDXS   = EXT_FIDXS  .set(fidx ); }
+    
     public Root(Syntax body) { super(body); }
     @Override boolean hm(final Work<Syntax> work) {
       assert debug_find()==_fun.debug_find();
       return false;
     }
     @Override void add_hm_work( @NotNull Work<Syntax> work) { throw unimpl(); }
-    @Override Type val(Work<Syntax> work) { return _fun._flow; }
-    @Override void add_val_work( Syntax child, @NotNull Work<Syntax> work) {
-      assert child==_fun;
-      work.add(this);
-      escapes(_fun._flow,work);      // Check for more escapes
+    @Override Type val(Work<Syntax> work) {
+      escapes(_fun._flow,work);
+      TypeMemPtr tmp = TypeMemPtr.make(false,EXT_ALIASES,TypeStruct.ISUSED);
+      TypeFunPtr tfp = TypeFunPtr.make(ProdOfSums.make(EXT_FIDXS),1);
+      return TypeTuple.make(_fun._flow,tmp,tfp);
     }
-    Type flow_type() { return sharpen(_flow); }
+    @Override void add_val_work( Syntax child, @NotNull Work<Syntax> work) { work.add(this); }
+    
+    // Add new aliases and fidxs to worklist
+    void add_val_work( Type old, @NotNull Work<Syntax> work) {
+      BitsAlias old_aliases = old instanceof TypeTuple tup ? ((TypeMemPtr)tup.at(1))._aliases : BitsAlias.EMPTY
+      BitsFun   old_fidxs   = old instanceof TypeTuple tup ? ((TypeFunPtr)tup.at(2)).fidxs()  : BitsFun  .EMPTY;
+      for( int alias : EXT_ALIASES )
+        if( !old_aliases.test(alias) &&
+            ALIASES.at(alias) instanceof Syntax syn )
+          work.add(syn);
+      
+      for( int fidx : EXT_FIDXS )
+        if( !old_fidxs.test(fidx) &&
+            Lambda.FUNS.get(fidx) instanceof Syntax syn )
+          work.add(syn);
+    }
+    Type flow_type() { return sharpen(((TypeTuple)_flow)._ts[0]); }
     @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
       prep_tree_impl(par,nongen,work,null);
       int cnt = 1+_fun.prep_tree(this,nongen,work);
       _hmt = _fun.find();
+      _flow = Type.ANY;
       return cnt;
     }
 
+    void add_freeze_work(Work<Syntax> work) {
+      // Freezing HM; all escaped function arguments get called with the most
+      // conservative args compatible with their HM types.
+      for( int fidx : EXT_FIDXS ) {
+        if( Lambda.FUNS.get(fidx) instanceof Lambda lam ) {
+          for( int i=0; i<lam.nargs(); i++ )
+            work.add(lam.refs(i));
+        }
+      }
+
+      // All Applys that are lifting with HM, now lift less.
+      if( DO_HM )
+        for( Func func : Lambda.FUNS.values() )
+          if( func instanceof Lambda lam )
+            work.addAll(lam._applys);
+    }
+
+    static BitsAlias matching_escaped_aliases(T2 t2) {
+      BitsAlias aliases = BitsAlias.EMPTY;
+      for( int alias : EXT_ALIASES )
+        if( !t2.trial_unify(ALIASES.at(alias).t2()) )
+          aliases = aliases.set(alias); // Compatible escaping alias
+      return aliases;
+    }
+    
+    static BitsFun matching_escaped_fidxs(T2 t2) {
+      BitsFun fidxs = BitsFun.EMPTY;
+      for( int fidx : EXT_FIDXS )
+        if( !t2.trial_unify(Lambda.FUNS.get(fidx).as_fun()) )
+          fidxs = fidxs.set(fidx); // Compatible escaping fidx
+      return fidxs;
+    }
+    
     // Escape all Root results.  Escaping functions are called with the most
     // conservative HM-compatible arguments.  Escaping Structs are recursively
     // escaped, and can appear as input arguments.
     private static final VBitSet ESCP = new VBitSet(), ESCF = new VBitSet();
-    public static void escapes(Type t, @NotNull Work<Syntax> work) {
+    private void escapes(Type t, Work<Syntax> work) {
       ESCP.clear();  ESCF.clear();
       _escapes(t,work);
     }
-    private static void _escapes(Type t, @NotNull Work<Syntax> work) {
+    private void _escapes(Type t, Work<Syntax> work) {
       if( t instanceof TypeMemPtr tmp ) {
         // Add to the set of escaped structures
         for( int alias : tmp._aliases ) {
-          if( alias==0 ) continue;
           if( ESCP.tset(alias) ) continue;
           EXT_ALIASES = EXT_ALIASES.set(alias);
           Alloc a = ALIASES.at(alias);
@@ -1230,29 +1376,11 @@ public class HM {
       //}
     }
 
-    private static void do_fidx(int fidx, @NotNull Work<Syntax> work) {
-      Func fun = Lambda.FUNS.get(fidx);
-      if( !EXT_FIDXS.test(fidx) )
-        fun.as_fun().add_deps_work(work); // TODO: why?
+    private void do_fidx( int fidx, Work<Syntax> work ) {
+      if( ESCF.tset(fidx) ) throw unimpl();        
+      if( Lambda.FUNS.get(fidx) instanceof Lambda lam )
+        lam.apply_push(this,work);        
       EXT_FIDXS = EXT_FIDXS.set(fidx);
-      for( int i=0; i<fun.nargs(); i++ ) {
-        // One-time make compatible external func/struct for this argument
-        Type cflow;
-        if( fun instanceof Lambda lam ) {
-          Ident[] ids = lam._refs[i];
-          if( ids!=null ) {
-            EXT_DEPS.add(ids); // Add to external deps; when HM_FREEZE flips these all need to be visited
-            for( Ident id : lam._refs[i] ) EXT_DEPS.add(id._par);
-          }
-          T2 t2 = lam.targ(i); // Get HM constraints on the arg
-          if( t2.is_fun() && !lam.extsetf(i) ) new EXTLambda(t2); // Make a canonical external function to call
-          if( t2.is_ptr() && !lam.extsetp(i) ) new EXTStruct(t2); // Make a canonical external struct for args
-          cflow = t2.as_flow(false);
-        } else {
-          cflow = TypeNil.SCALAR; // Most conservative args
-        }
-        fun.arg_meet(i,cflow,work); // Root / external-world calls this function with this arg
-      }
     }
 
   }
@@ -1269,11 +1397,9 @@ public class HM {
       _t2 = t2;
       _alias = alias;
       ALIASES.setX(alias,this);
-      Root.EXT_ALIASES = Root.EXT_ALIASES.set(alias);
+      Root.add_ext_alias(alias);
     }
-    @Override public String toString() {
-      return "["+_alias+"]"+_t2;
-    }
+    @Override public String toString() { return "["+_alias+"]"+_t2; }
     @Override public T2 t2() { return (_t2 = _t2.find()); }
     @Override public TypeMemPtr tmp() {
       Type t = _t2.as_flow(HM_FREEZE);
@@ -1284,8 +1410,9 @@ public class HM {
     @Override public Type fld(String id, Syntax fld) {
       T2 tfld = t2().get("*").arg(id);
       if( tfld==null ) return null;
-      Root.EXT_DEPS.add(fld);  // Leafs in tfld depend on HM_FREEZE
-      return tfld.as_flow(false);
+      //Root.EXT_DEPS.add(fld);  // Leafs in tfld depend on HM_FREEZE
+      //return tfld.as_flow(false);
+      throw unimpl();
     }
     @Override public void push(Syntax f) { }
   }
@@ -1297,15 +1424,15 @@ public class HM {
       _t2 = t2;
       _fidx = BitsFun.new_fidx(BitsFun.EXTX);
       Lambda.FUNS.put(_fidx,this);
-      Root.EXT_FIDXS = Root.EXT_FIDXS.set(_fidx);
       t2.get("ret").clr_cp();
+      Root.add_ext_fidx(_fidx);
     }
     @Override public String toString() { return "ext lambda"; }
     @Override public T2 as_fun() { return _t2.find(); }
     @Override public int nargs() { return as_fun().size()-1; }
     @Override public T2 targ(int argn) { throw unimpl(); }
     @Override public boolean arg_meet(int argn, Type t, Work<Syntax> work) { return false; }
-    @Override public void apply_push(Apply aply) { }
+    @Override public void apply_push(Apply aply, Work<Syntax> work) { }
   }
 
 
@@ -1413,12 +1540,7 @@ public class HM {
     @Override Type val(Work<Syntax> work) {
       return TypeMemPtr.make(_alias,TypeStruct.ISUSED);
     }
-    @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) {
-      work.add(_rflds.asAry());
-      // Check for more Root escapes on the changing fields
-      if( Root.EXT_ALIASES.test(_alias) )
-        Root.escapes(_flow,work);
-    }
+    @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) { work.add(_rflds.asAry()); }
 
     @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
       T2 hmt = T2.make_open_struct(null,null);
@@ -1527,15 +1649,17 @@ public class HM {
       T2 t2fld = t2rec.arg(_id);
       // Field from wrong alias (ignore/XSCALAR should not affect GCP field type),
       if( t2fld==null ) {
-        Root.EXT_DEPS.add(this);
-        return TypeNil.SCALAR.oob(!HM_FREEZE);
+        //Root.EXT_DEPS.add(this);
+        //return TypeNil.SCALAR.oob(!HM_FREEZE);
+        throw unimpl();
       }
       // HMT tells us the field is missing
       if( t2fld.is_err() )
         return TypeNil.SCALAR;
       // Convert the HM to a flow type; depends on HM_FREEZE
-      Root.EXT_DEPS.add(this);
-      return t2fld.as_flow(false);
+      //Root.EXT_DEPS.add(this);
+      //return t2fld.as_flow(false);
+      throw unimpl();
     }
     @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) { work.add(this); }
     @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
@@ -1712,12 +1836,6 @@ public class HM {
     @Override PrimSyn make() { return new Pair(); }
     @Override boolean hm(Work<Syntax> work) { return false; }
     @Override Type apply(Type[] flows) { return TypeMemPtr.make(_alias,TypeStruct.ISUSED); }
-    @Override public boolean arg_meet(int argn, Type t, Work<Syntax> work) {
-      if( !super.arg_meet(argn,t,work) ) return false;
-      if( Root.EXT_ALIASES.test(_alias) )
-        Root.escapes(tmp(),work);
-      return true;
-    }
   }
 
   // Triple
@@ -1746,12 +1864,6 @@ public class HM {
     @Override PrimSyn make() { return new Triple(); }
     @Override boolean hm(Work<Syntax> work) { return false; }
     @Override Type apply(Type[] flows) { return TypeMemPtr.make(_alias,TypeStruct.ISUSED);  }
-    @Override public boolean arg_meet(int argn, Type t, Work<Syntax> work) {
-      if( !super.arg_meet(argn,t,work) ) return false;
-      if( Root.EXT_ALIASES.test(_alias) )
-        Root.escapes(tmp(),work);
-      return true;
-    }
   }
 
   // Special form of a Lambda body for IF, which changes the H-M rules.
@@ -2048,7 +2160,7 @@ public class HM {
     // Meet into an argument type
     boolean arg_meet(int argn, Type cflow, Work<Syntax> work);
     // Push Apply onto Applys list
-    void apply_push(Apply apl);
+    void apply_push(Apply apl, Work<Syntax> work);
   }
 
   // ---------------------------------------------------------------------
@@ -2336,10 +2448,7 @@ public class HM {
       if( is_base() ) return _tflow;
       if( is_ptr() ) {
         // all escaping aliases that are compatible
-        BitsAlias aliases = BitsAlias.EMPTY;
-        for( int alias : Root.EXT_ALIASES )
-          if( !fresh_unify(ALIASES.at(alias).t2(),null,null) )
-            aliases = aliases.set(alias); // Compatible escaping alias
+        BitsAlias aliases = Root.matching_escaped_aliases(this);
         TypeStruct tstr = deep ? (TypeStruct)arg("*")._as_flow(deep) : TypeStruct.ISUSED;
         return TypeMemPtr.make(_may_nil,aliases,tstr);
       }
@@ -2347,10 +2456,7 @@ public class HM {
         return arg("?")._as_flow(deep).meet(TypeNil.AND_XSCALAR);
       if( is_fun() ) {
         // all escaping fidxs that are compatible
-        BitsFun fidxs = BitsFun.EMPTY;
-        for( int fidx : Root.EXT_FIDXS)
-          if( !fresh_unify(Lambda.FUNS.get(fidx).as_fun(),null,null) )
-            fidxs = fidxs.set(fidx);
+        BitsFun fidxs = Root.matching_escaped_fidxs(this);
         if( _may_nil ) fidxs = fidxs.set(0);
         Type tfun = ADUPS.get(_uid);
         if( tfun != null ) return tfun;  // TODO: Returning recursive flow-type functions
@@ -3046,11 +3152,6 @@ public class HM {
         // Lift the internal parts
         tjn = _walk_types_out(t,apply,test);
       }
-
-      // Add to EXT_DEPS if getting any lift
-      if( !HM_FREEZE && !test && tjn.join(t)!=t )
-        Root.EXT_DEPS.add(apply); // Add to external deps; when HM_FREEZE flips this needs to be visited
-
       return tjn;
     }
 
