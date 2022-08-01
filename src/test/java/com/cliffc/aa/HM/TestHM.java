@@ -26,8 +26,8 @@ public class TestHM {
     JIG=true;
 
     DO_HMT=true;
-    DO_GCP=false;
-    RSEED=12;
+    DO_GCP=true;
+    RSEED=0;
     test18();
   }
 

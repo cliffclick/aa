@@ -11,60 +11,7 @@ import java.util.function.IntSupplier;
 
 import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.AA.DSP_IDX;
-/*
-NOTES:
 
-Algo design -
-- All changes tracked in the changing of types
-- Can compute a new valid type
-- - And confirm: on-worklist or no-change (test)
-
-New Issue:
-- Lazy discovery of dependencies, ala SSA form
-- Found during type-compute OR
-- Found during work-compute / but work-compute is only done on type-change
-
-Non-Solution
-- Find new deps on work-compute
-- Issue: work-compute filtered on type-change: no-type-change means
-  no-work-compute means no discovery of new deps
-
-Non-Solution
-- Find new deps on type-compute when not-work
-- Issue: Cannot report progress of deps when type-compute does not change
-
-Solution?
-- Always report new-deps as part of type
-- Find new deps on type-compute when not-work
-
-
-ROOT:
-- New Deps include ESC_FIDXS, ESC_ALIASES
-- - ESC_ALIASES appear as inputs to ESC_FIDX, as ESC_ALIASES field contents, and ESC_ALIASES fields are conservative
-- - ESC_FIDXS are called with conservative args, including other ESC_FIDXS and ESC_ALIASES
-- Drop ESC_FIDXS, ESC_ALIASES; instead just track as part of the type
-- Need a type for "conservative (SCALAR) but not INTERNAL types and yes EXTERNAL types"
-- - Basically: [int & flt & BitsFun.EXT & BitsAlias.EXT]
-- - And can add bits to the bit-sets
-- - With HM, can filter down to one of int/flt/BitsFun/BitsAlais; with GCP alone just use Scalar
-
-APPLY/LAMBDA:
-- For Apply , the _fun arg TFP tracks Lambdas
-- For Lambda, once Apply discovers, need to put the reverse edge in Lambda
-- Theory: Lambda returns Tuple: (TFP,TRPC-of-Apply-bits)
-
-- Fun child of Apply tracks fidxs via values (this is the normal tracking)
-- - Changes here trigger Apply on work
-- - Even if TFP return is unchanged
-- Apply val doing work discovers Lambdas.  
-- - May not have any progress to test.
-- - But will push_apply on Lambda
-
-
-----------
-
-
-*/
 /**
 Combined Hindley-Milner and Global Constant Propagation typing.
 
@@ -191,12 +138,14 @@ public class HM {
 
   static { BitsAlias.init0(); BitsFun.init0(); }
 
-  static boolean DO_HM ;
-  static boolean DO_GCP;
+  static boolean DO_HM ;        // Do Hindley-Milner typing
+  static boolean DO_GCP;        // Do forwards-flow Global Constant Propagation typing
 
-  static boolean HM_FREEZE;
-  static boolean DO_AMBI;
-  static boolean DO_LIFT=true;
+  static boolean HM_FREEZE;     // After first pass, HM types are frozen but GCP types continue to fall
+  static boolean DO_AMBI;       // After 2nd pass, unresolved Overloads are an error
+
+  static Root ROOT;
+  
   public static Root hm( String sprog, int rseed, boolean do_hm, boolean do_gcp ) {
     Type.RECURSIVE_MEET=0;      // Reset between failed tests
     DO_HM  = do_hm ;
@@ -208,7 +157,7 @@ public class HM {
     new EXTStruct(T2.make_str(TypeMemPtr.STRPTR),TypeMemPtr.STR_ALIAS);
 
     // Parse
-    Root prog = parse( sprog );
+    Root prog = ROOT = parse( sprog );
 
     // Pass 0: Prep for SSA; pre-gather all the (unique) ids
     Work<Syntax> work = new Work<>(rseed);
@@ -273,6 +222,12 @@ public class HM {
 
         // VERY EXPENSIVE ASSERT: O(n^2).  Every Syntax that makes progress is on the worklist
         assert prog.more_work(work);
+        //if( !work.on(prog) && prog._flow instanceof TypeTuple tt ) {
+        //  BitsAlias aliases = Root.EXT_ALIASES;
+        //  BitsFun   fidxs   = Root.EXT_FIDXS  ;
+        //  prog.escapes(tt.at(0),work);
+        //  assert aliases==Root.EXT_ALIASES && fidxs==Root.EXT_FIDXS;
+        //}
       }
       // If we have any delayed overload resolution, attempt to resolve now.
       // If we have progress, go drain the main work loop and then check
@@ -847,6 +802,7 @@ public class HM {
       if( _refs[idx]==null ) {
         Ident id = new Ident(_args[idx]);
         id.init(this,idx,targ(idx),false)._hmt = id._idt;
+        id._par = this;
         _refs[idx] = new Ident[]{id};
       }
       assert _refs[idx].length>0; // At least 1 referring to call arg_meet
@@ -891,6 +847,9 @@ public class HM {
       _types[argn]=mt;          // Yes change, update
       work.add(_refs[argn]);    // And revisit referrers
       if( this instanceof PrimSyn ) work.add(this); // Primitives recompute
+      // Changing _types in Pair or Triple might escape the result
+      if( this instanceof Alloc alloc && mt instanceof TypeMemPtr && Root.ext_aliases().test(alloc.alias()) )
+        work.add(ROOT);
       return true;
     }
 
@@ -921,7 +880,7 @@ public class HM {
         if( Util.eq(_args[i],id._name) ) {
           // Deps are based on T2, and trigger when the HM types change
           _targs[i].push_update(id); //
-          // Refs are based on Syntax, basically a wimpy SSA for for GCP propagation
+          // Refs are based on Syntax, basically a wimpy SSA for GCP propagation
           Ident[] refs = _refs[i];
           if( refs==null ) _refs[i] = refs = new Ident[0];
           // Hard linear-time append ident to the end.  Should be very limited in size.
@@ -996,7 +955,6 @@ public class HM {
     final Syntax _fun;
     final Syntax[] _args;
     private Type _old_lift = Type.ANY; // Assert that apply-lift is monotonic
-    private final HashMap<T2,Type> _old_t2map = new HashMap<>(); // Assert that apply-lift is monotonic
 
     Apply(Syntax fun, Syntax... args) { _fun = fun; _args = args; }
     @Override SB str(SB sb) {
@@ -1143,13 +1101,11 @@ public class HM {
 
     // Gate around apply_lift.  Assert monotonic lifting and apply the lift.
     Type do_apply_lift(T2 rezt2, Type ret, boolean test) {
-      if( !DO_LIFT || !DO_HM ) return ret;
+      if( !DO_HM ) return ret;
       if( ret==TypeNil.XSCALAR ) return ret; // Nothing to lift
       Type lift = hm_apply_lift(rezt2, ret, test);
       assert _old_lift.isa(lift); // Lift is monotonic
       _old_lift=lift;             // Record updated lift
-      _old_t2map.clear();
-      _old_t2map.putAll(T2.T2MAP);
       if( lift==ret ) return ret; // No change
       if( !test ) rezt2.push_update(this);
       return ret.join(lift);    // Lifted result
@@ -1200,7 +1156,7 @@ public class HM {
       // push self, because the changed-functions' FIDXS might need to notice new Call Graph edge.
       if( child==_fun ) { work.add(this); return; }
       
-      if( DO_LIFT && DO_HM ) work.add(this); // Child input fell, parent may lift less
+      if( DO_HM ) work.add(this); // Child input fell, parent may lift less
 
       // Overloads mean any function anywhere might sharpen an Apply
       if( child instanceof Lambda lam )
@@ -1266,7 +1222,8 @@ public class HM {
     }
     @Override void add_hm_work( @NotNull Work<Syntax> work) { throw unimpl(); }
     @Override Type val(Work<Syntax> work) {
-      escapes(_fun._flow,work);
+      if( work!=null )
+        escapes(_fun._flow,work);
       TypeMemPtr tmp = TypeMemPtr.make(false,EXT_ALIASES,TypeStruct.ISUSED);
       TypeFunPtr tfp = TypeFunPtr.make(ProdOfSums.make(EXT_FIDXS),1);
       return TypeTuple.make(_fun._flow,tmp,tfp);
@@ -1342,7 +1299,7 @@ public class HM {
         // Add to the set of escaped structures
         for( int alias : tmp._aliases ) {
           if( ESCP.tset(alias) ) continue;
-          EXT_ALIASES = EXT_ALIASES.set(alias);
+          add_ext_alias(alias);
           Alloc a = ALIASES.at(alias);
           TypeMemPtr atmp = a.tmp();
           for( TypeFld fld : atmp._obj )
@@ -1379,8 +1336,8 @@ public class HM {
     private void do_fidx( int fidx, Work<Syntax> work ) {
       if( ESCF.tset(fidx) ) throw unimpl();        
       if( Lambda.FUNS.get(fidx) instanceof Lambda lam )
-        lam.apply_push(this,work);        
-      EXT_FIDXS = EXT_FIDXS.set(fidx);
+        lam.apply_push(this,work);
+      add_ext_fidx(fidx);
     }
 
   }
@@ -1391,7 +1348,6 @@ public class HM {
   static class EXTStruct implements Alloc {
     final int _alias;
     T2 _t2;
-    EXTStruct(T2 t2) { this(t2,BitsAlias.new_alias(BitsAlias.EXTX)); }
     EXTStruct(T2 t2, int alias) {
       assert t2.is_ptr();
       _t2 = t2;
@@ -1401,6 +1357,7 @@ public class HM {
     }
     @Override public String toString() { return "["+_alias+"]"+_t2; }
     @Override public T2 t2() { return (_t2 = _t2.find()); }
+    @Override public int alias() { return _alias; }
     @Override public TypeMemPtr tmp() {
       Type t = _t2.as_flow(HM_FREEZE);
       // Can be Scalar if the T2 type is_err
@@ -1494,6 +1451,7 @@ public class HM {
       return sb;
     }
     @Override public T2 t2() { return find(); }
+    @Override public int alias() { return _alias; }
     @Override public TypeMemPtr tmp() {
       Type[] ts = new Type[_flds.length];
       for( int i=0; i<_flds.length; i++ )
@@ -1827,6 +1785,7 @@ public class HM {
       ALIASES.setX(_alias,this);
     }
     @Override public T2 t2() { return find().get("ret"); }
+    @Override public int alias() { return _alias; }
     @Override public TypeMemPtr tmp() { return _tmp(_alias,FLDS,_types); }
     @Override public Type fld(String id, Syntax fld) {
       int idx = Util.find(FLDS,id);
@@ -1855,6 +1814,7 @@ public class HM {
       ALIASES.setX(_alias,this);
     }
     @Override public T2 t2() { return find().get("ret"); }
+    @Override public int alias() { return _alias; }
     @Override public TypeMemPtr tmp() { return _tmp(_alias,FLDS,_types); }
     @Override public Type fld(String id, Syntax fld) {
       int idx = Util.find(FLDS,id);
@@ -2135,6 +2095,7 @@ public class HM {
   interface Alloc {
     // Return a is_ptr T2
     T2 t2();
+    int alias();
     // Make a rich / deep pointer from this Alloc.
     // Used in sharpen() in result reporting.
     TypeMemPtr tmp();
@@ -2772,14 +2733,6 @@ public class HM {
       if( that.is_over() )
         throw unimpl();
 
-      //if( that.is_over() && this.is_fun() ) {
-      //  T2 tover = that._unify_over_fun(this);
-      //  if( tover==null ) return false; // No resolved overload yet
-      //  if( work==null ) return true;   // Resolved overload
-      //  this._fresh_unify(tover,nongen,work);
-      //  return that._union(tover,work); // Overload is resolved and removed
-      //}
-
       // Progress on the parts
       boolean progress = false;
       if( _tflow !=null ) progress = unify_base(that, work);
@@ -2794,11 +2747,11 @@ public class HM {
       } else {
         if( _may_nil && !that._may_nil ) { progress = that._may_nil = true; }
         if( is_ptr() && !that.is_ptr() ) // Error, fresh_unify a ptr into a non-ptr non-leaf
-          { that.cp_args(_args); progress=true; }
+          { return that._unify(_fresh(nongen),work); }
         if( is_fun() && !that.is_fun() ) // Error, fresh_unify a fun into a non-fun non-leaf
-          that.cp_args(_args)._is_fun=progress=true;
+          { that._is_fun=true; return that._unify(_fresh(nongen),work); }
         if( is_obj() && !that.is_obj() ) // Error, fresh_unify a struct into a non-struct non-leaf
-          that.cp_args(_args)._is_obj=progress=true;
+          { that._is_obj=true; return that._unify(_fresh(nongen),work); }
         if( _err!=null && !Util.eq(_err,that._err) ) {
           if( that._err!=null ) throw unimpl(); // TODO: Combine single error messages
           else { // Error, fresh_unify an error into a non-leaf non-error
@@ -2850,7 +2803,7 @@ public class HM {
       return progress;
     }
     private boolean vput(T2 that, boolean progress) { VARS.put(this,that); return progress; }
-
+    
     private boolean unify_nil_this( Work<Syntax> work ) {
       if( work==null ) return unify_nil_this_test();
       boolean progress = false;
@@ -2867,11 +2820,6 @@ public class HM {
       return vput(this,false);
     }
     private static Type meet_nil(Type t) { return t==null ? null : t.meet(TypeNil.XNIL); }
-    private T2 cp_args(NonBlockingHashMap<String,T2> args ) {
-      if( _args==null )
-        _args = (NonBlockingHashMap<String,T2>)args.clone(); // Error case; bring over the args
-      return this;
-    }
 
     // Return a fresh copy of 'this'
     T2 fresh() {
