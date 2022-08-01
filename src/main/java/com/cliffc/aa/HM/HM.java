@@ -719,7 +719,7 @@ public class HM {
         for( Apply apl : lam._applys ) {
           Type x = apl instanceof Root
             ? lam.targ(_idx).as_flow(this,false) // Most conservative arg
-            : apl._args[_idx]._flow;
+            : (_idx < apl._args.length ? apl._args[_idx]._flow : TypeNil.XSCALAR);
           lam.arg_meet(_idx, x, work);
         }
         return lam._types[_idx];
@@ -799,6 +799,7 @@ public class HM {
     @Override public T2 as_fun() { return find(); }
     @Override public int nargs() { return _types.length; }
     public Ident[] refs(int idx) {
+      if( idx>=_refs.length ) return null; // Happens for too-many-args cases
       if( _refs[idx]==null ) {
         Ident id = new Ident(_args[idx]);
         id.init(this,idx,targ(idx),false)._hmt = id._idt;
@@ -808,8 +809,8 @@ public class HM {
       assert _refs[idx].length>0; // At least 1 referring to call arg_meet
       return _refs[idx];
     }
-              public boolean extsetf(int argn) { boolean old = _extsetf[argn]; _extsetf[argn] = true; return old; }
-              public boolean extsetp(int argn) { boolean old = _extsetp[argn]; _extsetp[argn] = true; return old; }
+    public boolean extsetf(int argn) { boolean old = _extsetf[argn]; _extsetf[argn] = true; return old; }
+    public boolean extsetp(int argn) { boolean old = _extsetp[argn]; _extsetp[argn] = true; return old; }
     @Override public void apply_push(Apply apl, Work<Syntax> work) {
       if( _applys.find(apl) != -1 ) return;
       if( work==null ) return;  // Progress

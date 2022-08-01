@@ -25,10 +25,10 @@ public class TestHM {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_HMT=true;
+    DO_HMT=false;
     DO_GCP=true;
-    RSEED=0;
-    test32();
+    RSEED=1;
+    test69();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -1006,7 +1006,7 @@ all
     PA:*[13]@{
       FA;
       add_=[41]{any,3 ->PA };
-      pred=[39]{any,3 ->PB:*[10,11,12,13,17,18]@{FA; add_=[33,34,40,41,42]{any,3 ->Scalar }; pred=[19,33,39,40,41,42]{any,3 ->PB }; FB:succ=XA:[33,40,41,42]{any,3 ->*[10,11,13,17,18]@{FA; add_=XA; pred=[33,39,40,41,42]{any,3 ->PB }; FB; FC:zero=[22,24,32,38]{any,3 ->PC }} }; FC} };
+      pred=[39]{any,3 ->PB:*[10,11,12,13,17,18]@{FA; add_=[19,20,22,24,26,32,33,34,38,39,40,41,42]{any,3 ->Scalar }; pred=[19,20,21,22,24,25,26,32,33,34,38,39,40,41,42]{any,3 ->PB }; succ=[19,20,22,24,26,32,33,34,38,39,40,41,42]{any,3 ->PB }; zero=[19,20,21,22,24,25,26,32,33,34,38,39,40,41,42]{any,3 ->PC }} };
       succ=[40]{any,3 ->PA };
       zero=[38]{any,3 ->PC }
     }
@@ -1029,7 +1029,7 @@ all
   z=*[12]@{FA; add_=[34]{any,3 ->Scalar }; pred=[19]{any,3 ->~Scalar }; succ=[33]{any,3 ->Scalar }; zero=[32]{any,3 ->PA }}
 }
 """,
-         "[4,8,9,10,11,12,13,14,17,18]",
+         "[4,7,8,9,10,11,12,13,14,17,18]",
          "[19,20,21,22,23,24,25,26,27,32,33,34,38,39,40,41,42]"
          );
   }
