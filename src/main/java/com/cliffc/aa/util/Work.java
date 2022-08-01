@@ -19,6 +19,11 @@ public class Work<E extends IntSupplier> extends BitSetSparse {
       _work.push(e);
     return e;
   }
+  @Override public Work clear() {
+    super.clear();
+    _work.clear();
+    return this;
+  }
   // Bulk adders
   public void add(E[] es) { if(es!=null) for( E e : es ) add(e); }
   public void addAll(Ary<? extends E> es) { if( es!=null ) for( E e : es ) add(e); }

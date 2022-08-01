@@ -28,7 +28,7 @@ public class TestHM {
     DO_HMT=true;
     DO_GCP=true;
     RSEED=0;
-    test18();
+    test32();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -594,19 +594,19 @@ false = @{
 boolSub ={b ->(if b true false)};
 @{true=(boolSub 1) false=(boolSub 0)}
 """,
-        "*@{ false = A:*@{ and = { A -> A }; "+
-              "not = { B -> A }; "+
-              "or = { A -> A }; "+
-              "then = { { *( ) -> C } { *( ) -> C } -> C }"+
-            "}; "+
-            "true = D:*@{ and = { D -> D }; "+
-              "not = { E -> D }; "+
-              "or = { D -> D }; "+
-              "then = { { *( ) -> F } { *( ) -> F } -> F }"+
-            "}"+
-        "}",
+         "*@{ false = A:*@{ and = { A -> A }; "+
+               "not = { B -> A }; "+
+               "or = { A -> A }; "+
+               "then = { { *( ) -> C } { *( ) -> C } -> C }"+
+             "}; "+
+             "true = D:*@{ and = { D -> D }; "+
+               "not = { E -> D }; "+
+               "or = { D -> D }; "+
+               "then = { { *( ) -> F } { *( ) -> F } -> F }"+
+             "}"+
+         "}",
          "*[12]@{FA:^=any; false=PB:*[8,9]@{FA; and=[19,24]{any,3 ->Scalar }; not=[22,27]{any,3 ->PA:*[8]@{FA; and=[19]{any,3 ->Scalar }; not=[22]{any,3 ->PA }; or=[20]{any,3 ->PA }; then=[23]{any,4 ->Scalar }} }; or=[20,26]{any,3 ->Scalar }; then=[23,28]{any,4 ->Scalar }}; true=PB}",
-           "[4,8,9,12]","[19,20,21,22,23,24,25,26,27,28]");
+           "[4,7,8,9,12]","[19,20,21,22,23,24,25,26,27,28]");
   }
 
   // Regression test.  Was unexpectedly large type result.  Cut down version of
@@ -835,7 +835,7 @@ three =(n.s two);     // Three is the successor of two
   three=PC
 }
 """,
-        "[4,8,9,10,11,12,13,14,15,16]","[19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35]");
+        "[4,7,8,9,10,11,12,13,14,15,16]","[19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35]");
   }
 
 

@@ -707,18 +707,18 @@ public class HM {
       // Escaping Lambdas are called from Root by most conservative args.
       // Check if this is a parameter from an escaping Lambda.
       if( _def instanceof Lambda lam ) {
+        T2 t2 = find();
         if( work!=null &&                       // Not testing
-            Root.ext_fidxs().test(lam._fidx) && // defining Lambda escaped
-            find().is_fun() &&                  // this argument is HM typed as a function (so can be called with any compatible function)
-            !lam.extsetf(_idx) ) {              // And we've not made a compatible external fcn
-          new EXTLambda(find());
-          for( Apply apl : lam._applys ) // New external function for Root, so add to worklist
-            if( apl instanceof Root root ) work.add(root);
+            Root.ext_fidxs().test(lam._fidx) ) {// defining Lambda escaped
+          // this argument is HM typed as a function or struct, so can be
+          // called with any compatible external function or struct.
+          if( t2.is_fun() && !lam.extsetf(_idx) ) { new EXTLambda(t2);  work.add(ROOT); work.addAll(Root.EXT_DEPS); }
+          if( t2.is_ptr() && !lam.extsetp(_idx) ) { new EXTStruct(t2);  work.add(ROOT); work.addAll(Root.EXT_DEPS); }
         }
         
         for( Apply apl : lam._applys ) {
           Type x = apl instanceof Root
-            ? lam.targ(_idx).as_flow(false) // Most conservative arg
+            ? lam.targ(_idx).as_flow(this,false) // Most conservative arg
             : apl._args[_idx]._flow;
           lam.arg_meet(_idx, x, work);
         }
@@ -1209,7 +1209,9 @@ public class HM {
   static class Root extends Apply {
     private static BitsAlias EXT_ALIASES = BitsAlias.EMPTY;
     private static BitsFun   EXT_FIDXS   = BitsFun  .EMPTY;
-    static void reset() { EXT_ALIASES = BitsAlias.EMPTY; EXT_FIDXS = BitsFun.EMPTY; }
+    private static final Work<Syntax> FREEZE_DEPS = new Work<>();
+    private static final Work<Syntax> EXT_DEPS = new Work<>();
+    static void reset() { EXT_ALIASES = BitsAlias.EMPTY; EXT_FIDXS = BitsFun.EMPTY; FREEZE_DEPS.clear(); EXT_DEPS.clear(); }
     public static BitsAlias ext_aliases() { return EXT_ALIASES; }
     public static BitsFun   ext_fidxs  () { return EXT_FIDXS  ; }
     static void add_ext_alias(int alias) { EXT_ALIASES = EXT_ALIASES.set(alias); }
@@ -1243,6 +1245,8 @@ public class HM {
         if( !old_fidxs.test(fidx) &&
             Lambda.FUNS.get(fidx) instanceof Syntax syn )
           work.add(syn);
+      // Revisit fields depending on escaped values
+      work.addAll(EXT_DEPS);
     }
     Type flow_type() { return sharpen(((TypeTuple)_flow)._ts[0]); }
     @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
@@ -1268,6 +1272,9 @@ public class HM {
         for( Func func : Lambda.FUNS.values() )
           if( func instanceof Lambda lam )
             work.addAll(lam._applys);
+
+      work.addAll(FREEZE_DEPS);
+      FREEZE_DEPS.clear();
     }
 
     static BitsAlias matching_escaped_aliases(T2 t2) {
@@ -1320,21 +1327,10 @@ public class HM {
         // The flow return also escapes
         _escapes(tfp._ret,work);
       }
-      // TODO: test40 fails with rseed24, because the Root type falls thru some of the fidxs
-      // before hitting Scalar.  In rseed 24 it hits scalar fast, before noting the escape
-      // of fidx 17.  This fix escapes ALL fidxs upon hitting scalar, and is very conservative
-      // and weakens the gold answer for several tests.
-
-      //if( t==TypeNil.SCALAR || t==TypeNil.NSCALR ) {
-      //  for( long fidx : Lambda.FUNS.keySetLong() )
-      //    if( !EXT_FIDXS.test((int)fidx) &&
-      //        !(Lambda.FUNS.get((int)fidx) instanceof PrimSyn) )
-      //      do_fidx((int)fidx,work);
-      //}
     }
 
     private void do_fidx( int fidx, Work<Syntax> work ) {
-      if( ESCF.tset(fidx) ) throw unimpl();        
+      if( ESCF.tset(fidx) ) return; // Been there, done that
       if( Lambda.FUNS.get(fidx) instanceof Lambda lam )
         lam.apply_push(this,work);
       add_ext_fidx(fidx);
@@ -1348,6 +1344,7 @@ public class HM {
   static class EXTStruct implements Alloc {
     final int _alias;
     T2 _t2;
+    EXTStruct(T2 t2) { this(t2,BitsAlias.new_alias(BitsAlias.EXTX)); }
     EXTStruct(T2 t2, int alias) {
       assert t2.is_ptr();
       _t2 = t2;
@@ -1359,7 +1356,7 @@ public class HM {
     @Override public T2 t2() { return (_t2 = _t2.find()); }
     @Override public int alias() { return _alias; }
     @Override public TypeMemPtr tmp() {
-      Type t = _t2.as_flow(HM_FREEZE);
+      Type t = _t2.as_flow(null,HM_FREEZE);
       // Can be Scalar if the T2 type is_err
       return t instanceof TypeMemPtr tmp ? tmp : t.oob(TypeMemPtr.ISUSED);
     }
@@ -1367,9 +1364,8 @@ public class HM {
     @Override public Type fld(String id, Syntax fld) {
       T2 tfld = t2().get("*").arg(id);
       if( tfld==null ) return null;
-      //Root.EXT_DEPS.add(fld);  // Leafs in tfld depend on HM_FREEZE
-      //return tfld.as_flow(false);
-      throw unimpl();
+      Root.FREEZE_DEPS.add(fld); // Depends on HM_FREEZE
+      return tfld.as_flow(fld,false);
     }
     @Override public void push(Syntax f) { }
   }
@@ -1498,7 +1494,11 @@ public class HM {
     @Override Type val(Work<Syntax> work) {
       return TypeMemPtr.make(_alias,TypeStruct.ISUSED);
     }
-    @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) { work.add(_rflds.asAry()); }
+    @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) {
+      work.addAll(_rflds);
+      // Set a field in an escaped structure, need to re-compute escapes
+      if( Root.ext_aliases().test(_alias) ) work.add(ROOT);
+    }
 
     @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
       T2 hmt = T2.make_open_struct(null,null);
@@ -1607,17 +1607,13 @@ public class HM {
       T2 t2fld = t2rec.arg(_id);
       // Field from wrong alias (ignore/XSCALAR should not affect GCP field type),
       if( t2fld==null ) {
-        //Root.EXT_DEPS.add(this);
-        //return TypeNil.SCALAR.oob(!HM_FREEZE);
-        throw unimpl();
+        if( !HM_FREEZE ) Root.FREEZE_DEPS.add(this); // Revisit when HM_FREEZE flips
+        return TypeNil.SCALAR.oob(!HM_FREEZE);
       }
       // HMT tells us the field is missing
       if( t2fld.is_err() )
         return TypeNil.SCALAR;
-      // Convert the HM to a flow type; depends on HM_FREEZE
-      //Root.EXT_DEPS.add(this);
-      //return t2fld.as_flow(false);
-      throw unimpl();
+      return t2fld.as_flow(this,false);
     }
     @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) { work.add(this); }
     @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
@@ -2396,33 +2392,35 @@ public class HM {
     // compatible with HM type.  Called once shallow when HM_FREEZE is set.
     // Called once deep to make a final report
     static final NonBlockingHashMapLong<Type> ADUPS = new NonBlockingHashMapLong<>();
-    Type as_flow(boolean deep) {
+    Type as_flow(Syntax syn, boolean deep) {
       assert ADUPS.isEmpty();
-      Type t = _as_flow(deep);
+      Type t = _as_flow(syn,deep);
       ADUPS.clear();
       return t;
     }
-    Type _as_flow(boolean deep) {
+    Type _as_flow(Syntax syn, boolean deep) {
       assert !unified();
       if( is_err() ) return TypeNil.SCALAR;
       if( is_leaf() ) return TypeNil.SCALAR.oob(!HM_FREEZE);
       if( is_base() ) return _tflow;
       if( is_ptr() ) {
+        if( !deep ) Root.EXT_DEPS.add(syn); // Result depends on escapes
         // all escaping aliases that are compatible
         BitsAlias aliases = Root.matching_escaped_aliases(this);
-        TypeStruct tstr = deep ? (TypeStruct)arg("*")._as_flow(deep) : TypeStruct.ISUSED;
+        TypeStruct tstr = deep ? (TypeStruct)arg("*")._as_flow(syn,deep) : TypeStruct.ISUSED;
         return TypeMemPtr.make(_may_nil,aliases,tstr);
       }
       if( is_nil() )
-        return arg("?")._as_flow(deep).meet(TypeNil.AND_XSCALAR);
+        return arg("?")._as_flow(syn,deep).meet(TypeNil.AND_XSCALAR);
       if( is_fun() ) {
+        if( !deep ) Root.EXT_DEPS.add(syn); // Result depends on escapes
         // all escaping fidxs that are compatible
         BitsFun fidxs = Root.matching_escaped_fidxs(this);
         if( _may_nil ) fidxs = fidxs.set(0);
         Type tfun = ADUPS.get(_uid);
         if( tfun != null ) return tfun;  // TODO: Returning recursive flow-type functions
         ADUPS.put(_uid, TypeNil.XSCALAR);
-        Type rez = arg("ret")._as_flow(deep);
+        Type rez = arg("ret")._as_flow(syn,deep);
         return TypeFunPtr.makex(ProdOfSums.make(fidxs),size()-1+DSP_IDX,Type.ANY,rez);
       }
       if( is_obj() ) {
@@ -2439,7 +2437,7 @@ public class HM {
             ADUPS.put(_uid,tstr); // Stop cycles
             for( String id : _args.keySet() )
               if( !Util.eq(id,tstr._clz) )
-                tstr.get(id).setX(arg(id)._as_flow(deep)); // Recursive
+                tstr.get(id).setX(arg(id)._as_flow(syn,deep)); // Recursive
           }
           // update root args of an open HM struct, needs a type-flow type
           // that allows fields to be added
@@ -2912,12 +2910,13 @@ public class HM {
       if( is_fun() && that.is_fun() ||
           is_ptr() && that.is_ptr() ||
           is_obj() && that.is_obj() ) {
-        for( String id : _args.keySet() ) {
-          if( Util.eq(id,"ret") ) continue; // Do not unify based on return types
-          T2 lhs = this.arg(id);
-          T2 rhs = that.arg(id);
-          if( rhs!=null && lhs._trial_unify(rhs) ) return true;
-        }
+        if( _args!=null )
+          for( String id : _args.keySet() ) {
+            if( Util.eq(id,"ret") ) continue; // Do not unify based on return types
+            T2 lhs = this.arg(id);
+            T2 rhs = that.arg(id);
+            if( rhs!=null && lhs._trial_unify(rhs) ) return true;
+          }
         return this.mismatched_child(that) || that.mismatched_child(this);
       }
       return true;
@@ -2939,7 +2938,7 @@ public class HM {
     }
     // True if 'this' has extra children and 'that' does not allow extras
     private boolean mismatched_child( T2 that ) {
-      if( !that.is_open() )   // If RHS is closed
+      if( !that.is_open() && _args!=null )   // If RHS is closed
         for( String id : _args.keySet() )
           if( that.arg(id)==null ) // And missing key in RHS
             return true;           // Trial unification failed
