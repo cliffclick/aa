@@ -1275,7 +1275,7 @@ public class HM {
     
     // Add new aliases and fidxs to worklist
     void add_val_work( Type old, @NotNull Work<Syntax> work) {
-      BitsAlias old_aliases = old instanceof TypeTuple tup ? ((TypeMemPtr)tup.at(1))._aliases : BitsAlias.EMPTY
+      BitsAlias old_aliases = old instanceof TypeTuple tup ? ((TypeMemPtr)tup.at(1))._aliases : BitsAlias.EMPTY;
       BitsFun   old_fidxs   = old instanceof TypeTuple tup ? ((TypeFunPtr)tup.at(2)).fidxs()  : BitsFun  .EMPTY;
       for( int alias : EXT_ALIASES )
         if( !old_aliases.test(alias) &&
