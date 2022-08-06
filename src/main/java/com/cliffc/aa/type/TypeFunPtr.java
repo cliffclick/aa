@@ -187,6 +187,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     while( tfp._ret!=tfp ) {      // Break if self-cycle, which can have anything
       for( int fidx : tfp._pos._fidxs   ) if( CHK2.tset(fidx) ) return false;
       if( !(tfp._ret instanceof TypeFunPtr ret) ) break;
+      if( tfp._pos.is_empty() && ret._pos.is_empty() ) return false;
       tfp = ret;
     }
     return true;
@@ -253,16 +254,20 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     TypeFunPtr tfp = rtfp._rule2(new_pos,false);
     if( tfp==_ret ) return this; // Return was fine, so i am fine
     if( tfp==null ) return make_from(_dsp,rtfp._ret); // Hard fail
-    if( new_pos.overlaps(tfp._pos) ) return make_from(_dsp,tfp._ret);
+    if( new_pos.overlaps(tfp._pos) ) {
+      if( new_pos.is_empty() && tfp._pos.is_empty() )
+        return tfp;             // Avoid 2 empties in a row
+      return make_from(_dsp,tfp._ret);
+    }
     return make_from(_dsp,tfp);  // Wrap the return
   }
 
   private TypeFunPtr _rule2_apx() {
     if( this==_ret ) return this; // I am my own self-cycle
-    if( !(_ret instanceof TypeFunPtr rtfp) ) { // make a self cycle
-      if( _ret.isa(GENERIC_FUNPTR) )           // Falls to a cycle?
+    if( !(_ret instanceof TypeFunPtr rtfp) ) { // Ret is not a TFP?
+      if( _ret.isa(GENERIC_FUNPTR) )           // _ret is very high and falls to a cycle?
         return make_cycle(_any,_nil,_sub,_pos,_nargs,_dsp);
-      return null;              // Hard fail, return low self
+      return null;              // Hard fail, return low self; parent will wrap this low return
     }
     TypeFunPtr apx = rtfp._rule2_apx();
     if( apx==null ) return make_from(_dsp,rtfp._ret);

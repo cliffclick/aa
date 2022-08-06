@@ -145,7 +145,7 @@ public class HM {
   static boolean DO_AMBI;       // After 2nd pass, unresolved Overloads are an error
 
   static Root ROOT;
-  
+
   public static Root hm( String sprog, int rseed, boolean do_hm, boolean do_gcp ) {
     Type.RECURSIVE_MEET=0;      // Reset between failed tests
     DO_HM  = do_hm ;
@@ -154,7 +154,7 @@ public class HM {
     // Initialize the primitives
     for( PrimSyn prim : new PrimSyn[]{ new If(), new Pair(), new EQ(), new EQ0(), new IMul(), new FMul(), new I2F(), new Add(), new Dec(), new IRand(), new Str(), new Triple(), new Factor(), new IsEmpty(), new NotNil()} )
       PRIMSYNS.put(prim.name(),prim);
-    new EXTStruct(T2.make_str(TypeMemPtr.STRPTR),TypeMemPtr.STR_ALIAS);
+    new EXTStruct(T2.make_str(TypeMemPtr.STRPTR),TypeMemPtr.STR_ALIAS,null);
 
     // Parse
     Root prog = ROOT = parse( sprog );
@@ -712,10 +712,10 @@ public class HM {
             Root.ext_fidxs().test(lam._fidx) ) {// defining Lambda escaped
           // this argument is HM typed as a function or struct, so can be
           // called with any compatible external function or struct.
-          if( t2.is_fun() && !lam.extsetf(_idx) ) { new EXTLambda(t2);  work.add(ROOT); work.addAll(Root.EXT_DEPS); }
-          if( t2.is_ptr() && !lam.extsetp(_idx) ) { new EXTStruct(t2);  work.add(ROOT); work.addAll(Root.EXT_DEPS); }
+          if( t2.is_fun() && !lam.extsetf(_idx) ) { new EXTLambda(t2,work); work.addAll(Root.EXT_DEPS); }
+          if( t2.is_ptr() && !lam.extsetp(_idx) ) { new EXTStruct(t2,work); work.addAll(Root.EXT_DEPS); }
         }
-        
+
         for( Apply apl : lam._applys ) {
           Type x = apl instanceof Root
             ? lam.targ(_idx).as_flow(this,false) // Most conservative arg
@@ -818,7 +818,7 @@ public class HM {
       _applys.push(apl);
       // First time arg_meet for new apply
       for( int i=0; i<nargs(); i++ )
-        work.add(refs(i));      
+        work.add(refs(i));
     }
     @Override public T2 targ(int i) { T2 targ = _targs[i].find(); return targ==_targs[i] ? targ : (_targs[i]=targ); }
     @Override boolean hm(Work<Syntax> work) {
@@ -849,7 +849,8 @@ public class HM {
       work.add(_refs[argn]);    // And revisit referrers
       if( this instanceof PrimSyn ) work.add(this); // Primitives recompute
       // Changing _types in Pair or Triple might escape the result
-      if( this instanceof Alloc alloc && mt instanceof TypeMemPtr && Root.ext_aliases().test(alloc.alias()) )
+      if( this instanceof Alloc alloc && Root.ext_aliases().test(alloc.alias()) &&
+          (mt instanceof TypeMemPtr || mt instanceof TypeFunPtr) )
         work.add(ROOT);
       return true;
     }
@@ -933,7 +934,7 @@ public class HM {
       if( !Util.eq(id._name,_arg0) ) return -99;
       // Deps are based on T2, and trigger when the HM types change
       targ().push_update(id);
-      // Refs are based on Syntax, basically a wimpy SSA for for GCP propagation
+      // Refs are based on Syntax, basically a wimpy SSA for GCP propagation
       // Hard linear-time append ident to the end.  Should be very limited in size.
       _refs = Arrays.copyOf(_refs,_refs.length+1);
       _refs[_refs.length-1] = id;
@@ -991,9 +992,9 @@ public class HM {
         // no-progress: 0 choices, already error-unified
         // progress: 1 choice , first time unify
         // progress: 0 choices, first time error unify
-        
+
         throw unimpl();
-        
+
       } else if( !tfun.is_fun() ) { // Not a function, so progress
         T2 nfun = make_nfun();
         progress = tfun.unify(nfun,work); // Unify.
@@ -1030,7 +1031,7 @@ public class HM {
       T2 tret = tfun.arg("ret");
       if( tret._is_copy && _fun._flow instanceof TypeFunPtr tfp ) {
         for( int fidx : tfp.pos()._fidxs )
-          if( !Lambda.FUNS.get(fidx).as_fun().arg("ret")._is_copy ) {
+          if( fidx!=BitsFun.ALLX && !Lambda.FUNS.get(fidx).as_fun().arg("ret")._is_copy ) {
             if( work!=null ) tret.clr_cp();
             return true;
           }
@@ -1156,13 +1157,13 @@ public class HM {
       // push self, because self returns the changed-functions' ret.
       // push self, because the changed-functions' FIDXS might need to notice new Call Graph edge.
       if( child==_fun ) { work.add(this); return; }
-      
+
       if( DO_HM ) work.add(this); // Child input fell, parent may lift less
 
       // Overloads mean any function anywhere might sharpen an Apply
       if( child instanceof Lambda lam )
         work.addAll(lam._applys);
-      
+
       // Check for some Lambdas present
       Type flow = _fun._flow;
       if( !(flow instanceof TypeFunPtr tfp) ) return;
@@ -1215,9 +1216,14 @@ public class HM {
     static void reset() { EXT_ALIASES = BitsAlias.EMPTY; EXT_FIDXS = BitsFun.EMPTY; FREEZE_DEPS.clear(); EXT_DEPS.clear(); }
     public static BitsAlias ext_aliases() { return EXT_ALIASES; }
     public static BitsFun   ext_fidxs  () { return EXT_FIDXS  ; }
-    static void add_ext_alias(int alias) { EXT_ALIASES = EXT_ALIASES.set(alias); }
-    static void add_ext_fidx (int fidx ) { EXT_FIDXS   = EXT_FIDXS  .set(fidx ); }
-    
+    private static <B extends Bits<B>> B add_ext( int x, Work<Syntax> work, B b ) {
+      if( b.test(x) ) return b;
+      if( work!=null ) work.add(ROOT);
+      return b.set(x);
+    }
+    static void add_ext_alias(int alias, Work<Syntax> work) { EXT_ALIASES = add_ext(alias,work,EXT_ALIASES); }
+    static void add_ext_fidx (int fidx , Work<Syntax> work) { EXT_FIDXS   = add_ext(fidx ,work,EXT_FIDXS  ); }
+
     public Root(Syntax body) { super(body); }
     @Override boolean hm(final Work<Syntax> work) {
       assert debug_find()==_fun.debug_find();
@@ -1232,7 +1238,7 @@ public class HM {
       return TypeTuple.make(_fun._flow,tmp,tfp);
     }
     @Override void add_val_work( Syntax child, @NotNull Work<Syntax> work) { work.add(this); }
-    
+
     // Add new aliases and fidxs to worklist
     void add_val_work( Type old, @NotNull Work<Syntax> work) {
       BitsAlias old_aliases = old instanceof TypeTuple tup ? ((TypeMemPtr)tup.at(1))._aliases : BitsAlias.EMPTY;
@@ -1241,7 +1247,7 @@ public class HM {
         if( !old_aliases.test(alias) &&
             ALIASES.at(alias) instanceof Syntax syn )
           work.add(syn);
-      
+
       for( int fidx : EXT_FIDXS )
         if( !old_fidxs.test(fidx) &&
             Lambda.FUNS.get(fidx) instanceof Syntax syn )
@@ -1276,6 +1282,7 @@ public class HM {
 
       work.addAll(FREEZE_DEPS);
       FREEZE_DEPS.clear();
+      work.add(this);  // Always need self, if returning an overload
     }
 
     static BitsAlias matching_escaped_aliases(T2 t2) {
@@ -1285,7 +1292,7 @@ public class HM {
           aliases = aliases.set(alias); // Compatible escaping alias
       return aliases;
     }
-    
+
     static BitsFun matching_escaped_fidxs(T2 t2) {
       BitsFun fidxs = BitsFun.EMPTY;
       for( int fidx : EXT_FIDXS )
@@ -1293,7 +1300,7 @@ public class HM {
           fidxs = fidxs.set(fidx); // Compatible escaping fidx
       return fidxs;
     }
-    
+
     // Escape all Root results.  Escaping functions are called with the most
     // conservative HM-compatible arguments.  Escaping Structs are recursively
     // escaped, and can appear as input arguments.
@@ -1307,7 +1314,7 @@ public class HM {
         // Add to the set of escaped structures
         for( int alias : tmp._aliases ) {
           if( ESCP.tset(alias) ) continue;
-          add_ext_alias(alias);
+          add_ext_alias(alias,work);
           Alloc a = ALIASES.at(alias);
           TypeMemPtr atmp = a.tmp();
           for( TypeFld fld : atmp._obj )
@@ -1334,7 +1341,7 @@ public class HM {
       if( ESCF.tset(fidx) ) return; // Been there, done that
       if( Lambda.FUNS.get(fidx) instanceof Lambda lam )
         lam.apply_push(this,work);
-      add_ext_fidx(fidx);
+      add_ext_fidx(fidx,work);
     }
 
   }
@@ -1345,13 +1352,13 @@ public class HM {
   static class EXTStruct implements Alloc {
     final int _alias;
     T2 _t2;
-    EXTStruct(T2 t2) { this(t2,BitsAlias.new_alias(BitsAlias.EXTX)); }
-    EXTStruct(T2 t2, int alias) {
+    EXTStruct(T2 t2, Work<Syntax> work) { this(t2,BitsAlias.new_alias(BitsAlias.EXTX),work); }
+    EXTStruct(T2 t2, int alias, Work<Syntax> work) {
       assert t2.is_ptr();
       _t2 = t2;
       _alias = alias;
       ALIASES.setX(alias,this);
-      Root.add_ext_alias(alias);
+      Root.add_ext_alias(alias,work);
     }
     @Override public String toString() { return "["+_alias+"]"+_t2; }
     @Override public T2 t2() { return (_t2 = _t2.find()); }
@@ -1373,20 +1380,25 @@ public class HM {
   static class EXTLambda implements Func {
     final int _fidx;
     final T2 _t2;
-    EXTLambda(T2 t2) {
+    EXTLambda(T2 t2, Work<Syntax> work) {
       assert t2.is_fun();
       _t2 = t2;
       _fidx = BitsFun.new_fidx(BitsFun.EXTX);
       Lambda.FUNS.put(_fidx,this);
       t2.get("ret").clr_cp();
-      Root.add_ext_fidx(_fidx);
+      Root.add_ext_fidx(_fidx,work);
     }
     @Override public String toString() { return "ext lambda"; }
     @Override public T2 as_fun() { return _t2.find(); }
     @Override public int nargs() { return as_fun().size()-1; }
     @Override public T2 targ(int argn) { throw unimpl(); }
     @Override public boolean arg_meet(int argn, Type t, Work<Syntax> work) { return false; }
-    @Override public void apply_push(Apply aply, Work<Syntax> work) { }
+    @Override public void apply_push(Apply aply, Work<Syntax> work) {
+      // all these args escape
+      if( work!=null )
+        for( Syntax syn : aply._args )
+          ROOT.escapes(syn._flow,work);
+    }
   }
 
 
@@ -2802,7 +2814,7 @@ public class HM {
       return progress;
     }
     private boolean vput(T2 that, boolean progress) { VARS.put(this,that); return progress; }
-    
+
     private boolean unify_nil_this( Work<Syntax> work ) {
       if( work==null ) return unify_nil_this_test();
       boolean progress = false;
@@ -3095,6 +3107,7 @@ public class HM {
       Type tjn;
       if( !HM_FREEZE && !is_obj() && T2_NEW_LEAF ) {
         T2.push_updates(T2JOIN_LEAFS,apply); // Result is kept high by some leaf
+        Root.FREEZE_DEPS.add(apply);
         tjn = T2.T2JOIN_LEAF==TypeNil.XSCALAR ? TypeNil.XSCALAR : TypeNil.XNSCALR; // Future leafs preserve nilability
       } else {
         // Lift the internal parts

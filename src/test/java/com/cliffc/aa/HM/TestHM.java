@@ -25,10 +25,10 @@ public class TestHM {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_HMT=false;
+    DO_HMT=true;
     DO_GCP=true;
-    RSEED=1;
-    test69();
+    RSEED=0;
+    test81();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -36,7 +36,7 @@ public class TestHM {
     Root syn = HM.hm(prog, rseed, rez_hm!=null, frez_gcp!=null );
     if(  rez_hm !=null )  assertEquals(stripIndent(rez_hm),stripIndent(syn._hmt.p()));
     if( frez_gcp!=null )  assertEquals(Type.valueOf(frez_gcp),syn.flow_type());
-    if( rez_hm!=null && frez_gcp!=null ) {
+    if( rez_hm!=null && frez_gcp!=null && !rez_hm.contains("Cannot") ) {
       // Track expected Root escapes
       String esc_ptrs2 = "*"+esc_ptrs+"()";
       String esc_funs2 =     esc_funs+"{any,3->Scalar}";
@@ -397,7 +397,7 @@ map ={fun parg -> (fun (cdr parg))};
          "A:Cannot unify { A -> A } and *@{ u = A; ... }",
          "Scalar",
          "Scalar",
-         "[4,10]","[19,20,21,25]");
+         "[4,7]","[19,20,21,22]");
   }
 
   // Example from TestParse.test15:
@@ -1160,7 +1160,7 @@ A:*@{
          "test",
          "{ { A:{A->A} -> {A->B} } -> B }",
          "[24]{any,3 ->Scalar }",
-         null,"[21,24]");
+         null,"[19,20,21,22,24]");
   }
 
   @Test public void test79() {
@@ -1191,8 +1191,8 @@ A:*@{
          "  { x -> (f* x 3.0) };"+  // Arg is 'flt'
          " ]",
          "&[ {int64 -> int64}; {flt64 -> flt64} ]",
-         "[]&[~20+22]{any,3 ->~Scalar0 }",
-         null,"[20,22]"
+         "[]&[~20+23]{any,3 ->~Scalar0 }",
+         null,"[20,23]"
         );
   }
 
