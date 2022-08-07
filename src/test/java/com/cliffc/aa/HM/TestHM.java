@@ -26,9 +26,9 @@ public class TestHM {
     JIG=true;
 
     DO_HMT=true;
-    DO_GCP=true;
+    DO_GCP=false;
     RSEED=0;
-    test81();
+    test79();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -223,7 +223,7 @@ map = { fun x -> (fun x)};
     rune("fcn = {p -> (if p {a -> (pair a a)} {b -> (pair b (pair 3 b))})};"+
          "map = { fun x -> (fun x)};"+
          "{ q -> (map (fcn q) 5)}",
-         "{ A? -> *( B:Cannot unify 5 and *( 3, B), B) }",
+         "{ A? -> *( B:[Cannot unify 5 and *( 3, B)], B) }",
          "[31]{any,3 -> *[7,8](^=any, 5, nScalar) }",
          "[4,7,8,9]","[31]" );
   }
@@ -373,7 +373,7 @@ map ={fun parg -> (fun (cdr parg))};
   // Example from SimpleSub requiring 'x' to be both a struct with field
   // 'v', and also a function type - specifically disallowed in 'aa'.
   @Test public void test38() { rune("{ x -> y = ( x x.v ); 0}",
-                                    "{ Cannot unify {A->B} and *@{ v=A; ...} -> C? }",
+                                    "{ A:[Cannot unify {B->A} and *@{ v=B;...}] -> C? }",
                                     "[19]{any,3 ->xnil }",
                                     "[4,10]","[19,21]");
   }
@@ -393,9 +393,7 @@ map ={fun parg -> (fun (cdr parg))};
   // The first arg to x is two different kinds of functions, so fails unification.
   @Test public void test40() {
     rune("x = w = (x x); { z -> z}; (x { y -> y.u})",
-         "A:Cannot unify { A -> A } and *@{ u = A; ... }",
-         "A:Cannot unify { A -> A } and *@{ u = A; ... }",
-         "Scalar",
+         "A:[Cannot unify { A -> A } and *@{ u = A; ... }]",
          "Scalar",
          "[4,7]","[19,20,21,22]");
   }
@@ -441,7 +439,7 @@ out_bool= (map in_str { xstr -> (eq xstr "def")});
   @Test public void test44() {
     run("fun = (if (isempty \"abc\") {x->x} {x->1.2}); (fun @{})",
         "1.2f",
-        "Cannot unify 1.2f and *()",
+        "[Cannot unify 1.2f and *()]",
         "1.2f","1.2f");
 
   }
@@ -463,7 +461,7 @@ loop = { name cnt ->
 (loop "def" (id 2))
 """,
         "*str:(nint8)?",      // Both HM and GCP
-        "Cannot unify int8 and *str:(nint8)?", // HM alone cannot do this one
+        "[Cannot unify int8 and *str:(nint8)?]", // HM alone cannot do this one
         "*[4]str:(, 100)",    // Both HM and GCP
         "nScalar");           // GCP alone gets a very weak answer
   }
@@ -1180,7 +1178,7 @@ A:*@{
   // GCP folds the 'if' to the true arm.  Instead call: '(rand 2)'
   @Test public void test80() {
     run("i = {x -> x}; k = {x -> (i x)}; l = {x -> (k x)}; m = {x -> (l x)}; n = {x -> (m x)}; (if (rand 2) (n 1) (n \"a\"))",
-        "Cannot unify 1 and *str:(97)", "nScalar" );
+        "[Cannot unify 1 and *str:(97)]", "nScalar" );
   }
 
 
@@ -1215,15 +1213,13 @@ A:*@{
         "   { x -> (i* x 2) };"+  // Arg is 'int'
         "   { x -> (i* x 3) };"+  // Arg is 'int'
         "  ] 4)",                 // Error, ambiguous
-        "Ambiguous overloads: &[ { int64 -> int64 }; { int64 -> int64} ]", "~int64");
+        "A:[Cannot unify {4->A} and &[ {int64->int64}; {int64->int64} ] ]", "~int64");
   }
 
   // Wrong args for all overloads
   @Test public void test84() {
     rune("(&[ { x y -> (i* x y) }; { x y z -> (i* y z) };] 4)",
-         "A:Cannot unify { 4 -> A } and &[ { int64 int64 -> int64 }; {B int64 int64 -> int64 } ]",
-         "A:Cannot unify { 4 -> A } and &[ { int64 int64 -> int64 }; {B int64 int64 -> int64 } ]",
-         "~Scalar",
+         "A:[Cannot unify { 4 -> A } and &[ { int64 int64 -> int64 }; {B int64 int64 -> int64 } ] ]",
          "~int64",
          null,null);
   }
@@ -1236,8 +1232,8 @@ fy = &[ { z -> "def" }; { a -> 4     }; ];
 fz = (if (rand 2) fx fy);
 (isempty (fz 1.2))
 """,
-         "Ambiguous overloads: &[ {A->3}; {B->*str:(97)} ]","Ambiguous overloads: &[ {A->3}; {B->*str:(97)} ]",
-         "int1","~Scalar",
+         "A:[Cannot unify {A->A}? and int1 and flt32 and *str:(int8)? and &[{B-> [ Cannot unify 3 and *str:(100) ]}; { C-> [ Cannot unify 4 and *str:(97) ] } ] ]",
+         "~Scalar",
          null,null);
   }
 
