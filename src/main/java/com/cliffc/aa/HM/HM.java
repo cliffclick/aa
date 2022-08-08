@@ -180,10 +180,7 @@ public class HM {
 
     // Pass 3: failed overloads propagate errors
     DO_AMBI = true;           // Allow HM work to propagate errors
-    for( DelayedOverload delay : DelayedOverload._delays ) {
-      delay.over().add_deps_work(work);
-      delay.that().add_deps_work(work);
-    }
+    DelayedOverload.delay_is_unresolved(work);
     main_work_loop(prog,work);
     assert prog.more_work(work);
 
@@ -265,21 +262,16 @@ public class HM {
       _trial = null;
       return progress;
     }
-    // Check for unresolved overloads at the end of typing
-    public static T2 ambiguous_errs(T2 t2) {
-      for( DelayedOverload delay : _delays ) {
-        if( delay.over()==t2 ) return t2;
-        if( delay.that()==t2 ) return delay.over();
-      }
-      return null;
-    }
-    public static boolean find(T2 over, T2 that) {
-      for( DelayedOverload delay : _delays )
-        if( delay.over()==over && delay.that()==that )
-          return true;
-      return false;
-    }
 
+    // All delays are now unresolved errors.  Propagate.
+    public static void delay_is_unresolved( Work<Syntax> work ) {
+      while( _delays.len() > 0 ) {
+        DelayedOverload delay = _delays.pop();
+        delay.over().add_deps_work(work);
+        delay.that().add_deps_work(work);
+      }
+    }
+    
     private T2 _over;
     private T2 _that;
     private final VStack _nongen;
@@ -335,21 +327,6 @@ public class HM {
           if( self._err!=null && self._err.equals("Missing field") )
             self._err = "Missing field "+fld._id+" in "+ptr;
         }
-
-        //// Check all Applys have resolved overloads
-        //if( syn instanceof Apply apl ) {
-        //  T2 fover = apl._fun.find();
-        //  if( (fover=DelayedOverload.ambiguous_errs(fover))!=null ) {
-        //    self._err = "Ambiguous overloads: "+fover;
-        //    self.add_deps_work(work);
-        //  }
-        //}
-        //T2 delay = DelayedOverload.ambiguous_errs(self);
-        //if( delay!=null && self._err==null ) {
-        //  self._err = delay._err==null ? "Ambiguous overloads: "+delay.p() : delay._err;
-        //  self.add_deps_work(work);
-        //  syn.add_hm_work(work);
-        //}
 
         if( self.is_err2() && self.has_nil() )
           // If any contain nil, then we may have folded in a not-nil.
@@ -1010,7 +987,7 @@ public class HM {
       if( tfun._err!=null )
         progress |= find().unify_errs(tfun._err,work);
       if( tfun.is_err2() )
-        progress |= find().union(tfun,work);
+        progress |= find().unify(tfun,work);
 
       // Flag HMT result as widening, if GCP falls to a TFP which widens in HMT.
       T2 tret = tfun.arg("ret");
@@ -2608,8 +2585,8 @@ public class HM {
       if( that.is_nil() && !this.is_nil() ) return this.unify_nil(that,work);
 
       // Special case: overload vs other
-      if( this.is_over() && !that.is_over() ) return this._unify_over(that,null,false,work);
-      if( that.is_over() && !this.is_over() ) return that._unify_over(this,null,false,work);
+      if( this.is_over() && !this.is_err2() && !that.is_over() ) return this._unify_over(that,null,false,work);
+      if( that.is_over() && !that.is_err2() && !this.is_over() ) return that._unify_over(this,null,false,work);
 
       // Cycle check
       long luid = dbl_uid(that);    // long-unique-id formed from this and that

@@ -28,7 +28,7 @@ public class TestHM {
     DO_HMT=true;
     DO_GCP=false;
     RSEED=0;
-    test79();
+    test83();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -1168,7 +1168,7 @@ A:*@{
          "term = {z->{y ->((y (z I))(z K))}};"+
          "test = (term W);"+
          "(test {x -> {y -> (pair (x 3) (((y \"a\") \"b\") \"c\")) } })",
-         "*(A:Cannot unify {A->A} and 3 and *str:(nint8), A)",
+         "*( A:[Cannot unify {A->A} and 3 and *str:(nint8)], A )",
          "*[7](^=any, Scalar, Scalar)",
          "[4,7]","[]");
   }
