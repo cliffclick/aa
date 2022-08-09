@@ -271,14 +271,14 @@ public class HM {
         delay.that().add_deps_work(work);
       }
     }
-    
+
     private T2 _over;
     private T2 _that;
     private final VStack _nongen;
-    private final boolean _fresh;
+    private final boolean _fresh_this, _fresh_that;
 
     // Delay overload resolution of this pair
-    public static void delay( T2 over, T2 that, VStack nongen, boolean fresh ) {
+    public static void delay( T2 over, T2 that, VStack nongen, boolean fresh_this, boolean fresh_that ) {
       // This is a top-level main work loop test, and resolution failed and
       // needs to delay again.
       if( _trial!=null ) {
@@ -287,32 +287,38 @@ public class HM {
         return;
       }
       // Create a new delayed overload
-      DelayedOverload delay0 = new DelayedOverload(over,that,nongen,fresh);
+      DelayedOverload delay0 = new DelayedOverload(over,that,nongen,fresh_this, fresh_that);
       // Dup check, made complicated by needing a U-F effect
       for( DelayedOverload delay : _delays )
         if( delay0.equals(delay) ) return; // Dup, ignore
       _delays.add(delay0);
     }
-    private DelayedOverload( T2 over, T2 that, VStack nongen, boolean fresh ) {
+    private DelayedOverload( T2 over, T2 that, VStack nongen, boolean fresh_this, boolean fresh_that ) {
       assert over.is_over();
       _over = over;
       _that = that;
       _nongen = nongen;
-      _fresh = fresh;
+      _fresh_this = fresh_this;
+      _fresh_that = fresh_that;
     }
     // Two delays are the same, modulo the U-F effect
     @Override public boolean equals( Object o ) {
       if( this==o ) return true;
       if( !(o instanceof DelayedOverload delay) ) return false;
-      return over()==delay.over() && that()==delay.that();
+      if( _fresh_this != delay._fresh_this ) return false;
+      if( _fresh_that != delay._fresh_that ) return false;
+      boolean rez = over()==delay.over() && that()==delay.that();
+      assert _nongen == delay._nongen;
+      return rez;
     }
     @Override public int hashCode() { return super.hashCode(); }
     T2 over() { return _over.unified() ? (_over = _over.find()) : _over; }
     T2 that() { return _that.unified() ? (_that = _that.find()) : _that; }
 
     private void unify(Work<Syntax> work) {
-      if (_fresh) over().fresh_unify(that(), _nongen, work);
-      else        over().      unify(that(),          work);
+      if(      _fresh_this ) over().fresh_unify(that(), _nongen, work);
+      else if( _fresh_that ) that().fresh_unify(over(), _nongen, work);
+      else              over().      unify(that(),          work);
     }
   }
 
@@ -2585,8 +2591,8 @@ public class HM {
       if( that.is_nil() && !this.is_nil() ) return this.unify_nil(that,work);
 
       // Special case: overload vs other
-      if( this.is_over() && !this.is_err2() && !that.is_over() ) return this._unify_over(that,null,false,work);
-      if( that.is_over() && !that.is_err2() && !this.is_over() ) return that._unify_over(this,null,false,work);
+      if( this.is_over() && !this.is_err2() && !that.is_over() ) return this._unify_over(that,null,false,false,work);
+      if( that.is_over() && !that.is_err2() && !this.is_over() ) return that._unify_over(this,null,false,false,work);
 
       // Cycle check
       long luid = dbl_uid(that);    // long-unique-id formed from this and that
@@ -2699,9 +2705,9 @@ public class HM {
 
 
       // Fresh-unify with an ad-hoc polymorphic overload to a function
-      if( this.is_over() && !that.is_over() ) return this._unify_over(that,nongen,true,work);
+      if( this.is_over() && !that.is_over() ) return this._unify_over(that,nongen,true,false,work);
       if( that.is_over() && !this.is_over() )
-        throw unimpl();
+        return that._unify_over(this,nongen,false,true,work);
 
       // Progress on the parts
       boolean progress = false;
@@ -2823,10 +2829,11 @@ public class HM {
     }
 
 
-    // Given an overload &[ A, B, C, ...] and another type F, unify with a
-    // single match or return false if many matches and put on the delayed
-    // overload list, or unify with an ambiguous overload error.
-    private boolean _unify_over( T2 that, VStack nongen, boolean fresh, Work<Syntax> work ) {
+    // Given an overload &[ A, B, C, ...] and another type F, either
+    // (1) unify with a single match or return false if many matches and put on
+    // the delayed overload list, OR
+    // (2) unify with an ambiguous overload error.
+    private boolean _unify_over( T2 that, VStack nongen, boolean fresh_this, boolean fresh_that, Work<Syntax> work ) {
       assert is_over() && !that.is_over();
       assert _err==null;        // Not sure why Overload itself gets errors
       T2 no_err=null;
@@ -2838,7 +2845,8 @@ public class HM {
             if( DO_AMBI )               // Ambiguous never resolved, report instead of stall
               return that.union(this,work); // Force unify of overload and other
             // Stall ambiguous until things can be resolved
-            if( work!=null ) DelayedOverload.delay(this,that,nongen,fresh);
+            if( work!=null ) DelayedOverload.delay(this,that,nongen,fresh_this,fresh_that);
+            push_update(that._deps); // Changes to 'that' might now resolve overload
             return false;    // No change if testing, or onto the delay list
           }
           no_err = over; // Collect non-errors
@@ -2847,8 +2855,10 @@ public class HM {
       if( no_err==null ) // All overloads are in-error
         return union(that, work); // Hard union; both are broken
       // Unify the one valid choice into that
-      if( fresh ) // Fresh overload: keep it around, unify the winner with that
+      if( fresh_this ) // Fresh overload: keep it around, unify the winner with that
         return no_err._fresh_unify(that,nongen,work);
+      if( fresh_that )
+        return that._fresh_unify(no_err,nongen,work);
       // Not fresh: remove the overload
       no_err._unify(that,work);
       return _union(that,work); // The overload is resolved and removed; hard-unioned into the result

@@ -27,8 +27,8 @@ public class TestHM {
 
     DO_HMT=true;
     DO_GCP=false;
-    RSEED=0;
-    test83();
+    RSEED=3;
+    test87();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -1256,8 +1256,8 @@ fz = (if (rand 2) fx fy);
   // a useful type.
   @Test public void test87() {
     String hm_rez =  "*("+
-      "A:*@{_*_={B:*@{_*_=&[{*@{i=int64;...}->B};{*@{f=flt64;...}->C:*@{_*_=&[{*@{i=int64;...}->C};{*@{f=flt64;...}->C}];f=flt64}}];i=int64}->A};f=flt64},"+
-      "D:*@{_*_={E:*@{_*_=&[{*@{i=int64;...}->E};{*@{f=flt64;...}->F:*@{_*_=&[{*@{i=int64;...}->F};{*@{f=flt64;...}->F}];f=flt64}}];i=int64}->D};i=int64},"+
+      "A:*@{_*_=&[{B:*@{_*_=&[{*@{i=int64;...}->B};{*@{f=flt64;...}->C:*@{_*_=&[{*@{i=int64;...}->C};{*@{f=flt64;...}->C}];f=flt64}}];i=int64}->A};{*@{f=flt64;...}->A}];f=flt64},"+
+      "D:*@{ _*_={E:*@{_*_=&[{*@{i=int64;...}->E};{*@{f=flt64;...}->F:*@{_*_=&[{*@{i=int64;...}->F};{*@{f=flt64;...}->F}];f=flt64}}];i=int64}->D};i=int64}, "+
       "G:*@{_*_={H:*@{_*_=&[{*@{i=int64;...}->H};{*@{f=flt64;...}->H}];f=flt64}->G};f=flt64}"+
       ")";
 
@@ -1287,8 +1287,8 @@ mul2 = { x -> (x._*_ con2)};
 """,
         hm_rez, hm_rez,
         "*[9](FA:^=any, PA:*[7]@{FA; _*_=[]&[~22+24]{any,3 ->PA }; f=flt64}, *[8]@{FA; _*_=[]&[~28+31]{any,3 ->*[]( ...) }; i=int64}, PA)",
-        "*[9](FA:^=any, PA:*[7]@{FA; _*_=[]&[~22+24]{any,3 ->PA }; f=flt64}, *[]( ...), PA)",
-        "[4,7,8,9,10,11,17,18]","[22,24,28,31]");
+        "*[9](FA:^=any, PA:*[7]@{FA; _*_=[]&[~21+23]{any,3 ->PA }; f=flt64}, *[]( ...), PA)",
+        "[4,7,8,9,10,11,17,18]","[21,23,28,31]");
   }
 }
 
