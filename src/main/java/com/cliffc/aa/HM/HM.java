@@ -106,28 +106,27 @@ only be typed using the combination of GCP and HM.
 BNF for the "core AA" syntax:
    e  = number         | // Primitive numbers; note that wrapped AA numbers are explicitly wrapped in tests
         string         | // More or less a proxy for arrays.
-        primitives     | // +, -, *, /, eq, etc
+        primitives     | // +, -, *, /, eq, (,) tuple pair, etc
         (fe0 fe1*)     | // Application.  Multiple args are allowed and tracked
         { id* -> fe0 } | // Lambda.  Multiple args are allowed and tracked.  Numbered uniquely
         id             | // Use of an id, either a lambda arg or in a Let/In
-        id = fe0; fe1  | // Eqv: letrec ld = fe0 in fe1
+        id = fe0; fe1  | // Eqv: letrec id = fe0 in fe1
         @{ (label = fe0;)* } | Structures.  Numbered uniquely.  ';' is a field-separator not a field-end
         fe = e         | // No  field after expression
         fe.label       | // Yes field after expression
-        &[ (fe0;)* ]     // A collection of ad-hoc polymorphism lambdas.
+        &[ (fe0;)* ]     // A collection of ad-hoc polymorphism expressions
 
 BNF for the "core AA" pretty-printed types:
    T = Vnnn               | // Leaf number nnn
        >>T1               | // Unified; lazyily collapsed with 'find()' calls
        base               | // any lattice element, all are nilable
-       T0?T1              | // T1 is a not-nil T0
+       T0?T1              | // T1 is a not-nil T0; stacked not-nils collapse
        { T* -> Tret }     | // Lambda, arg count is significant
        *T0                | // Ptr-to-struct; T0 is either a leaf, or unified, or a struct
        @{ (label = T;)* } | // ';' is a field-separator not a field-end
-       &[ (e0;)* ]        | // Collection of ad-hoc poly lambdas; e0 is base, unified, or a lambda
-       (Error base* T0*)
+       &[ (e0;)* ]        | // Overload: a collection of ad-hoc poly expressions
+       (Error base* T0*)  | // A union of base and not-nil, lambda, ptr, struct, overload
 
-   Multiple stacked T????s collapse
 */
 
 public class HM {
@@ -202,7 +201,7 @@ public class HM {
         if( DO_HM ) {
           T2 old = syn._hmt;      // Old value for progress assert
           if( syn.hm(work) ) {
-            assert syn.debug_find()==old.debug_find(); // monotonic: unifying with the result is no-progress
+            assert syn.debug_find().find()==old.debug_find().find(); // monotonic: unifying with the result is no-progress
             syn.add_hm_work(work);// Push affected neighbors on worklist
           }
         }
@@ -961,39 +960,34 @@ public class HM {
       //   this-unify-_fun.return makes progress
       T2 tfun = _fun.find();
 
-      // If overload, trial unify with function
-      if( (tfun.is_over() && !tfun.is_err()) ||  // overload, not function, maybe other errors
-          !tfun.is_fun() ) {                     // Not a function, so progress
+      if( !tfun.is_fun() ) {    // Not a function, try to make it one
         T2 nfun = make_nfun();
         progress = tfun.unify(nfun,work); // Unify.
         if( work==null )                  // Just testing, but did an allocation for the trial
           { nfun.free(); return progress; }
         tfun = nfun.find();
 
-      } else { // function, maybe other errors and/or overload
+      } else {                  // function, unify by parts
         // Check for progress amongst arg pairs
         int miss=0;
         for( int i=0; i<_args.length; i++ ) {
           T2 farg = tfun.arg(Lambda.ARGNAMES[i]);
-          if( farg==null ) {
-            miss++;
-            progress |= bad_arg_cnt(work);
-          } else progress |= farg.unify(_args[i].find(),work);
+          progress |= farg==null
+            ? find().unify_errs("Bad arg count",work) // more args than the lambda takes
+            : farg.unify(_args[i].find(),work);
+          if( farg==null ) miss++;                  // 
           if( progress && work==null ) return true; // Will-progress & just-testing early exit
-          tfun=tfun.find();
+          tfun = tfun.find();
         }
         if( (tfun.size()-1)-(_args.length-miss) > 0 && !tfun.is_err() )
-          progress |= bad_arg_cnt(work);
+          progress |= find().unify_errs("Bad arg count",work); // less args than the lambda takes
         // Check for progress on the return
         progress |= find().unify(tfun.arg("ret"),work);
         tfun=tfun.find();
       }
 
       // Errors are poisonous
-      if( tfun._err!=null )
-        progress |= find().unify_errs(tfun._err,work);
-      if( tfun.is_err2() )
-        progress |= find().unify(tfun,work);
+      progress |= find().unify_errs(tfun._err,work);
 
       // Flag HMT result as widening, if GCP falls to a TFP which widens in HMT.
       T2 tret = tfun.arg("ret");
@@ -1017,14 +1011,6 @@ public class HM {
       fun._err = find()._err;
       fun.push_update(this); // TODO
       return fun; // TODO
-    }
-    private boolean bad_arg_cnt(Work<Syntax> work) {
-      if( find().is_err() ) return false;
-      if( work!=null ) {
-        find()._err = "Bad argument count";
-        find().add_deps_work(work); // Error removes apply_lift
-      }
-      return true;
     }
     @Override void add_hm_work( @NotNull Work<Syntax> work) {
       work.add(_par);
@@ -1611,31 +1597,37 @@ public class HM {
     }
   }
 
+  // Limited choice.  Unifies with zero or one choice.  Two or more choices is
+  // ambiguous and stalls until pass#3, and is then declared an error which
+  // unifies and propagates.  One choice is legit.  Zero choices is an error,
+  // and since we do not know which one choice might have unified, we go ahead
+  // and unify with all (which widens the error).  All unifications are done in
+  // unify() and fresh_unify().  This class just builds the corresponding T2
+  // type.
   static class Overload extends Syntax {
-    final Syntax[] _funs;
-    Overload( Syntax[] funs ) { assert funs.length>1; _funs=funs; }
+    final Syntax[] _overs;
+    Overload( Syntax[] overs ) { assert overs.length>1; _overs =overs; }
     @Override SB str(SB sb) {
       sb.p("&[ ");
-      for( Syntax fun : _funs )
+      for( Syntax fun : _overs)
         fun.str(sb).p("; ");
       return sb.unchar(2).p("]");
     }
     @Override SB p1(SB sb, VBitSet dups) { return sb.p("&[ ... ] "); }
     @Override SB p2(SB sb, VBitSet dups) {
-      for( Syntax fun : _funs )
+      for( Syntax fun : _overs)
         fun.p0(sb.i().nl(),dups);
       return sb;
     }
     @Override boolean hm(Work<Syntax> work) { return false; }
-    @Override void add_hm_work( @NotNull Work<Syntax> work) {
-      work.add(_par);
-    }
+    @Override void add_hm_work( @NotNull Work<Syntax> work) { work.add(_par); }
     @Override Type val(Work<Syntax> work) {
+      // TODO: WILDLY INCORRECT.  UNION OF MEETS OF ALL TYPES, NOT JUST TFPS
       // Join (choice) of all children.  If some child is below any function,
       // we fall to Scalar and force reporting an error.
       Type t = TypeNil.SCALAR;
       BitsFun overs = BitsFun.EMPTY;
-      for( Syntax fun : _funs ) {
+      for( Syntax fun : _overs) {
         Type tf = fun._flow;
         if( !tf.above_center() ) { // Input is still falling
           if( !(tf instanceof TypeFunPtr tfp) )
@@ -1659,23 +1651,23 @@ public class HM {
       T2 hmt = T2.make_overload();
       prep_tree_impl(par, nongen, work, hmt);
       int cnt = 1;                // One for self
-      for( int i=0; i<_funs.length; i++ ) { // Prep all sub-fields
-        cnt += _funs[i].prep_tree(this,nongen,work);
-        hmt._args.put("&"+i,_funs[i].find());
+      for(int i = 0; i< _overs.length; i++ ) { // Prep all sub-fields
+        cnt += _overs[i].prep_tree(this,nongen,work);
+        hmt._args.put("&"+i, _overs[i].find());
       }
       assert hmt.is_over();
       return cnt;
     }
     @Override boolean more_work(Work<Syntax> work) {
       if( !more_work_impl(work) ) return false;
-      for( Syntax fun : _funs )
+      for( Syntax fun : _overs)
         if( !fun.more_work(work) )
           return false;
       return true;
     }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       T rez = map.apply(this);
-      for( Syntax fun : _funs )
+      for( Syntax fun : _overs)
         rez = reduce.apply(rez,fun.visit(map,reduce));
       return rez;
     }
@@ -2283,8 +2275,10 @@ public class HM {
     }
 
     T2 find() {
-      T2 u = _find0();
-      return u.is_nil() ? u._find_nil() : u;
+      T2 u0 = _find0();
+      T2 u1 = u0.is_nil () ? u0._find_nil () : u0;
+      T2 u2 = u1.is_over() ? u1._find_over() : u1;
+      return u2;
     }
     // U-F find
     private T2 _find0() {
@@ -2324,6 +2318,10 @@ public class HM {
       n.merge_deps(this,null);
       return this;
     }
+    private T2 _find_over() {
+      T2 resolved = arg("&&");
+      return resolved==null ? this : resolved;
+    }
 
     private long dbl_uid(T2 t) { return dbl_uid(t._uid); }
     private long dbl_uid(long uid) { return ((long)_uid<<32)|uid; }
@@ -2353,8 +2351,8 @@ public class HM {
     // unchanging (e.g. defensive clone)
     @Override public int hashCode() {
       int hash = 0;
-      if(    _tflow !=null ) hash+=    _tflow._hash;
-      if(   _eflow!=null ) hash+=   _eflow._hash;
+      if( _tflow!=null ) hash+= _tflow._hash;
+      if( _eflow!=null ) hash+= _eflow._hash;
       if( _is_fun ) hash = (hash+ 7)*13;
       if( _may_nil) hash = (hash+13)*23;
       if( _is_obj ) hash = (hash+23)*29;
@@ -2484,11 +2482,11 @@ public class HM {
     boolean unify_errs(String err, Work<Syntax> work) {
       assert !unified();
       if( err==null || err.equals(_err) ) return false;
-      if( work==null ) return !DO_AMBI;// Would be progress
-      if( _err!=null ) throw unimpl(); // TODO: Combine single errors
-      _err = err;                      // Error is poisonous
+      if( work==null ) return true;  // Would be progress
+      if( _err!=null ) return false; // TODO: Combine single errors, right now 1st one wins
+      _err = err;                    // Propagate errors
       add_deps_work(work);
-      return !DO_AMBI;
+      return true;
     }
 
     // Unify this._flow into that._flow.  Flow is limited to only one of
@@ -2541,7 +2539,7 @@ public class HM {
       return leaf.union(copy,work) | _union(that,work);
     }
     // U-F union; that is nilable and a fresh copy of this becomes that.  No
-    // change if only testing, and reports progress.  Handles cycles in the
+    // change if only testing, and reports progress.  Handle cycles in the
     // fresh side.
     boolean unify_nil(T2 that, Work<Syntax> work, VStack nongen) {
       assert !is_nil() && that.is_nil();
@@ -2706,8 +2704,7 @@ public class HM {
 
       // Fresh-unify with an ad-hoc polymorphic overload to a function
       if( this.is_over() && !that.is_over() ) return this._unify_over(that,nongen,true,false,work);
-      if( that.is_over() && !this.is_over() )
-        return that._unify_over(this,nongen,false,true,work);
+      if( that.is_over() && !this.is_over() ) return that._unify_over(this,nongen,false,true,work);
 
       // Progress on the parts
       boolean progress = false;
@@ -2835,35 +2832,51 @@ public class HM {
     // (2) unify with an ambiguous overload error.
     private boolean _unify_over( T2 that, VStack nongen, boolean fresh_this, boolean fresh_that, Work<Syntax> work ) {
       assert is_over() && !that.is_over();
-      assert _err==null;        // Not sure why Overload itself gets errors
-      T2 no_err=null;
-      for( String id : _args.keySet() ) {
-        T2 over = arg(id);              // Get an overload
-        if( over==this ) continue;      // Parts unified with self; already an error, ignore
-        if( !over.trial_unify(that) ) { // If no error
-          if( no_err!=null ) {          // Two or more no-errors: need to delay
-            if( DO_AMBI )               // Ambiguous never resolved, report instead of stall
-              return that.union(this,work); // Force unify of overload and other
-            // Stall ambiguous until things can be resolved
-            if( work!=null ) DelayedOverload.delay(this,that,nongen,fresh_this,fresh_that);
-            push_update(that._deps); // Changes to 'that' might now resolve overload
-            return false;    // No change if testing, or onto the delay list
+      T2 no_err = arg("&&");
+      if( no_err==null ) {
+        for( String id : _args.keySet() ) {
+          T2 over = arg(id);              // Get an overload
+          if( over==this ) continue;      // Parts unified with self; already an error, ignore
+          if( !over.trial_unify(that) ) { // If no error
+            if( no_err!=null ) { no_err=this; break; } // Two or more no-errors: need to delay
+            no_err = over; // Collect non-errors
           }
-          no_err = over; // Collect non-errors
         }
+      } else {                  // Resolved one-way already
+        // Assert all other directions still fail
+        for( String id : _args.keySet() )
+          assert arg(id)==no_err || arg(id).trial_unify(that);
+        if( no_err.trial_unify(that) ) // Check resolve still holds
+          no_err=null;                 // All directions fail
       }
-      if( no_err==null ) // All overloads are in-error
-        return union(that, work); // Hard union; both are broken
-      // Unify the one valid choice into that
-      if( fresh_this ) // Fresh overload: keep it around, unify the winner with that
-        return no_err._fresh_unify(that,nongen,work);
-      if( fresh_that )
-        return that._fresh_unify(no_err,nongen,work);
-      // Not fresh: remove the overload
-      no_err._unify(that,work);
-      return _union(that,work); // The overload is resolved and removed; hard-unioned into the result
+
+      if( no_err==this || no_err==null ) {  // Two or more no-errors, or all are in-error: need to delay
+        if( !DO_AMBI ) {    // Stall ambiguous until things can be resolved
+          if( work!=null ) DelayedOverload.delay(this,that,nongen,fresh_this,fresh_that);
+          push_update(that._deps); // Changes to 'that' might now resolve overload
+          return false;    // No change if testing, or onto the delay list
+        }
+        // Ambiguous never resolved, report instead of stall.
+        // Unify that into all choices.  Declare error in the overload.
+        boolean progress = that.unify_errs("Ambiguous overload "+p()+": ",work);
+        for( String id : _args.keySet() )
+          progress |= arg(id)._unify(that,nongen,fresh_this,fresh_that,work);
+        if( work!=null && !fresh_this ) _args.put("&&",arg("&0"));
+        return progress;
+      }
+      // Single choice; unify to it
+      if( work!=null && !fresh_this ) _args.put("&&",no_err);
+      return no_err._unify(that,nongen,fresh_this,fresh_that,work);
     }
 
+    // Pick which unify to do 
+    private boolean _unify( T2 that, VStack nongen,  boolean fresh_this, boolean fresh_that, Work<Syntax> work ) {
+      if( fresh_this ) return this._fresh_unify(that,nongen,work);
+      if( fresh_that ) return that._fresh_unify(this,nongen,work);
+      return _unify(that,work);      
+    }
+
+      
     // Do a trial unification between this and that.  Report back if any error
     // happens.  No change to either side, this is a trial only.
     private static final NonBlockingHashMapLong<T2> TDUPS = new NonBlockingHashMapLong<>();
@@ -3233,6 +3246,7 @@ public class HM {
 
       // Special printing for errors
       if( is_err() ) {
+        if( _err!=null ) sb.p(_err); // Error message, if any
         if( is_err2() ) {
           sb.p("[Cannot unify ");
           if( is_fun () ) str_fun(sb,visit,dups,debug).p(" and ");
@@ -3243,7 +3257,6 @@ public class HM {
           if( is_obj () ) str_obj(sb,visit,dups,debug).p(" and ");
           return sb.unchar(5).p("]");
         }
-        return sb.p(_err);      // Just a simple error
       }
 
       if( is_base() ) return str_base(sb);
@@ -3279,10 +3292,15 @@ public class HM {
     }
     private SB str_ovr(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
       sb.p("&[ ");
+      T2 resolved = _args.get("&&");
+      if( resolved!=null ) resolved = resolved.debug_find();
       for( int i=0; i<_args.size(); i++ ) {
         T2 fun = _args.get("&"+i);
-        if( fun!=null )
+        if( fun!=null ) {
+          if( resolved==fun.debug_find() )
+            sb.p("resolved: ");
           str0(sb,visit,fun,dups,debug).p("; ");
+        }
       }
       return sb.unchar(2).p(" ]");
     }

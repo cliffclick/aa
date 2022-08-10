@@ -25,10 +25,10 @@ public class TestHM {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_HMT=true;
-    DO_GCP=false;
-    RSEED=3;
-    test87();
+    DO_HMT=false;
+    DO_GCP=true;
+    RSEED=0;
+    test86();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -1173,7 +1173,7 @@ A:*@{
          "[4,7]","[]");
   }
 
-  // Stacked if functions "carry thru" precision.
+  // Stacked if functions "carry through" precision.
   // Test was buggy, since 'rand' is a known non-zero function pointer constant,
   // GCP folds the 'if' to the true arm.  Instead call: '(rand 2)'
   @Test public void test80() {
@@ -1189,8 +1189,8 @@ A:*@{
          "  { x -> (f* x 3.0) };"+  // Arg is 'flt'
          " ]",
          "&[ {int64 -> int64}; {flt64 -> flt64} ]",
-         "[]&[~20+23]{any,3 ->~Scalar0 }",
-         null,"[20,23]"
+         "[]&[~20+22]{any,3 ->~Scalar0 }",
+         null,"[20,22]"
         );
   }
 
@@ -1206,20 +1206,19 @@ A:*@{
          "[4,7]",null);
   }
 
-
   // Ambiguous overload, {int->int}, cannot select
   @Test public void test83() {
     run("(&["                  +  // Define overloaded fcns
         "   { x -> (i* x 2) };"+  // Arg is 'int'
         "   { x -> (i* x 3) };"+  // Arg is 'int'
         "  ] 4)",                 // Error, ambiguous
-        "A:[Cannot unify {4->A} and &[ {int64->int64}; {int64->int64} ] ]", "~int64");
+        "Ambiguous overload &[ {int64->int64}; {int64->int64} ]: int64", "~int64");
   }
 
   // Wrong args for all overloads
   @Test public void test84() {
     rune("(&[ { x y -> (i* x y) }; { x y z -> (i* y z) };] 4)",
-         "A:[Cannot unify { 4 -> A } and &[ { int64 int64 -> int64 }; {B int64 int64 -> int64 } ] ]",
+         "Ambiguous overload &[ {int64 int64->int64}; {A int64 int64->int64} ]: int64",
          "~int64",
          null,null);
   }
@@ -1232,7 +1231,7 @@ fy = &[ { z -> "def" }; { a -> 4     }; ];
 fz = (if (rand 2) fx fy);
 (isempty (fz 1.2))
 """,
-         "A:[Cannot unify {A->A}? and int1 and flt32 and *str:(int8)? and &[{B-> [ Cannot unify 3 and *str:(100) ]}; { C-> [ Cannot unify 4 and *str:(97) ] } ] ]",
+         "Ambiguous overload &[ {A->[Cannot unify 3 and *str:(100)] };{B->[Cannot unify 4 and *str:(97)] } ]: int1",
          "~Scalar",
          null,null);
   }
@@ -1247,17 +1246,52 @@ fz = (if (rand 2) fx fy);
 }
 """,
          "{A? -> *(int64,flt64) }",
-         "[29]{any,3 ->*[7](^=any, int64, flt64) }",
+         "[29]{any,3 ->*[7](^=any, ~Scalar, ~Scalar) }",
          null,null);
   }
+
 
   // CNC test case here is trying to get HM to do some overload resolution.
   // Without, many simple int/flt tests in main AA using HM alone fail to find
   // a useful type.
   @Test public void test87() {
+    rune(
+"""
+fwrap = { ff ->
+  @{ f = ff;
+     _*_ = &[
+       { y -> (fwrap (f* ff (i2f y.i))) };
+       { y -> (fwrap (f* ff      y.f)) }
+     ]
+   }
+};
+iwrap = { ii ->
+  @{ i = ii;
+     _*_ = &[
+       { y -> (iwrap (i*      ii  y.i)) };
+       { y -> (fwrap (f* (i2f ii) y.f)) }
+     ]
+   }
+};
+
+con2   = (iwrap 2  );
+con2_1 = (fwrap 2.1);
+(con2_1._*_ con2_1)
+""",
+        "A:*@{_*_={B:*@{_*_=&[{*@{i=int64;...}->B};{*@{f=flt64;...}->B}];f=flt64}->A};f=flt64}",
+        "A:*@{_*_={B:*@{_*_=&[{*@{i=int64;...}->B};{*@{f=flt64;...}->B}];f=flt64}->A};f=flt64}",
+        "PA:*[7]@{^=any; _*_=[]&[~21+23]{any,3 ->PA }; f=flt64}",
+        "PA:*[7]@{^=any; _*_=[]&[~21+23]{any,3 ->PA }; f=flt64}",
+        "[4,7,9,10]","[21,23]");
+  }
+
+  // CNC test case here is trying to get HM to do some overload resolution.
+  // Without, many simple int/flt tests in main AA using HM alone fail to find
+  // a useful type.
+  @Test public void test99() {
     String hm_rez =  "*("+
-      "A:*@{_*_=&[{B:*@{_*_=&[{*@{i=int64;...}->B};{*@{f=flt64;...}->C:*@{_*_=&[{*@{i=int64;...}->C};{*@{f=flt64;...}->C}];f=flt64}}];i=int64}->A};{*@{f=flt64;...}->A}];f=flt64},"+
-      "D:*@{ _*_={E:*@{_*_=&[{*@{i=int64;...}->E};{*@{f=flt64;...}->F:*@{_*_=&[{*@{i=int64;...}->F};{*@{f=flt64;...}->F}];f=flt64}}];i=int64}->D};i=int64}, "+
+      "A:*@{_*_={B:*@{_*_=&[{*@{i=int64;...}->B};{*@{f=flt64;...}->C:*@{_*_=&[{*@{i=int64;...}->C};{*@{f=flt64;...}->C}];f=flt64}}];i=int64}->A};f=flt64},"+
+      "D:*@{_*_={E:*@{_*_=&[{*@{i=int64;...}->E};{*@{f=flt64;...}->F:*@{_*_=&[{*@{i=int64;...}->F};{*@{f=flt64;...}->F}];f=flt64}}];i=int64}->D};i=int64},"+
       "G:*@{_*_={H:*@{_*_=&[{*@{i=int64;...}->H};{*@{f=flt64;...}->H}];f=flt64}->G};f=flt64}"+
       ")";
 
@@ -1286,9 +1320,9 @@ mul2 = { x -> (x._*_ con2)};
 (triple (mul2 con2_1)  (con2._*_ con2) (con2_1._*_ con2_1))
 """,
         hm_rez, hm_rez,
-        "*[9](FA:^=any, PA:*[7]@{FA; _*_=[]&[~22+24]{any,3 ->PA }; f=flt64}, *[8]@{FA; _*_=[]&[~28+31]{any,3 ->*[]( ...) }; i=int64}, PA)",
+        "*[9](FA:^=any, PA:*[7]@{FA; _*_=[]&[~21+23]{any,3 ->PA }; f=flt64}, *[8]@{FA; _*_=[]&[~26+29]{any,3 ->*[]( ...) }; i=int64}, PA)",
         "*[9](FA:^=any, PA:*[7]@{FA; _*_=[]&[~21+23]{any,3 ->PA }; f=flt64}, *[]( ...), PA)",
-        "[4,7,8,9,10,11,17,18]","[21,23,28,31]");
+        "[4,7,8,9,10,11,12,13]","[21,23,26,29]");
   }
 }
 
