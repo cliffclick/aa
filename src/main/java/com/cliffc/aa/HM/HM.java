@@ -904,8 +904,8 @@ public class HM {
       T2 targ = T2.make_leaf();
       int cnt = _def .prep_tree(this,new VStack(nongen,targ),work) +
                 _body.prep_tree(this,           nongen      ,work);
-      targ.unify(targ(),work);      // Unify targ with _def._hmt
-      _hmt.unify(_body.find(),work);  // Unify 'Let._hmt' with the '_body'
+      targ.unify(targ(),work);       // Unify targ with _def._hmt
+      _hmt.unify(_body.find(),work); // Unify 'Let._hmt' with the '_body'
       return cnt+1;
     }
     @Override int prep_lookup_deps(Ident id, Syntax prior) {
@@ -924,9 +924,9 @@ public class HM {
       return _body.more_work(work) && _def.more_work(work);
     }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
-      T rez  = map.apply(this);
-      T def  = reduce.apply(rez,_def .visit(map,reduce));
-      return   reduce.apply(def,_body.visit(map,reduce));
+      T rez = map.apply(this);
+      T def = reduce.apply(rez,_def .visit(map,reduce));
+      return  reduce.apply(def,_body.visit(map,reduce));
     }
   }
 

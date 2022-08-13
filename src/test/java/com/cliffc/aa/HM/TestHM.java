@@ -25,10 +25,10 @@ public class TestHM {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_HMT=false;
-    DO_GCP=true;
+    DO_HMT=true;
+    DO_GCP=false;
     RSEED=0;
-    test86();
+    test87a();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -1250,6 +1250,23 @@ fz = (if (rand 2) fx fy);
          null,null);
   }
 
+// CNC Simpler test case, no overloads, no ints
+  @Test public void test87a() {
+    rune(
+"""
+fwrap = { ff ->
+  @{ f = ff;
+     mul = { y -> (fwrap (f* ff y.f)) }
+   }
+};
+con21 = (fwrap 2.1);
+fakefloat = @{ f=2.3; bogon="abc"};
+(con21.mul fakefloat)
+""",
+        "A:*@{f=flt64;mul={*@{f=flt64;...}->A}}",
+        "PA:*[7]@{^=any; mul=[20]{any,3 ->PA }; f=flt64}",
+        "[4,7,8]","[20]");
+  }
 
   // CNC test case here is trying to get HM to do some overload resolution.
   // Without, many simple int/flt tests in main AA using HM alone fail to find
