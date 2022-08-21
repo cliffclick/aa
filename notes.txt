@@ -1,4 +1,130 @@
 =======================================
+7/18/2022
+
+Recursive types (both Data and Functions) and Structs
+
+
+CNC: My haskell attempt: 
+  import Data.Typeable
+  
+  // Define a cyclic data wrapper type
+  data FWrap = FWrap {flt::Float, mul::FWrap -> FWrap}
+  fwrap = (\x -> FWrap { flt=x, mul=(\y -> fwrap(x * (flt y)))})
+  
+  main = do
+    putStrLn (show( flt (fwrap(1.2)) ))
+    putStrLn (show(typeOf(fwrap)))
+
+
+Struct / Fields -
+- Structs create a record or struct, fields use a record.
+- Structs create a set of labels (or fields).  The set is "closed" in that all
+  the labels involved are directly mentioned, and no others are present.  These
+  fields are all available.
+- Fields demand (or require) a particular label, but do not care if others are
+  present; they make an "open" struct or a "partial" struct.
+
+- Unifying two structs intersects the available fields:
+    "(if rand @{ x=1.2; y="abc"} @{ x=2.3; z=17 })"  // is typed: @{ x=flt }
+  Since the fields "y" and "z" are not available on both arms, they are not
+  available in the result.
+
+- Unifying two field refs unions the required fields:
+    "(if rand rec.x rec.y)" // is typed: @{ x=A; y=A; ... }
+  Since "x" and "y" are both mentioned, both are required.  Since they are
+  field references, other fields are allowed and the result is open.  Their
+  internal types are recursively unified.
+  
+- Unifying a closed and an open struct - I "lose" the required fields and keep
+  the list of available fields, even the unused ones.
+    "s0 = @{x=1.2; y="abc"}; (s0,s0.x)"  // is typed: (@{x=1.2,y="abc"},1.2)    
+- If some required fields are not present, they are added to the closed side as
+  an error type.
+      "s0 = @{x=1.2; y="abc"}; (s0,s0.z)"  // is typed: (@{x=1.2,y="abc",z=E:[Error: missing field 'z']},1.2,E)
+
+Recursive Types:
+- Everybody loves them with a type-name in the middle, and fails when anonymous:
+    "List A =: @{ next=List; value=A }?" // AA version of a normal "List" type
+    "f = (f f)" // "Occurs check" fail in Haskell (Scala?), and the original H-M algorithm
+                // AA type: A:{A -> B}
+
+  Without the type-name in the middle, the normal H-M algo fails.  Modifying it
+  to succeed is straight-forward, if tedious.  However, now we have a
+  type-equivalance problem: are "unrolled" versions of a type equal to the
+  re-rolled?  See https://en.wikipedia.org/wiki/Recursive_data_type, esp the
+  sections on iso-recursive vs equi-recursive.  The Lattice types in AA are
+  equi-recursive and use the O(n log n) algorithm to minimize, and cheap
+  reference equality after that.
+
+  Right now, the H-M types are iso-recursive and require a cycle-aware
+  equivalence check.
+
+
+Recursive Types & Structs
+        // Define a function 'fwrap' taking one float argument
+	fwrap = { ff ->
+          // ...and returning a structure.
+	  @{
+             // The structure has a float field 'f'
+             f = ff;
+             // ...and a function field 'mul'.  The mul function takes a struct
+             // with required field 'f' and calls fwrap after multiplying.
+	     mul = { y ->
+                      (fwrap (f* ff y.f))
+             }
+             // Both 'f' and 'mul' fields are available in the result
+	   }
+	};
+        // Type a sample wrapped float.
+	(fwrap 1.2)
+        
+Haskell cannot type the Haskell version because "occurs check".
+AA types it fine as:
+         A:*@{
+           f = flt64;
+           mul = { *@{f=flt64;...} -> A }  // Note the struct is cyclic on itself
+         }
+Extending the fwrap example:
+        con12 = (fun 1.2);
+        (con12.mul con12)  // Compute 1.2*1.2
+AA types as:
+        A:*@{
+          f = flt64;
+          mul = { B:*@{    // Hey! We've inlined (nearly) the same type....
+                    f = flt64;
+                    mul = { *@{f=flt64;...}
+                            -> B
+                    }
+                  }
+                  -> A
+          }
+        }
+
+As the float expression goes deeper, the type notes that the deepest leaf is
+only used for its payload (requires field 'f') and can have another other
+fields "...".  The in-between and outer types all use the closed struct syntax,
+because those types are made here, and not passed-in.  Hence they list the
+available fields, not required.  The type ends up 'counting' the number of
+layers between the outer available-field types, and the leaf required-field
+type.  End result: minimal type is as large as the deepest expression.  Yuck.
+
+-------------------
+         
+Haskell CAN type this version, which uses an explicit named data type:
+Haskell:  data FWrap = FWrap {ff::Float, mul:: FWrap -> FWrap }
+Main AA:       FWrap =:     @{ff :flt  ; mul:{ FWrap -> FWrap } };
+
+Haskell:  fwrap = (\x ->  FWrap{ff=x, mul=(\y ->  fwrap (x * (ff y))) } )
+Main AA:  fwrap = { x ->  FWrap(   x,     { y ->  fwrap (x  * y.ff) } ) }
+Core AA:  fwrap = { x -> (FWrap    x      { y -> (fwrap (f* x y.ff))} ) }
+
+Haskell learnings: user 'rounds up' the inner type to a more specific (less
+general) type: FWrap.  Now everything is just {FWrap->FWrap} and the types do
+not unroll endlessly.
+
+
+
+=======================================
 7/8/2022
 
 Overloads in HM mostly working.

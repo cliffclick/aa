@@ -44,10 +44,10 @@ HM includes polymorphic structures and fields (structural typing not duck
 typing), polymorphic nil-checking, constant bases and an error type-var.  Both
 HM and GCP types fully support recursive/cyclic types.
 
-HM includes ad-hoc polymorphims via overloaded functions.  A set of overloads
-are unambiguously resolved to a single function, or else error-typed as
-ambiguous.  This is done by doing *trial-unifications* until only a single
-overload target resolves without an error.
+HM includes ad-hoc polymorphim via overloading.  A set of overloads are
+unambiguously resolved to a single type, or else error-typed as ambiguous.
+This is done by doing *trial-unifications* until only a single overload target
+resolves without an error.
 
 HM errors keep all the not-unifiable types, all at once, as a special case of a
 union type.  Further unifications with the error either add a new not-unifiable
@@ -327,10 +327,21 @@ public class HM {
         // Nil check on fields
         if( syn instanceof Field fld ) {
           T2 ptr = fld._ptr.find();
-          if( ptr.is_nil() || ptr._may_nil )
+          if( ptr.is_nil() || ptr._may_nil ) {
             self._err = "May be nil when loading field "+fld._id;
-          if( self._err!=null && self._err.equals("Missing field") )
-            self._err = "Missing field "+fld._id+" in "+ptr;
+            if( !self.is_leaf() ) self._err += ": ";
+          }
+          // Expand "Missing field" error with the full pointer type
+          if( self._err!=null && self._err.startsWith("Missing field") ) {
+            T2 rec=null, bad=null;
+            // If the ptr is a full struct, then do not re-print the missing
+            // field when printinfg the ptr type.
+            boolean miss2 = ptr.is_ptr() && ((rec=ptr.arg("*"))!=null ) && rec.is_obj();
+            if( miss2 )  bad = rec._args.remove(fld._id); // Remove bad field
+            self._err = "Missing field "+fld._id+" in "+ptr.p();
+            if( miss2 )  rec._args.put(fld._id,bad); // Put it back after printing
+            if( !self.is_leaf() ) self._err += ": "; // A colon between a following type
+          }
         }
 
         if( self.is_err2() && self.has_nil() )
@@ -518,8 +529,7 @@ public class HM {
   static class VStack implements Iterable<T2> {
     final VStack _par;
     private T2 _nongen;
-    final int _d;
-    VStack( VStack par, T2 nongen ) { _par=par; _nongen=nongen; _d = par==null ? 0 : par._d+1; }
+    VStack( VStack par, T2 nongen ) { _par=par; _nongen=nongen; }
     T2 nongen() {
       T2 n = _nongen.find();
       return n==_nongen ? n : (_nongen=n);
@@ -973,14 +983,14 @@ public class HM {
         for( int i=0; i<_args.length; i++ ) {
           T2 farg = tfun.arg(Lambda.ARGNAMES[i]);
           progress |= farg==null
-            ? find().unify_errs("Bad arg count",work) // more args than the lambda takes
+            ? find().unify_errs("Bad arg count: ",work) // more args than the lambda takes
             : farg.unify(_args[i].find(),work);
           if( farg==null ) miss++;                  // 
           if( progress && work==null ) return true; // Will-progress & just-testing early exit
           tfun = tfun.find();
         }
         if( (tfun.size()-1)-(_args.length-miss) > 0 && !tfun.is_err() )
-          progress |= find().unify_errs("Bad arg count",work); // less args than the lambda takes
+          progress |= find().unify_errs("Bad arg count: ",work); // less args than the lambda takes
         // Check for progress on the return
         progress |= find().unify(tfun.arg("ret"),work);
         tfun=tfun.find();
@@ -1510,37 +1520,34 @@ public class HM {
       // Get the pointed-at struct.
       // If not a ptr, make it one (which might trigger an error).
       T2 rec = ptr.arg("*");
-      if( rec==null && !ptr.is_base() ) {
+      if( rec==null ) {
+        if( ptr.is_base() )     // Short-cut to a nicer error
+          return self.unify_errs("Missing field "+_id+":",work);
+        if( work==null ) return true;
         if( ptr._args ==null ) ptr._args = new NonBlockingHashMap<>();
         ptr._args.put("*", rec = T2.make_leaf());
         rec._deps = ptr._deps;  // TODO: stop sharing deps
       }
-
+      
+      // Add struct-ness
+      if( !rec.is_obj() ) {
+        if( work==null ) return true;
+        rec._open = true;
+        rec._is_obj = true;
+        if( rec._args==null ) rec._args = new NonBlockingHashMap<>();
+        assert rec.is_obj();
+      }
+      
       // Look up field
-      if( rec != null ) {
-        T2 fld = rec.arg(_id);
-        if( fld!=null )           // Unify against a pre-existing field
-          return fld.unify(self, work);
-
-        // Add struct-ness if possible
-        if( !rec.is_obj() ) {
-          rec._open = true;
-          rec._is_obj = true;
-          if( rec._args==null ) rec._args = new NonBlockingHashMap<>();
-          assert rec.is_obj();
-        }
-        // Add the field
-        if( rec.is_obj() && rec.is_open() ) {
-          rec.add_fld(_id,self,work);
-          return true;
-        }
-      }
-      // Field is missing
-      if( self._err==null ) {
-        self._err = "Missing field";
-        return true;
-      }
-      return false;
+      T2 fld = rec.arg(_id);
+      if( fld!=null )           // Unify against a pre-existing field
+        return fld.unify(self, work);
+      // If field must be there, and it is not, then it is missing
+      if( !rec.is_open() )
+        self.unify_errs("Missing field "+_id+":",work);
+      
+      // Add the field
+      return work==null || rec.add_fld(_id,self,work);
     }
     @Override void add_hm_work( @NotNull Work<Syntax> work) {
       work.add(_par);
@@ -2746,11 +2753,12 @@ public class HM {
           T2 rhs = that.arg(key);
           if( rhs==null ) {         // No RHS to unify against
             missing = true;         // Might be missing RHS
+            this.merge_deps(that,work);
             if( is_open() || that.is_open() || lhs.is_err() || (is_fun() && that.is_fun()) ) {
               if( work==null ) return true; // Will definitely make progress
               T2 nrhs = lhs._fresh(nongen); // New RHS value
               if( !that.is_open() ) {
-                nrhs._err = "Missing field " + key; // TODO: merge errors
+                nrhs._err = "Missing field " + key+": "; // TODO: merge errors
                 this.add_deps_work(work);
               }
               progress |= that.add_fld(key,nrhs,work);
@@ -2944,6 +2952,15 @@ public class HM {
     // -----------------
     private static final VBitSet ODUPS = new VBitSet();
 
+    boolean nongen_in(VStack vs) {
+      if( vs==null ) return false;
+      ODUPS.clear();
+      for( T2 t2 : vs )
+        if( _occurs_in_type(t2) )
+          return true;
+      return false;
+    }
+
     boolean _occurs_in_type(T2 x) {
       assert !unified() && !x.unified();
       if( x==this ) return true;
@@ -2952,15 +2969,6 @@ public class HM {
         for( String key : x._args.keySet() )
           if( _occurs_in_type(x.arg(key)) )
             return true;
-      return false;
-    }
-
-    boolean nongen_in(VStack vs) {
-      if( vs==null ) return false;
-      ODUPS.clear();
-      for( T2 t2 : vs )
-        if( _occurs_in_type(t2.find()) )
-          return true;
       return false;
     }
 
@@ -3267,6 +3275,7 @@ public class HM {
       if( is_nil () ) return str0(sb,visit,_args.get("?"),dups,debug).p('?');
 
       // Generic structural T2
+      if( _err!=null ) return sb;
       sb.p("( ");
       if( _args!=null )
         for( String s : _args.keySet() )
@@ -3313,6 +3322,7 @@ public class HM {
             sb.p(is_clz = fld);
       final boolean is_tup = is_tup(); // Distinguish tuple from struct during printing
       sb.p(is_tup ? "(" : "@{");
+      boolean sep=false;
       if( _args==null ) sb.p(" ");
       else {
         for( String fld : sorted_flds() ) {
@@ -3321,11 +3331,12 @@ public class HM {
           if( Util.eq(fld,"ret") ) continue;
           if( Util.eq(fld,is_clz)) continue;
           // Skip field names in a tuple
-          str0(is_tup ? sb.p(' ') : sb.p(' ').p(fld).p(" = "),visit,_args.get(fld),dups,debug).p(is_tup ? ',' : ';');
+          str0(is_tup ? sb.p(' ') : sb.p(' ').p(fld).p(" = "),visit,get(fld),dups,debug).p(is_tup ? ',' : ';');
+          sep=true;
         }
       }
       if( is_open() ) sb.p(" ...,");
-      if( _args!=null && _args.size() > 0 ) sb.unchar();
+      if( sep ) sb.unchar();
       sb.p(!is_tup ? "}" : ")");
       if( _may_nil ) sb.p("?");
       return sb;

@@ -27,8 +27,8 @@ public class TestHM {
 
     DO_HMT=true;
     DO_GCP=false;
-    RSEED=0;
-    test87a();
+    RSEED=17;
+    test43();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -373,7 +373,7 @@ map ={fun parg -> (fun (cdr parg))};
   // Example from SimpleSub requiring 'x' to be both a struct with field
   // 'v', and also a function type - specifically disallowed in 'aa'.
   @Test public void test38() { rune("{ x -> y = ( x x.v ); 0}",
-                                    "{ A:[Cannot unify {B->A} and *@{ v=B;...}] -> C? }",
+                                    "{ [Cannot unify {A->B} and *@{ v=A;...}] -> C? }",
                                     "[19]{any,3 ->xnil }",
                                     "[4,10]","[19,21]");
   }
@@ -425,7 +425,7 @@ out_bool= (map in_str { xstr -> (eq xstr "def")});
   @Test public void test42() {
     run("pred = 0; s1 = @{ x=\"abc\" }; s2 = @{ y=3.4 }; (if pred s1 s2).y",
         "3.4f",
-        "Missing field y in *()",
+        "Missing field y in *(): 3.4f",
         "3.4f",
         "3.4f");
   }
@@ -473,7 +473,7 @@ loop = { name cnt ->
 
   // Basic nil test
   @Test public void test47() { rune("{ pred -> (if pred @{x=3} 0).x}",
-                                    "{ A? -> May be nil when loading field x }", "[23]{any,3 ->3 }",
+                                    "{ A? -> May be nil when loading field x: 3 }", "[23]{any,3 ->3 }",
                                     null,"[23]"  );
   }
 
@@ -509,8 +509,8 @@ loop = { name cnt ->
   )
 }
 """,
-         "{ A? -> *( 3, May be nil when loading field x ) }",
-         "{ A? -> *( 3, May be nil when loading field x ) }",
+         "{ A? -> *( 3, May be nil when loading field x: 5 ) }",
+         "{ A? -> *( 3, May be nil when loading field x: 5 ) }",
          "[28]{any,3 ->*[7](^=any, nint8, nint8) }",
          "[28]{any,3 ->*[7](^=any, nint8, nint8) }",
          "[4,7]","[28]");
@@ -864,7 +864,7 @@ three =(n.s two);     // Three is the successor of two
   // pass in a field 'a'... and still no error.  Fixed.
   @Test public void test61() {
     rune("f = { p1 p2 -> (if p2.a p1 p2)}; (f @{a=2} @{b=2.3})",
-         "*@{ a= Missing field a }",
+         "*@{ a= Missing field a: 2 }",
          "*[7,8](^=any)",
          "[4,7,8]",null);
   }
@@ -872,7 +872,7 @@ three =(n.s two);     // Three is the successor of two
   // Broken from Marco; function 'f' clearly uses 'p2.a' but example 'res1' does not
   // pass in a field 'a'... and still no error.  Fixed.
   @Test public void test62() { run("f = { p1 -> p1.a };"+"(f @{b=2.3})",
-                                    "Missing field a",
+                                    "Missing field a: ",
                                    "Scalar");  }
 
   @Test public void test63() {
@@ -895,11 +895,11 @@ three =(n.s two);     // Three is the successor of two
          "@{f=f;res1=res1;res2=res2}",
 
          "*@{ f    =  { A:*@{ a=B;... } A -> A };"+
-         "    res1 = *@{ a = Missing field a };"+
+         "    res1 = *@{ a = Missing field a: 2};"+
          "    res2 = *@{ a=nint8; b=nflt32 }"+
          "}",
          "*@{ f    =  { A:*@{ a=B;... } A -> A };"+
-         "    res1 = *@{ a = Missing field a };"+
+         "    res1 = *@{ a = Missing field a: 2};"+
          "    res2 = *@{ a=nint8; b=nflt32 }"+
          "}",
          "*[13]@{FA:^=any; f=[20]{any,4 ->*[7,8,9,10,11,12]SA:(FA) }; res1=*[7,8]SA; res2=*[9,12]@{FA; a=nint8; b=nflt32}}",
@@ -1090,12 +1090,12 @@ all = @{
 
   // Test incorrect argument count
   @Test public void test69() {
-    rune("({x y -> (pair x y) } 1 2 3)","Bad argument count","*[7](^=any, 1, 2)","[4,7]",null);
+    rune("({x y -> (pair x y) } 1 2 3)","Bad arg count: *(1,2)","*[7](^=any, 1, 2)","[4,7]",null);
   }
 
   // Test incorrect argument count
   @Test public void test70() {
-    rune("({x y -> (pair x y) } 1 )","Bad argument count","*[7](^=any, 1, ~Scalar)","[4,7]",null);
+    rune("({x y -> (pair x y) } 1 )","Bad arg count: *(1,A)","*[7](^=any, 1, ~Scalar)","[4,7]",null);
   }
 
   // Test example from AA with expanded ints
@@ -1189,8 +1189,8 @@ A:*@{
          "  { x -> (f* x 3.0) };"+  // Arg is 'flt'
          " ]",
          "&[ {int64 -> int64}; {flt64 -> flt64} ]",
-         "[]&[~20+22]{any,3 ->~Scalar0 }",
-         null,"[20,22]"
+         "[]&[~20+23]{any,3 ->~Scalar0 }",
+         null,"[20,23]"
         );
   }
 
@@ -1250,25 +1250,7 @@ fz = (if (rand 2) fx fy);
          null,null);
   }
 
-// CNC Simpler test case, no overloads, no ints
-  @Test public void test87a() {
-    rune(
-"""
-fwrap = { ff ->
-  @{ f = ff;
-     mul = { y -> (fwrap (f* ff y.f)) }
-   }
-};
-con21 = (fwrap 2.1);
-fakefloat = @{ f=2.3; bogon="abc"};
-(con21.mul fakefloat)
-""",
-        "A:*@{f=flt64;mul={*@{f=flt64;...}->A}}",
-        "PA:*[7]@{^=any; mul=[20]{any,3 ->PA }; f=flt64}",
-        "[4,7,8]","[20]");
-  }
-
-  // CNC test case here is trying to get HM to do some overload resolution.
+  // Test case here is trying to get HM to do some overload resolution.
   // Without, many simple int/flt tests in main AA using HM alone fail to find
   // a useful type.
   @Test public void test87() {
@@ -1296,16 +1278,91 @@ con2_1 = (fwrap 2.1);
 (con2_1._*_ con2_1)
 """,
         "A:*@{_*_={B:*@{_*_=&[{*@{i=int64;...}->B};{*@{f=flt64;...}->B}];f=flt64}->A};f=flt64}",
-        "A:*@{_*_={B:*@{_*_=&[{*@{i=int64;...}->B};{*@{f=flt64;...}->B}];f=flt64}->A};f=flt64}",
-        "PA:*[7]@{^=any; _*_=[]&[~21+23]{any,3 ->PA }; f=flt64}",
-        "PA:*[7]@{^=any; _*_=[]&[~21+23]{any,3 ->PA }; f=flt64}",
-        "[4,7,9,10]","[21,23]");
+        "PA:*[7]@{^=any; _*_=[]&[~22+24]{any,3 ->PA }; f=flt64}",
+        "[4,7,10,11]","[22,24]");
   }
 
-  // CNC test case here is trying to get HM to do some overload resolution.
-  // Without, many simple int/flt tests in main AA using HM alone fail to find
-  // a useful type.
-  @Test public void test99() {
+  // Recursive structs.  First: closed structs list available fields;
+  // unification produces the set intersection.
+  @Test public void test88() {
+    rune("{ p -> (if p @{x=3;y=4} @{y=6;z=\"abc\"})}",
+         "{A?->*@{y=nint8}}",
+         "[23]{any,3 ->*[7,8]@{^=any; y=nint8} }",
+         "[4,7,8]","[23]");
+  }
+  // Recursive structs.  Next: open structs list required fields;
+  // unification produces the set union.
+  @Test public void test89() {
+    rune("{ p rec -> (if p rec.x rec.y)}",
+         "{ A? *@{x=B;y=B;...} -> B }",
+         "[23]{any,4 ->Scalar }",
+         "[4,10]","[23]");
+  }
+  // Recursive structs.  Next: passing extra fields; they are passed along
+  // here.  Required fields are fresh every time.
+  @Test public void test90() {
+    rune("fun = { rec -> (pair rec rec.x)}; (pair (fun @{x=3;y=4}) (fun @{x=\"abc\";z=2.1}))",
+         "*(*(*@{x=3;y=4},3), *(*@{x=A:*str:(97);z=2.1f},A))",
+         "*[8](FA:^=any, PA:*[7](FA, *[9,12]@{FA; x=nScalar}, nScalar), PA)",
+         "[4,7,8,9,12]","[]");
+  }
+  // Recursive structs.  Next: passing extra fields, but the function requires
+  // the structures to be the same.  Extra fields dropped.  Unify required fields.
+  @Test public void test91() {
+    rune("({fun -> "+
+         "   (pair (fun @{x=3      ;y=4  } )"+    // available {x,y}
+         "         (fun @{x=\"abc\";z=2.1} )  )"+ // available {x,z}
+         "  } { rec -> (pair rec rec.x) } )",     // required  {x}
+         "*(A:*(*@{x=B:[Cannot unify 3 and *str:(97)]},B),A)",
+         "*[7](FA:^=any, PA:*[12](FA, *[8,9]@{FA; x=nScalar}, nScalar), PA)",
+         "[4,7,8,9,12]","[]");
+  }
+  // Recursive structs.  Next: passing extra fields, but the function requires
+  // the structures to be the same.  Extra fields dropped.  Unify required fields.
+  @Test public void test92() {
+    rune("({fun -> "+
+         "   (pair (fun @{x=3; y=4  } )"+    // available {x,y}
+         "         (fun @{x=4; z=2.1} )  )"+ // available {x,z}
+         "  } { rec -> (pair rec rec.x) } )",// required  {x}
+         "*(A:*(*@{x=nint8},nint8),A)",
+         "*[7](FA:^=any, PA:*[12](FA, *[8,9]@{FA; x=nint8}, nint8), PA)",
+         "[4,7,8,9,12]","[]");
+  }
+  // Recursive structs.  
+  @Test public void test93() {
+    rune("""
+fun = { ff ->
+  @{ f = ff;                           // available {f,mul}
+     mul = { y -> (fun (f* ff y.f)) }  // required {f}
+   }
+};
+(fun 1.2) // required {f} in inner, available {f,mul} in outer
+""",
+         "A:*@{f=flt64;mul={*@{f=flt64;...}->A}}", // required {f} in inner, available {f,mul} in outer
+         "PA:*[7]@{^=any; f=flt64; mul=[20]{any,3 ->PA }}",
+         "[4,7,10]","[20]");
+  }
+
+  // Recursive structs, with deeper expressions.  The type expands with
+  // expression depth.
+  @Test public void test94() {
+    rune("""
+fun = { ff ->
+  @{ f = ff;                           // available {f,mul}
+     mul = { y -> (fun (f* ff y.f)) }  // required {f}
+   }
+};
+con12=(fun 1.2);   // required {f} in inner, available {f,mul} in outer
+(con12.mul con12)  // required {f} in inner, available {f,mul} in outer,middle
+""",
+         "A:*@{f=flt64;mul={B:*@{f=flt64;mul={*@{f=flt64;...}->B}}->A}}", // required {f} in inner, available {f,mul} in middle,outer
+         "PA:*[7]@{^=any; f=flt64; mul=[20]{any,3 ->PA }}",
+         "[4,7,10]","[20]");
+  }
+
+
+  // Recursive structs.  More like what main AA will do with wrapped primitives.
+  @Test public void test95() {
     String hm_rez =  "*("+
       "A:*@{_*_={B:*@{_*_=&[{*@{i=int64;...}->B};{*@{f=flt64;...}->C:*@{_*_=&[{*@{i=int64;...}->C};{*@{f=flt64;...}->C}];f=flt64}}];i=int64}->A};f=flt64},"+
       "D:*@{_*_={E:*@{_*_=&[{*@{i=int64;...}->E};{*@{f=flt64;...}->F:*@{_*_=&[{*@{i=int64;...}->F};{*@{f=flt64;...}->F}];f=flt64}}];i=int64}->D};i=int64},"+
@@ -1337,9 +1394,51 @@ mul2 = { x -> (x._*_ con2)};
 (triple (mul2 con2_1)  (con2._*_ con2) (con2_1._*_ con2_1))
 """,
         hm_rez, hm_rez,
-        "*[9](FA:^=any, PA:*[7]@{FA; _*_=[]&[~21+23]{any,3 ->PA }; f=flt64}, *[8]@{FA; _*_=[]&[~26+29]{any,3 ->*[]( ...) }; i=int64}, PA)",
-        "*[9](FA:^=any, PA:*[7]@{FA; _*_=[]&[~21+23]{any,3 ->PA }; f=flt64}, *[]( ...), PA)",
-        "[4,7,8,9,10,11,12,13]","[21,23,26,29]");
+        "*[9](FA:^=any, PA:*[7]@{FA; _*_=[]&[~22+24]{any,3 ->PA }; f=flt64}, *[8]@{FA; _*_=[]&[~28+31]{any,3 ->*[]( ...) }; i=int64}, PA)",
+        "*[9](FA:^=any, PA:*[7]@{FA; _*_=[]&[~22+24]{any,3 ->PA }; f=flt64}, *[]( ...), PA)",
+        "[4,7,8,9,10,11,17,18]","[22,24,28,31]");
   }
+
+  // Recursive structs, in a loop.  Test of recursive int wrapper type ("occurs
+  // check") in a loop.
+  @Test public void test96() {
+    String hm_rez =  "";
+    rune(
+"""
+// fwrap: a wrapped float
+fwrap = { ff ->                 // fwrap is a function which takes a float 'ff' and...
+  @{ f = ff;                    //   ...returns a struct with fields f, mul.
+     mul = &[                   // mul is an overloaded function, which does a widening multiply
+       { y -> (fwrap (f* ff (i2f y.i))) }; // widen before f* (float multiply) and fwrap
+       { y -> (fwrap (f* ff      y.f)) }   // f* and fwrap
+     ];
+   }
+};
+
+// iwrap: a "wrapped" integer.
+iwrap = { ii ->                 // iwrap is a function which takes an integer 'ii' and...
+  @{ i = ii;                    //   ...returns a struct with fields f, mul, is0, sub1.
+     mul = &[                   // mul is an overloaded function, which does a widening multiply
+       { y -> (iwrap (i*      ii  y.i)) };  // i* (integer multiply) and iwrap
+       { y -> (fwrap (f* (i2f ii) y.f)) }   // widen before f* and fwrap
+     ];
+     is0 = (eq0 ii);            // is0 is a pre-computed boolean, not a function
+     sub1= (iwrap (dec ii))     // pre-compute the decrement, and re-wrap
+   }
+};
+
+c1 = (iwrap 1);                 // The wrapped constant 1
+c5 = (iwrap 5);                 // The wrapped constant 5
+
+// Standard factorial, using wrapped integers
+fact = { n -> (if n.is0 c1 (n.mul (fact n.sub1))) };
+// Compute 5!
+(fact c5)
+""",
+        "A:*@{i=int64; is0=int1; mul = {A->A}; sub1=A }",
+        "PA:*[8]@{^=any; i=int64; is0=int1; mul=[]&[~28+31]{any,3 ->*[](...) }; sub1=PA}",
+        "[4,8,10,11]","[28,31]");
+  }
+
 }
 
