@@ -928,9 +928,10 @@ public class TestLattice {
   // all tree parents into their leaves gives us a lattice over sets and
   // set-inclusions, which typically ARE a lattice
   // (https://en.wikipedia.org/wiki/Lattice_(order) pic#1).
+  // Set elements are 2,5,6 are all independent sets (siblings in the tree).
 
-  // The following is NOT a lattice (matches pic#7).  Set elements are 2,5,6
-  // and are all independent sets (siblings in the tree).
+  // The following is NOT a lattice (matches pic#7): The MEET of {+2+5} and 6
+  // is either {2&6} or {5&6}, no GLB.
   //
   //         {+2+5+6}
   //        /    |   \
@@ -968,6 +969,57 @@ public class TestLattice {
     test(o256);
   }
 
+  // Add some extra bits: A+BC, B+AC, C+AB, A(B+C), B(A+C), C(A+B)
+  //
+  // Observation: the complete power-set of ABC and complements should be a
+  // simple lattice - of exponental size!
+
+  // Keeping a exponential powerset is too large.
+  //   https://en.wikipedia.org/wiki/Espresso_heuristic_logic_minimizer
+  // Program to (efficiently, not optimally) reduce boolean expressions.
+  
+  // Might allow the powerset, which in turn allows choice sets of bits, which
+  // allows a lattice w/meet/join/dual to represent Overloads.  
+  @Ignore @Test public void testLattice10_a() {
+    N.reset();
+    N xABC = new N("ABC");
+
+    N xAB  = new N("AB",xABC);
+    N xAC  = new N("AC",xABC);
+    N xBC  = new N("BC",xABC);
+
+    N pABC = new N("AB+AC",xAB,xAC);
+    N pBCA = new N("AB+BC",xAB,xBC);
+    N pCAB = new N("AC+BC",xAC,xBC);
+    
+    N CA   = new N("A",pABC);
+    N CB   = new N("B",pBCA);
+    N CC   = new N("C",pCAB);
+
+    N sABC = new N("BC+A",CA,pBCA,pCAB);
+    N sBCA = new N("AC+B",CB,pCAB,pABC);
+    N sCAB = new N("AB+C",CC,pBCA,pABC);
+    
+    N oAB  = new N("A+B",sABC,sBCA);
+    N oAC  = new N("A+C",sABC,sCAB);
+    N oBC  = new N("B+C",sBCA,sCAB);
+
+    N oABC = new N("A+B+C",oAB,oAC,oBC);
+
+    // Mark the non-Centerline duals
+    xABC.set_dual(oABC);
+    xAB .set_dual(oAB );
+    xAC .set_dual(oAC );
+    xBC .set_dual(oBC );
+
+    pABC.set_dual(sABC);
+    pBCA.set_dual(sBCA);
+    pCAB.set_dual(sCAB);
+
+    test(oABC);
+  }
+
+  
   // Same as Lattice10, except no centerline constants; everything is either up
   // or down.  Still not a Lattice.  The MEET of {+2+5} and &6 is either {2&6}
   // or {5&6}, no GLB.

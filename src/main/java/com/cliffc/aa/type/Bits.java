@@ -40,6 +40,28 @@ import java.lang.Long;
 // in the middle.  The meet of -2 and -5 is... [], the empty set, and NOT
 // [2&5].  See TestLattice#10 for a failure test case.  Adding a dual lattice
 // without the empty-set also fails, see TestLattice#11.
+//
+// We can Have It All, if we switch to a PowerSet representation.  That is, we
+// have a simple meet and join/dual (set union, intersection), plus the join is
+// precise and not the empty set.  Example: we have only 3 bits ABC/abc; upper/
+// lower case for on/off.  To represent just A, we make B & C Dont Care -
+//            {Abc,ABc,AbC,ABC}   -- 4 bits out of 8 choices in the powerset.
+// Again for just B:
+//            {aBc,ABc,aBC,ABC}   -- 4 bits out of 8 choices in the powerset.
+// The meet is intersection:
+//            {    ABc,    ABC}   -- Now C is the only Dont Care
+// The join is union:
+//        {aBc,Abc,ABc,AbC,ABC,aBC} -- 6 of 8 bits set.
+// Suppose I want (A+B)*C; then I do meet/intersect of the C powerset with the
+// prior join/union:
+//        {            AbC,ABC,aBC} -- 3 of 8 bits set.
+//
+// This fully supports e.g. an Overload/Unresolved/choice of fidxs meeting at a
+// Phi with another unrelated FIDX or Unresolved.  The problem is that a naive
+// powerset requires exponential bits.  Also, lots of loops do things like
+// "forall FIDXS" which is no longer well defined.  Most bitset uses fall into
+// a few narrow camps:  {all,none,single,small-count}.
+
 
 // TODO: Ponder a Plan B: No sets-of-siblings allowed.  Instead meet of
 // siblings goes straight to the tree LCA.  This means we only ever have 1 bit

@@ -46,7 +46,7 @@ public abstract class PrimNode extends Node {
     int fidx = BitsFun.new_fidx();
     _formals = formals;
     _ret = ret;
-    _tfp=TypeFunPtr.make(ProdOfSums.make(fidx),formals.len(),TypeMemPtr.NO_DISP,ret);
+    _tfp=TypeFunPtr.make(BitsFun.make0(fidx),formals.len(),TypeMemPtr.NO_DISP,ret);
     _badargs=null;
   }
 

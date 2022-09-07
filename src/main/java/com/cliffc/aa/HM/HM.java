@@ -125,7 +125,7 @@ BNF for the "core AA" pretty-printed types:
        *T0                | // Ptr-to-struct; T0 is either a leaf, or unified, or a struct
        @{ (label = T;)* } | // ';' is a field-separator not a field-end
        &[ (e0;)* ]        | // Overload: a collection of ad-hoc poly expressions
-       (Error base* T0*)  | // A union of base and not-nil, lambda, ptr, struct, overload
+       [Error base* T0*]  | // A union of base and not-nil, lambda, ptr, struct, overload
 
 */
 
@@ -140,8 +140,8 @@ public class HM {
   static boolean DO_HM ;        // Do Hindley-Milner typing
   static boolean DO_GCP;        // Do forwards-flow Global Constant Propagation typing
 
-  static boolean HM_FREEZE;     // After first pass, HM types are frozen but GCP types continue to fall
-  static boolean DO_AMBI;       // After 2nd pass, unresolved Overloads are an error
+  static boolean DO_AMBI;       // After first pass, unresolved Overloads are an error
+  static boolean HM_FREEZE;     // After 2nd pass, HM types are frozen but GCP types continue to fall
 
   static Root ROOT;
 
@@ -168,18 +168,18 @@ public class HM {
     main_work_loop(prog,work);
     assert prog.more_work(work);
 
-    // H-M types freeze, escaping function args are assumed called with lowest H-M compatible
+    // Pass 2: failed overloads propagate as errors
+    DO_AMBI = true;           // Allow HM work to propagate errors
+    DelayedOverload.delay_is_unresolved(work);
+    main_work_loop(prog,work);
+    assert prog.more_work(work);
+    
+    // Pass 3: H-M types freeze, escaping function args are assumed called with lowest H-M compatible
     HM_FREEZE = true;
     prog.add_freeze_work(work);
     assert prog.more_work(work);
 
     // Pass 2: GCP types continue to run downhill.
-    main_work_loop(prog,work);
-    assert prog.more_work(work);
-
-    // Pass 3: failed overloads propagate errors
-    DO_AMBI = true;           // Allow HM work to propagate errors
-    DelayedOverload.delay_is_unresolved(work);
     main_work_loop(prog,work);
     assert prog.more_work(work);
 
@@ -607,7 +607,7 @@ public class HM {
     // Giant Assert: True if OK; all Syntaxs off worklist do not make progress
     abstract boolean more_work(Work<Syntax> work);
     final boolean more_work_impl(Work<Syntax> work) {
-      if( DO_HM && (!work.on(this) || (HM_FREEZE && !DO_AMBI)) && hm(null) ) // Any more HM work?
+      if( DO_HM && (!work.on(this) || HM_FREEZE) && hm(null) ) // Any more HM work?
         return false;           // Found HM work not on worklist or when frozen
       if( DO_GCP ) {            // Doing GCP AND
         Type t = val(null);
@@ -766,7 +766,7 @@ public class HM {
       // A unique FIDX for this Lambda
       _fidx = BitsFun.new_fidx();
       FUNS.put(_fidx,this);
-      _flow = TypeFunPtr.makex(ProdOfSums.make(_fidx),_args.length+DSP_IDX,Type.ANY,TypeNil.XSCALAR);
+      _flow = TypeFunPtr.makex(BitsFun.make0(_fidx),_args.length+DSP_IDX,Type.ANY,TypeNil.XSCALAR);
     }
     @Override SB str(SB sb) {
       sb.p("{ ");
@@ -824,7 +824,7 @@ public class HM {
     @Override void add_hm_work( @NotNull Work<Syntax> work) { throw unimpl(); }
     @Override Type val(Work<Syntax> work) {
       // Just wrap a function around the body return
-      return TypeFunPtr.makex(ProdOfSums.make(_fidx),_args.length+DSP_IDX,Type.ANY,_body._flow);
+      return TypeFunPtr.makex(BitsFun.make0(_fidx),_args.length+DSP_IDX,Type.ANY,_body._flow);
     }
     // Meet the formal argument# with a new Apply call site actual arg.
     @Override public boolean arg_meet(int argn, Type cflow, Work<Syntax> work) {
@@ -1002,7 +1002,7 @@ public class HM {
       // Flag HMT result as widening, if GCP falls to a TFP which widens in HMT.
       T2 tret = tfun.arg("ret");
       if( tret!=null && tret._is_copy && _fun._flow instanceof TypeFunPtr tfp ) {
-        for( int fidx : tfp.pos()._fidxs )
+        for( int fidx : tfp.pos() )
           if( fidx!=BitsFun.ALLX && !Lambda.FUNS.get(fidx).as_fun().arg("ret")._is_copy ) {
             if( work!=null ) tret.clr_cp();
             return true;
@@ -1034,20 +1034,18 @@ public class HM {
         // If the input function is an overloaded function, and resolved by HMT
         // trim the functions down (and sharpen the return type).
         T2 t2fun = _fun.find();
-        if( t2fun.is_fun() ) {
+        if( tfp.pos().above_center() ) {
           // Look at the overloaded choices and see if we can resolve
-          for( BitsFun overs : tfp.pos()._overs ) {
-            Func lam1=null;
-            for( int fidx : overs ) {
-              Func lam = Lambda.FUNS.get(fidx);
-              T2 ffun = lam.as_fun();
-              if( !t2fun.trial_unify(ffun) )
-                if( lam1==null ) lam1=lam;
-                else { lam1=null; break; } // Not resolved yet
-            }
-            if( lam1!=null ) // Found exactly one resolvable HMT choice
-              tfp = (TypeFunPtr)tfp.meet(((Lambda)lam1)._flow);
+          Func lam1=null;
+          for( int fidx : tfp.pos() ) {
+            Func lam = Lambda.FUNS.get(fidx);
+            T2 ffun = lam.as_fun();
+            if( !t2fun.trial_unify(ffun) )
+              if( lam1==null ) lam1=lam;
+              else { lam1=null; break; } // Not resolved yet
           }
+          if( lam1!=null ) // Found exactly one resolvable HMT choice
+            tfp = (TypeFunPtr)tfp.meet(((Lambda)lam1)._flow);
         }
         // Meet all calling arguments over all called function args.  Lazily
         // building a call-graph, needed to track arg_meet.  We got here
@@ -1198,7 +1196,7 @@ public class HM {
       if( work!=null )
         escapes(_fun._flow,work);
       TypeMemPtr tmp = TypeMemPtr.make(false,EXT_ALIASES,TypeStruct.ISUSED);
-      TypeFunPtr tfp = TypeFunPtr.make(ProdOfSums.make(EXT_FIDXS),1);
+      TypeFunPtr tfp = TypeFunPtr.make(EXT_FIDXS,1);
       return TypeTuple.make(_fun._flow,tmp,tfp);
     }
     @Override void add_val_work( Syntax child, @NotNull Work<Syntax> work) { work.add(this); }
@@ -1289,13 +1287,10 @@ public class HM {
       if( t instanceof TypeFunPtr tfp && !ESCF.tset(tfp._uid) ) {
         // Walk all escaped function args, and call them (like an external
         // Apply might) with the most conservative flow arguments possible.
-        for( int fidx : tfp.pos()._fidxs )
-          do_fidx(fidx, work);
-        // Escaping overloads only count after freezing
-        if( HM_FREEZE )
-          for( BitsFun overs : tfp.pos()._overs )
-            for( int fidx : overs )
-              do_fidx(fidx, work);
+        // Escaping overloads only count after freezing.
+        if( !tfp.above_center() || HM_FREEZE )
+          for( int fidx : tfp.pos() )
+            do_fidx(fidx, work);
         // The flow return also escapes
         _escapes(tfp._ret,work);
       }
@@ -1629,24 +1624,40 @@ public class HM {
     @Override boolean hm(Work<Syntax> work) { return false; }
     @Override void add_hm_work( @NotNull Work<Syntax> work) { work.add(_par); }
     @Override Type val(Work<Syntax> work) {
-      // TODO: WILDLY INCORRECT.  UNION OF MEETS OF ALL TYPES, NOT JUST TFPS
-      // Join (choice) of all children.  If some child is below any function,
-      // we fall to Scalar and force reporting an error.
-      Type t = TypeNil.SCALAR;
-      BitsFun overs = BitsFun.EMPTY;
-      for( Syntax fun : _overs) {
-        Type tf = fun._flow;
-        if( !tf.above_center() ) { // Input is still falling
-          if( !(tf instanceof TypeFunPtr tfp) )
-            return TypeNil.SCALAR; // Some fun is below any function, so are we
-          tf = tfp.make_from(ProdOfSums.EMPTY); // Use the high TFP for choice
-          overs = (BitsFun)overs.join(tfp.pos().overload());
+      // If not resolved, the overload is still pending; take the join of children.
+      // If resolved to a single child, take that child.
+      // If resolved to all children, the overload is in error; take the meet of children.
+      T2 over = find();
+      T2 rez = over.is_over() ? over.arg("&&") : over; // Can be resolved and folded away
+      if( rez==null ) {         // Not resolved, take the join
+        Type t = TypeNil.SCALAR;
+        for( Syntax ov : _overs )
+          t = t.join(ov._flow);
+        // TODO: Need the Powerset representation of FIDXS here.
+        // This is WRONG, in general
+        if( t instanceof TypeFunPtr tfp ) {
+          BitsFun fidxs = BitsFun.EMPTY;
+          // Repeat, but just looking at the FIDXS; take the meet and dual.
+          for( Syntax ov : _overs ) {
+            BitsFun f2 = ov._flow instanceof TypeFunPtr tfp2
+              ? tfp2.pos()
+              : (ov._flow.above_center() ? BitsFun.NALL : BitsFun.EMPTY);
+            fidxs = fidxs.meet(f2);
+          }
+          fidxs = fidxs.dual();
+          t = tfp.make_from(fidxs);
         }
-        t = t.join(tf);
+        if( t instanceof TypeMemPtr tmp ) throw unimpl();
+        return t;
+      } else {
+        // Resolved.  Take meet of all matching children.  Its either one, if
+        // no error, or all of them if an error.
+        Type t = TypeNil.XSCALAR;
+        for( Syntax ov : _overs )
+          if( ov.find()==rez )
+            t = t.meet(ov._flow);
+        return t;
       }
-      if( t instanceof TypeFunPtr tfp )
-        t = tfp.make_from(ProdOfSums.make(BitsFun.EMPTY,BitsFuns.make(overs)));
-      return t;
     }
     @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) {
       work.add(this);
@@ -1657,6 +1668,7 @@ public class HM {
     @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
       T2 hmt = T2.make_overload();
       prep_tree_impl(par, nongen, work, hmt);
+      hmt.push_update(this);
       int cnt = 1;                // One for self
       for(int i = 0; i< _overs.length; i++ ) { // Prep all sub-fields
         cnt += _overs[i].prep_tree(this,nongen,work);
@@ -1706,7 +1718,7 @@ public class HM {
       return 1;
     }
     @Override boolean hm(Work<Syntax> work) {
-      // For most primitives, they do math on the inputs.  Hence if the input
+      // For most primitives, they do math on the inputs.  Hence, if the input
       // is an error, so is the output.  Primitives like Pair and Triple carry
       // their inputs directly through, and thus can represent partial errors
       // in the result.  The If primitive can ignore some (error) inputs.
@@ -1725,7 +1737,7 @@ public class HM {
     @Override Type val(Work<Syntax> work) {
       assert _body==null;
       Type ret = apply(_types);
-      return TypeFunPtr.makex(ProdOfSums.make(_fidx),_args.length+DSP_IDX,Type.ANY,ret);
+      return TypeFunPtr.makex(BitsFun.make0(_fidx),_args.length+DSP_IDX,Type.ANY,ret);
     }
 
     @Override boolean more_work(Work<Syntax> work) { return more_work_impl(work); }
@@ -2408,7 +2420,7 @@ public class HM {
         if( tfun != null ) return tfun;  // TODO: Returning recursive flow-type functions
         ADUPS.put(_uid, TypeNil.XSCALAR);
         Type rez = arg("ret")._as_flow(syn,deep);
-        return TypeFunPtr.makex(ProdOfSums.make(fidxs),size()-1+DSP_IDX,Type.ANY,rez);
+        return TypeFunPtr.makex(fidxs,size()-1+DSP_IDX,Type.ANY,rez);
       }
       if( is_obj() ) {
         assert HM_FREEZE && deep; // Only for final reporting
@@ -2709,7 +2721,7 @@ public class HM {
         return unify_nil(that,work,nongen);
 
 
-      // Fresh-unify with an ad-hoc polymorphic overload to a function
+      // Fresh-unify with an ad-hoc polymorphic overload
       if( this.is_over() && !that.is_over() ) return this._unify_over(that,nongen,true,false,work);
       if( that.is_over() && !this.is_over() ) return that._unify_over(this,nongen,false,true,work);
 
@@ -2859,7 +2871,7 @@ public class HM {
       }
 
       if( no_err==this || no_err==null ) {  // Two or more no-errors, or all are in-error: need to delay
-        if( !DO_AMBI ) {    // Stall ambiguous until things can be resolved
+        if( !DO_AMBI ) {        // Stall ambiguous until things can be resolved
           if( work!=null ) DelayedOverload.delay(this,that,nongen,fresh_this,fresh_that);
           push_update(that._deps); // Changes to 'that' might now resolve overload
           return false;    // No change if testing, or onto the delay list
@@ -2869,7 +2881,10 @@ public class HM {
         boolean progress = that.unify_errs("Ambiguous overload "+p()+": ",work);
         for( String id : _args.keySet() )
           progress |= arg(id)._unify(that,nongen,fresh_this,fresh_that,work);
-        if( work!=null && !fresh_this ) _args.put("&&",arg("&0"));
+        if( work!=null && !fresh_this ) {
+          _args.put("&&",arg("&0"));
+          add_deps_work(work);  // Revisit the error overload for GCP
+        }
         return progress;
       }
       // Single choice; unify to it
@@ -3139,7 +3154,7 @@ public class HM {
         WDUPS.remove(_uid);
         return t instanceof TypeFunPtr tfp
           ? tfp.make_from(Type.ANY,trlift)
-          : TypeFunPtr.makex((t.above_center() ? ProdOfSums.EMPTY : ProdOfSums.NALL),size()-1+DSP_IDX, Type.ANY, trlift);
+          : TypeFunPtr.makex((t.above_center() ? BitsFun.EMPTY : BitsFun.NALL),size()-1+DSP_IDX, Type.ANY, trlift);
       }
 
       if( is_obj() ) return t; // expect ptrs to be simple, so t is ISUSED

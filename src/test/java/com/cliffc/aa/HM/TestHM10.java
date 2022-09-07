@@ -83,21 +83,21 @@ public class TestHM10 {
   // Make a field holding a function pointer, type "fld":[fidx]{ any -> Scalar }
   private static TypeFld mfun( String fld, int fidx ) { return mfun(fld,fidx,1); }
   private static TypeFld mfun( String fld, int fidx, int nargs ) {
-    return TypeFld.make(fld,TypeFunPtr.make(ProdOfSums.make(fidx),nargs));
+    return TypeFld.make(fld,TypeFunPtr.make(BitsFun.make0(fidx),nargs));
   }
 
   // Make a field holding a function pointer, type "fld":[fidxs...]{ any -> Scalar }
   private static TypeFld mfun( int nargs, String fld, int... fidxs ) {
-    return TypeFld.make(fld,TypeFunPtr.make(ProdOfSums.make(BitsFun.make0(fidxs)),nargs));
+    return TypeFld.make(fld,TypeFunPtr.make(BitsFun.make0(fidxs),nargs));
   }
   private static TypeFld mfun( int nargs, String fld, Type ret, int... fidxs ) {
     return TypeFld.make(fld,mfun(nargs,ret,fidxs));
   }
   private static TypeFunPtr mfun( int nargs, Type ret, int... fidxs ) {
-    return TypeFunPtr.make(ProdOfSums.make(BitsFun.make0(fidxs)),nargs,PTR_NDSP,ret);
+    return TypeFunPtr.make(BitsFun.make0(fidxs),nargs,PTR_NDSP,ret);
   }
   private static TypeFld bfun2(String fld, int a0, int a1, int nargs ) {
-    return TypeFld.make(fld,TypeFunPtr.make(ProdOfSums.make(BitsFun.make0(a0,a1)),nargs));
+    return TypeFld.make(fld,TypeFunPtr.make(BitsFun.make0(a0,a1),nargs));
   }
 
   // Make a boolean field, with struct fields and,or,thenElse

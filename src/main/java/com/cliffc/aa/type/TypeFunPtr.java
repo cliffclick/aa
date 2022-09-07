@@ -40,24 +40,24 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   // Cannot just use a meet of overloaded functions, because as resolution
   // proceeds the set of functions shrinks not grows as Combo proceeds.  Thus
   // overloads are above-center, while Phi meets are below center.
-  private ProdOfSums _pos;      // Known function bits
+  private BitsFun _pos;         // Known function bits
 
   private int _nargs;           // Number of formals, including the ctrl, mem, display
   public Type _ret;             // Return scalar type
   private Type _dsp;            // Display; often a TMP to a TS; ANY is dead (not live, nobody uses).
 
-  private TypeFunPtr _init(ProdOfSums pos, int nargs, Type dsp, Type ret) {
+  private TypeFunPtr _init(BitsFun pos, int nargs, Type dsp, Type ret) {
     assert _any == pos.above_center() || pos.is_empty(); // No must-have to be above-center
     assert !(dsp instanceof TypeFld);
     _pos = pos;
     _nargs=nargs; _dsp=dsp; _ret=ret;
     return this;
   }
-  private TypeFunPtr init(boolean any, boolean nil, ProdOfSums pos, int nargs, Type dsp, Type ret ) {
+  private TypeFunPtr init(boolean any, boolean nil, BitsFun pos, int nargs, Type dsp, Type ret ) {
     super.init(any,nil);
     return _init(pos,nargs,dsp,ret);
   }
-  private TypeFunPtr init(boolean any, boolean nil, boolean sub, ProdOfSums pos, int nargs, Type dsp, Type ret ) {
+  private TypeFunPtr init(boolean any, boolean nil, boolean sub, BitsFun pos, int nargs, Type dsp, Type ret ) {
     super.init(any,nil,sub);
     return _init(pos,nargs,dsp,ret);
   }
@@ -149,7 +149,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return _ret._str_complex(visit,dups); }
 
   static TypeFunPtr valueOf(Parse P, String cid) {
-    ProdOfSums pos = P.pos();
+    BitsFun pos = P.bits(BitsFun.EMPTY);
     if( P.peek('+') ) throw unimpl();
     P.require('{');
     TypeFunPtr tfp = malloc(pos,0,null,null);
@@ -185,7 +185,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     // Make sure a FIDX appears only once, up to an ending self-cycle.
     CHK2.clear();
     while( tfp._ret!=tfp ) {      // Break if self-cycle, which can have anything
-      for( int fidx : tfp._pos._fidxs   ) if( CHK2.tset(fidx) ) return false;
+      for( int fidx : tfp.pos() ) if( CHK2.tset(fidx) ) return false;
       if( !(tfp._ret instanceof TypeFunPtr ret) ) break;
       if( tfp._pos.is_empty() && ret._pos.is_empty() ) return false;
       tfp = ret;
@@ -195,7 +195,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
 
   // Functions can grow indefinitely, if being built in a recursive loop.
   // We check that fidx return invariant holds.
-  public static TypeFunPtr make( boolean any, boolean nil, boolean sub, ProdOfSums pos, int nargs, Type dsp, Type ret ) {
+  public static TypeFunPtr make( boolean any, boolean nil, boolean sub, BitsFun pos, int nargs, Type dsp, Type ret ) {
     TypeFunPtr tfp = malloc(any, nil, sub, pos, nargs,dsp,ret).hashcons_free();
     assert check2(tfp);          // Assert new return-chain is valid
     return tfp;
@@ -205,7 +205,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   // Make the TFP, which might not have the invariant.
   // Call _rule2; the result has the invariant.
   // Check and return.
-  public static TypeFunPtr makex( boolean any, boolean nil, boolean sub, ProdOfSums pos, int nargs, Type dsp, Type ret ) {
+  public static TypeFunPtr makex( boolean any, boolean nil, boolean sub, BitsFun pos, int nargs, Type dsp, Type ret ) {
     assert !(ret instanceof TypeFunPtr rtfp) || check2(rtfp); // Assert old return-chain is valid
     // Make the TFP, but it may NOT pass the invariant
     TypeFunPtr tfp = malloc(any, nil, sub, pos, nargs,dsp,ret).hashcons_free();
@@ -243,7 +243,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   // (3) a -> b -> Scalar // If end in a below-TFP, NO REPEATS....
 
   // Rule2: roll forwards and check that new_fidxs do not appear anywhere
-  private TypeFunPtr _rule2(ProdOfSums new_pos, boolean first) {
+  private TypeFunPtr _rule2(BitsFun new_pos, boolean first) {
     if( this==_ret ) return this; // Self-cycle, end is fine
     if( !first && new_pos.overlaps(_pos) )
       return _rule2_apx(); // Overlaps, so do hard approximation
@@ -276,7 +276,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   }
 
   // Install a length-1 self-cycle
-  static TypeFunPtr make_cycle( boolean any, boolean nil, boolean sub, ProdOfSums pos, int nargs, Type dsp ) {
+  static TypeFunPtr make_cycle( boolean any, boolean nil, boolean sub, BitsFun pos, int nargs, Type dsp ) {
     TypeFunPtr tfp = malloc(any,nil,sub,pos,nargs,dsp,null);
     tfp._ret = tfp;             // Make a self-cycle of length 1
     assert dsp._hash!=0;        // Can be 'compute_hash'
@@ -292,16 +292,16 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   }
 
   // Allocate and init
-  private static TypeFunPtr malloc(boolean any, boolean nil, boolean sub, ProdOfSums pos, int nargs, Type dsp, Type ret ) {
+  private static TypeFunPtr malloc(boolean any, boolean nil, boolean sub, BitsFun pos, int nargs, Type dsp, Type ret ) {
     TypeFunPtr t1 = POOLS[TFUNPTR].malloc();
     return t1.init(any,nil,sub,pos,nargs,dsp,ret);
   }
-  private static TypeFunPtr malloc(ProdOfSums pos, int nargs, Type dsp, Type ret ) {
+  private static TypeFunPtr malloc(BitsFun pos, int nargs, Type dsp, Type ret ) {
     TypeFunPtr t1 = POOLS[TFUNPTR].malloc();
     return t1.init(pos.above_center(),pos.test(0),pos.clear(0),nargs,dsp,ret);
   }
 
-  public static TypeFunPtr make( ProdOfSums pos, int nargs, Type dsp, Type ret ) {
+  public static TypeFunPtr make( BitsFun pos, int nargs, Type dsp, Type ret ) {
     boolean haz_nil = pos.test(0);
     boolean any = pos.above_center();
     boolean nil = any &&  haz_nil;
@@ -309,7 +309,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     assert !haz_nil;             // TODO: Fix side-effect, or intern
     return make(any, nil, sub, pos, nargs,dsp,ret);
   }
-  public static TypeFunPtr makex( ProdOfSums pos, int nargs, Type dsp, Type ret ) {
+  public static TypeFunPtr makex( BitsFun pos, int nargs, Type dsp, Type ret ) {
     boolean haz_nil = pos.test(0);
     boolean any = pos.above_center() || pos.is_empty();
     boolean nil = any &&  haz_nil;
@@ -317,16 +317,16 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     return makex(any, nil, sub, pos.clear(0), nargs,dsp,ret);
   }
   public static TypeFunPtr make( int fidx, int nargs, Type dsp, Type ret ) {
-    return make(ProdOfSums.make(fidx),nargs,dsp,ret);
+    return make(BitsFun.make0(fidx),nargs,dsp,ret);
   }
   public static TypeFunPtr make_new_fidx( int parent, int nargs, Type dsp, Type ret ) {
     return make(BitsFun.new_fidx(parent),nargs,dsp,ret);
   }
-  public static TypeFunPtr make( ProdOfSums pos, int nargs) {
+  public static TypeFunPtr make( BitsFun pos, int nargs) {
     return make(pos,nargs,TypeMemPtr.NO_DISP,TypeNil.SCALAR);
   }
   public TypeFunPtr make_from( Type dsp ) { return make(_pos,_nargs, dsp,_ret); }
-  public TypeFunPtr make_from( ProdOfSums pos ) {
+  public TypeFunPtr make_from( BitsFun pos ) {
     return pos==_pos ? this : malloc( pos.above_center(), _nil, _sub, pos, _nargs,_dsp,_ret).hashcons_free();
   }
 
@@ -336,10 +336,10 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     return makex(any,nil,sub,_pos,_nargs,_dsp,_ret);
   }
 
-  public  static final TypeFunPtr GENERIC_FUNPTR = make(ProdOfSums.NALL ,1,Type.ALL,Type.ALL);
-  public  static final TypeFunPtr ARG2   =         make(ProdOfSums.NALL ,2,Type.ALL,Type.ALL);
-  public  static final TypeFunPtr THUNK  = (TypeFunPtr)make(ProdOfSums.NALL ,3,Type.ALL,Type.ALL).meet(TypeNil.XNIL); // zero-arg function (plus ctrl, mem, display)
-  public  static final TypeFunPtr EMPTY  =         make(ProdOfSums.EMPTY,1,Type.ANY,Type.ANY);
+  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.NALL ,1,Type.ALL,Type.ALL);
+  public  static final TypeFunPtr ARG2   =         make(BitsFun.NALL ,2,Type.ALL,Type.ALL);
+  public  static final TypeFunPtr THUNK  = (TypeFunPtr)make(BitsFun.NALL ,3,Type.ALL,Type.ALL).meet(TypeNil.XNIL); // zero-arg function (plus ctrl, mem, display)
+  public  static final TypeFunPtr EMPTY  =         make(BitsFun.EMPTY,1,Type.ANY,Type.ANY);
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,ARG2,THUNK};
 
   @Override protected TypeFunPtr xdual() {
@@ -355,7 +355,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     boolean nil = _nil & tf._nil;
     boolean sub = _sub & tf._sub;
     // Meet of non-return parts
-    ProdOfSums pos = _pos.meet(tf._pos);
+    BitsFun pos = _pos.meet(tf._pos);
     int nargs = (_nargs ^ tf._nargs) > 0 ? Math.min(_nargs,tf._nargs) : Math.max(_nargs,tf._nargs);
     Type dsp = _dsp.meet(tf._dsp);
 
@@ -370,13 +370,13 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   }
 
   // All fidxs, whether meet or join
-  public BitsFun fidxs() { assert _pos._overs.length==0; return _pos._fidxs; }
-  public ProdOfSums pos() { return _pos; }
-  public int fidx() { return _pos.fidx(); } // Asserts internally single-bit
-  public boolean is_fidx() { return _pos.is_fidx(); } // Single-bit TFP
+  public BitsFun fidxs() { return _pos; }
+  public BitsFun pos() { return _pos; }
+  public int fidx() { return _pos.getbit(); } // Asserts internally single-bit
+  public boolean is_fidx() { return _pos.abit()>-1; } // Single-bit TFP
   public boolean test(int fidx) { return _pos.test(fidx); }
   public boolean is_empty() { return _pos.is_empty(); }
-  public boolean is_full() { return _pos.is_full(); }
+  public boolean is_full() { return _pos==BitsFun.NALL; }
   public int nargs() { return Math.abs(_nargs); }
 
   // Widens, not lowers.

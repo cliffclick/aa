@@ -864,15 +864,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       require(']');
       return dual ? b.dual() : b;
     }
-    ProdOfSums pos( ) {
-      BitsFun fidxs = bits(BitsFun.EMPTY);
-      BitsFun[] overs = BitsFuns.EMPTY;
-      if( peek(fidxs.above_center() ? '+' : '&') ) {
-        do overs = BitsFuns.add(overs, bits(BitsFun.EMPTY));
-        while (peek(fidxs.above_center() ? '+' : '&'));
-      }
-      return ProdOfSums.make(fidxs,overs);
-    }
     private boolean is_all() { if( _str.startsWith("ALL", _x) ) { _x +=3; return true; } else return false; }
     // Demand
     void require(char c) {

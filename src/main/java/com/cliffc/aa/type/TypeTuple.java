@@ -83,7 +83,7 @@ public class TypeTuple extends Type<TypeTuple> {
   public  static final TypeTuple CALLE= make(CTRL, TypeMem.ALLMEM, ALL); // Type of CallEpiNodes
   public  static final TypeTuple TEST0= make(CTRL, TypeMem.ALLMEM, TypeFunPtr.GENERIC_FUNPTR, TypeNil.SCALAR); // Call with 1 arg
   public  static final TypeTuple TEST1= make(CTRL, TypeMem.ANYMEM, TypeFunPtr.GENERIC_FUNPTR, TypeNil.SCALAR); // Call with 1 arg
-  public  static final TypeTuple ROOT0= make(CTRL, TypeMem.ALLMEM, TypeRPC.ALL_CALL, TypeFunPtr.make(ProdOfSums.NALL,1),TypeMemPtr.ISUSED.make_from(BitsAlias.NALL));
+  public  static final TypeTuple ROOT0= make(CTRL, TypeMem.ALLMEM, TypeRPC.ALL_CALL, TypeFunPtr.make(BitsFun.NALL,1),TypeMemPtr.ISUSED.make_from(BitsAlias.NALL));
   // Arguments
   public  static final TypeTuple INT64      = make(CTRL, TypeMem.ALLMEM, TypeStruct.INT); // {int->flt}
   public  static final TypeTuple FLT64      = make(CTRL, TypeMem.ALLMEM, TypeStruct.FLT); // {flt->flt}

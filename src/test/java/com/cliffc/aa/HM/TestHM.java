@@ -26,9 +26,9 @@ public class TestHM {
     JIG=true;
 
     DO_HMT=true;
-    DO_GCP=false;
-    RSEED=17;
-    test43();
+    DO_GCP=true;
+    RSEED=0;
+    test83();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -52,7 +52,7 @@ public class TestHM {
     if( JIG )
       _run0s(prog,rez_hm,frez_gcp,RSEED,esc_ptrs,esc_funs);
     else
-      for( int rseed=0; rseed<32; rseed++ )
+      for( int rseed=0; rseed<4; rseed++ )
         _run0s(prog,rez_hm,frez_gcp,rseed,esc_ptrs,esc_funs);
   }
 
@@ -1189,7 +1189,7 @@ A:*@{
          "  { x -> (f* x 3.0) };"+  // Arg is 'flt'
          " ]",
          "&[ {int64 -> int64}; {flt64 -> flt64} ]",
-         "[]&[~20+23]{any,3 ->~Scalar0 }",
+         "[~20+23]{any,3 ->~Scalar0 }",
          null,"[20,23]"
         );
   }
@@ -1212,7 +1212,11 @@ A:*@{
         "   { x -> (i* x 2) };"+  // Arg is 'int'
         "   { x -> (i* x 3) };"+  // Arg is 'int'
         "  ] 4)",                 // Error, ambiguous
-        "Ambiguous overload &[ {int64->int64}; {int64->int64} ]: int64", "~int64");
+        "Ambiguous overload &[ {int64->int64}; {int64->int64} ]: int64",
+        "Ambiguous overload &[ {int64->int64}; {int64->int64} ]: int64",
+        "nint8",
+        "~int64"
+      );
   }
 
   // Wrong args for all overloads
@@ -1246,8 +1250,8 @@ fz = (if (rand 2) fx fy);
 }
 """,
          "{A? -> *(int64,flt64) }",
-         "[29]{any,3 ->*[7](^=any, ~Scalar, ~Scalar) }",
-         null,null);
+         "[31]{any,3 ->*[7](^=any, ~Scalar, ~Scalar) }",
+         "[4,7]","[29]");
   }
 
   // Test case here is trying to get HM to do some overload resolution.
@@ -1278,7 +1282,7 @@ con2_1 = (fwrap 2.1);
 (con2_1._*_ con2_1)
 """,
         "A:*@{_*_={B:*@{_*_=&[{*@{i=int64;...}->B};{*@{f=flt64;...}->B}];f=flt64}->A};f=flt64}",
-        "PA:*[7]@{^=any; _*_=[]&[~22+24]{any,3 ->PA }; f=flt64}",
+        "PA:*[7]@{^=any; _*_=[~22+24]{any,3 ->PA }; f=flt64}",
         "[4,7,10,11]","[22,24]");
   }
 
@@ -1394,8 +1398,8 @@ mul2 = { x -> (x._*_ con2)};
 (triple (mul2 con2_1)  (con2._*_ con2) (con2_1._*_ con2_1))
 """,
         hm_rez, hm_rez,
-        "*[9](FA:^=any, PA:*[7]@{FA; _*_=[]&[~22+24]{any,3 ->PA }; f=flt64}, *[8]@{FA; _*_=[]&[~28+31]{any,3 ->*[]( ...) }; i=int64}, PA)",
-        "*[9](FA:^=any, PA:*[7]@{FA; _*_=[]&[~22+24]{any,3 ->PA }; f=flt64}, *[]( ...), PA)",
+        "*[9](FA:^=any, PA:*[7]@{FA; _*_=[~22+24]{any,3 ->PA }; f=flt64}, *[8]@{FA; _*_=[~28+31]{any,3 ->*[]( ...) }; i=int64}, PA)",
+        "*[9](FA:^=any, PA:*[7]@{FA; _*_=[~22+24]{any,3 ->PA }; f=flt64}, *[]( ...), PA)",
         "[4,7,8,9,10,11,17,18]","[22,24,28,31]");
   }
 
@@ -1436,7 +1440,7 @@ fact = { n -> (if n.is0 c1 (n.mul (fact n.sub1))) };
 (fact c5)
 """,
         "A:*@{i=int64; is0=int1; mul = {A->A}; sub1=A }",
-        "PA:*[8]@{^=any; i=int64; is0=int1; mul=[]&[~28+31]{any,3 ->*[](...) }; sub1=PA}",
+        "PA:*[8]@{^=any; i=int64; is0=int1; mul=[~28+31]{any,3 ->*[](...) }; sub1=PA}",
         "[4,8,10,11]","[28,31]");
   }
 

@@ -288,7 +288,7 @@ public class TestNodeSmall {
     TypeFunPtr tmint = v(mint,gvn), tmintX = tmint.dual();
     TypeFunPtr tmflt = v(mflt,gvn), tmfltX = tmflt.dual();
 
-    TypeFunPtr tmul1E = TypeFunPtr.make(ProdOfSums.EMPTY,0,NO_DISP,null); // All bad choices
+    TypeFunPtr tmul1E = TypeFunPtr.make(BitsFun.EMPTY,0,NO_DISP,null); // All bad choices
 
     assert tadd1X.isa(tnum1X) && tnum1X.isa(tflt1X) && tflt1X.isa(tnum1) && tnum1.isa(tadd1);
 

@@ -672,7 +672,7 @@ public class FunNode extends RegionNode {
       new_funptr.insert(old_funptr); // Make cloned recursive calls, call the old version not the new version
       TypeFunPtr ofptr = (TypeFunPtr) old_funptr._val;
       path_call.set_fdx(new_funptr); // Force new_funptr, will re-wire later
-      TypeFunPtr nfptr = ofptr.make_from(ProdOfSums.make(newret._fidx));
+      TypeFunPtr nfptr = ofptr.make_from(BitsFun.make0(newret._fidx));
       path_call._val = CallNode.set_ttfp((TypeTuple) path_call._val,nfptr);
       //for( Node use : oldret._uses ) // Check extra FunPtrs are dead
       //  if( use instanceof FunPtrNode ) Env.GVN.add_dead(map.get(use));
@@ -716,7 +716,7 @@ public class FunNode extends RegionNode {
       if( nn instanceof FunPtrNode fptr && fptr.ret()==newret ) { // FunPtr(s) pick up the new fidx
         TypeFunPtr ofptr = (TypeFunPtr)nt;
         assert ofptr.fidx()==oldret._fidx;
-        nt = ofptr.make_from(ProdOfSums.make(newret._fidx));
+        nt = ofptr.make_from(BitsFun.make0(newret._fidx));
       }
       nn._val = nt;             // Values
       nn._elock();              // In GVN table

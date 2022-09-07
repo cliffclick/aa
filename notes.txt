@@ -1,4 +1,24 @@
 =======================================
+8/22/2022
+
+Recursive types seem sane, modulo unroll/re-roll or O(n log n) minimization.
+Overloads seem sane, not tested on larger programs.
+
+Probably need true row-polymorphism (a type-var with a set of labels/types
+representing all the unnamed labels in an open struct).  Means I can make
+a struct of e.g. a subclass or extra fields, and keep the extras.  Example:
+  { point delta -> @{ x=point.x+delta, y=point.y+delta, point... } }
+Adds delta to fields {x,y}, and copies the remaining fields into the result.
+This can be used to type-safe update-in-place, or classic side-effects.
+
+Also, would like progress on main AA.
+
+Decision:
+Progress on main AA!
+Row-polymorphism for another time.
+
+
+=======================================
 7/18/2022
 
 Recursive types (both Data and Functions) and Structs
