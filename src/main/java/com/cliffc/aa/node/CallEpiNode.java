@@ -537,7 +537,7 @@ public final class CallEpiNode extends Node {
 
     // Flag HMT result as widening, if GCP falls to a TFP which widens in HMT.
     TV2 tret = tfun.find().arg(" ret");
-    if( tret.is_copy() && fdx._val instanceof TypeFunPtr tfp ) {
+    if( tret.is_copy() && fdx._val instanceof TypeFunPtr tfp && tfp.fidxs()!=BitsFun.NALL ) {
       for( int fidx : tfp.fidxs() ) {
         if( fidx==0 ) continue;
         RetNode ret = RetNode.FUNS.at(fidx);

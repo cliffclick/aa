@@ -1008,7 +1008,7 @@ all
   false=PC:*[8,9]@{FA; and=[23,27]{any,3 ->Scalar }; or=[25,29]{any,3 ->Scalar }; then=[26,30]{any,4 ->Scalar }};
   s=[45]{any,3 ->
     PA:*[13]@{
-      FA; 
+      FA;
       add_=[44]{any,3 ->PA };
       pred=[42]{any,3 ->PB:*[10,11,12,13,17,18]@{FA; add_=[4,5,22,23,25,27,29,35,36,37,41,42,43,44,45]{any,3 ->Scalar }; pred=[4,5,22,23,24,25,27,28,29,35,36,37,41,42,43,44,45]{any,3 ->PB }; succ=[4,5,22,23,25,27,29,35,36,37,41,42,43,44,45]{any,3 ->PB }; zero=[4,5,22,23,24,25,27,28,29,35,36,37,41,42,43,44,45]{any,3 ->PC }} };
       succ=[43]{any,3 ->PA }; zero=[41]{any,3 ->PC }
@@ -1016,7 +1016,7 @@ all
   };
   true=PC;
   z=*[12]@{
-    FA; 
+    FA;
     add_=[37]{any,3 ->Scalar };
     pred=[22]{any,3 ->~Scalar };
     succ=[36]{any,3 ->PA };
@@ -1025,10 +1025,10 @@ all
 }
 """,
          """
-*[14]@{FA:^=any; 
-  false=PA:*[8,9]@{FA; and=[23,27]{any,3 ->Scalar }; or=[25,29]{any,3 ->Scalar }; then=[26,30]{any,4 ->Scalar }}; 
-  s=[45]{any,3 ->Scalar }; 
-  true=PA; 
+*[14]@{FA:^=any;
+  false=PA:*[8,9]@{FA; and=[23,27]{any,3 ->Scalar }; or=[25,29]{any,3 ->Scalar }; then=[26,30]{any,4 ->Scalar }};
+  s=[45]{any,3 ->Scalar };
+  true=PA;
   z=*[12]@{FA; add_=[37]{any,3 ->Scalar }; pred=[22]{any,3 ->~Scalar }; succ=[36]{any,3 ->Scalar }; zero=[35]{any,3 ->PA }}
 }
 """,

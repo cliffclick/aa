@@ -160,11 +160,10 @@ public class TestParse {
   }
 
   @Test public void testParse02() {
-    test("x=3; andx={y -> x & y}; andx(2)", "int:2", "int:2"); // trivially inlined; capture external variable
     // Anonymous function definition.  Note: { x -> x&1 }; 'x' can be either an
     // int or any struct with an operator '_&_', which needs to be nil-checked
     // before loading the operator field.
-    test("{x:int -> x&1}","[54]{any,4 -> int:int1 }","@{^=any}","{A int:int64 -> int:int64}",null,"[54]");
+    _test2("{x:int -> x&1}","[54]{any,4 -> int:int1 }","{A int:int64 -> int:int64}",null,null,null,"[54]",null,0);
     test("{5}()", "int:5", "int:5"); // No args nor -> required; this is simply a function returning 5, being executed
     testerr("{x:flt y -> x+y}", "Unable to resolve _+_",13); // {Scalar Scalar -> Scalar}
 
@@ -175,7 +174,7 @@ public class TestParse {
     testerr("fun={x -> }; fun(0)", "Missing function body",10);
     testerr("fun(2)", "Unknown ref 'fun'", 0);
     test("mul3={x -> y=3; x*y}; mul3(2)", "int:6","A", "int:6","int:6"); // multiple statements in func body
-    _test2("x=3; addx={y -> x+y}; addx(2)", "int:5",null,"int:5","int:5","int:5",null,null,"Unable to resolve _+_",-1); // must inline to resolve overload {+}:Int
+    _test2("x=3; addx={y -> x+y}; addx(2)", "int:5","int:5","int:5","int:5",null,null,"Unable to resolve _+_",-1); // must inline to resolve overload {+}:Int
     test("x=3; mul2={x -> x*2}; mul2(2.1)", "flt:4.2","flt:4.2"); // must inline to resolve overload {*}:Flt with I->F conversion
     //test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     //test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
@@ -879,7 +878,7 @@ HashTable = {@{
   // If HMT !=null, test against HMT results.  Ignore err.
   // If both are null and err is set, test against err.
   // if both are set, also check esc_ptrs and esc_funs.
-  static private void _test0( String program, String gcp, String formals, String hmt, String esc_ptrs, String esc_funs, String err, int cur_off, int rseed ) {
+  static private void _test0( String program, String gcp, String hmt, String esc_ptrs, String esc_funs, String err, int cur_off, int rseed ) {
     TypeEnv te = Exec.file("test",program,rseed,gcp!=null,hmt!=null);
     // Check GCP result
     if( gcp != null && (err==null || cur_off<0) ) {
@@ -887,13 +886,6 @@ HashTable = {@{
       Type actual = te._tmem.sharptr(te._t); // Sharpen any memory pointers
       Type expect = Type.valueOf(gcp);
       assertEquals(expect,actual);
-      // Also check GCP formals.
-      if( expect instanceof TypeFunPtr ) {
-        TypeStruct actual_formals = te._formals;
-        TypeStruct expect_formals = (TypeStruct)Type.valueOf(formals);
-        assertEquals(expect_formals,actual_formals);
-      } else
-        assert formals==null;
     }
     // Check HMT result
     if( hmt != null && err==null ) {
@@ -932,32 +924,31 @@ HashTable = {@{
   private static String stripIndent(String s){ return s.replace("\n","").replace(" ",""); }
 
   // Run a program once-per-rseed
-  static private void _test1( String program, String gcp, String formals, String hmt_expect, String esc_ptrs, String esc_funs, String err, int cur_off ) {
+  static private void _test1( String program, String gcp, String hmt_expect, String esc_ptrs, String esc_funs, String err, int cur_off ) {
     if( JIG )
-      _test0(program,gcp,formals,hmt_expect,esc_ptrs,esc_funs,err,cur_off,RSEED);
+      _test0(program,gcp,hmt_expect,esc_ptrs,esc_funs,err,cur_off,RSEED);
     else
       for( int rseed=0; rseed<4; rseed++ )
-        _test0(program,gcp,formals,hmt_expect,esc_ptrs,esc_funs,err,cur_off,rseed);
+        _test0(program,gcp,hmt_expect,esc_ptrs,esc_funs,err,cur_off,rseed);
   }
 
   // Run a program in all 3 modes, with all rseeds
-  static private void _test2( String program, String gcp, String formals, String hmt, String gcp_both, String hmt_both, String esc_ptrs, String esc_funs, String err, int cur_off ) {
-    if( !JIG || ( DO_GCP && !DO_HMT) )  _test1(program,gcp     ,formals,null    ,esc_ptrs,esc_funs,err,cur_off);
-    if( !JIG || (!DO_GCP &&  DO_HMT) )  _test1(program,null    ,null   ,hmt     ,esc_ptrs,esc_funs,err,cur_off);
-    if( !JIG || ( DO_GCP &&  DO_HMT) )  _test1(program,gcp_both,formals,hmt_both,esc_ptrs,esc_funs,err,cur_off);
+  static private void _test2( String program, String gcp, String hmt, String gcp_both, String hmt_both, String esc_ptrs, String esc_funs, String err, int cur_off ) {
+    if( gcp_both==null ) gcp_both=gcp;
+    if( hmt_both==null ) hmt_both=hmt;
+    if( !JIG || ( DO_GCP && !DO_HMT) )  _test1(program,gcp     ,null    ,esc_ptrs,esc_funs,err,cur_off);
+    if( !JIG || (!DO_GCP &&  DO_HMT) )  _test1(program,null    ,hmt     ,esc_ptrs,esc_funs,err,cur_off);
+    if( !JIG || ( DO_GCP &&  DO_HMT) )  _test1(program,gcp_both,hmt_both,esc_ptrs,esc_funs,err,cur_off);
   }
 
   // Run a program in all 3 modes, yes function returns, no errors
-  private void test( String program, String gcp, String formals, String hmt, String esc_ptrs, String esc_funs ) {
-    _test2(program,gcp,formals,hmt,gcp,hmt,esc_ptrs,esc_funs,null,0);
-  }
   // Short form test: simple GCP, no formal args
   private void test( String program, String gcp, String hmt ) {
-    _test2(program,gcp,null,hmt,gcp,hmt,null,null,null,0);
+    _test2(program,gcp,hmt,gcp,hmt,null,null,null,0);
   }
   // Short form test: simple GCP, no formal args
   static private void test( String program, String gcp, String hmt, String gcp_both, String hmt_both ) {
-    _test2(program,gcp,null,hmt,gcp_both,hmt_both,null,null,null,0);
+    _test2(program,gcp,hmt,gcp_both,hmt_both,null,null,null,0);
   }
 
 
@@ -992,7 +983,7 @@ HashTable = {@{
   }
 
   static void testerr( String program, String err, int cur_off ) {
-    _test2(program,"",null,"",null,null,null,null,err,cur_off);
+    _test2(program,"","",null,null,null,null,err,cur_off);
   }
 
 

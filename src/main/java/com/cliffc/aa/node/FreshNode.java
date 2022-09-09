@@ -2,9 +2,8 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.TV2;
-import com.cliffc.aa.type.*;
-
-import static com.cliffc.aa.AA.unimpl;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMemPtr;
 
 // "fresh" the incoming TVar: make a fresh instance before unifying
 public class FreshNode extends Node {
@@ -70,8 +69,7 @@ public class FreshNode extends Node {
   // Two FreshNodes are only equal, if they have compatible TVars
   @Override public boolean equals(Object o) {
     if( _tvar==null ) return this==o;
-    if( !(o instanceof FreshNode) ) return false;
-    //return tvar().compatible(((FreshNode) o).tvar());
-    throw unimpl();
+    if( !(o instanceof FreshNode frsh) ) return false;
+    return tvar()==frsh.tvar();
   }
 }

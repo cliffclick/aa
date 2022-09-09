@@ -374,7 +374,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   public BitsFun pos() { return _pos; }
   public int fidx() { return _pos.getbit(); } // Asserts internally single-bit
   public boolean is_fidx() { return _pos.abit()>-1; } // Single-bit TFP
-  public boolean test(int fidx) { return _pos.test(fidx); }
+  public boolean test(int fidx) { return _pos.test_recur(fidx); }
   public boolean is_empty() { return _pos.is_empty(); }
   public boolean is_full() { return _pos==BitsFun.NALL; }
   public int nargs() { return Math.abs(_nargs); }
