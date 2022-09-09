@@ -1,6 +1,7 @@
 package com.cliffc.aa.util;
 
 import java.util.concurrent.ConcurrentMap;
+import java.util.Arrays;
 
 public class Util {
   // Fast linear scan for a hit, returns index or -1
@@ -154,4 +155,28 @@ public class Util {
         return false;
     return true;
   }
+
+  // Return a merged sorted array from two sorted arrays, removing dups.
+  // If the merge is the same as either array, return that array.
+  // If the merge is the same as BOTH arrays, return the array with the smaller
+  // hashCode (goal: canonicalize identical arrays, so the fast == check works
+  // more often, and we do not make lots of equals-not-== arrays).
+  static public short[] merge_sort( short[] es0, short[] es1 ) {
+    if( es0==es1 ) return es0;
+    if( Arrays.equals(es0,es1) )
+      throw com.cliffc.aa.AA.unimpl();
+    short[] xs = new short[es0.length+es1.length];
+    int i=0, j=0, k=0;
+    while( i<es0.length || j<es1.length ) {
+      short s0 = i<es0.length ? es0[i] : Short.MAX_VALUE, s1 = j<es1.length ? es1[j] : Short.MAX_VALUE, s2=s0;
+      if( s0<=s1 ) { i++; s2=s0; }
+      if( s1<=s0 ) { j++; s2=s1; }
+      xs[k++] = s2;
+    }
+    assert k>i && k>j; // Arrays were not equals, so at least one element from each copied to other
+    if( k < xs.length )
+      throw com.cliffc.aa.AA.unimpl(); // Compact
+    return xs;
+  }
+  
 }

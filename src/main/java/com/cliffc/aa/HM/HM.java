@@ -166,24 +166,22 @@ public class HM {
     HM_FREEZE = false;
     DO_AMBI = false;
     main_work_loop(prog,work);
-    assert prog.more_work(work);
 
     // Pass 2: failed overloads propagate as errors
     DO_AMBI = true;           // Allow HM work to propagate errors
     DelayedOverload.delay_is_unresolved(work);
-    main_work_loop(prog,work);
     assert prog.more_work(work);
-    
+    main_work_loop(prog,work);
+
     // Pass 3: H-M types freeze, escaping function args are assumed called with lowest H-M compatible
+    // GCP types continue to run downhill.
     HM_FREEZE = true;
     prog.add_freeze_work(work);
     assert prog.more_work(work);
-
-    // Pass 2: GCP types continue to run downhill.
     main_work_loop(prog,work);
-    assert prog.more_work(work);
 
     // Error propagation, no types change.
+    assert prog.more_work(work);
     pass_err(prog, work);
 
     return prog;
@@ -319,6 +317,12 @@ public class HM {
       else if( _fresh_that ) that().fresh_unify(over(), _nongen, work);
       else              over().      unify(that(),          work);
     }
+
+    static void reset() {
+      _delays.clear();
+      _trial=null;
+      _resolved=false;
+    }
   }
 
   static void pass_err( Root prog, Work<Syntax> work ) {
@@ -355,7 +359,8 @@ public class HM {
   }
 
 
-  // Reset global statics between tests
+  // Reset global statics between tests.  Tests fail leaving wreckage and
+  // broken statics in their wake... and then the next test attempts to start.
   static void reset() {
     //System.out.println("Type.INTERN reprobes");
     //AryInt rps = Type.reprobes();
@@ -366,10 +371,11 @@ public class HM {
     //System.out.println("Accesses: "+cnt+", total reprobes: "+sum+", size: "+Type.intern_size()+", cap: "+Type.intern_capacity());
     BitsAlias.reset_to_init0();
     BitsFun.reset_to_init0();
+    Lambda.FUNS.clear();
     Root.reset();
     PRIMSYNS.clear();
     ALIASES.clear();
-    Lambda.FUNS.clear();
+    DelayedOverload.reset();
     Syntax.reset();
     T2.reset();
   }
@@ -607,7 +613,7 @@ public class HM {
     // Giant Assert: True if OK; all Syntaxs off worklist do not make progress
     abstract boolean more_work(Work<Syntax> work);
     final boolean more_work_impl(Work<Syntax> work) {
-      if( DO_HM && (!work.on(this) || HM_FREEZE) && hm(null) ) // Any more HM work?
+      if( DO_HM && (!work.on(this) || HM_FREEZE) && hm(null) ) // Anymore HM work?
         return false;           // Found HM work not on worklist or when frozen
       if( DO_GCP ) {            // Doing GCP AND
         Type t = val(null);
@@ -1050,7 +1056,8 @@ public class HM {
         // Meet all calling arguments over all called function args.  Lazily
         // building a call-graph, needed to track arg_meet.  We got here
         // because, e.g. _fun._flow added some more functions, all those new
-        // functions need the arg_meet.
+        // functions need the arg_meet.  Overloads must stall until resolved
+        // so we do not mix arg_meets from the wrong Overload.
         if( !tfp.above_center() && work!=null && !tfp.is_full() )
           for( int fidx : tfp.fidxs() )
             // new call site for lambda; all args must meet into this lambda;
@@ -1059,7 +1066,7 @@ public class HM {
 
       // Attempt to lift the result, based on HM types.
       Type lifted = do_apply_lift(find(),tfp._ret, work==null);
-      assert _flow.isa(lifted) ; // Monotonic...
+      assert _flow.isa(lifted); // Monotonic...
       return lifted;
     }
 
@@ -1133,7 +1140,7 @@ public class HM {
       // child arg to a call-site changed; find the arg#;
       int argn = Util.find(_args,child);
       // visit all Lambdas; meet the child flow into the Lambda arg#
-      if( argn != -1 && !tfp.is_full() && !tfp.above_center() )
+      if( argn != -1 && !tfp.is_full() )
         for( int fidx : tfp.fidxs() )
           if( Lambda.FUNS.get(fidx) instanceof Lambda lam )
             work.add(lam.refs(argn));
@@ -1175,7 +1182,19 @@ public class HM {
     private static BitsFun   EXT_FIDXS   = BitsFun  .EMPTY;
     private static final Work<Syntax> FREEZE_DEPS = new Work<>();
     private static final Work<Syntax> EXT_DEPS = new Work<>();
-    static void reset() { EXT_ALIASES = BitsAlias.EMPTY; EXT_FIDXS = BitsFun.EMPTY; FREEZE_DEPS.clear(); EXT_DEPS.clear(); }
+    static final Ary<EXTLambda> EXTS = new Ary<>(EXTLambda.class);
+    static void reset() {
+      EXT_ALIASES = BitsAlias.EMPTY;
+      EXT_FIDXS = BitsFun.EMPTY;
+      FREEZE_DEPS.clear();
+      EXT_DEPS.clear();
+      EXTS.clear();
+      // Default, external 1,2,3 arg functions
+      EXTS.push(null);
+      EXTS.push(new EXTLambda(T2.make_fun(T2.make_leaf()),null)); 
+      EXTS.push(new EXTLambda(T2.make_fun(T2.make_leaf(),T2.make_leaf()),null)); 
+      EXTS.push(new EXTLambda(T2.make_fun(T2.make_leaf(),T2.make_leaf(),T2.make_leaf()),null)); 
+    }
     public static BitsAlias ext_aliases() { return EXT_ALIASES; }
     public static BitsFun   ext_fidxs  () { return EXT_FIDXS  ; }
     private static <B extends Bits<B>> B add_ext( int x, Work<Syntax> work, B b ) {
@@ -1256,10 +1275,21 @@ public class HM {
     }
 
     static BitsFun matching_escaped_fidxs(T2 t2) {
+      assert t2.is_fun();
       BitsFun fidxs = BitsFun.EMPTY;
-      for( int fidx : EXT_FIDXS )
-        if( !t2.trial_unify(Lambda.FUNS.get(fidx).as_fun()) )
-          fidxs = fidxs.set(fidx); // Compatible escaping fidx
+      // Always poison the BitsFun with a FIDX which always has clr_cp/!_is_copy.
+      EXTLambda elam = Root.EXTS.atX(t2.nargs());
+      if( elam==null ) throw unimpl();
+      fidxs = fidxs.set(elam._fidx);
+      // Cannot ask for trial_unify until HM_FREEZE, because trials can fail
+      // over time which runs the result backwards in GCP.
+      if( HM_FREEZE )
+        for( int fidx : EXT_FIDXS ) {
+          Func fun = Lambda.FUNS.get(fidx);
+          // Dunno (yet), since trial_unify can pass, then filter as HM proceeds
+          if( !t2.trial_unify(fun.as_fun()) )
+            fidxs = fidxs.set(fidx); // Compatible escaping fidx
+        }
       return fidxs;
     }
 
@@ -1349,7 +1379,7 @@ public class HM {
     }
     @Override public String toString() { return "ext lambda"; }
     @Override public T2 as_fun() { return _t2.find(); }
-    @Override public int nargs() { return as_fun().size()-1; }
+    @Override public int nargs() { return as_fun().nargs(); }
     @Override public T2 targ(int argn) { throw unimpl(); }
     @Override public boolean arg_meet(int argn, Type t, Work<Syntax> work) { return false; }
     @Override public void apply_push(Apply aply, Work<Syntax> work) {
@@ -1521,7 +1551,7 @@ public class HM {
         if( work==null ) return true;
         if( ptr._args ==null ) ptr._args = new NonBlockingHashMap<>();
         ptr._args.put("*", rec = T2.make_leaf());
-        rec._deps = ptr._deps;  // TODO: stop sharing deps
+        rec._deps = ptr._deps.deepCopy();
       }
       
       // Add struct-ness
@@ -1634,21 +1664,27 @@ public class HM {
         for( Syntax ov : _overs )
           t = t.join(ov._flow);
         // TODO: Need the Powerset representation of FIDXS here.
-        // This is WRONG, in general
+        boolean multi=false;
         if( t instanceof TypeFunPtr tfp ) {
           BitsFun fidxs = BitsFun.EMPTY;
           // Repeat, but just looking at the FIDXS; take the meet and dual.
+          // Restriction to single-bits.
           for( Syntax ov : _overs ) {
-            BitsFun f2 = ov._flow instanceof TypeFunPtr tfp2
-              ? tfp2.pos()
-              : (ov._flow.above_center() ? BitsFun.NALL : BitsFun.EMPTY);
+            if( !(ov._flow instanceof TypeFunPtr tfp2) ) return t; // Give up the sharpening
+            BitsFun f2 = tfp2.pos();
+            if( f2.abit()== -1 ) multi=true;
             fidxs = fidxs.meet(f2);
           }
-          fidxs = fidxs.dual();
-          t = tfp.make_from(fidxs);
+          t = tfp.make_from(fidxs.dual());
         }
         if( t instanceof TypeMemPtr tmp ) throw unimpl();
+        if( !multi ) return t;
+        // Give up on JOIN, without PowerSet
+        t = TypeNil.XSCALAR;
+        for( Syntax ov : _overs )
+          t = t.meet(ov._flow);
         return t;
+       
       } else {
         // Resolved.  Take meet of all matching children.  Its either one, if
         // no error, or all of them if an error.
@@ -2183,8 +2219,7 @@ public class HM {
       t._is_obj = _is_obj;
       t._open = _open;
       t._is_copy = _is_copy;
-      // TODO: stop sharing _deps
-      t._deps = _deps;
+      t._deps = _deps==null ? null : _deps.deepCopy();
       t._err = _err;
       return t;
     }
@@ -2385,6 +2420,14 @@ public class HM {
     //  if( o instanceof T2 t2 ) return cycle_equals(t2);
     //  return false;
     //}
+    int nargs() {
+      assert is_fun();
+      for( int i=Lambda.ARGNAMES.length-1; i>=0; i-- )
+        if( arg(Lambda.ARGNAMES[i])!=null )
+          return i+1;
+      throw unimpl();
+    }
+    
 
     // -----------------
     // Worse-case arguments that the Root/Universe can call with.  Must be
@@ -2860,6 +2903,7 @@ public class HM {
           if( !over.trial_unify(that) ) { // If no error
             if( no_err!=null ) { no_err=this; break; } // Two or more no-errors: need to delay
             no_err = over; // Collect non-errors
+            that.push_update(over._deps); // If deps changes, and we no longer trial unify, need to revisit
           }
         }
       } else {                  // Resolved one-way already

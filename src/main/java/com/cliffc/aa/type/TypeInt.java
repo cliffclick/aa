@@ -40,11 +40,12 @@ public class TypeInt extends TypeNil<TypeInt> {
 
   static Type valueOfInt(String cid) {
     return switch(cid) {
-    case  "int64" ->  INT64;
-    case "~int64" ->  INT64.dual();
-    case  "int8"  ->  INT8 ;
-    case  "int1"  -> BOOL;
-    case "nint8"  -> NINT8 ;
+    case   "int64" ->  INT64;
+    case  "~int64" ->  INT64.dual();
+    case   "int8"  ->  INT8 ;
+    case   "int1"  -> BOOL;
+    case  "nint8"  -> NINT8 ;
+    case "~nint8"  -> NINT8.dual();
     default       -> null;
     };
   }
