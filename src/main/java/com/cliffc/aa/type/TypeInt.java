@@ -32,7 +32,8 @@ public class TypeInt extends TypeNil<TypeInt> {
     if( !(o instanceof TypeInt t2) ) return false;
     return super.equals(o) && _z==t2._z && _con==t2._con;
   }
-  @Override public boolean cycle_equals( Type o ) { return equals(o); }  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
+  @Override public boolean cycle_equals( Type o ) { return equals(o); }
+  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     if( _z==0 )
       return sb.p(_con);
     return _strn(sb).p("int").p(_z);
@@ -75,6 +76,7 @@ public class TypeInt extends TypeNil<TypeInt> {
   public  static final TypeInt C3    = con(3);
   public  static final TypeInt C123  = con(123456789L);
   static final TypeInt[] TYPES = new TypeInt[]{INT64,NINT64,INT32,INT16,INT8,NINT8,BOOL,TRUE,C3,C123};
+  static final TypeInt[][] MINMAX = new TypeInt[][]{ {make(false,false,false,1,0),make(false,false,true,1,0)}, {make(false,true,false,1,0),make(false,true,true,1,0)} };
   static void init1( HashMap<String,Type> types ) {
     types.put("bool" ,BOOL);
     types.put("int1" ,BOOL);

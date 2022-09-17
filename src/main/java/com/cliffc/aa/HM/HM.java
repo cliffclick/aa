@@ -47,13 +47,16 @@ HM and GCP types fully support recursive/cyclic types.
 HM includes ad-hoc polymorphim via overloading.  A set of overloads are
 unambiguously resolved to a single type, or else error-typed as ambiguous.
 This is done by doing *trial-unifications* until only a single overload target
-resolves without an error.
+resolves without an error.  Unifying two overloads requires their parts to
+unify.
 
 HM errors keep all the not-unifiable types, all at once, as a special case of a
 union type.  Further unifications with the error either add a new not-unifiable
 type, or unify with one of the prior types.  These means that types can ALWAYS
 unify, including nonsensical unifications between e.g. the constant 5 and a
-struct @{ x,y }.  The errors are reported when a type prints.
+struct @{ x,y }.  The errors are reported when a type prints.  If the program
+contains an error that is not printed at the top-level, then the error code is
+dead and the program is considered well typed.
 
 Unification typically makes many temporary type-vars and immediately unifies
 them.  For efficiency, this algorithm checks to see if unification requires an
@@ -99,6 +102,10 @@ improve the GCP type on a per-call-site basis.
 Also for HM->GCP, the HM types are used to constrain the GCP types that can
 call any escaped function.  You can think of this as using HM "module types" to
 derive the GCP calling types.
+
+Also for HM->GCP, Overloads produce a GCP Union before the overload resolves,
+one Type for each choice.  Once HM resolves the Overload the correct Type is
+used instead.
 
 Test case 45 demonstrates this combined algorithm, with a program which can
 only be typed using the combination of GCP and HM.
@@ -567,6 +574,8 @@ public class HM {
     private static int CNT=1;
     final int _uid=CNT++;
     @Override public int getAsInt() { return _uid; }
+    Syntax() { this(TypeNil.XSCALAR); }
+    Syntax(Type init_t) { _flow=init_t; }
 
     Syntax _par;                // Parent in the AST
     VStack _nongen;             // Non-generative type variables
@@ -604,7 +613,6 @@ public class HM {
     final void prep_tree_impl( Syntax par, VStack nongen, Work<Syntax> work, T2 t ) {
       _par = par;
       _hmt = t;
-      _flow= TypeNil.XSCALAR;
       _nongen = nongen;
       work.add(this);
     }
@@ -644,7 +652,7 @@ public class HM {
 
   static class Con extends Syntax {
     final Type _con;
-    Con(Type con) { super(); _con=con; }
+    Con(Type con) { super(con); _con=con; }
     @Override SB str(SB sb) { return p1(sb,null); }
     @Override SB p1(SB sb, VBitSet dups) { return sb.p(_con.toString()); }
     @Override SB p2(SB sb, VBitSet dups) { return sb; }
@@ -676,7 +684,6 @@ public class HM {
       _idx = idx;
       _idt = idt;
       _fresh = fresh;
-      _flow = TypeNil.XSCALAR;
       return this;
     }
     @Override SB str(SB sb) { return p1(sb,null); }
@@ -704,22 +711,47 @@ public class HM {
         T2 t2 = find();
         if( work!=null &&                       // Not testing
             Root.ext_fidxs().test(lam._fidx) ) {// defining Lambda escaped
-          // this argument is HM typed as a function or struct, so can be
+          // This argument is HM typed as a function or struct, so can be
           // called with any compatible external function or struct.
           if( t2.is_fun() && !lam.extsetf(_idx) ) { new EXTLambda(t2,work); work.addAll(Root.EXT_DEPS); }
           if( t2.is_ptr() && !lam.extsetp(_idx) ) { new EXTStruct(t2,work); work.addAll(Root.EXT_DEPS); }
         }
 
+        // Meet args across all Applys/Calls.
         for( Apply apl : lam._applys ) {
           Type x = apl instanceof Root
             ? lam.targ(_idx).as_flow(this,false) // Most conservative arg
+            // Missing args are XSCALAR here, reported as error later.
             : (_idx < apl._args.length ? apl._args[_idx]._flow : TypeNil.XSCALAR);
           lam.arg_meet(_idx, x, work);
         }
+        // Return GCP arg type from meet across all calls
         return lam._types[_idx];
       }
       // Else a Let
-      return ((Let)_def)._def._flow;
+      Syntax def = ((Let)_def)._def;
+      Type dt = def._flow;
+      //if( !(dt instanceof TypeTuple tt) )
+      //  return dt;              // Not an overloaded result
+      //// An overloaded Let result; it may never resolve, although this of it might
+      //T2 deft2 = def.find();
+      //if( !deft2.is_over() || deft2.size()!=tt.len() )
+      //  throw unimpl(); //return tt; // CNC Can i resolve this
+      //
+      //// Sharpen a not-resolved overload.  Happens for overloads only used by
+      //// fresh-unify, i.e. all Let ids.
+      //Type rez=null;
+      //for( String id : deft2._args.keySet() ) {
+      //  T2 over = deft2.arg(id);
+      //  if( !over.trial_unify(t2) ) {
+      //    Type t0 = tt._ts[Integer.parseInt(id.substring(1))];
+      //    if( rez==null ) rez = t0;
+      //    else return _flow;
+      //  }
+      //}
+      //// Found a single matching key
+      //return rez;
+      throw unimpl();
     }
     @Override int prep_tree( Syntax par, VStack nongen, Work<Syntax> work ) {
       prep_tree_impl(par,nongen,work,T2.make_leaf());
@@ -754,8 +786,10 @@ public class HM {
     final int _fidx;            // Unique function idx
     final Ary<Apply> _applys;   // Applys using this Lambda
     static final String[] ARGNAMES = new String[]{" x"," y"," z"};
+    static private int xfidx;
 
     Lambda(Syntax body, String... args) {
+      super(TypeFunPtr.makex(BitsFun.make0(xfidx=BitsFun.new_fidx()),args.length+DSP_IDX,Type.ANY,TypeNil.XSCALAR));
       _args=args;
       _body=body;
       // Type variables for all arguments
@@ -770,9 +804,8 @@ public class HM {
       _refs = new Ident[args.length][];
       _applys = new Ary<>(Apply.class);
       // A unique FIDX for this Lambda
-      _fidx = BitsFun.new_fidx();
+      _fidx = xfidx;
       FUNS.put(_fidx,this);
-      _flow = TypeFunPtr.makex(BitsFun.make0(_fidx),_args.length+DSP_IDX,Type.ANY,TypeNil.XSCALAR);
     }
     @Override SB str(SB sb) {
       sb.p("{ ");
@@ -952,6 +985,7 @@ public class HM {
     final Syntax[] _args;
     private Type _old_lift = Type.ANY; // Assert that apply-lift is monotonic
 
+    Apply(Type flow, Syntax fun) { super(flow); _fun = fun; _args = new Syntax[0]; }
     Apply(Syntax fun, Syntax... args) { _fun = fun; _args = args; }
     @Override SB str(SB sb) {
       _fun.str(sb.p("(")).p(" ");
@@ -1035,24 +1069,25 @@ public class HM {
 
     @Override Type val(Work<Syntax> work) {
       Type flow = _fun._flow;
+      if( flow instanceof TypeUnion ) throw unimpl();
       if( !(flow instanceof TypeFunPtr tfp) ) return flow.oob(TypeNil.SCALAR);
       if( !tfp.is_empty() ) {   // Nothing being called
         // If the input function is an overloaded function, and resolved by HMT
         // trim the functions down (and sharpen the return type).
         T2 t2fun = _fun.find();
-        if( tfp.pos().above_center() ) {
-          // Look at the overloaded choices and see if we can resolve
-          Func lam1=null;
-          for( int fidx : tfp.pos() ) {
-            Func lam = Lambda.FUNS.get(fidx);
-            T2 ffun = lam.as_fun();
-            if( !t2fun.trial_unify(ffun) )
-              if( lam1==null ) lam1=lam;
-              else { lam1=null; break; } // Not resolved yet
-          }
-          if( lam1!=null ) // Found exactly one resolvable HMT choice
-            tfp = (TypeFunPtr)tfp.meet(((Lambda)lam1)._flow);
-        }
+        //if( tfp.pos().above_center() ) {
+        //  // Look at the overloaded choices and see if we can resolve
+        //  Func lam1=null;
+        //  for( int fidx : tfp.pos() ) {
+        //    Func lam = Lambda.FUNS.get(fidx);
+        //    T2 ffun = lam.as_fun();
+        //    if( !t2fun.trial_unify(ffun) )
+        //      if( lam1==null ) lam1=lam;
+        //      else { lam1=null; break; } // Not resolved yet
+        //  }
+        //  if( lam1!=null ) // Found exactly one resolvable HMT choice
+        //    tfp = (TypeFunPtr)tfp.meet(((Lambda)lam1)._flow);
+        //}
         // Meet all calling arguments over all called function args.  Lazily
         // building a call-graph, needed to track arg_meet.  We got here
         // because, e.g. _fun._flow added some more functions, all those new
@@ -1205,7 +1240,7 @@ public class HM {
     static void add_ext_alias(int alias, Work<Syntax> work) { EXT_ALIASES = add_ext(alias,work,EXT_ALIASES); }
     static void add_ext_fidx (int fidx , Work<Syntax> work) { EXT_FIDXS   = add_ext(fidx ,work,EXT_FIDXS  ); }
 
-    public Root(Syntax body) { super(body); }
+    public Root(Syntax body) { super(Type.ANY,body); }
     @Override boolean hm(final Work<Syntax> work) {
       assert debug_find()==_fun.debug_find();
       return false;
@@ -1236,12 +1271,13 @@ public class HM {
       // Revisit fields depending on escaped values
       work.addAll(EXT_DEPS);
     }
+    
     Type flow_type() { return sharpen(((TypeTuple)_flow)._ts[0]); }
+    
     @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
       prep_tree_impl(par,nongen,work,null);
       int cnt = 1+_fun.prep_tree(this,nongen,work);
       _hmt = _fun.find();
-      _flow = Type.ANY;
       return cnt;
     }
 
@@ -1638,7 +1674,11 @@ public class HM {
   // type.
   static class Overload extends Syntax {
     final Syntax[] _overs;
-    Overload( Syntax[] overs ) { assert overs.length>1; _overs =overs; }
+    Overload( Syntax[] overs ) {
+      super(type(overs));
+      assert overs.length>1;
+      _overs =overs;
+    }
     @Override SB str(SB sb) {
       sb.p("&[ ");
       for( Syntax fun : _overs)
@@ -1653,41 +1693,50 @@ public class HM {
     }
     @Override boolean hm(Work<Syntax> work) { return false; }
     @Override void add_hm_work( @NotNull Work<Syntax> work) { work.add(_par); }
+    private static Type type( Syntax[] overs ) {
+      Type u = TypeNil.SCALAR;
+      for( Syntax over : overs )
+        u = u.join(over._flow);
+      assert u instanceof TypeUnion;
+      return u;
+    }
+   
     @Override Type val(Work<Syntax> work) {
       // If not resolved, the overload is still pending; take the join of children.
       // If resolved to a single child, take that child.
       // If resolved to all children, the overload is in error; take the meet of children.
       T2 over = find();
       T2 rez = over.is_over() ? over.arg("&&") : over; // Can be resolved and folded away
-      if( rez==null ) {         // Not resolved, take the join
-        Type t = TypeNil.SCALAR;
-        for( Syntax ov : _overs )
-          t = t.join(ov._flow);
-        // TODO: Need the Powerset representation of FIDXS here.
-        boolean multi=false;
-        if( t instanceof TypeFunPtr tfp ) {
-          BitsFun fidxs = BitsFun.EMPTY;
-          // Repeat, but just looking at the FIDXS; take the meet and dual.
-          // Restriction to single-bits.
-          for( Syntax ov : _overs ) {
-            if( !(ov._flow instanceof TypeFunPtr tfp2) ) return t; // Give up the sharpening
-            BitsFun f2 = tfp2.pos();
-            if( f2.abit()== -1 ) multi=true;
-            fidxs = fidxs.meet(f2);
-          }
-          t = tfp.make_from(fidxs.dual());
-        }
-        if( t instanceof TypeMemPtr tmp ) throw unimpl();
-        if( !multi ) return t;
-        // Give up on JOIN, without PowerSet
-        t = TypeNil.XSCALAR;
-        for( Syntax ov : _overs )
-          t = t.meet(ov._flow);
-        return t;
+      if( rez==null ) {         // Not resolved, produce a tuple
+        return type(_overs);
+        //Type t = TypeNil.SCALAR;
+        //for( Syntax ov : _overs )
+        //  t = t.join(ov._flow);
+        //// TODO: Need the Powerset representation of FIDXS here.
+        //boolean multi=false;
+        //if( t instanceof TypeFunPtr tfp ) {
+        //  BitsFun fidxs = BitsFun.EMPTY;
+        //  // Repeat, but just looking at the FIDXS; take the meet and dual.
+        //  // Restriction to single-bits.
+        //  for( Syntax ov : _overs ) {
+        //    if( !(ov._flow instanceof TypeFunPtr tfp2) ) return t; // Give up the sharpening
+        //    BitsFun f2 = tfp2.pos();
+        //    if( f2.abit()== -1 ) multi=true;
+        //    fidxs = fidxs.meet(f2);
+        //  }
+        //  t = tfp.make_from(fidxs.dual());
+        //}
+        //if( t instanceof TypeMemPtr tmp ) throw unimpl();
+        //if( !multi ) return t;
+        //// Give up on JOIN, without PowerSet
+        //t = TypeNil.XSCALAR;
+        //for( Syntax ov : _overs )
+        //  t = t.meet(ov._flow);
+        //return t;
        
       } else {
-        // Resolved.  Take meet of all matching children.  Its either one, if
-        // no error, or all of them if an error.
+        // Resolved.  Take meet of all matching children.  Should be exactly
+        // one, or if an error then all of them.
         Type t = TypeNil.XSCALAR;
         for( Syntax ov : _overs )
           if( ov.find()==rez )

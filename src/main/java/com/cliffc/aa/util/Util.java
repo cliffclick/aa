@@ -140,6 +140,14 @@ public class Util {
     add_hash(h3);
     return get_hash();
   }
+  static public long mix_hash( long h0, long h1, long h2, long h3, long h4 ) {
+    add_hash(h0);
+    add_hash(h1);
+    add_hash(h2);
+    add_hash(h3);
+    add_hash(h4);
+    return get_hash();
+  }
 
   static public int gcd(int x, int y) {
     if( x==0 || y== 0 ) return 0;

@@ -135,6 +135,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
 
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
+    if( _any ) sb.p('~');
     _pos.str(sb);
     sb.p('{');                  // Arg list start
     if( debug ) _dsp._str(visit,dups, sb, true, indent).p(",");
@@ -338,9 +339,11 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.NALL ,1,Type.ALL,Type.ALL);
   public  static final TypeFunPtr ARG2   =         make(BitsFun.NALL ,2,Type.ALL,Type.ALL);
-  public  static final TypeFunPtr THUNK  = (TypeFunPtr)make(BitsFun.NALL ,3,Type.ALL,Type.ALL).meet(TypeNil.XNIL); // zero-arg function (plus ctrl, mem, display)
+  public  static final TypeFunPtr THUNK  =         make(false,false,false,BitsFun.NALL ,3,Type.ALL,Type.ALL); // zero-arg function (plus ctrl, mem, display)
   public  static final TypeFunPtr EMPTY  =         make(BitsFun.EMPTY,1,Type.ANY,Type.ANY);
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,ARG2,THUNK};
+  private static final TypeFunPtr FMINMAX = make(BitsFun.EMPTY,999,Type.ANY,Type.ANY);
+  static final TypeFunPtr[][] MINMAX = new TypeFunPtr[][]{ {FMINMAX.make_from(false,false,false),FMINMAX.make_from(false,false,true)}, {FMINMAX.make_from(false,true,false),FMINMAX.make_from(false,true,true)} };
 
   @Override protected TypeFunPtr xdual() {
     boolean xor = _nil == _sub;

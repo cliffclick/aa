@@ -375,10 +375,11 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // Collections of Scalars, Memory, Fields.  Not Nilable.
   static final byte TSTRUCT =12; // Memory Structs; tuples with named fields
   static final byte TTUPLE  =13; // Tuples; finite collections of unrelated Types, kept in parallel
-  static final byte TARY    =14; // Tuple of indexed fields; only appears in a TSTRUCT
-  static final byte TFLD    =15; // Fields in structs
-  static final byte TMEM    =16; // Memory type; a map of Alias#s to TOBJs
-  static final byte TLAST   =17; // Type check
+  static final byte TUNION  =14; // Union of each primitive type
+  static final byte TARY    =15; // Tuple of indexed fields; only appears in a TSTRUCT
+  static final byte TFLD    =16; // Fields in structs
+  static final byte TMEM    =17; // Memory type; a map of Alias#s to TOBJs
+  static final byte TLAST   =18; // Type check
 
   // Object Pooling to handle frequent (re)construction of temp objects being
   // interned.  This is a performance hack and a big one: big because its
@@ -520,12 +521,15 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     if(   is_simple() ) return this.xmeet(t   );
     if( t.is_simple() ) return t   .xmeet(this);
     // Triangulate on is_nil without being the same class
-    if( is_nil() && t.is_nil() ) {
-      TypeNil t0 = (TypeNil)this;
-      TypeNil t1 = (TypeNil)t   ;
-      if( t0._type==TNIL ) return t0.nmeet(t1); // LHS is TypeNil directly
+    if( this instanceof TypeNil t0 && t instanceof TypeNil t1 ) {
+      // Unions absorb non-union
+      if( t0 instanceof TypeUnion tu0 ) return tu0.umeet(t1);
+      if( t1 instanceof TypeUnion tu1 ) return tu1.umeet(t0);
+      // LHS is TypeNil directly
+      if( t0._type==TNIL ) return t0.nmeet(t1); 
       if( t1._type==TNIL ) return t1.nmeet(t0);
-      return t0.cross_nil(t1);  // Mis-matched TypeNil subclasses
+      // Mis-matched TypeNil subclasses
+      return t0.cross_nil(t1);
     }
     // Spray TypeNil across fields in a TypeStruct
     if( this instanceof TypeNil tn && t    instanceof TypeStruct ts ) return ts.nmeet(tn);
@@ -607,6 +611,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     concat(ts,TypeMem   .TYPES);
     concat(ts,TypeStruct.TYPES);
     concat(ts,TypeTuple .TYPES);
+    concat(ts,TypeUnion .TYPES);
     // Partial order Sort, makes for easier tests later.  Arrays.sort requires
     // a total order (i.e., the obvious Comparator breaks the sort contract),
     // so we hand-roll a simple bubble sort.

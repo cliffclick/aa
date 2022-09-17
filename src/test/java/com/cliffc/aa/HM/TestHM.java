@@ -28,7 +28,7 @@ public class TestHM {
     DO_HMT=true;
     DO_GCP=true;
     RSEED=0;
-    test58();
+    test83();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -1194,8 +1194,8 @@ A:*@{
          "  { x -> (f* x 3.0) };"+  // Arg is 'flt'
          " ]",
          "&[ {int64 -> int64}; {flt64 -> flt64} ]",
-         "[~23+26]{any,3 ->~Scalar0 }", // TODO: [~23+26] need PowerSet to gain precision here
-         null,"[23,26]"
+         "[~23+25]{any,3 ->~Scalar0 }", // TODO: [~23+26] need PowerSet to gain precision here
+         null,"[23,25]"
         );
   }
 
@@ -1447,6 +1447,39 @@ fact = { n -> (if n.is0 c1 (n.mul (fact n.sub1))) };
         "A:*@{i=int64; is0=int1; mul = {A->A}; sub1=A }",
         "PA:*[8]@{^=any; i=int64; is0=int1; mul=[~31+34]{any,3 ->*[]( ...) }; sub1=PA}",
         "[4,8,10,11]","[31,34]");
+  }
+
+  // Test overload as union of primitives
+  @Ignore @Test public void test97() {
+    rune("red=&[ 123; \"red\" ]; (pair (dec red) (isempty red))",
+         "*(int64,int1)",
+         "*(int64,int1)",
+         "*[7](^=any,122,0)",
+         "*[7](^=any,~int64,~Scalar)",
+         null,null);
+  }
+
+  // Test overload as union of primitives
+  @Ignore @Test public void test98() {
+    rune("{ pred -> red=(if pred &[ 123; \"red\" ] &[ 456; \"blue\" ]); (pair (dec red) (isempty red))}",         
+         "*(int64,int1)",
+         "*(int64,int1)",
+         "*[7](^=any,122,0)",
+         "*[7](^=any,~int64,~Scalar)",
+         null,null);
+  }
+
+  // Test overload as union of primitives
+  @Ignore @Test public void test99() {
+    rune("fun = { a0 -> (dec a0) }; "               + // a0 is an int
+         "(pair (fun &[ 0x123; \"abc\" ]        );" + // Correct overload is 0x123
+         "      (fun &[ \"def\"; @{x=1}; 0x456 ])"  + // Correct overload is 0x456
+         ")",
+         "*(int64,int1)",
+         "*(int64,int1)",
+         "*[7](^=any,122,0)",
+         "*[7](^=any,~int64,~Scalar)",
+         null,null);
   }
 
 }

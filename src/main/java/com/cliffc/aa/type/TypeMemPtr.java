@@ -49,11 +49,11 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     return Cyclic._path_diff(_obj,((TypeMemPtr)t)._obj,links);
   }
 
-  @Override long static_hash() { return Util.mix_hash(super.static_hash(),_aliases._hash,_obj._type); }
+  @Override long static_hash() { return Util.mix_hash(super.static_hash(),_aliases._hash); }
 
   // Static properties equals.  Already known to be the same class and
   // not-equals.  Ignore edges.
-  @Override boolean static_eq(TypeMemPtr t) { return super.static_eq(t) && _aliases == t._aliases && _obj._type == t._obj._type; }
+  @Override boolean static_eq(TypeMemPtr t) { return super.static_eq(t) && _aliases == t._aliases; }
 
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -78,6 +78,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   }
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
+    if( _any ) sb.p('~');
     sb.p('*');
     if( debug ) _aliases.str(sb);
     sb = _obj._str(visit,dups, sb, debug, indent);
@@ -164,6 +165,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public  static final TypeMemPtr STRPTR = make_str(TypeInt.INT8); // For legacy HM tests
 
   static final Type[] TYPES = new Type[]{ISUSED0,EMTPTR,DISPLAY,DISPLAY_PTR};
+  static final TypeMemPtr[][] MINMAX = new TypeMemPtr[][]{ {EMTPTR.make_from(false,false,false),EMTPTR.make_from(false,false,true)}, {EMTPTR.make_from(false,true,false),EMTPTR.make_from(false,true,true)} };
 
   @Override protected TypeMemPtr xdual() {
     BitsAlias ad = _aliases.dual();

@@ -12,17 +12,11 @@ import static org.junit.Assert.assertTrue;
 public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
-    int a = BitsFun.new_fidx();
-    int b = BitsFun.new_fidx();
-    int c = BitsFun.new_fidx();
-    int d = BitsFun.new_fidx();
-    BitsFun ab = BitsFun.make0(a,b).dual();
-    BitsFun ac = BitsFun.make0(a,c).dual();
-    BitsFun mt = ab.meet(ac);   // Since both high, keeps intersection
-    BitsFun jn = (BitsFun)ab.join(ac);
-    //BitsFun diff = (BitsFun)jn.subtract(mt).dual();
-
-    //assertTrue(mt==jn);
+    Type t0 = TypeNil.XNIL;
+    Type t1 = TypeInt.INT8.dual();
+    Type t2 = t0.meet(t1);
+    Type t3 = null; // if T?F go to TFF
+    //assertEquals(t3,t2);
   }
 
   @Test public void testTFPChain() {
@@ -302,7 +296,8 @@ public class TestType {
     // Crossing ints and *[ALL]+null
     Type  i8 = TypeInt.INT8;
     Type xi8 = i8.dual();
-    assertEquals( TypeNil.make(false,true,true), xi8.meet(xmem0)); // ~OOP+0 & ~i8 -> 0+Scalar
+    Type tu = TypeInt.INT64._dual.meet(TypeFlt.FLT64._dual);
+    assertEquals( tu, xi8.meet(xmem0)); // ~OOP+0 & ~i8 -> &[0+int1 0+flt32  highest_low_tmp highest_low_tfp ]
   }
 
   // Old model: fields are ordered, and are MEETd in order.  If fields at the
@@ -367,7 +362,8 @@ public class TestType {
     int fidx0 = f1i2i.fidx();
     int fidx1 = f1f2f.fidx();
     BitsFun funs = BitsFun.make0(fidx0).meet(BitsFun.make0(fidx1));
-    TypeFunPtr f3i2r = TypeFunPtr.make(funs,2,NO_DISP,TypeNil.SCALAR);
+    Type tu = TypeInt.INT64.meet(TypeFlt.FLT64);
+    TypeFunPtr f3i2r = TypeFunPtr.make(funs,2,NO_DISP,tu);
     assertEquals(f3i2r,mt);
     assertTrue(f3i2r.isa(gf));
     assertTrue(f1i2i.isa(f3i2r));
@@ -460,7 +456,8 @@ public class TestType {
     assertEquals("v",mtab0.get("v")._fld);
     TypeMemPtr mtab1 = (TypeMemPtr)mtab0.at("n");
     assertTrue(mtab1._aliases.test(alias2)&& mtab1._aliases.test(alias5));
-    assertEquals(TypeNil.SCALAR,mtab0.at("v"));
+    Type tu = TypeInt.INT64.meet(TypeFlt.FLT64);
+    assertEquals(tu,mtab0.at("v"));
 
     // In the ptr/mem model, all Objs from the same NewNode are immediately
     // approximated by a single Alias#.  This stops any looping type growth.
@@ -486,6 +483,7 @@ public class TestType {
   // Test a cycle with two names on mismatched cycle boundaries
   @Test public void testNameCycle() {
     Object dummy0 = TypeMemPtr.DISPLAY_PTR; // Must <clinit> out of RECURSIVE_MEET
+    Object dummy1 = TypeFunPtr.EMPTY;       // Must <clinit> out of RECURSIVE_MEET
     // Make a cycle: 0_A: -> 1_(n=*,v=i64) -> 2_TMP -> 3_B: -> 4_(n=*,v=f64) -> 5_TMP ->
     // Dual; then meet ~4_() and ~0_A
     final int alias = BitsAlias.ALLX;
@@ -513,7 +511,9 @@ public class TestType {
     // Lose the names, but everything else stays high.
     Type mt = das1.meet(dbs4);  // ~ ~@{a join b, int join flt} ==> @{a join b, int32}
     TypeStruct smt = (TypeStruct)mt;
-    assertEquals(/*TypeNil.NIL*/TypeNil.make(false,true,true),smt.at("v"));// Mixing int/flt gives /*nil*/ 0+Scalar
+    // Meet of two high "v" fields
+    Type tu = TypeInt.INT64._dual.meet(TypeFlt.FLT64._dual);
+    assertEquals(tu,smt.at("v"));// Mixing int/flt gives /*nil*/ 0+Scalar
     TypeMemPtr smp = (TypeMemPtr)smt.at("n");
     assertEquals(smt,smp._obj);
     assertEquals(BitsAlias.NALL.dual(),smp._aliases);

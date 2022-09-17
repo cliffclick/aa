@@ -100,7 +100,7 @@ public interface Cyclic {
       if( t!=old ) SCC_FREE.push(t);
       t=old;
 
-    // Detect an scc change; we just ended walking an entire SCC
+    // Detect an SCC change; we just ended walking an entire SCC
     } else if( scc_leader != leader ) {
       // Just completed an entire SCC.  Hash it, install it.
       Ary<Type> ts = SCC_MEMBERS.at(scc_depth2);
@@ -190,7 +190,7 @@ public interface Cyclic {
     for( int idx=0; idx < REACHABLE._len; idx++ ) {
       Type t = REACHABLE.at(idx);
       assert t.interned() || t instanceof Cyclic;
-      if( !t.interned() && t instanceof Cyclic cyc )
+      if( !t.interned() && t instanceof Cyclic )
         t.walk((tc,ignore) -> {
             if( !ON_REACH.tset(tc._uid) && (!tc.interned() || also_interned) )
               REACHABLE.push(tc);
@@ -368,6 +368,15 @@ public interface Cyclic {
         TypeFunPtr tfp = (TypeFunPtr) h;
         _uid(_uid(tfp.fidxs().str(sb).p("{ "), tfp.dsp()).p(" -> "), tfp._ret).p(" }");
       }
+      case Type.TUNION -> {
+        TypeUnion tu = (TypeUnion) h;
+        sb.p("&[");
+        _uid(sb.p(" "),tu._int());
+        _uid(sb.p(" "),tu._flt());
+        _uid(sb.p(" "),tu._tmp());
+        _uid(sb.p(" "),tu._tfp());
+        sb.p("]");
+      }
       case Type.TARY -> throw unimpl();
       default -> h.str(sb, false, false);
       }
@@ -443,14 +452,13 @@ public interface Cyclic {
     static private final Ary<Ary<Type>> FREES0 = new Ary(new Ary[1],0);
 
     // use[edge]-->>def;
-    static Type add_def_use( Type use, String edge, Type def ) {
+    static void add_def_use(Type use, String edge, Type def ) {
       var edges = EDGES.get(def._uid);
       if( edges==null )
         EDGES.put(def._uid,edges = malloc());
       var uses = edges.get(edge);
       if( uses==null ) edges.put(edge,uses = malloc0());
       uses.push(use);
-      return null;
     }
 
     // Get an iterator for all the uses of a def with edge e
@@ -599,7 +607,7 @@ public interface Cyclic {
     return lk;
   }
 
-  Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links);
+  abstract Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links);
 
   // --------------------------------------------------------------------------
   class Prof {

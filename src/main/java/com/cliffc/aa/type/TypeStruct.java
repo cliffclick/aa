@@ -82,6 +82,19 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // Suitable for hacking fields.
   TypeStruct copy2() { return _copy().init(_clz,_def,TypeFlds.clone(_flds)); }
 
+  @Override public Cyclic.Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links) {
+    TypeStruct ts = (TypeStruct)t;
+    Cyclic.Link lk = null;
+    for( TypeFld fld0 : this ) {
+      TypeFld fld1 = ts.get(fld0._fld);
+      if( fld1==null ) throw unimpl(); // different here
+      Cyclic.Link dlk = Cyclic._path_diff(fld0,fld1,links);
+      if( dlk==null || dlk._t0==null ) continue; // No difference
+      lk = Cyclic.Link.min(lk,dlk); // Min depth
+    }
+    return lk;
+  }
+
   // --------------------------------------------------------------------------
   // Hash code computation and (cycle) Equals
 
@@ -226,8 +239,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // Used to make a few testing constants
   public static TypeStruct make_test( String fld_name, Type t, Access a ) { return make(TypeFld.make(fld_name,t,a)); }
 
-  // Primitive wrapper field name
-  public static final String CANONICAL_INSTANCE = "$";
   public static TypeStruct make_int(TypeInt ti) { return make("int:",ti); }
   public static TypeStruct make_flt(TypeFlt tf) { return make("flt:",tf); }
 
@@ -271,9 +282,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   public TypeStruct make_from(TypeFld[] flds) { return make0(_clz,_def,flds); }
 
   Type nmeet( TypeNil tn ) {
-    if( tn._type!=TNIL ) {
-      tn = TypeNil.make(false,tn._nil,tn._sub);
-    }
+    if( tn._type!=TNIL )
+      tn = tn.as_nil(); 
     if( tn._any ) { // PLAN A, simple
       TypeFld[] flds = TypeFlds.get(_flds.length);
       for( int i=0; i<flds.length; i++ )
@@ -286,7 +296,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
       return t;
     }
   }
-
   public void remove_dups() { _flds = remove_dups(_def,_flds); }
   public void remove_dups_hashcons() { _flds = TypeFlds.hash_cons(remove_dups(_def,_flds)); }
 
@@ -603,19 +612,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     for( int i=0; i<len(); i++ )
       _flds[i] = (TypeFld)map.map(_flds[i]);
   }
-  @Override public Cyclic.Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links) {
-    TypeStruct ts = (TypeStruct)t;
-    Cyclic.Link lk = null;
-    for( TypeFld fld0 : this ) {
-      TypeFld fld1 = ts.get(fld0._fld);
-      if( fld1==null ) throw unimpl(); // different here
-      Cyclic.Link dlk = Cyclic._path_diff(fld0,fld1,links);
-      if( dlk==null || dlk._t0==null ) continue; // No difference
-      lk = Cyclic.Link.min(lk,dlk); // Min depth
-    }
-    return lk;
-  }
-
   static boolean isDigit(char c) { return '0' <= c && c <= '9'; }
   public boolean is_tup() {
     if( len()==0 || (len()==1 && get("^")!=null) ) return true;

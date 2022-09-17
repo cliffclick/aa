@@ -61,7 +61,11 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
 
   // Static properties equals; edges are IGNORED.  Already known to be the same
   // class and not-equals.
-  boolean static_eq(N t) { return equals(t); }
+  boolean static_eq(N t) {
+    if( this==t ) return true;
+    if( _type != t._type ) return false;
+    return _any==t._any && _sub ==t._sub && _nil ==t._nil;
+  }
 
   static final String[][][] NSTRS = new String[][][]{
     {{ ""    , "n"},  // all, !nil, {!sub,sub}  AND, NOT
@@ -152,8 +156,8 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     boolean nil = _nil & tn._nil;
     boolean sub = _sub & tn._sub;
     if( !_any ) return make(any,nil,sub); // Falling past 'tn' to a low TypeNil
-    // If would fall to subtype YES-nil, fall to AND-nil instead
-    if( !sub ) nil=false;
+    // If type would fall to subtype YES-nil, fall to AND-nil instead
+    nil &= sub;
     return tn.make_from(any,nil,sub);
   }
 
@@ -164,8 +168,31 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     boolean any = false; // Unrelated sub-parts cannot keep their choices; falls to Scalar-plus-nil-whatever
     boolean nil = _nil & tn._nil;
     boolean sub = _sub & tn._sub;
-    return make(any,nil,sub);
+    int idxn = nil ? 1 : 0;
+    int idxs = sub ? 1 : 0;
+    TypeInt    int0= TypeInt   .MINMAX[idxn][idxs]; //.make(false,nil,sub,1,0);
+    TypeFlt    flt = TypeFlt   .MINMAX[idxn][idxs]; //.make(false,nil,sub,32,0);
+    TypeMemPtr tmp = TypeMemPtr.MINMAX[idxn][idxs]; //.EMTPTR.make_from(false,nil,sub);
+    TypeFunPtr tfp = TypeFunPtr.MINMAX[idxn][idxs]; //.make(BitsFun.EMPTY,999,Type.ANY,Type.ANY).make_from(false,nil,sub);
+    switch( this ) {
+    case TypeInt    tint: { int0=(TypeInt   )int0.meet(tint); break; }
+    case TypeFlt    tflt: { flt =(TypeFlt   )flt .meet(tflt); break; }
+    case TypeMemPtr ttmp: { tmp =(TypeMemPtr)tmp .meet(ttmp); break; }
+    case TypeFunPtr ttfp: { tfp =(TypeFunPtr)tfp .meet(ttfp); break; }
+    case TypeRPC    trpc: return make(any,nil,sub);
+    default: throw unimpl();
+    }
+    switch( tn ) {
+    case TypeInt    tint: { int0=(TypeInt   )int0.meet(tint); break; }
+    case TypeFlt    tflt: { flt =(TypeFlt   )flt .meet(tflt); break; }
+    case TypeMemPtr ttmp: { tmp =(TypeMemPtr)tmp .meet(ttmp); break; }
+    case TypeFunPtr ttfp: { tfp =(TypeFunPtr)tfp .meet(ttfp); break; }
+    case TypeRPC    trpc: return make(any,nil,sub);
+    default: throw unimpl();
+    }
+    return TypeUnion.make(any,nil,sub,int0,flt,tmp,tfp);
   }
+  TypeNil as_nil() { return make(false,_nil,_sub); }
 
   // Type must support a nil
   public boolean must_nil() { return !_sub; }
@@ -173,7 +200,7 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   @Override public boolean above_center() { return _any; }
 
   @Override public boolean is_con() { return this==XNIL || this==NIL; }
-  
+
   @Override public Type widen() { return this; }
 
   // Parser init
