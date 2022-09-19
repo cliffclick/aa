@@ -14,7 +14,7 @@ public class TypeRPC extends TypeNil<TypeRPC> {
     _rpcs = rpcs;
     return this;
   }
-  @Override public long static_hash( ) { return ((TRPC + _rpcs._hash)<<1)|1; }
+  @Override public long static_hash( ) { return ((TRPC + (long)_rpcs._hash)<<1)|1; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !super.equals(o) || !(o instanceof TypeRPC rpc) ) return false;
@@ -24,14 +24,24 @@ public class TypeRPC extends TypeNil<TypeRPC> {
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    if( _any && _rpcs==BitsRPC.EMPTY ) sb.p('~');
+    if( _any ) sb.p('~');
     return _str_nil(_rpcs.str(sb.p("#")));
   }
 
-  static { new Pool(TRPC,new TypeRPC()); }
-  public static TypeRPC make( boolean any, boolean nil, boolean sub, BitsRPC rpcs ) {
-    return POOLS[TRPC].<TypeRPC>malloc().init(any,nil,sub,rpcs).hashcons_free();
+  static TypeRPC valueOf(Parse P, String cid, boolean any) {
+    P.require('#');
+    var rpcs = P.bits(BitsRPC.EMPTY);
+    assert any==rpcs.above_center() || rpcs.is_empty();
+    TypeRPC rpc = malloc(any, rpcs.test(0),true, rpcs.clear(0));
+    if( cid!=null ) P._dups.put(cid,rpc);
+    return rpc.val_nil(P);
   }
+
+  static { new Pool(TRPC,new TypeRPC()); }
+  public static TypeRPC malloc( boolean any, boolean nil, boolean sub, BitsRPC rpcs ) {
+    return POOLS[TRPC].<TypeRPC>malloc().init(any,nil,sub,rpcs);
+  }
+  public static TypeRPC make( boolean any, boolean nil, boolean sub, BitsRPC rpcs ) { return malloc(any,nil,sub,rpcs).hashcons_free(); }
   @Override TypeRPC make_from( boolean any, boolean nil, boolean sub ) { return make(any,nil,sub,_rpcs); }
 
   public static TypeRPC make( int rpc ) { return make(false,false,true,BitsRPC.make0(rpc)); }

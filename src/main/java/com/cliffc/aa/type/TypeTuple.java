@@ -43,7 +43,7 @@ public class TypeTuple extends Type<TypeTuple> {
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     if( _any ) sb.p('~');
-    sb.p('(');
+    sb.p('{');
     if( _ts!=null && _ts.length>0 ) { // No commas for zero-length
       int j = _ts.length-1;     // Find length of trailing equal parts
       Type last = _ts[j];       // Last type
@@ -54,7 +54,24 @@ public class TypeTuple extends Type<TypeTuple> {
       if( j+2<_ts.length-1 )  sb.p("..."); // Abbreviate tail
       if( _ts.length> j+2 ) last._str(visit,dups, sb.p(','), debug, indent);
     }
-    return sb.p(')');
+    return sb.p('}');
+  }
+
+  static TypeTuple valueOf(Parse P, String cid, boolean any) {
+    P.require('{');
+    Type[] ts = Types.get(10);
+    int i=0;
+    while(true) {
+      ts[i++] = P.type(null,false,-1);
+      if( !P.peek(',') ) break;
+    }
+    Type[] ts0 = Types.get(i);
+    System.arraycopy(ts,0,ts0,0,i);
+    Types.free(ts);
+    TypeTuple tt = make0(any,ts0);
+    if( cid!=null ) P._dups.put(cid,tt);
+    P.require('}');
+    return tt;
   }
 
   static { new Pool(TTUPLE,new TypeTuple()); }

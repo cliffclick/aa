@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.util.*;
 
 import java.util.HashMap;
@@ -87,25 +88,25 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
 
   @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return _obj._str_complex(visit,dups); }
 
-  static TypeMemPtr valueOf(Parse P, String cid) {
+  static TypeMemPtr valueOf(Parse P, String cid, boolean any) {
     P.require('*');
     var aliases = P.bits(BitsAlias.EMPTY);
-    TypeMemPtr tmp = malloc(aliases.test(0),aliases.clear(0),null);
+    assert any==aliases.above_center() || aliases.is_empty();
+    TypeMemPtr tmp = malloc(any, aliases.test(0),aliases.clear(0),null);
     if( cid!=null ) P._dups.put(cid,tmp);
+    assert !tmp.interned();
     tmp._obj = (TypeStruct)P.type();
-    if( P.peek('?') )
-      tmp = (TypeMemPtr)tmp.meet(TypeNil.XNIL);
-    return tmp;
+    return tmp.val_nil(P);
   }
 
 
   static { new Pool(TMEMPTR,new TypeMemPtr()); }
-  public static TypeMemPtr malloc(boolean nil, BitsAlias aliases, TypeStruct obj ) {
+  public static TypeMemPtr malloc(boolean any, boolean nil, BitsAlias aliases, TypeStruct obj ) {
     TypeMemPtr t1 = POOLS[TMEMPTR].malloc();
-    return t1.init(aliases.above_center(),nil,aliases,obj);
+    return t1.init(any,nil,aliases,obj);
   }
   public static TypeMemPtr make(boolean nil, BitsAlias aliases, TypeStruct obj ) {
-    return malloc(nil,aliases,obj).hashcons_free();
+    return malloc(aliases.above_center(),nil,aliases,obj).hashcons_free();
   }
   public static TypeMemPtr malloc(boolean any, boolean nil, boolean sub, BitsAlias aliases, TypeStruct obj ) {
     TypeMemPtr t1 = POOLS[TMEMPTR].malloc();
@@ -133,7 +134,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public static TypeMemPtr make_str(String s) { return make_str(TypeInt.con(s.length()>0 ? s.charAt(0):0)); }
   public static TypeMemPtr make_str(Type t) { return make_str(BitsAlias.make0(STR_ALIAS),t); }
   public static TypeMemPtr make_str(BitsAlias aliases, Type t) {
-    TypeStruct ts = TypeStruct.make("str:",t);
+    TypeStruct ts = TypeStruct.make(TypeFld.ANY_DSP,TypeFld.make_tup(t, AA.ARG_IDX)).set_name("str:");
     return TypeMemPtr.make(aliases.test(0),aliases.clear(0),ts);
   }
   public boolean is_str() { return Util.eq(_obj._clz,"str:"); }
@@ -152,7 +153,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     TypeFld[] flds = TypeFlds.make(DISP_FLD);
     TypeStruct.RECURSIVE_MEET--;
     DISPLAY = TypeStruct.malloc("",Type.ALL,flds);
-    DISPLAY_PTR = malloc(false,BitsAlias.NALL,DISPLAY);
+    DISPLAY_PTR = malloc(false,false,BitsAlias.NALL,DISPLAY);
     DISP_FLD.setX(DISPLAY_PTR);
     TypeStruct ds = Cyclic.install(DISPLAY);
     assert ds==DISPLAY;
@@ -292,6 +293,8 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
         fidxs = fidxs.meet(tmem.at(alias)._all_reaching_fidxs(tmem));
     return fidxs;
   }
+
+  private static boolean above_center( BitsAlias aliases ) { return aliases.above_center(); }
 
   @Override public Type widen() { return this; }
 

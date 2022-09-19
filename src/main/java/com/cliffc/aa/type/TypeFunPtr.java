@@ -149,19 +149,20 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
 
   @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return _ret._str_complex(visit,dups); }
 
-  static TypeFunPtr valueOf(Parse P, String cid) {
+  static TypeFunPtr valueOf(Parse P, String cid, boolean any) {
     BitsFun pos = P.bits(BitsFun.EMPTY);
+    assert any==pos.above_center();
     if( P.peek('+') ) throw unimpl();
     P.require('{');
     TypeFunPtr tfp = malloc(pos,0,null,null);
     if( cid!=null ) P._dups.put(cid,tfp);
     tfp.set_dsp(P.type());
     P.require(',');
-    tfp._nargs = (int)P.num();
+    tfp._nargs = (int)P._num();
     P.require('-');  P.require('>');
     tfp._ret = P.type();
     P.require('}');
-    return tfp;
+    return tfp.val_nil(P);
   }
 
 

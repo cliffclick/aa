@@ -39,10 +39,10 @@ public class TypeAry extends Type<TypeAry> implements Cyclic {
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     sb.p('[');
-    if( _len!=null && _len != TypeInt.INT64 ) sb.p(_len);
+    if( _len!=null && _len != TypeInt.INT64 ) _len._str(visit,dups,sb,debug,indent);
     sb.p(']');
-    if( _elem !=null ) sb.p(_elem);
-    if( _elem != _stor && _stor!=null ) sb.p('/').p(_stor);
+    if( _elem !=null ) _elem._str(visit,dups,sb,debug,indent);
+    if( _elem != _stor && _stor!=null ) _stor._str(visit,dups,sb.p('/'),debug,indent);
     return sb;
   }
 

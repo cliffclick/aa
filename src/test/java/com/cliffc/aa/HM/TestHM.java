@@ -26,9 +26,9 @@ public class TestHM {
     JIG=true;
 
     DO_HMT=true;
-    DO_GCP=true;
+    DO_GCP=false;
     RSEED=0;
-    test83();
+    test06();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -92,12 +92,12 @@ public class TestHM {
 
   @Test public void test02() { rune( "{ x -> (pair 3 x) }" ,
                                      "{ A -> *( 3, A) }",
-                                     "[23]{any,3 -> *[7](^=any,3,Scalar)}",
+                                     "[23]{any,3 -> *[7](3,Scalar)}",
                                      "[7]", "[23]" ); }
 
   @Test public void test03() { rune( "{ z -> (pair (z 0) (z \"abc\")) }" ,
                                     "{ { *str:(97)? -> A } -> *( A, A) }",
-                                    "[23]{any,3 ->*[7](^=any, Scalar, Scalar) }",
+                                    "[23]{any,3 ->*[7](Scalar, Scalar) }",
                                     "[7]", "[23,24]" );
   }
 
@@ -114,8 +114,8 @@ public class TestHM {
     rune("({ id -> (pair (id 3) (id 5) ) } {x->x})",
          "*( nint8, nint8)",   // HMT result type, using both GCP + HMT
          "*( nint8, nint8)",   // HMT result type, HMT alone
-         "*[7](^=any, 3, 5)",  // GCP result type, using both GCP + HMT
-         "*[7](^=any, nint8, nint8)", // GCP result type, GCP alone
+         "*[7](3, 5)",  // GCP result type, using both GCP + HMT
+         "*[7](nint8, nint8)", // GCP result type, GCP alone
           "[7]",null);
   }
 
@@ -125,9 +125,9 @@ public class TestHM {
          "*( 3, *str:(97))",
          "*( 3, *str:(97))",
          // GCP with HM
-         "*[7](^=any, 3, *[4]str:(, 97))",
-         // GCP is weaker without HM
-         "*[7](^=any, nScalar, nScalar)",
+         "*[7](3, *[4]str:(97))",
+         // GCP is weaker without HM, reports error tuple
+         "*[7]( &[nint8 & nflt32 & PA:*[4]str:( 97) & XA:[]{any,999 ->any } ],  &[nint8 & nflt32 & PA & XA ])",
          "[4,7]", null );
   }
 
@@ -160,7 +160,7 @@ public class TestHM {
   // example that demonstrates generic and non-generic variables:
   @Test public void test09() { rune( "{ g -> f = { ignore -> g }; (pair (f 3) (f \"abc\"))}",
                                      "{ A -> *( A, A) }",
-                                     "[25]{any,3 ->*[7](^=any, Scalar, Scalar) }",
+                                     "[25]{any,3 ->*[7](Scalar, Scalar) }",
                                      "[4,7]","[25]"); }
 
   @Test public void test10() { rune( "{ f g -> (f g)}",
@@ -191,8 +191,8 @@ public class TestHM {
          "(pair ((map str) 5) ((map factor) 2.3))",
          "*( *str:(int8), flt64)",
          "*( *str:(int8), flt64)",
-         "*[7](^=any, *[4]str:(, int8), flt64)",
-         "*[7](^=any, Scalar, Scalar)",
+         "*[7](*[4]str:(, int8), flt64)",
+         "*[7]( &[int1 & flt64 & PA:*[4]str:(, int8)? & XA:[]{any,999 ->any }? ]?,  &[int1 & flt64 & PA & XA ]?)",
          "[4,7]",null);
   }
 
@@ -200,14 +200,14 @@ public class TestHM {
   @Test public void test15() { run("map = { fun x -> (fun x)}; (map {a->3} 5)", "3", "3"); }
 
   // map takes a function and an element (collection?) and applies it (applies to collection?)
-  @Test public void test16() { rune("map = { fun x -> (fun x)}; (map { a-> (pair a a)} 5)", "*( 5, 5)", "*[7](^=any, 5, 5)","[4,7]",null); }
+  @Test public void test16() { rune("map = { fun x -> (fun x)}; (map { a-> (pair a a)} 5)", "*( 5, 5)", "*[7](5, 5)","[4,7]",null); }
 
   @Test public void test17() { rune("""
 fcn = { p -> { a -> (pair a a) }};
 map = { fun x -> (fun x)};
 { q -> (map (fcn q) 5)}
 """,
-                                    "{ A -> *( 5, 5) }", "[27]{any,3 ->*[7](^=any, 5, 5) }",
+                                    "{ A -> *( 5, 5) }", "[27]{any,3 ->*[7](5, 5) }",
                                     "[4,7]","[27]"); }
 
   // Checking behavior when using "if" to merge two functions with sufficiently
@@ -225,7 +225,7 @@ map = { fun x -> (fun x)};
          "map = { fun x -> (fun x)};"+
          "{ q -> (map (fcn q) 5)}",
          "{ A? -> *( B:[Cannot unify 5 and *( 3, B)], B) }",
-         "[34]{any,3 -> *[7,8](^=any, 5, nScalar) }",
+         "[34]{any,3 -> *[7,8](5, nScalar) }",
          "[4,7,8,9]","[34]" );
   }
 
@@ -250,8 +250,8 @@ map ={fun parg -> (fun (cdr parg))};
 """,
          "*( *str:(int8), int1)",
          "*( *str:(int8), int1)",
-         "*[7](^=any, *[4]str:(, int8), int64)",
-         "*[7](^=any, Scalar, Scalar)",
+         "*[7](*[4]str:(, int8), int64)",
+         "*[7](Scalar, Scalar)",
          "[4,7]",null );
   }
 
@@ -288,7 +288,7 @@ map ={fun parg -> (fun (cdr parg))};
 }
 """,
          "{ { nint8 -> A } -> *( A, A) }",
-         "[30]{any,3 ->*[7](^=any, Scalar, Scalar) }",
+         "[30]{any,3 ->*[7](Scalar, Scalar) }",
          "[4,7]","[24,30]" );
   }
 
@@ -296,7 +296,7 @@ map ={fun parg -> (fun (cdr parg))};
   @Test public void test25() {
     rune("@{x=2; y=3}",
          "*@{ x = 2; y = 3}",
-         "*[7]@{^=any; x=2; y=3}",
+         "*[7]@{x=2; y=3}",
          "[4,7]",null);
   }
 
@@ -311,7 +311,7 @@ map ={fun parg -> (fun (cdr parg))};
 
   @Test public void test29() { rune("{ g -> @{x=g; y=g}}",
                                     "{ A -> *@{ x = A; y = A} }",
-                                    "[22]{any,3 ->*[7]@{^=any; x=Scalar; y=Scalar} }",
+                                    "[22]{any,3 ->*[7]@{x=Scalar; y=Scalar} }",
                                     "[4,7]","[22]"); }
 
   // Load common field 'x', ignoring mismatched fields y and z
@@ -335,7 +335,7 @@ map ={fun parg -> (fun (cdr parg))};
   @Test public void test32() {
     rune("map = { fcn lst -> @{ n1 = (map fcn lst.n0); v1 = (fcn lst.v0) } }; map",
          "{ { A -> B } C:*@{ n0 = C; v0 = A; ...} -> D:*@{ n1 = D; v1 = B} }",
-         "[22]{any,4 ->PA:*[7]@{^=any; n1=PA; v1=Scalar} }",
+         "[22]{any,4 ->PA:*[7]@{n1=PA; v1=Scalar} }",
          "[4,7,10]","[22,24]");
   }
 
@@ -345,7 +345,7 @@ map ={fun parg -> (fun (cdr parg))};
   @Test public void test33() {
     rune("map = { fcn lst -> (if lst @{ n1=(map fcn lst.n0); v1=(fcn lst.v0) } 0) }; map",
          "{ { A -> B } C:*@{ n0 = C; v0 = A; ...}? -> D:*@{ n1 = D; v1 = B}? }",
-         "[26]{any,4 ->PA:*[0,7]@{^=any; n1=PA; v1=Scalar} }",
+         "[26]{any,4 ->PA:*[0,7]@{n1=PA; v1=Scalar} }",
          "[4,7,10]","[24,26]");
   }
 
@@ -353,7 +353,7 @@ map ={fun parg -> (fun (cdr parg))};
   @Test public void test34() {
     rune("map = { fcn lst -> (if lst @{ n1 = (map fcn lst.n0); v1 = (fcn lst.v0) } 0) }; (map dec @{n0 = 0; v0 = 5})",
          "A:*@{ n1 = A; v1 = int64}?",
-         "PA:*[0,7]@{^=any; n1=PA; v1=4}",
+         "PA:*[0,7]@{n1=PA; v1=4}",
          "[4,7]",null);
   }
 
@@ -362,7 +362,7 @@ map ={fun parg -> (fun (cdr parg))};
   @Test public void test36() {
     rune("map = { lst -> (if lst @{ n1= arg= lst.n0; (if arg @{ n1=(map arg.n0); v1=(str arg.v0)} 0); v1=(str lst.v0) } 0) }; map",
          "{ A:*@{ n0 = *@{ n0 = A; v0 = int64; ...}?; v0 = int64; ...}? -> B:*@{ n1 = *@{ n1 = B; v1 = *str:(int8)}?; v1 = *str:(int8)}? }",
-         "[32]{any,3 ->PA:*[0,8]@{FA:^=any; n1=*[0,7]@{FA; n1=PA; FB:v1=*[4]str:(FA, int8)}; FB} }",
+         "[32]{any,3 ->PA:*[0,8]@{n1=*[0,7]@{n1=PA; FB:v1=*[4]str:(int8)}; FB} }",
          "[4,7,8,10]","[32]" );
   }
 
@@ -417,8 +417,8 @@ out_bool= (map in_str { xstr -> (eq xstr "def")});
 """,
          "*( *str:(int8), int1)",
          "*( *str:(int8), int1)",
-         "*[9](^=any, *[4]str:(, int8), int64)",
-         "*[9](^=any, Scalar, Scalar)",
+         "*[9](*[4]str:(, int8), int64)",
+         "*[9](Scalar, Scalar)",
          "[4,9]",null);
   }
 
@@ -495,8 +495,8 @@ loop = { name cnt ->
 """,
          "{ A? -> *( 3, nint8) }",
          "{ A? -> *( 3, nint8) }",
-         "[34]{any,3 ->*[7](^=any, nint8, nint8) }",
-         "[34]{any,3 ->*[7](^=any, nint8, nint8) }",
+         "[34]{any,3 ->*[7](nint8, nint8) }",
+         "[34]{any,3 ->*[7](nint8, nint8) }",
          "[4,7]","[34]");
   }
 
@@ -512,8 +512,8 @@ loop = { name cnt ->
 """,
          "{ A? -> *( 3, May be nil when loading field x: 5 ) }",
          "{ A? -> *( 3, May be nil when loading field x: 5 ) }",
-         "[31]{any,3 ->*[7](^=any, nint8, nint8) }",
-         "[31]{any,3 ->*[7](^=any, nint8, nint8) }",
+         "[31]{any,3 ->*[7](nint8, nint8) }",
+         "[31]{any,3 ->*[7](nint8, nint8) }",
          "[4,7]","[31]");
   }
 
@@ -557,8 +557,8 @@ loop = { name cnt ->
          "",
          "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
          "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
-         "*[15]@{FA:^=any; a=int64 ; b=*[13,14](FA); bool=*[12]@{FA; false=PA:*[8,9]@{FA; and=[22,26]{any,3 ->Scalar }; or=[23,27]{any,3 ->Scalar }; then=[25,29]{any,4 ->Scalar }}; force=[33]{any,3 ->PA }; true=PA}}",
-         "*[15]@{FA:^=any; a=Scalar; b=Scalar      ; bool=*[12]@{FA; false=PA:*[8,9]@{FA; and=[22,26]{any,3 ->Scalar }; or=[23,27]{any,3 ->Scalar }; then=[25,29]{any,4 ->Scalar }}; force=[33]{any,3 ->PA }; true=PA}}",
+         "*[15]@{a=int64 ; b=*[13,14](); bool=*[12]@{false=PA:*[8,9]@{and=[22,26]{any,3 ->Scalar }; or=[23,27]{any,3 ->Scalar }; then=[25,29]{any,4 ->Scalar }}; force=[33]{any,3 ->PA }; true=PA}}",
+         "*[15]@{a=Scalar; b=Scalar    ; bool=*[12]@{false=PA:*[8,9]@{and=[22,26]{any,3 ->Scalar }; or=[23,27]{any,3 ->Scalar }; then=[25,29]{any,4 ->Scalar }}; force=[33]{any,3 ->PA }; true=PA}}",
          "[4,7,8,9,12,13,14,15]","[22,23,24,25,26,27,28,29,33]");
   }
 
@@ -604,7 +604,7 @@ boolSub ={b ->(if b true false)};
                "then = { { *( ) -> F } { *( ) -> F } -> F }"+
              "}"+
          "}",
-         "*[12]@{FA:^=any; false=PB:*[8,9]@{FA; and=[22,27]{any,3 ->Scalar }; not=[25,30]{any,3 ->PA:*[8]@{FA; and=[22]{any,3 ->Scalar }; not=[25]{any,3 ->PA }; or=[23]{any,3 ->PA }; then=[26]{any,4 ->Scalar }} }; or=[23,29]{any,3 ->Scalar }; then=[26,31]{any,4 ->Scalar }}; true=PB}",
+         "*[12]@{false=PB:*[8,9]@{and=[22,27]{any,3 ->Scalar }; not=[25,30]{any,3 ->PA:*[8]@{and=[22]{any,3 ->Scalar }; not=[25]{any,3 ->PA }; or=[23]{any,3 ->PA }; then=[26]{any,4 ->Scalar }} }; or=[23,29]{any,3 ->Scalar }; then=[26,31]{any,4 ->Scalar }}; true=PB}",
            "[4,7,8,9,12]","[22,23,24,25,26,27,28,29,30,31]");
   }
 
@@ -620,7 +620,7 @@ boolSub ={b ->(if b true false)};
          "left"+
          "",
          "A:*@{ n1 = *@{ n1 = A; v1 = 7}; v1 = 7}",
-         "PA:*[8]@{FA:^=any; n1=*[7]@{FA; n1=PA; FB:v1=7}; FB}",
+         "PA:*[8]@{n1=*[7]@{n1=PA; FB:v1=7}; FB}",
          "[4,7,8]",null);
   }
 
@@ -642,11 +642,10 @@ all
         "*@{ boolSub = { A? -> *@{ not = { B -> C:*@{ not = { D -> C }; then = { { 7 -> E } { 7 -> E } -> E }} }; then = { { 7 -> F } { 7 -> F } -> F }} }; false = C; true = C}",
         """
 *[9]@{
-  FA:^=any;
   boolSub=[31]{any,3 ->
-    PA:*[7,8]@{FA; not=[22,25]{any,3 ->PA }; then=[23,26]{any,4 ->Scalar }}
+    PA:*[7,8]@{not=[22,25]{any,3 ->PA }; then=[23,26]{any,4 ->Scalar }}
   };
-  false=PB:*[8]@{FA; not=[25]{any,3 ->PC:*[7]@{FA; not=[22]{any,3 ->PB }; then=[23]{any,4 ->Scalar }} }; then=[26]{any,4 ->Scalar }};
+  false=PB:*[8]@{not=[25]{any,3 ->PC:*[7]@{not=[22]{any,3 ->PB }; then=[23]{any,4 ->Scalar }} }; then=[26]{any,4 ->Scalar }};
   true=PC
 }
 """,
@@ -790,24 +789,20 @@ three =(n.s two);     // Three is the successor of two
         "",
        """
 *[16]@{
-  FA:^=any;
   b=*[12]@{
-    FA;
-    false=PA:*[9]@{FA; and_=[27]{any,3 ->PA }; or__=[29]{any,3 ->Scalar }; then=[30]{any,4 ->Scalar }};
-    true =PB:*[8]@{FA; and_=[23]{any,3 ->Scalar }; or__=[25]{any,3 ->PB }; then=[26]{any,4 ->Scalar }}
+    false=PA:*[9]@{and_=[27]{any,3 ->PA }; or__=[29]{any,3 ->Scalar }; then=[30]{any,4 ->Scalar }};
+    true =PB:*[8]@{and_=[23]{any,3 ->Scalar }; or__=[25]{any,3 ->PB }; then=[26]{any,4 ->Scalar }}
   };
   n=*[15]@{
-    FA;
     s=[38]{any,3 ->
       PC:*[14]@{
-        FA;
         add_=[37]{any,3 ->Scalar };
         pred=[35]{any,3 ->Scalar };
         succ=[36]{any,3 ->PC };
         zero=[34]{any,3 ->PA }
       }
     };
-    z=*[13]@{FA; add_=[33]{any,3 ->Scalar }; pred=[22]{any,3 ->~Scalar }; succ=[32]{any,3 ->PC }; zero=[31]{any,3 ->PB }}
+    z=*[13]@{add_=[33]{any,3 ->Scalar }; pred=[22]{any,3 ->~Scalar }; succ=[32]{any,3 ->PC }; zero=[31]{any,3 ->PB }}
   };
   one=PC;
   three=PC;
@@ -816,24 +811,20 @@ three =(n.s two);     // Three is the successor of two
 """,
        """
 *[16]@{
-  FA:^=any;
   b=*[12]@{
-    FA;
-    false=PA:*[9]@{FA; and_=[27]{any,3 ->PA }; or__=[29]{any,3 ->Scalar }; then=[30]{any,4 ->Scalar }};
-    true =PB:*[8]@{FA; and_=[23]{any,3 ->Scalar }; or__=[25]{any,3 ->PB }; then=[26]{any,4 ->Scalar }}
+    false=PA:*[9]@{and_=[27]{any,3 ->PA }; or__=[29]{any,3 ->Scalar }; then=[30]{any,4 ->Scalar }};
+    true =PB:*[8]@{and_=[23]{any,3 ->Scalar }; or__=[25]{any,3 ->PB }; then=[26]{any,4 ->Scalar }}
   };
   n=*[15]@{
-    FA;
     s=[38]{any,3 ->
       PC:*[14]@{
-        FA;
         add_=[37]{any,3 ->Scalar };
         pred=[35]{any,3 ->Scalar };
         succ=[36]{any,3 ->PC };
         zero=[34]{any,3 ->PA }
       }
     };
-    z=*[13]@{FA; add_=[33]{any,3 ->Scalar }; pred=[22]{any,3 ->~Scalar }; succ=[32]{any,3 ->PC }; zero=[31]{any,3 ->PB }}
+    z=*[13]@{add_=[33]{any,3 ->Scalar }; pred=[22]{any,3 ->~Scalar }; succ=[32]{any,3 ->PC }; zero=[31]{any,3 ->PB }}
   };
   one=PC;
   three=PC;
@@ -863,7 +854,7 @@ three =(n.s two);     // Three is the successor of two
          "(sx self1)"+
          "",
          "A:*@{ succ=A}",
-         "PA:*[7]@{^=any; succ=PA}",
+         "PA:*[7]@{succ=PA}",
          "[4,7]",null);
   }
 
@@ -872,7 +863,7 @@ three =(n.s two);     // Three is the successor of two
   @Test public void test61() {
     rune("f = { p1 p2 -> (if p2.a p1 p2)}; (f @{a=2} @{b=2.3})",
          "*@{ a= Missing field a: 2 }",
-         "*[7,8](^=any)",
+         "*[7,8]()",
          "[4,7,8]",null);
   }
 
@@ -889,7 +880,7 @@ three =(n.s two);     // Three is the successor of two
          "rez"+
          "",
          "{ A? -> *@{x=nint8} }",
-         "[26]{any,3 ->*[7,8]@{^=any; x=nint8} }",
+         "[26]{any,3 ->*[7,8]@{x=nint8} }",
          "[4,7,8]","[26]");
   }
 
@@ -909,8 +900,8 @@ three =(n.s two);     // Three is the successor of two
          "    res1 = *@{ a = Missing field a: 2};"+
          "    res2 = *@{ a=nint8; b=nflt32 }"+
          "}",
-         "*[13]@{FA:^=any; f=[23]{any,4 ->*[7,8,9,10,11,12]SA:(FA) }; res1=*[7,8]SA; res2=*[9,12]@{FA; a=nint8; b=nflt32}}",
-         "*[13]@{^=any; f=[23]{any,4 ->Scalar }; res1=Scalar; res2=Scalar}",
+         "*[13]@{f=[23]{any,4 ->*[7,8,9,10,11,12]SA:() }; res1=*[7,8]SA; res2=*[9,12]@{a=nint8; b=nflt32}}",
+         "*[13]@{f=[23]{any,4 ->Scalar }; res1=Scalar; res2=Scalar}",
          "[4,7,8,9,10,11,12,13]","[23]");
   }
 
@@ -1004,19 +995,16 @@ all
 """,
          """
 *[14]@{
-  FA:^=any;
-  false=PC:*[8,9]@{FA; and=[23,27]{any,3 ->Scalar }; or=[25,29]{any,3 ->Scalar }; then=[26,30]{any,4 ->Scalar }};
+  false=PC:*[8,9]@{and=[23,27]{any,3 ->Scalar }; or=[25,29]{any,3 ->Scalar }; then=[26,30]{any,4 ->Scalar }};
   s=[45]{any,3 ->
     PA:*[13]@{
-      FA;
       add_=[44]{any,3 ->PA };
-      pred=[42]{any,3 ->PB:*[10,11,12,13,17,18]@{FA; add_=[4,5,22,23,25,27,29,35,36,37,41,42,43,44,45]{any,3 ->Scalar }; pred=[4,5,22,23,24,25,27,28,29,35,36,37,41,42,43,44,45]{any,3 ->PB }; succ=[4,5,22,23,25,27,29,35,36,37,41,42,43,44,45]{any,3 ->PB }; zero=[4,5,22,23,24,25,27,28,29,35,36,37,41,42,43,44,45]{any,3 ->PC }} };
+      pred=[42]{any,3 ->PB:*[10,11,12,13,17,18]@{add_=[4,5,22,23,25,27,29,35,36,37,41,42,43,44,45]{any,3 ->Scalar }; pred=[4,5,22,23,24,25,27,28,29,35,36,37,41,42,43,44,45]{any,3 ->PB }; succ=[4,5,22,23,25,27,29,35,36,37,41,42,43,44,45]{any,3 ->PB }; zero=[4,5,22,23,24,25,27,28,29,35,36,37,41,42,43,44,45]{any,3 ->PC }} };
       succ=[43]{any,3 ->PA }; zero=[41]{any,3 ->PC }
     }
   };
   true=PC;
   z=*[12]@{
-    FA;
     add_=[37]{any,3 ->Scalar };
     pred=[22]{any,3 ->~Scalar };
     succ=[36]{any,3 ->PA };
@@ -1025,11 +1013,11 @@ all
 }
 """,
          """
-*[14]@{FA:^=any;
-  false=PA:*[8,9]@{FA; and=[23,27]{any,3 ->Scalar }; or=[25,29]{any,3 ->Scalar }; then=[26,30]{any,4 ->Scalar }};
+*[14]@{
+  false=PA:*[8,9]@{and=[23,27]{any,3 ->Scalar }; or=[25,29]{any,3 ->Scalar }; then=[26,30]{any,4 ->Scalar }};
   s=[45]{any,3 ->Scalar };
   true=PA;
-  z=*[12]@{FA; add_=[37]{any,3 ->Scalar }; pred=[22]{any,3 ->~Scalar }; succ=[36]{any,3 ->Scalar }; zero=[35]{any,3 ->PA }}
+  z=*[12]@{add_=[37]{any,3 ->Scalar }; pred=[22]{any,3 ->~Scalar }; succ=[36]{any,3 ->Scalar }; zero=[35]{any,3 ->PA }}
 }
 """,
          "[4,7,8,9,10,11,12,13,14,17,18]",
@@ -1067,8 +1055,8 @@ maybepet = petcage.get;
 """,
          "*(nflt32,nflt32,*str:(nint8))",
          "*(nflt32,nflt32,*str:(nint8))",
-         "*[12](^=any, Scalar, Scalar, *[4]str:(, nint8))",
-         "*[12](^=any, Scalar, Scalar, *[4]str:(, nint8))",
+         "*[12](Scalar, Scalar, *[4]str:(, nint8))",
+         "*[12](Scalar, Scalar, *[4]str:(, nint8))",
          "[4,12]",null);
   }
 
@@ -1088,19 +1076,19 @@ all = @{
     rune("dsp = @{  id = { dsp n -> n}}; (pair (dsp.id dsp 3) (dsp.id dsp \"abc\"))",
          "*( 3, *str:(97))",
          "*( 3, *str:(97))",
-         "*[8](^=any, 3 , *[4]str:(, 97))",
-         "*[8](^=any, nScalar, nScalar)",
+         "*[8](3 , *[4]str:(, 97))",
+         "*[8](nScalar, nScalar)",
          "[4,8]",null);
   }
 
   // Test incorrect argument count
   @Test public void test69() {
-    rune("({x y -> (pair x y) } 1 2 3)","Bad arg count: *(1,2)","*[7](^=any, 1, 2)","[4,7]",null);
+    rune("({x y -> (pair x y) } 1 2 3)","Bad arg count: *(1,2)","*[7](1, 2)","[4,7]",null);
   }
 
   // Test incorrect argument count
   @Test public void test70() {
-    rune("({x y -> (pair x y) } 1 )","Bad arg count: *(1,A)","*[7](^=any, 1, ~Scalar)","[4,7]",null);
+    rune("({x y -> (pair x y) } 1 )","Bad arg count: *(1,A)","*[7](1, ~Scalar)","[4,7]",null);
   }
 
   // Test example from AA with expanded ints
@@ -1115,7 +1103,7 @@ A:*@{
   i=int64
 }
 """,
-         "PA:*[7]@{^=any; i=int64; add=[23]{any,4 ->PA }}",
+         "PA:*[7]@{i=int64; add=[23]{any,4 ->PA }}",
            "[4,7,10,11]","[23]");
   }
 
@@ -1136,7 +1124,7 @@ A:*@{
          "p1",
 
          rez_hm,
-         "*[8](FA:^=any, XA:[23]{any,5 ->*[7](FA, Scalar, Scalar, Scalar) }, XA, XA)",
+         "*[8](XA:[23]{any,5 ->*[7](Scalar, Scalar, Scalar) }, XA, XA)",
          "[4,7,8]","[23]"  );
   }
 
@@ -1150,7 +1138,7 @@ A:*@{
          "p3",
 
          rez_hm,
-         "*[12](FA:^=any, PB:*[9](FA, PA:*[8](FA, XA:[23]{any,5 ->*[7](FA, Scalar, Scalar, Scalar) }, XA, XA), PA, PA), PB, PB)",
+         "*[12](PB:*[9](PA:*[8](XA:[23]{any,5 ->*[7](Scalar, Scalar, Scalar) }, XA, XA), PA, PA), PB, PB)",
          "[4,7,8,9,12]","[23]");
   }
 
@@ -1174,7 +1162,7 @@ A:*@{
          "test = (term W);"+
          "(test {x -> {y -> (pair (x 3) (((y \"a\") \"b\") \"c\")) } })",
          "*( A:[Cannot unify {A->A} and 3 and *str:(nint8)], A )",
-         "*[7](^=any, Scalar, Scalar)",
+         "*[7]( Scalar, Scalar)",
          "[4,7]","[]");
   }
 
@@ -1207,7 +1195,7 @@ A:*@{
          "];"+
          "(pair (f 2) (f 1.2))",    // Call with different args
          "*(int64,flt64)", "*(int64,flt64)",
-         "*[7](^=any,4,3.6000001f)", "*[7](^=any,~Scalar,~Scalar)",
+         "*[7](4,3.6000001f)", "*[7](~Scalar,~Scalar)",
          "[4,7]",null);
   }
 
@@ -1255,7 +1243,7 @@ fz = (if (rand 2) fx fy);
 }
 """,
          "{A? -> *(int64,flt64) }",
-         "[34]{any,3 ->*[7](^=any, Scalar, Scalar) }",
+         "[34]{any,3 ->*[7]( Scalar, Scalar) }",
          "[4,7]","[34]");
   }
 
@@ -1287,7 +1275,7 @@ con2_1 = (fwrap 2.1);
 (con2_1._*_ con2_1)
 """,
         "A:*@{_*_={B:*@{_*_=&[{*@{i=int64;...}->B};{*@{f=flt64;...}->B}];f=flt64}->A};f=flt64}",
-        "PA:*[7]@{^=any; _*_=[~25+27]{any,3 ->PA }; f=flt64}",
+        "PA:*[7]@{_*_=[~25+27]{any,3 ->PA }; f=flt64}",
         "[4,7,10,11]","[25,27]");
   }
 
@@ -1296,7 +1284,7 @@ con2_1 = (fwrap 2.1);
   @Test public void test88() {
     rune("{ p -> (if p @{x=3;y=4} @{y=6;z=\"abc\"})}",
          "{A?->*@{y=nint8}}",
-         "[26]{any,3 ->*[7,8]@{^=any; y=nint8} }",
+         "[26]{any,3 ->*[7,8]@{y=nint8} }",
          "[4,7,8]","[26]");
   }
   // Recursive structs.  Next: open structs list required fields;
@@ -1312,7 +1300,7 @@ con2_1 = (fwrap 2.1);
   @Test public void test90() {
     rune("fun = { rec -> (pair rec rec.x)}; (pair (fun @{x=3;y=4}) (fun @{x=\"abc\";z=2.1}))",
          "*(*(*@{x=3;y=4},3), *(*@{x=A:*str:(97);z=2.1f},A))",
-         "*[8](FA:^=any, PA:*[7](FA, *[9,12]@{FA; x=nScalar}, nScalar), PA)",
+         "*[8](PA:*[7](*[9,12]@{x=nScalar}, nScalar), PA)",
          "[4,7,8,9,12]","[]");
   }
   // Recursive structs.  Next: passing extra fields, but the function requires
@@ -1323,7 +1311,7 @@ con2_1 = (fwrap 2.1);
          "         (fun @{x=\"abc\";z=2.1} )  )"+ // available {x,z}
          "  } { rec -> (pair rec rec.x) } )",     // required  {x}
          "*(A:*(*@{x=B:[Cannot unify 3 and *str:(97)]},B),A)",
-         "*[7](FA:^=any, PA:*[12](FA, *[8,9]@{FA; x=nScalar}, nScalar), PA)",
+         "*[7](PA:*[12](*[8,9]@{x=nScalar}, nScalar), PA)",
          "[4,7,8,9,12]","[]");
   }
   // Recursive structs.  Next: passing extra fields, but the function requires
@@ -1334,7 +1322,7 @@ con2_1 = (fwrap 2.1);
          "         (fun @{x=4; z=2.1} )  )"+ // available {x,z}
          "  } { rec -> (pair rec rec.x) } )",// required  {x}
          "*(A:*(*@{x=nint8},nint8),A)",
-         "*[7](FA:^=any, PA:*[12](FA, *[8,9]@{FA; x=nint8}, nint8), PA)",
+         "*[7](PA:*[12](*[8,9]@{x=nint8}, nint8), PA)",
          "[4,7,8,9,12]","[]");
   }
   // Recursive structs.  
@@ -1348,7 +1336,7 @@ fun = { ff ->
 (fun 1.2) // required {f} in inner, available {f,mul} in outer
 """,
          "A:*@{f=flt64;mul={*@{f=flt64;...}->A}}", // required {f} in inner, available {f,mul} in outer
-         "PA:*[7]@{^=any; f=flt64; mul=[23]{any,3 ->PA }}",
+         "PA:*[7]@{f=flt64; mul=[23]{any,3 ->PA }}",
          "[4,7,10]","[23]");
   }
 
@@ -1365,7 +1353,7 @@ con12=(fun 1.2);   // required {f} in inner, available {f,mul} in outer
 (con12.mul con12)  // required {f} in inner, available {f,mul} in outer,middle
 """,
          "A:*@{f=flt64;mul={B:*@{f=flt64;mul={*@{f=flt64;...}->B}}->A}}", // required {f} in inner, available {f,mul} in middle,outer
-         "PA:*[7]@{^=any; f=flt64; mul=[23]{any,3 ->PA }}",
+         "PA:*[7]@{f=flt64; mul=[23]{any,3 ->PA }}",
          "[4,7,10]","[23]");
   }
 
@@ -1403,8 +1391,8 @@ mul2 = { x -> (x._*_ con2)};
 (triple (mul2 con2_1)  (con2._*_ con2) (con2_1._*_ con2_1))
 """,
         hm_rez, hm_rez,
-        "*[9](FA:^=any, PA:*[7]@{FA; _*_=[~25+27]{any,3 ->PA }; f=flt64}, *[8]@{FA; _*_=[~31+34]{any,3 ->*[]( ...) }; i=int64}, PA)",
-        "*[9](FA:^=any, PA:*[7]@{FA; _*_=[~25+27]{any,3 ->PA }; f=flt64}, *[]( ...), PA)",
+        "*[9](PA:*[7]@{_*_=[~25+27]{any,3 ->PA }; f=flt64}, *[8]@{_*_=[~31+34]{any,3 ->*[]( ...) }; i=int64}, PA)",
+        "*[9](PA:*[7]@{_*_=[~25+27]{any,3 ->PA }; f=flt64}, *[]( ...), PA)",
         "[4,7,8,9,10,11,17,18]","[25,27,31,34]");
   }
 
@@ -1445,7 +1433,7 @@ fact = { n -> (if n.is0 c1 (n.mul (fact n.sub1))) };
 (fact c5)
 """,
         "A:*@{i=int64; is0=int1; mul = {A->A}; sub1=A }",
-        "PA:*[8]@{^=any; i=int64; is0=int1; mul=[~31+34]{any,3 ->*[]( ...) }; sub1=PA}",
+        "PA:*[8]@{i=int64; is0=int1; mul=[~31+34]{any,3 ->*[]( ...) }; sub1=PA}",
         "[4,8,10,11]","[31,34]");
   }
 
@@ -1454,8 +1442,8 @@ fact = { n -> (if n.is0 c1 (n.mul (fact n.sub1))) };
     rune("red=&[ 123; \"red\" ]; (pair (dec red) (isempty red))",
          "*(int64,int1)",
          "*(int64,int1)",
-         "*[7](^=any,122,0)",
-         "*[7](^=any,~int64,~Scalar)",
+         "*[7](122,0)",
+         "*[7](~int64,~Scalar)",
          null,null);
   }
 
@@ -1464,8 +1452,8 @@ fact = { n -> (if n.is0 c1 (n.mul (fact n.sub1))) };
     rune("{ pred -> red=(if pred &[ 123; \"red\" ] &[ 456; \"blue\" ]); (pair (dec red) (isempty red))}",         
          "*(int64,int1)",
          "*(int64,int1)",
-         "*[7](^=any,122,0)",
-         "*[7](^=any,~int64,~Scalar)",
+         "*[7](122,0)",
+         "*[7](~int64,~Scalar)",
          null,null);
   }
 
@@ -1477,8 +1465,8 @@ fact = { n -> (if n.is0 c1 (n.mul (fact n.sub1))) };
          ")",
          "*(int64,int1)",
          "*(int64,int1)",
-         "*[7](^=any,122,0)",
-         "*[7](^=any,~int64,~Scalar)",
+         "*[7](122,0)",
+         "*[7](~int64,~Scalar)",
          null,null);
   }
 

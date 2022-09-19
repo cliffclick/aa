@@ -25,4 +25,6 @@ public class Types extends AryI<Type> {
   public static Type[] ts(Type t0, Type t1, Type t2, Type t3, Type t4) { return TYPES._ts(t0,t1,t2,t3,t4); }
   public static Type[] ts(Type t0, Type t1, Type t2, Type t3, Type t4, Type t5) { return TYPES._ts(t0,t1,t2,t3,t4,t5); }
   public static Type[] clone(Type[] ts) { return TYPES._clone(ts); }
+  public static Type[] copyOf(Type[] ts, int len) { return TYPES._copyOf(ts,len); }
+  public static void free(Type[] ts) { TYPES._free(ts); }
 }

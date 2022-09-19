@@ -731,8 +731,8 @@ public class HM {
       // Else a Let
       Syntax def = ((Let)_def)._def;
       Type dt = def._flow;
-      //if( !(dt instanceof TypeTuple tt) )
-      //  return dt;              // Not an overloaded result
+      if( !(dt instanceof TypeUnion tu) )
+        return dt;              // Not an overloaded result
       //// An overloaded Let result; it may never resolve, although this of it might
       //T2 deft2 = def.find();
       //if( !deft2.is_over() || deft2.size()!=tt.len() )
@@ -2350,7 +2350,7 @@ public class HM {
     }
     static T2 make_str(TypeMemPtr flow) {
       assert flow.is_str();
-      T2 t2str = make_open_struct(new String[]{"str:","0"},new T2[]{make_leaf(),make_base(flow._obj._def)});
+      T2 t2str = make_open_struct(new String[]{"str:","0"},new T2[]{make_leaf(),make_base(flow._obj.at(1))});
       return make_ptr(t2str);
     }
     // No fields (yet), filled in during prep-tree

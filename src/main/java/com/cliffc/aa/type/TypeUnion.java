@@ -28,8 +28,8 @@ public class TypeUnion extends TypeNil<TypeUnion> implements Cyclic {
     _flt = flt;
     _tmp = tmp;
     _tfp = tfp;
-    assert (any==int0._any || int0.is_con()) && (any==flt._any || flt.is_con()) && any==tmp._any && any==tfp._any;
-    assert  nil==int0._nil                   &&  nil==flt._nil                  && nil==tmp._nil && nil==tfp._nil;
+    assert (any==int0._any || int0.is_con()) && (any==flt._any || flt.is_con()) && (tmp==null || (any==tmp._any && any==tfp._any));
+    assert  nil==int0._nil                   &&  nil==flt._nil                  && (tmp==null || (nil==tmp._nil && nil==tfp._nil));
     return this;
   }
 
@@ -90,14 +90,29 @@ public class TypeUnion extends TypeNil<TypeUnion> implements Cyclic {
     _tfp._str(visit,dups, sb, debug, indent );
     return _str_nil(sb.p(" ]"));
   }
+  
+  static TypeUnion valueOf(Parse P, String cid, boolean any) {
+    P.require('&');
+    P.require('[');
+    TypeInt int0= (TypeInt   )P.type();   P.require(any ? '+' : '&');
+    TypeFlt flt = (TypeFlt   )P.type();   P.require(any ? '+' : '&');
+    TypeUnion  tu  = malloc(any,int0._nil,int0._sub,int0,flt,null,null);
+    if( cid!=null ) P._dups.put(cid,tu);
+    tu._tmp = (TypeMemPtr)P.type();   P.require(any ? '+' : '&');
+    tu._tfp = (TypeFunPtr)P.type();
+    P.require(']');
+    if( P.peek('?') )
+      tu = (TypeUnion)tu.meet(TypeNil.XNIL);
+    return tu;
+  }
 
   static { new Pool(TUNION,new TypeUnion()); }
   private static TypeUnion malloc( boolean any, boolean nil, boolean sub, TypeInt int0, TypeFlt flt, TypeMemPtr tmp, TypeFunPtr tfp ) {
     TypeUnion t1 = POOLS[TUNION].malloc();
-    return t1.init(any,nil,sub,int0,flt,tmp,tfp).hashcons_free();
+    return t1.init(any,nil,sub,int0,flt,tmp,tfp);
   }
 
-  public static TypeUnion make( boolean any, boolean nil, boolean sub, TypeInt int0, TypeFlt flt, TypeMemPtr tmp, TypeFunPtr tfp ) { return malloc(any,nil,sub,int0,flt,tmp,tfp); }
+  public static TypeUnion make( boolean any, boolean nil, boolean sub, TypeInt int0, TypeFlt flt, TypeMemPtr tmp, TypeFunPtr tfp ) { return malloc(any,nil,sub,int0,flt,tmp,tfp).hashcons_free(); }
   // AND bits into all children
   TypeUnion make_from(boolean any, boolean nil, boolean sub ) {
     any &= _any;
@@ -125,7 +140,7 @@ public class TypeUnion extends TypeNil<TypeUnion> implements Cyclic {
   // just dual each element.  Also flip the infinitely extended tail type.
   @Override protected TypeUnion xdual() {
     boolean xor = _nil == _sub;
-    return POOLS[TUNION].<TypeUnion>malloc().init(!_any,_nil^xor,_sub^xor, _int.dual(), _flt.dual(), _tmp.dual(), _tfp.dual());
+    return malloc(!_any,_nil^xor,_sub^xor, _int.dual(), _flt.dual(), _tmp.dual(), _tfp.dual());
   }
   void rdual() { throw unimpl(); }
 

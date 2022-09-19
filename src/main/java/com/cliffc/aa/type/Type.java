@@ -210,7 +210,12 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // printing strings (SB).
 
   // toString is called on a single Type in the debugger, and prints debug-info.
-  @Override public final String toString() { return str(new SB(), true, false).toString(); }
+  @Override public final String toString() {
+    String rez = str(new SB(), true, false).toString();
+    //Type t = _valueOf(rez);
+    //assert t==this;
+    return rez;
+  }
   // Nice, REPL-friendly and error-friendly dump.  Debug flag dumps, e.g. raw
   // aliases and raw fidxs.  Non-debug dumps are used in ErrMsg.  Many debug
   // dumps use this version, and intersperse types with other printouts in the
@@ -602,7 +607,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     Ary<Type> ts = new Ary<>(new Type[1],0);
     concat(ts,Type      .TYPES);
     concat(ts,TypeNil   .TYPES);
-    concat(ts,TypeAry   .TYPES);
+    //concat(ts,TypeAry   .TYPES);
     concat(ts,TypeInt   .TYPES);
     concat(ts,TypeFlt   .TYPES);
     concat(ts,TypeMemPtr.TYPES);
@@ -746,53 +751,81 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     int _x;
     final NonBlockingHashMap<String,Type> _dups=new NonBlockingHashMap<>();
     Parse(String str) { _str = str; }
-    Type type() { return type(null); }
-    Type type(String cid) {
+    Type type() { return type(null,false,-1); }
+    Type type(String cid, boolean any, int fld_num) {
       return switch( skipWS() ) {
-      case '*' -> cyc(TypeMemPtr.valueOf(this,cid));
-      case '[' -> cyc(TypeFunPtr.valueOf(this,cid));
-      case '(' -> cyc(TypeStruct.valueOf(this,cid,true ,false));
-      case '@' -> cyc(TypeStruct.valueOf(this,cid,false,false));
-      case '~' -> {
-        if( at(_x+1)=='@' )
-          { _x++; yield cyc(TypeStruct.valueOf(this,cid,false,true)); }
-        yield simple_type(id());
-      }
-      case '0','1','2','3','4','5','6','7','8','9','-' -> {
-        double d = num();
-        Type t = ((long)d)==d ? TypeInt.con((long)d) : TypeFlt.con(d);
-        if( cid!=null ) _dups.put(cid,t);
-        yield t;
-      }
+      case '0','1','2','3','4','5','6','7','8','9','-' -> num();
+      case '"'  -> throw unimpl(); // parse string
+      case '~' -> type(cid,-1 < _x++,fld_num);
+      case ':' -> type(cid,_x++ < -1,-1); // DUP::@{} dup struct with no clz, skip the extra ':' and normal struct parse
+      case '#' ->     TypeRPC   .valueOf(this,cid,any) ;
+      case '{' ->     TypeTuple .valueOf(this,cid,any) ;
+      case '*' -> cyc(TypeMemPtr.valueOf(this,cid,any));
+      case '(' -> cyc(TypeStruct.valueOf(this,cid,any,true ));
+      case '@' -> cyc(TypeStruct.valueOf(this,cid,any,false));
+      case '&' -> cyc(TypeUnion .valueOf(this,cid,any));
+      case '[' -> peek("[[")
+        ? TypeMem.valueOf(this,cid,any)
+        : cyc(TypeFunPtr.valueOf(this,cid,any));
       default -> {
-        // Simple types or recursive type names
+        // These strings all start with an id.
+        // DUP:type     // defining a repeated type
+        // DUP          // using    a repeated type
+        // CLZ:@{}  or CLZ:()  // Struct clazz
+        // DUP:CLZ:@{}  // Both are possible
+        // FLD=type     // A field label
+        // NIL          // Any one of several constant types
+        int oldx = _x;
         String id = id();
-        if( !peek(':') ) {      // Either a pre-defined name "FA" or a simple type "int64"
-          Type t = _dups.get(id);
-          if( t!=null ) { assert cid==null; yield t; } // Hit a pre-defined cyclic name
-          t = simple_type(id); // Something like { int64, any, ~Scalar, nil }
-          if( cid!=null ) _dups.put(cid,t);
+        
+        // duplicate! - Use a repeat name
+        Type t = _dups.get(id);
+        if( t!=null ) yield t;
+        
+        // Leading type repeat name
+        if( fld_num<0 && peek(':') ) {
+          int oldx2 = _x;
+          // To resolve ambiguity with TypeStruct parse, look for a 2nd clz id and ':'.
+          // "str:(97)"    - struct clz "str" with leading char 'a'
+          // "SA::(97)"    - struct no clz, with DUP "SA:"
+          // "SA:str:(97)" - struct clz "str" with DUP "SA:"
+          // "SA:int64"    - DUP "SA:" with some other type
+          id();                // Skip clz parse
+          if( !peek(':') ) {   // Distinguish "CLZ:@{}" from "DUP:int64" or "DUP:fld_name=int64"
+            char c = at(_x);   // Single "clz:" then tuple or struct
+            if( c=='(' ) { _x=oldx; yield cyc(TypeStruct.valueOf(this,cid,any,true )); }
+            if( c=='@' ) { _x=oldx; yield cyc(TypeStruct.valueOf(this,cid,any,false)); }
+            // DUP "id" with some other type
+          }
+          _x=oldx2;             // Unwind back to after "DUP:"
+          
+          RECURSIVE_MEET++;     // Ok, really start a recursive type
+          t = type(id,any,fld_num);
+          if( --RECURSIVE_MEET == 0)
+            t = Cyclic.install(t,_dups);
           yield t;
         }
-        assert cid==null;       // No doing things like "FA:XB:"
-        // Lower case types are simple named types: "int:@{x=1}" or "Cat:@{legs=4}"
-        if( !isRecur(id) ) {
-          String tname = (id+':').intern();
-          if( Util.eq(id,"int") || Util.eq(id,"flt"))
-            yield TypeStruct.make(tname,type(null));
-          yield ((TypeStruct)type(null)).set_name(tname);
-        }
 
-        RECURSIVE_MEET++;   // Ok, really start a recursive type
-        Type t = type(id);
-        if( --RECURSIVE_MEET == 0)
-          t = Cyclic.install(t,_dups);
-        yield t;
+        // Check for field id
+        if( fld_num == 0 )
+          yield cyc(TypeFld.valueOf(this,cid,any,id,fld_num));
+        
+        // Lookup various constant type names
+        t = simple_type(id);
+        if( t!=null ) {
+          if( any ) t = t.dual();
+          if( fld_num>=0 ) t = TypeFld.make(TypeFld.TUPS[fld_num],t);
+          yield t;
+        }
+        
+        // Failed to parse 'id'
+        throw unimpl();
       }
-      };
+    };
     }
-    // Something like { int64, any, ~Scalar, nil }
-    Type simple_type(String id) {
+
+    // Something like { int64, any, ~Scalar, nil } or null
+    private Type simple_type(String id) {
       // A simple type
       for( int i=0; i<STRS.length; i++ )
         if( Util.eq(id,STRS[i]) )
@@ -802,13 +835,12 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       if( t!=null ) return t;
       t = TypeInt.valueOfInt(id);
       if( t!=null ) return t;
-      t = TypeFlt.valueOfFlt(id);
-      if( t!=null ) return t;
-      throw unimpl();
+      // Succeed or return null
+      return TypeFlt.valueOfFlt(id);
     }
     <T extends Type> T cyc(T t) { return RECURSIVE_MEET==0 ? Cyclic.install(t,_dups) : t; }
     char at(int x) { return _str.charAt(x); }
-    char skipWS() {
+    char skipWS() { // Advance to 1st not-WS char and return it, or -1 for end-of-string
       while( !eos() && at(_x) <= ' ' ) _x++;
       return eos() ? (char)-1 : at(_x);
     }
@@ -817,6 +849,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       if( skipWS()==c ) { _x++; return true; }
       else return false;
     }
+    // If find "s", advance cursor and true.
     boolean peek(String s) {
       if( skipWS()!=s.charAt(0) ) return false;
       for( int i=1; i<s.length(); i++ )
@@ -824,10 +857,14 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       _x+= s.length();
       return true;
     }
-    boolean eos() { return _x >= _str.length(); }
+    boolean eos() { return _x >= _str.length(); } // shorter length check
     // A number.  Either a pure integer, or contains a '.' and a double.
     // Possibly followed by a 'f' for a float.
-    double num() {
+    private Type num() {
+      double d = _num();
+      return ((long)d)==d ? TypeInt.con((long)d) : TypeFlt.con(d);
+    }
+    double _num() {
       int i=0, d;
       int neg = peek('-') ? -1 : 1;
       while( !eos() &&  (d=at(_x)-'0') >= 0 && d<=9 )
@@ -843,28 +880,29 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     String id() {
       skipWS();
       int oldx=_x;
-      if( _x < _str.length() && isId0(at(_x)) ) _x++;
-      while( _x < _str.length() && isId1(at(_x)) ) _x++;
-      return _str.substring(oldx,_x).intern();
+      if( !eos() && isId0(at(_x)) ) _x++;
+      while( !eos() && isId1(at(_x)) ) _x++;
+      return oldx==_x ? null : _str.substring(oldx,_x).intern();
     }
     // Rules for an ID character
     private static boolean isId0(char c) {
-      return c=='^' || c=='_' || c=='~' ||
+      return c=='^' || c=='_' ||
         ('A' <= c && c <= 'Z') ||
         ('a' <= c && c <= 'z');
     }
     private static boolean isId1(char c) {
       return isId0(c) || 
-        ('0' <= c && c <= '9') ||
-        c=='*';
+        ('0' <= c && c <= '9');
     }
 
     // Examples: [], [0], [5], [2,3,4], [0,ALL]
     <B extends Bits<B>> B bits( B b ) {
       require('[');
       if( peek(']') ) return b; // Empty
+      if( peek("nALL]") ) return b.set(1);
+      if( peek("nANY]") ) return b.set(1).dual();
       boolean dual = peek('~');
-      do b = b.set(is_all() ? 1 : (int)num());
+      do b = b.set(is_all() ? 1 : (int)_num());
       while( peek(dual ? '+' : ',') );
       require(']');
       return dual ? b.dual() : b;
@@ -881,7 +919,15 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     }
     @Override public String toString() { return _str.substring(_x); }
   }
-  public static Type valueOf( String str ) { return str == null ? null : new Parse(str).type(); }
+  public static Type _valueOf( String str ) { return new Parse(str).type(); }
+  public static Type valueOf( String str ) {
+    if( str==null ) return null;
+    Type t = _valueOf(str);
+    //String rez = t.str(new SB(), true, false).toString();
+    //assert stripIndent(rez).equals(stripIndent(str));
+    return t;
+  }
+  private static String stripIndent(String s){ return s.replace("\n","").replace(" ",""); }
 
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));

@@ -87,6 +87,13 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   };
   SB _str_nil( SB sb ) { return sb.p(XSTRS[_nil ?1:0][_sub ?1:0]); }
 
+  N val_nil( Parse P ) {
+    if( P.peek('?' ) ) _nil = _sub = false;
+    if( P.peek("+0") ) _nil = _sub = true;
+    if( P.peek("=0") ) throw unimpl();
+    return (N)this;
+  }
+  
   static {
     new Pool( TNIL, new TypeNil());
   }
@@ -117,10 +124,9 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   static Type valueOfNil(String cid) {
     return switch(cid) {
     case  "Scalar" ->  SCALAR;
-    case "~Scalar" -> XSCALAR;
-    case "~Scalar0" -> AND_XSCALAR;
     case "nScalar" -> NSCALR;
     case "xnil"    -> XNIL;
+    case "nil"     -> NIL;
     default        -> null;
     };
   }

@@ -35,7 +35,7 @@ public class TestLift {
     TypeFld fld1 = flds[2] = TypeFld.malloc("1",null,Access.Final);
     TypeFld fld2 = flds[3] = TypeFld.malloc("2",null,Access.Final);
     TypeStruct ts = TypeStruct.malloc("",Type.ALL,flds);
-    TypeMemPtr ret1 = TypeMemPtr.malloc(false,B3,ts);
+    TypeMemPtr ret1 = TypeMemPtr.malloc(false,false,B3,ts);
     fld0.setX(ret1);
     fld1.setX(ret1);
     fld2.setX(ret1);

@@ -2,6 +2,7 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.node.PrimNode;
 import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.SB;
 import org.junit.Test;
 
 import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
@@ -12,11 +13,33 @@ import static org.junit.Assert.assertTrue;
 public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
-    Type t0 = TypeNil.XNIL;
-    Type t1 = TypeInt.INT8.dual();
-    Type t2 = t0.meet(t1);
-    Type t3 = null; // if T?F go to TFF
-    //assertEquals(t3,t2);
+  }
+
+
+  // Test for a collection of Types, that toString and valueOf are a bijection
+  @Test public void testToString() {
+    Ary<Type> ts = Type.ALL_TYPES();
+    String[] ss = new String[ts.len()];
+    for( int i=0; i<ts.len(); i++ )
+      ss[i] = ts.at(i).str(new SB(), true, false).toString();
+    for( int i=0; i<ts.len(); i++ ) {
+      Type t = Type._valueOf(ss[i]);
+      assertEquals(ts.at(i),t);
+    }
+  }
+  // Test for a collection of Strings, that toString and valueOf are a bijection
+  @Test public void testValueOf() {
+    String[] ss = new String[] {
+      "3"
+    };
+    for( String s : ss ) {
+      Type t0 = Type.valueOf(s);
+      String s0 = t0.toString();
+      assertEquals(s, s0);
+      Type t1 = Type.valueOf(s0);
+      assertEquals(t0, t1);
+    }
+    
   }
 
   @Test public void testTFPChain() {

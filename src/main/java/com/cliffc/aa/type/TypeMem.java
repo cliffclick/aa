@@ -122,16 +122,16 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    if( this==ALLMEM  ) return sb.p("[ all ]");
-    if( this==ANYMEM  ) return sb.p("[_any_]");
+    if( this==ALLMEM  ) return sb.p("[[_all_]]");
+    if( this==ANYMEM  ) return sb.p("[[_any_]]");
 
     if( _pubs.length==1 )
-      return _pubs[0]._str(visit,dups, sb.p('['), debug, indent).p(']');
+      return _pubs[0]._str(visit,dups, sb.p("[["), debug, indent).p("]]");
 
     if( _pubs[0]==TypeStruct.UNUSED ) sb.p('!');
     else _pubs[0]._str(visit,dups,sb,debug, indent);
 
-    sb.p('[');
+    sb.p("[[");
     if( indent ) sb.ii(1).nl(); // Indent memory
     for( int i = 1; i< _pubs.length; i++ )
       if( _pubs[i] != null ) {
@@ -141,9 +141,16 @@ public class TypeMem extends Type<TypeMem> {
       }
     if( indent ) sb.di(1).i();
     else sb.unchar();
-    return sb.p(']');
+    return sb.p("]]");
   }
 
+
+  static TypeMem valueOf(Parse P, String cid, boolean any ) {
+    if( P.peek("_all_]]") ) return ALLMEM;
+    if( P.peek("_any_]]") ) return ANYMEM;
+    throw unimpl();
+  }
+  
   // Alias-at.  Out of bounds or null uses the parent value.
   public TypeStruct at(int alias) { return at(_pubs ,alias); }
   static TypeStruct at(TypeStruct[] tos, int alias) { return tos.length==1 ? tos[0].oob(TypeStruct.ISUSED): tos[at_idx(tos,alias)]; }

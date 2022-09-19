@@ -4,7 +4,7 @@ import com.cliffc.aa.type.Type;
 
 /** Tight/tiny StringBuilder wrapper.
  *  Short short names on purpose; so they don't obscure the printing.
- *  Can't believe this wasn't done long long ago. */
+ *  Can't believe this wasn't done long, long ago. */
 public final class SB {
   private final StringBuilder _sb;
   private int _indent = 0;

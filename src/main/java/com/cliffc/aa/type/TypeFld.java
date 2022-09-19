@@ -1,6 +1,9 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.*;
+import com.cliffc.aa.util.NonBlockingHashMapLong;
+import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.Util;
+import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.function.BinaryOperator;
@@ -77,22 +80,26 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   }
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    if( !TypeStruct.isDigit(_fld.charAt(0)) ) // Do not print number-named fields for tuples
-      _access.str(sb.p(_fld));
+    if( !TypeStruct.isDigit(_fld.charAt(0)) || // Do not print number-named fields for tuples, unless dups are involved
+        dups.get(_uid)!=null || _t==null || dups.get(_t._uid)!=null ) // DUP:_t is ambiguous with DUP:0=_t and 0=DUP:_t; so print field name
+      _access.str(sb.p(_fld));                                        // Print "field="
     return _t==null ? sb.p('!') : (_t._str(visit, dups, sb, debug, indent));
   }
 
-  static TypeFld valueOfArg(Parse P, String fid) {
-    int oldx=P._x;
-    String id = P.id();
-    if( !P.peek('=') ) { assert fid==null; P._x=oldx; return null; } // No such field
-    return _valueOf(P,fid,id);
-  }
-  static TypeFld valueOfTup(Parse P, String fid, int order) {  return _valueOf(P,fid,TUPS[order]);  }
-  static TypeFld _valueOf(Parse P, String fid, String fname) {
-    TypeFld fld = TypeFld.malloc(fname,null,Access.Final);
-    if( fid!=null ) P._dups.put(fid,fld);
-    return fld.setX(P.type());
+  // Parse "=type" and all variants of "=" in SHORTS, or return null.
+  // Passed in any "DUP:" string as cid.  Passed in the field name and number.
+  static TypeFld valueOf(Parse P, String cid, boolean any, String fld, int fld_num) {
+    assert !any;                // Discovered via SHORTS
+    assert fld_num>=0;          // Only called in a field context
+    String[] eqs = Access.SHORTS;
+    int i; for( i=0; i<eqs.length; i++ ) // Find assignment flavor
+      if( P.peek(eqs[i]) )
+        break;
+    if( i==eqs.length ) return null; // Not a assignment flavor
+    TypeFld tf = malloc(fld,null,Access.values[i]); // Make TypeFld without type yet
+    if( cid!=null ) P._dups.put(cid,tf);            // Close cyclic types
+    tf._t = P.type();                               // Fill in field type
+    return tf;
   }
 
   static { new Pool(TFLD,new TypeFld()); }
@@ -114,7 +121,8 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   public TypeFld make_from(Type t) { return t==_t ? this : make(_fld,t,_access); }
   public TypeFld make_from(Type t, Access a) { return (t==_t && a==_access) ? this : make(_fld,t,a); }
   // For some tests
-  public static final TypeFld NO_DSP = TypeFld.make_dsp(TypeMemPtr.NO_DISP);
+  public static final TypeFld ANY_DSP = TypeFld.make_dsp(Type.ANY);
+  public static final TypeFld NO_DSP  = TypeFld.make_dsp(TypeMemPtr.NO_DISP);
 
   @Override protected TypeFld xdual() {
     if( Util.eq(_fld,sdual(_fld)) && _t==_t.dual() && _access==_access.dual() )

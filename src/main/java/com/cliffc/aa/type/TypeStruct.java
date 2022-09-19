@@ -59,6 +59,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   TypeStruct init( String clz, Type def, TypeFld[] flds ) {
     assert check(def,flds) && check_name(clz);
+    assert above_center(clz)==def.above_center();
     super.init();
     _def  = def;
     _clz  = clz;
@@ -315,7 +316,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   public  static final TypeStruct POINT = make(TypeFld.make("x",TypeFlt.FLT64),TypeFld.make("y",TypeFlt.FLT64));
   public  static final TypeStruct NAMEPT= POINT.set_name("Point:");
   public  static final TypeStruct A     = make_test("a",TypeFlt.FLT64,Access.Final);
-  public  static final TypeStruct C0    = make_test("c",TypeNil.XNIL,Access.Final); // @{c:0}
+  public  static final TypeStruct C0    = make_test("c",TypeNil.XNIL ,Access.Final); // @{c:0}
   public  static final TypeStruct D1    = make_test("d",TypeInt.TRUE ,Access.Final); // @{d:1}
   public  static final TypeStruct ARW   = make_test("a",TypeFlt.FLT64,Access.RW   );
 
@@ -327,10 +328,18 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   // Dual the flds, dual the tuple.  Return a not-interned thing.
   @Override protected TypeStruct xdual() {
+    boolean is_con= _def == _def._dual;
     TypeFld[] tfs = TypeFlds.get(len());
-    for( int i=0; i<tfs.length; i++ )
+    for( int i=0; i<tfs.length; i++ ) {
       tfs[i] = _flds[i]._dual;
-    return malloc(clz_dual(_clz), _def._dual, TypeFlds.hash_cons(tfs));
+      is_con &= tfs[i] == _flds[i];
+    }
+    if( is_con ) return this;   // On centerline, a constant struct
+    String dclz = clz_dual(_clz);
+    // If the dual is a constant, it does not change hi/lo during a dual.
+    // Keep the clz matching.
+    if( above_center(dclz) != _def._dual.above_center() ) dclz = _clz;
+    return malloc(dclz, _def._dual, TypeFlds.hash_cons(tfs));
   }
 
   // Recursive dual
@@ -370,7 +379,10 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // Remove dups, remove defaults, sort.
   private static final Ary<TypeFld> FLDS = new Ary<>(new TypeFld[1],0);
   private TypeStruct flat_meet( TypeStruct that, String clz ) {
-    Type  def = _def.meet(that._def);
+    Type def = _def.meet(that._def);
+    if( !above_center(clz) && def.above_center() ) // Mismatched names drop hard
+      def = def.dual();                            // Force default to drop as well
+    
     TypeFld[] flds0 = TypeFlds.get(this.len()+that.len());
     int i=0, j=0, len0=0;
     while( i<this.len() && j<that.len() ) {
@@ -486,6 +498,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     TypeFld[] flds = TypeFlds.get(FLDS.len());
     System.arraycopy(FLDS._es,0,flds,0,FLDS.len()); // Bulk fill without filtering
     Type def = _def.meet(that._def);
+    if( !above_center(clz) && def.above_center() ) // Mismatched names drop hard
+      def = def.dual();                            // Force default to drop as well
     mt = malloc(clz,def,flds);
     MEETS0.put(new TPair(this,that),mt);
 
@@ -630,36 +644,36 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   }
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    if( Util.eq(_clz,"int:") ) return _def._str(visit,dups,sb,debug,false);
-    if( Util.eq(_clz,"flt:") ) return _def._str(visit,dups,sb,debug,false);
-
-    sb.p(_clz);
+    sb.p(_clz);                 // Includes a leading "~" if above_center(), and a trailing ':' if not-empty
+    // To distinguish "DUP:(...)" from "CLZ:(...)" we require another ':' IFF DUP is present.
+    //           ()  -- parses as a no-dup no-clz tuple
+    //       clz:()  -- parses as a no-dup    clz tuple
+    //   dup:   :()  -- parses as a    dup no-clz tuple
+    //   dup:clz:()  -- parses as a    dup    clz tuple
+    if( _clz.isEmpty() && dups.get(_uid)!=null )  sb.p(':'); 
     boolean is_tup = is_tup();
     sb.p(is_tup ? "(" : "@{");
-    // Special shortcut for the all-prims display type
-    if(      is_math()    ) sb.p("MATH");
-    else if( is_int_clz() ) sb.p("INT");
-    else if( is_flt_clz() ) sb.p("FLT");
-    else if( is_top_dsp() ) sb.p("TOP_DSP");
-    else {
-      // Set the indent flag once for the entire struct.  Indent if any field is complex.
-      boolean ind = false;
-      for( TypeFld fld : this )
-        if( (debug || !Util.eq(fld._fld,"^")) && (fld._t!=null && fld._t._str_complex(visit,dups)) )
-          ind=indent;           // Field is complex, indent if asked to do so
-      if( ind ) sb.ii(1);
-      for( TypeFld fld : _flds ) {
-        if( !debug && Util.eq(fld._fld,"^") ) continue; // Do not print the ever-present display
+    // Set the indent flag once for the entire struct.  Indent if any field is complex.
+    boolean ind = false;
+    for( TypeFld fld : this )
+      if( (debug || !Util.eq(fld._fld,"^")) && (fld._t!=null && fld._t._str_complex(visit,dups)) )
+        ind=indent;           // Field is complex, indent if asked to do so
+    if( ind ) sb.ii(1);
+    boolean sep=false;
+    for( TypeFld fld : _flds ) {
+      if( fld==TypeFld.ANY_DSP ) sb.p('_'); // Short cut the ever-present display
+      else {
         if( ind ) sb.nl().i();
         fld._str(visit,dups, sb, debug, indent ); // Field name, access mod, type
-        sb.p(is_tup ? ", " : "; "); // Between fields
       }
-      if( _flds.length>0 ) sb.unchar().unchar();
-      if( _def==ANY ) sb.p(", ..."); // Any extra fields are allowed
-      else if( _def==ALL ) ;         // No extra fields
-      else sb.p(", ").p(_def);       // Unusual extra fields
-      if( ind ) sb.nl().di(1).i();
+      sb.p(is_tup ? ", " : "; "); // Between fields
+      sep=true;
     }
+    if( _def==ANY ) sb.p("..."); // Any extra fields are allowed
+    else if( _def==ALL ) {       // No extra fields
+      if( sep ) sb.unchar().unchar();
+    } else sb.p('$').p(_def);    // Unusual extra fields
+    if( ind ) sb.nl().di(1).i();
     sb.p(!is_tup ? "}" : ")");
     return sb;
   }
@@ -671,58 +685,33 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   boolean is_int_clz() { return has("!_"); }
   boolean is_flt_clz() { return has("_/_") && !has("!_"); }
 
-  // e.g. (), (^=any), (^=any,"abc"), (3.14), (3.14,"abc"), (,,)
-  static TypeStruct valueOf(Parse P, String cid, boolean is_tup, boolean any ) {
-    if( is_tup ) P.require('(');
-    else { P.require('@');  P.require('{'); }
-    TypeStruct ts = malloc("",any ? ANY : ALL,TypeFlds.get(0));
+  // e.g. (), (^=any), (^=any,"abc"), (3.14), (3.14,"abc")
+  // @{}, @{x=3.14; y="abc"}
+  static TypeStruct valueOf(Parse P, String cid, boolean any, boolean is_tup ) {
+    TypeStruct ts = malloc(any ? "~" : "",any ? ANY : ALL,TypeFlds.get(0));
     if( cid!=null ) P._dups.put(cid,ts);
-    if( P.peek(',') ) {
-      ts._def = P.type();
-      P.require(is_tup ? ')' : '}');
-      return ts;
+    String clz = P.id();
+    if( clz!=null ) {
+      P.require(':');
+      ts._clz = ((any?"~":"")+clz+":").intern();
     }
-    if( P.peek(!is_tup ? '}' : ')') ) return ts;
+    if( !is_tup ) { P.require('@');  P.require('{'); } else P.require('(');
+    char close = is_tup ? ')' : '}';
+    if( P.peek(close) ) return ts;
 
-    int aidx=DSP_IDX;
-    do {
-      TypeFld fld=null;
-      int oldx = P._x;
-      String fid = P.id();
-      Type dup = P._dups.get(fid);
-      if( dup==null ) {
-        // Check for a leading repeat name, even on a tuple: "FA:^=any"
-        if( fid.length()!=0 && P.peek(':') && (fid!="int" && fid!="flt") && (!is_tup || aidx==DSP_IDX) )
-          RECURSIVE_MEET++;     // Start a cyclic field type
-        else { P._x = oldx; fid=null; }
-        // Check for "^=any" on *tuples* which do not normally print field names
-        if( aidx==DSP_IDX ) {
-          fld = TypeFld.valueOfArg(P, fid);
-          if( fld==null ) aidx++; // Parse "(int64)" correct; tuple with leading id not field name
-        }
-        if( fld==null && P.peek("...") ) {
-          ts._def=ANY;
-          break;
-        }
-        if( fld==null )         // Parse a field
-          fld = is_tup ? TypeFld.valueOfTup(P,fid,aidx) : TypeFld.valueOfArg(P,fid);
+    int fld_num = ARG_IDX;
+    while(true) {
+      if( P.peek("...") ) { assert any; break; }
+      if( P.peek('$') )
+        { ts._def = P.type(null,false,-1); break; }
+      TypeFld fld = ts.len()==0 && P.peek('_')
+        ? TypeFld.ANY_DSP
+        : (TypeFld)P.type(null,false,is_tup && P.skipWS()!='^' ? fld_num++ : 0);
+      ts.add_fld(fld);        
+      if( !P.peek(is_tup ? ',' : ';') ) break;
+    }
 
-        if( fid!=null ) --RECURSIVE_MEET; // End cyclic field type
-        TypeFld ofld = fld;
-        fld = P.cyc(fld);                 // Install as needed
-        if( fid!=null && fld!=ofld )
-          P._dups.put(fid,fld); // Update dups if we early-interned
-      } else {                  // Hit a duplicate
-        // Ambiguous with un-named tuple fields
-        fld = dup instanceof TypeFld dup2 ? dup2
-          : TypeFld.malloc(TypeFld.TUPS[aidx==DSP_IDX ? ARG_IDX : aidx],dup,Access.Final);
-      }
-
-      aidx++;
-      ts.add_fld(fld);
-
-    } while( P.peek(is_tup ? ',' : ';') );
-    P.require(is_tup ? ')' : '}');
+    P.require(close);
     return ts;
   }
 
@@ -792,7 +781,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     throw unimpl();
   }
 
-  @Override public boolean above_center() { return _def.above_center(); }
+  private static boolean above_center(String clz ) { return clz.length()>0 && clz.charAt(0)=='~'; }
+  @Override public boolean above_center() { return above_center(_clz); }
   @Override public boolean is_con() {
     if( !_def.is_con() ) return false;
     for( TypeFld fld : _flds )
