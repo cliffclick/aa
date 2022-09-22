@@ -729,29 +729,8 @@ public class HM {
         return lam._types[_idx];
       }
       // Else a Let
-      Syntax def = ((Let)_def)._def;
-      Type dt = def._flow;
-      if( !(dt instanceof TypeUnion tu) )
-        return dt;              // Not an overloaded result
-      //// An overloaded Let result; it may never resolve, although this of it might
-      //T2 deft2 = def.find();
-      //if( !deft2.is_over() || deft2.size()!=tt.len() )
-      //  throw unimpl(); //return tt; // CNC Can i resolve this
-      //
-      //// Sharpen a not-resolved overload.  Happens for overloads only used by
-      //// fresh-unify, i.e. all Let ids.
-      //Type rez=null;
-      //for( String id : deft2._args.keySet() ) {
-      //  T2 over = deft2.arg(id);
-      //  if( !over.trial_unify(t2) ) {
-      //    Type t0 = tt._ts[Integer.parseInt(id.substring(1))];
-      //    if( rez==null ) rez = t0;
-      //    else return _flow;
-      //  }
-      //}
-      //// Found a single matching key
-      //return rez;
-      throw unimpl();
+      Syntax let = ((Let)_def)._def;
+      return let._flow;
     }
     @Override int prep_tree( Syntax par, VStack nongen, Work<Syntax> work ) {
       prep_tree_impl(par,nongen,work,T2.make_leaf());
@@ -1069,7 +1048,6 @@ public class HM {
 
     @Override Type val(Work<Syntax> work) {
       Type flow = _fun._flow;
-      if( flow instanceof TypeUnion ) throw unimpl();
       if( !(flow instanceof TypeFunPtr tfp) ) return flow.oob(TypeNil.SCALAR);
       if( !tfp.is_empty() ) {   // Nothing being called
         // If the input function is an overloaded function, and resolved by HMT
@@ -1675,7 +1653,6 @@ public class HM {
   static class Overload extends Syntax {
     final Syntax[] _overs;
     Overload( Syntax[] overs ) {
-      super(type(overs));
       assert overs.length>1;
       _overs =overs;
     }
@@ -1693,13 +1670,6 @@ public class HM {
     }
     @Override boolean hm(Work<Syntax> work) { return false; }
     @Override void add_hm_work( @NotNull Work<Syntax> work) { work.add(_par); }
-    private static Type type( Syntax[] overs ) {
-      Type u = TypeNil.SCALAR;
-      for( Syntax over : overs )
-        u = u.join(over._flow);
-      assert u instanceof TypeUnion;
-      return u;
-    }
    
     @Override Type val(Work<Syntax> work) {
       // If not resolved, the overload is still pending; take the join of children.
@@ -1707,32 +1677,8 @@ public class HM {
       // If resolved to all children, the overload is in error; take the meet of children.
       T2 over = find();
       T2 rez = over.is_over() ? over.arg("&&") : over; // Can be resolved and folded away
-      if( rez==null ) {         // Not resolved, produce a tuple
-        return type(_overs);
-        //Type t = TypeNil.SCALAR;
-        //for( Syntax ov : _overs )
-        //  t = t.join(ov._flow);
-        //// TODO: Need the Powerset representation of FIDXS here.
-        //boolean multi=false;
-        //if( t instanceof TypeFunPtr tfp ) {
-        //  BitsFun fidxs = BitsFun.EMPTY;
-        //  // Repeat, but just looking at the FIDXS; take the meet and dual.
-        //  // Restriction to single-bits.
-        //  for( Syntax ov : _overs ) {
-        //    if( !(ov._flow instanceof TypeFunPtr tfp2) ) return t; // Give up the sharpening
-        //    BitsFun f2 = tfp2.pos();
-        //    if( f2.abit()== -1 ) multi=true;
-        //    fidxs = fidxs.meet(f2);
-        //  }
-        //  t = tfp.make_from(fidxs.dual());
-        //}
-        //if( t instanceof TypeMemPtr tmp ) throw unimpl();
-        //if( !multi ) return t;
-        //// Give up on JOIN, without PowerSet
-        //t = TypeNil.XSCALAR;
-        //for( Syntax ov : _overs )
-        //  t = t.meet(ov._flow);
-        //return t;
+      if( rez==null ) {         // Not resolved, produce an overload
+        throw unimpl();
        
       } else {
         // Resolved.  Take meet of all matching children.  Should be exactly

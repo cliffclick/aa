@@ -172,34 +172,9 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   Type cross_nil( TypeNil tn ) {
     assert _type!=tn._type && _type!=TNIL && tn._type!=TNIL;   // Unrelated subclass parts
     boolean any = false; // Unrelated sub-parts cannot keep their choices; falls to Scalar-plus-nil-whatever
-    TypeInt    int0= TypeInt   .INT64.dual();
-    TypeFlt    flt = TypeFlt   .FLT64.dual();
-    TypeMemPtr tmp = TypeMemPtr.ISUSED0.dual();
-    TypeFunPtr tfp = TypeFunPtr.GENERIC_FUNPTR0.dual();
-    switch( this ) {
-    case TypeInt    tint: { int0=tint; break; }
-    case TypeFlt    tflt: { flt =tflt; break; }
-    case TypeMemPtr ttmp: { tmp =ttmp; break; }
-    case TypeFunPtr ttfp: { tfp =ttfp; break; }
-    case TypeRPC    trpc: return make(any,_nil & tn._nil,_sub & tn._sub);
-    default: throw unimpl();
-    }
-    switch( tn ) {
-    case TypeInt    tint: { int0=tint; break; }
-    case TypeFlt    tflt: { flt =tflt; break; }
-    case TypeMemPtr ttmp: { tmp =ttmp; break; }
-    case TypeFunPtr ttfp: { tfp =ttfp; break; }
-    case TypeRPC    trpc: return make(any,_nil & tn._nil,_sub & tn._sub);
-    default: throw unimpl();
-    }
-    TypeNil tn0 = make(true,_nil&tn._nil,_sub&tn._sub);
-    TypeUnion tu = TypeUnion.make(any,
-                                  (TypeInt   )int0.meet(tn0),
-                                  (TypeFlt   )flt .meet(tn0),
-                                  (TypeMemPtr)tmp .meet(tn0),
-                                  (TypeFunPtr)tfp .meet(tn0));
-    return tu;
-    
+    boolean nil = _nil & tn._nil;
+    boolean sub = _sub & tn._sub;
+    return make(any,nil,sub);
   }
   TypeNil as_nil() { return make(false,_nil,_sub); }
 

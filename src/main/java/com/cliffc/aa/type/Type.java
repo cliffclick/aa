@@ -525,9 +525,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     // Reverse; xmeet 2nd arg is never "is_simple" and never equal to "this".
     if(   is_simple() ) return this.xmeet(t   );
     if( t.is_simple() ) return t   .xmeet(this);
-    // Unions absorb non-union
-    if( this instanceof TypeUnion tu0 && t    instanceof TypeNil tn ) return tu0.umeet(tn);
-    if( t    instanceof TypeUnion tu1 && this instanceof TypeNil tn ) return tu1.umeet(tn);
     // Triangulate on is_nil without being the same class
     if( this instanceof TypeNil t0 && t instanceof TypeNil t1 ) {
       // LHS is TypeNil directly
@@ -604,7 +601,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     Ary<Type> ts = new Ary<>(new Type[1],0);
     concat(ts,Type      .TYPES);
     concat(ts,TypeNil   .TYPES);
-    //concat(ts,TypeAry   .TYPES);
+    //concat(ts,TypeAry   .TYPES); // Ambiguous printout
     concat(ts,TypeInt   .TYPES);
     concat(ts,TypeFlt   .TYPES);
     concat(ts,TypeMemPtr.TYPES);
@@ -613,7 +610,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     concat(ts,TypeMem   .TYPES);
     concat(ts,TypeStruct.TYPES);
     concat(ts,TypeTuple .TYPES);
-    concat(ts,TypeUnion .TYPES);
     // Partial order Sort, makes for easier tests later.  Arrays.sort requires
     // a total order (i.e., the obvious Comparator breaks the sort contract),
     // so we hand-roll a simple bubble sort.
@@ -763,7 +759,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       case '*' -> cyc(TypeMemPtr.valueOf(this,cid,any));
       case '(' -> cyc(TypeStruct.valueOf(this,cid,any,true ));
       case '@' -> cyc(TypeStruct.valueOf(this,cid,any,false));
-      case '&' -> cyc(TypeUnion .valueOf(this,cid,any));
       case '[' -> peek("[[")
         ? TypeMem.valueOf(this,cid,any)
         : cyc(TypeFunPtr.valueOf(this,cid,any));

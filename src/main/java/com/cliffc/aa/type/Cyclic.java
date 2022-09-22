@@ -368,15 +368,6 @@ public interface Cyclic {
         TypeFunPtr tfp = (TypeFunPtr) h;
         _uid(_uid(tfp.fidxs().str(sb).p("{ "), tfp.dsp()).p(" -> "), tfp._ret).p(" }");
       }
-      case Type.TUNION -> {
-        TypeUnion tu = (TypeUnion) h;
-        sb.p("&[");
-        _uid(sb.p(" "),tu._int());
-        _uid(sb.p(" "),tu._flt());
-        _uid(sb.p(" "),tu._tmp());
-        _uid(sb.p(" "),tu._tfp());
-        sb.p("]");
-      }
       case Type.TARY -> throw unimpl();
       default -> h.str(sb, false, false);
       }

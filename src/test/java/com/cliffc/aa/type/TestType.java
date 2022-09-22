@@ -332,8 +332,7 @@ public class TestType {
     // Crossing ints and *[ALL]+null
     Type  i8 = TypeInt.INT8;
     Type xi8 = i8.dual();
-    TypeUnion tu = TypeUnion.make(false,(TypeInt)xi8,TypeFlt.FLT64._dual,(TypeMemPtr)xmem0,TypeFunPtr.GENERIC_FUNPTR.dual());
-    assertEquals( tu, xi8.meet(xmem0)); // ~OOP+0 & ~i8 -> &[0+int1 0+flt32  highest_low_tmp highest_low_tfp ]
+    assertEquals( TypeNil.make(false,true,true), xi8.meet(xmem0)); // ~OOP+0 & ~i8 -> 0+Scalar
   }
 
   // Old model: fields are ordered, and are MEETd in order.  If fields at the
