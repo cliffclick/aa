@@ -59,7 +59,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   TypeStruct init( String clz, Type def, TypeFld[] flds ) {
     assert check(def,flds) && check_name(clz);
-    assert above_center(clz)==def.above_center();
     super.init();
     _def  = def;
     _clz  = clz;
@@ -282,21 +281,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   public static TypeStruct make0(String name, Type def, TypeFld[] flds) { return make(name,def,TypeFlds.hash_cons(remove_dups(def,flds))); }
   public TypeStruct make_from(TypeFld[] flds) { return make0(_clz,_def,flds); }
 
-  Type nmeet( TypeNil tn ) {
-    if( tn._type!=TNIL )
-      tn = tn.as_nil(); 
-    if( tn._any ) { // PLAN A, simple
-      TypeFld[] flds = TypeFlds.get(_flds.length);
-      for( int i=0; i<flds.length; i++ )
-        flds[i] = _flds[i].make_from(_flds[i]._t.meet(tn));
-      return make0(_clz,_def.meet(tn),flds);
-    } else {
-      Type t = _def.meet(tn);
-      for( TypeFld fld : _flds )
-        t = t.meet(fld._t);
-      return t;
-    }
-  }
   public void remove_dups() { _flds = remove_dups(_def,_flds); }
   public void remove_dups_hashcons() { _flds = TypeFlds.hash_cons(remove_dups(_def,_flds)); }
 
@@ -336,9 +320,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     }
     if( is_con ) return this;   // On centerline, a constant struct
     String dclz = clz_dual(_clz);
-    // If the dual is a constant, it does not change hi/lo during a dual.
-    // Keep the clz matching.
-    if( above_center(dclz) != _def._dual.above_center() ) dclz = _clz;
     return malloc(dclz, _def._dual, TypeFlds.hash_cons(tfs));
   }
 
@@ -366,23 +347,20 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
     // Common name prefix
     String clz = clz_meet(_clz,that._clz);
+    Type def = _def.meet(that._def);
 
     // If both are cyclic, we have to do the complicated cyclic-aware meet
     return cyclic()!=null && that.cyclic()!=null
-      ? cyclic_meet(that, clz )
+      ? cyclic_meet(that, clz, def )
       // Recursive but not cyclic; since at least one of these types is
       // non-cyclic.  Normal recursion will bottom-out.
-      :   flat_meet(that, clz );
+      :   flat_meet(that, clz, def );
   }
 
   // Meet all common fields, using defaults for the uncommon fields.
   // Remove dups, remove defaults, sort.
   private static final Ary<TypeFld> FLDS = new Ary<>(new TypeFld[1],0);
-  private TypeStruct flat_meet( TypeStruct that, String clz ) {
-    Type def = _def.meet(that._def);
-    if( !above_center(clz) && def.above_center() ) // Mismatched names drop hard
-      def = def.dual();                            // Force default to drop as well
-    
+  private TypeStruct flat_meet( TypeStruct that, String clz, Type def ) {
     TypeFld[] flds0 = TypeFlds.get(this.len()+that.len());
     int i=0, j=0, len0=0;
     while( i<this.len() && j<that.len() ) {
@@ -466,7 +444,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // Both structures are cyclic.  The meet will be "as if" both structures are
   // infinitely unrolled, Meeted, and then re-rolled.  If cycles are of uneven
   // length, the end result will be the cyclic GCD length.
-  private TypeStruct cyclic_meet( TypeStruct that, String clz ) {
+  private TypeStruct cyclic_meet( TypeStruct that, String clz, Type def ) {
     // Walk 'this' and 'that' and map them both (via MEETS0) to a shared common
     // Meet result.  Only walk the cyclic parts... cyclically.  When visiting a
     // finite-sized part we use the normal recursive Meet.  When doing the
@@ -497,9 +475,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     for( ; j<that.len(); j++ )  add_fldc(that._flds[j]);
     TypeFld[] flds = TypeFlds.get(FLDS.len());
     System.arraycopy(FLDS._es,0,flds,0,FLDS.len()); // Bulk fill without filtering
-    Type def = _def.meet(that._def);
-    if( !above_center(clz) && def.above_center() ) // Mismatched names drop hard
-      def = def.dual();                            // Force default to drop as well
     mt = malloc(clz,def,flds);
     MEETS0.put(new TPair(this,that),mt);
 
@@ -680,11 +655,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return true; }
 
-  boolean is_math() { return has("pi"); }
-  boolean is_top_dsp() { return has("int") && has("flt") && has("math"); }
-  boolean is_int_clz() { return has("!_"); }
-  boolean is_flt_clz() { return has("_/_") && !has("!_"); }
-
   // e.g. (), (^=any), (^=any,"abc"), (3.14), (3.14,"abc")
   // @{}, @{x=3.14; y="abc"}
   static TypeStruct valueOf(Parse P, String cid, boolean any, boolean is_tup ) {
@@ -722,10 +692,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     int idx = find(fld._fld);
     if( get(idx)==fld ) return this;
     return make_from(TypeFlds.make_from(_flds,idx,fld));
-  }
-  public TypeStruct pop_fld(int idx) {
-    assert idx==_flds.length-1;
-    return make_from(TypeFlds.pop(_flds));
   }
   public TypeStruct remove_fld(int idx) {
     return make_from(TypeFlds.remove(_flds,idx));
@@ -765,24 +731,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
       flds[i] = _flds[i].make_from(_flds[i].oob(), Access.bot());
     return make_from(flds);
   }
-  
-  // Used during liveness propagation from Loads.
-  // Fields not-loaded are not-live.
-  TypeStruct remove_other_flds(String name, Type live) {
-    TypeFld nfld = get(name);
-    if( nfld == null ) return UNUSED; // No such field, so all fields will be XSCALAR so UNUSED instead
-    //TypeStruct ts = malloc(_clz,_def);
-    //for( int i=0; i<len(); i++ ) {
-    //  String fname = get(i)._fld;
-    //  //ts._flds.push(TypeFld.make(fname,Util.eq(fname,name) ? live : XSCALAR, Access.bot()));
-    //  throw unimpl();
-    //}
-    //return ts.hashcons_free();
-    throw unimpl();
-  }
 
-  private static boolean above_center(String clz ) { return clz.length()>0 && clz.charAt(0)=='~'; }
-  @Override public boolean above_center() { return above_center(_clz); }
+  @Override public boolean above_center() { return _def.above_center(); }
   @Override public boolean is_con() {
     if( !_def.is_con() ) return false;
     for( TypeFld fld : _flds )

@@ -92,8 +92,8 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer>, Comp
   // return a new Bits.  Overridden in subclasses to make type-specific Bits.
   abstract B make_impl(int con, long[] bits );
   abstract Tree<B> tree();
-  public abstract B NALL();
-  public abstract B NANY();
+  public abstract B ALL();
+  public abstract B ANY();
   public abstract B EMPTY();
 
   // Common init
@@ -322,19 +322,19 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer>, Comp
   // semantics; any set bits automatically include all their children as well.
   //
   // AS-IF: For any given set-bit, we "unpack" it, setting every child bit.  We
-  // then do the proper AND/OR operation on the bits, followed by a repack.
+  // then do the proper AND/OR operation on the bits, followed by a re-pack.
   //
 
   @SuppressWarnings("unchecked")
   public B meet( final B bs ) {
     if( this==bs ) return (B)this;
-    B full = NALL();             // Subclass-specific version of full
+    B full = ALL();             // Subclass-specific version of full
     if( this==full || bs==full ) return full;
-    B any  = NANY();             // Subclass-specific version of any
+    B any  = ANY();             // Subclass-specific version of any
     if( this==any ) return bs;
     if( bs  ==any ) return (B)this;
     // Empty is a little odd; similar to meeting two JOIN sets with nothing in
-    // common - it is on the center, and forces above values to fall, and
+    // common - it is in the center, and forces above values to fall, and
     // itself falls to below values.
     if( is_empty() ) return bs.above_center() ? (B)this : bs;
     if( bs.is_empty() ) return above_center() ? bs : (B)this;

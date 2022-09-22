@@ -1,4 +1,45 @@
 =======================================
+9/22/2022
+
+Troubles making TypeUnion a lattice, with constants and nil.
+Thinking:
+  drop TypeUnion
+  
+Overload makes a TypeStruct with tuple-named fields; no display (no scope).
+Need a Load/with-unknown (HM only knows) field to get correct field.
+
+Overloads are numbered (or clz?  or alias?), based on alloc site.  
+Meet with same number/clz/alias uses per-element.
+Meet with unrelated blows out to e.g. &[ANY].  Awaits HM selection per-use.
+
+Illegal to mix unrelated Overloads (ambiguous), unless can extract per-use sanely.
+
+// Here 2 unrelated Overloads MEET.  Must resolve prior to MEET, and the Phi has e.g. "int" type.
+    over = pred ? &[1 0x123 "red" ] : &[2 3.14 0x456 ]; // Unrelated Overloads MEET
+    x = over & 3;  // resolves 'over' as 'int'; otherwise over is 2 unrelated unions, and resolve happens across all
+
+
+// Mixing related Overloads MEET field by field.  Require same ALIAS#
+  "color = { num str -> &[ num str ] };                       // Single Overload alias#
+   rgb = pred ? (color 0x123 "red") : (color 0x456 "blue");   // Mixing same overload is OK
+   (pair (cat "light" rgb) (- rgb 0x010101))"                 // at use sites, extracts correct part; GCP checks for Overload, checks for HM resolution, extracts part; use uses JOIN 
+
+// Mixing UNrelated and UNresolved Overloads just returns a MEET of JOIN-ALL-FIELDS.
+// IN AA, every Use asks: resolve-now, or post-pone?
+  "bits = pred ? &[ 0x123 "red" ] : &[ 3.14 0x456 @{x=1} ]; // Mixed overload, resolves here
+   (dec bits)" // Only uses integer
+
+
+So Overloads with same alias meet part-by-part; same for Apply arguments (Just Another Phi).
+At other uses, check for HM resolve.  Unresolved, uses JOIN.  Resolved uses chosen part.
+
+To allow overload _+_ oper and _*_ oper to be mixed, all must be made by the same function.
+  make_bin_op = { ii if fi ff -> &[ ii if fi ff] }
+  add_prims = (make_bin_op _i+i_ _i+f_ _f+i_ _f+f_); // overload of widening add prims
+  sub_prims = (make_bin_op _i-i_ _i-f_ _f-i_ _f-f_); // overload of widening add prims
+
+
+=======================================
 8/22/2022
 
 Recursive types seem sane, modulo unroll/re-roll or O(n log n) minimization.

@@ -27,8 +27,10 @@ public class BitsAlias extends Bits<BitsAlias> {
   public static final int INTX = new_alias(ALLX); // Internal aliases
   public static final int STRX = new_alias(INTX); // String alias
   // The All-Memory alias class
-  public static BitsAlias NALL = new BitsAlias().make_impl(ALLX,null); // All aliases, no nil
-  public static BitsAlias NANY = NALL.dual();
+  public  static final BitsAlias NALL = new BitsAlias().make_impl(ALLX,null); // All aliases, no nil
+  public  static final BitsAlias NANY = NALL.dual();
+  private static final BitsAlias  ALL = NALL.make_impl(1,new long[]{0x3}); // All aliases
+  private static final BitsAlias  ANY = ALL.dual();
 
   public static final BitsAlias EXT = make0(EXTX);
   public static final BitsAlias INT = make0(INTX);
@@ -46,8 +48,8 @@ public class BitsAlias extends Bits<BitsAlias> {
   // Iterate over children
   public static int next_kid( int alias, int kid ) { return TREE.next_kid(alias,kid); }
 
-  @Override public BitsAlias NALL() { return NALL; }
-  @Override public BitsAlias NANY() { return NANY; }
+  @Override public BitsAlias ALL() { return ALL; }
+  @Override public BitsAlias ANY() { return ANY; }
   @Override public BitsAlias EMPTY() { return EMPTY ; }
 
   public static BitsAlias make0( int bit ) { return NALL.make(bit); }

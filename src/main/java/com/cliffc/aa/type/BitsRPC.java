@@ -30,11 +30,13 @@ public class BitsRPC extends Bits<BitsRPC> {
   
   // Have to make a first BitsRPC here; thereafter the v-call to make_impl
   // will make more on demand.  But need the first one to make a v-call.
-  public static final BitsRPC NALL  = new BitsRPC().make_impl(ALLX,null);
-  public static final BitsRPC NANY = NALL.dual();
-  public static final BitsRPC EMPTY = NALL.make(); // No bits
-  @Override public BitsRPC NALL () { return NALL ; }
-  @Override public BitsRPC NANY () { return NANY ; }
+  public  static final BitsRPC NALL  = new BitsRPC().make_impl(ALLX,null);
+  public  static final BitsRPC NANY = NALL.dual();
+  private static final BitsRPC  ALL = NALL.make_impl(1,new long[]{0x3}); // All RPCs
+  private static final BitsRPC  ANY = ALL.dual();
+  public  static final BitsRPC EMPTY = NALL.make(); // No bits
+  @Override public BitsRPC ALL() { return ALL ; }
+  @Override public BitsRPC ANY() { return ANY ; }
   @Override public BitsRPC EMPTY() { return EMPTY; }
 
   static BitsRPC make0( int bit ) { return NALL.make(bit); }

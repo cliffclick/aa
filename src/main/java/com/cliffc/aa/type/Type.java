@@ -525,26 +525,23 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     // Reverse; xmeet 2nd arg is never "is_simple" and never equal to "this".
     if(   is_simple() ) return this.xmeet(t   );
     if( t.is_simple() ) return t   .xmeet(this);
+    // Unions absorb non-union
+    if( this instanceof TypeUnion tu0 && t    instanceof TypeNil tn ) return tu0.umeet(tn);
+    if( t    instanceof TypeUnion tu1 && this instanceof TypeNil tn ) return tu1.umeet(tn);
     // Triangulate on is_nil without being the same class
     if( this instanceof TypeNil t0 && t instanceof TypeNil t1 ) {
-      // Unions absorb non-union
-      if( t0 instanceof TypeUnion tu0 ) return tu0.umeet(t1);
-      if( t1 instanceof TypeUnion tu1 ) return tu1.umeet(t0);
       // LHS is TypeNil directly
       if( t0._type==TNIL ) return t0.nmeet(t1); 
       if( t1._type==TNIL ) return t1.nmeet(t0);
       // Mis-matched TypeNil subclasses
       return t0.cross_nil(t1);
     }
-    // Spray TypeNil across fields in a TypeStruct
-    if( this instanceof TypeNil tn && t    instanceof TypeStruct ts ) return ts.nmeet(tn);
-    if( t    instanceof TypeNil tn && this instanceof TypeStruct ts ) return ts.nmeet(tn);
     return Type.ALL;        // Mixing 2 unrelated types not subclassing TypeNil
   }
 
 
   // Compute meet right now.  Overridden in subclasses.
-  // Handles cases where 'this.is_simple()' and unequal to 't'.
+  // Handle cases where 'this.is_simple()' and unequal to 't'.
   // Subclassed xmeet calls can assert that '!t.is_simple()'.
   protected Type xmeet(Type t) {
     assert is_simple(); // Should be overridden in subclass
@@ -753,6 +750,9 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     Parse(String str) { _str = str; }
     Type type() { return type(null,false,-1); }
     Type type(String cid, boolean any, int fld_num) {
+      if( fld_num>0 )           // Normal type parse (no field name), then wrap in a numbered field
+        return TypeFld.make(TypeFld.TUPS[fld_num],type(null,any,-1));
+
       return switch( skipWS() ) {
       case '0','1','2','3','4','5','6','7','8','9','-' -> num();
       case '"'  -> throw unimpl(); // parse string
@@ -812,11 +812,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         
         // Lookup various constant type names
         t = simple_type(id);
-        if( t!=null ) {
-          if( any ) t = t.dual();
-          if( fld_num>=0 ) t = TypeFld.make(TypeFld.TUPS[fld_num],t);
-          yield t;
-        }
+        if( t!=null )
+          yield any ? t.dual() : t;
         
         // Failed to parse 'id'
         throw unimpl();

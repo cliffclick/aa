@@ -127,14 +127,17 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     //return make(aliases,_obj);
     throw unimpl();
   }
-  @Override TypeMemPtr make_from( boolean any, boolean nil, boolean sub ) { return malloc(any,nil,sub,_aliases,_obj).hashcons_free(); }
+  @Override TypeMemPtr make_from( boolean any, boolean nil, boolean sub ) {
+    nil &= sub;
+    return any == _any && nil == _nil && sub == _sub ? this : malloc(any,nil,sub,_aliases,_obj).hashcons_free();
+  }
 
   // Legacy constructor for legacy HM tests
   public static final int STR_ALIAS = 4; // Legacy str ptr value
   public static TypeMemPtr make_str(String s) { return make_str(TypeInt.con(s.length()>0 ? s.charAt(0):0)); }
   public static TypeMemPtr make_str(Type t) { return make_str(BitsAlias.make0(STR_ALIAS),t); }
   public static TypeMemPtr make_str(BitsAlias aliases, Type t) {
-    TypeStruct ts = TypeStruct.make(TypeFld.ANY_DSP,TypeFld.make_tup(t, AA.ARG_IDX)).set_name("str:");
+    TypeStruct ts = TypeStruct.make(TypeFld.make_tup(t, AA.ARG_IDX)).set_name("str:");
     return TypeMemPtr.make(aliases.test(0),aliases.clear(0),ts);
   }
   public boolean is_str() { return Util.eq(_obj._clz,"str:"); }
@@ -166,7 +169,6 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public  static final TypeMemPtr STRPTR = make_str(TypeInt.INT8); // For legacy HM tests
 
   static final Type[] TYPES = new Type[]{ISUSED0,EMTPTR,DISPLAY,DISPLAY_PTR};
-  static final TypeMemPtr[][] MINMAX = new TypeMemPtr[][]{ {EMTPTR.make_from(false,false,false),EMTPTR.make_from(false,false,true)}, {EMTPTR.make_from(false,true,false),EMTPTR.make_from(false,true,true)} };
 
   @Override protected TypeMemPtr xdual() {
     BitsAlias ad = _aliases.dual();

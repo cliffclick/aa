@@ -14,22 +14,25 @@ import static com.cliffc.aa.AA.*;
 // external union must have the same setting for the _nil and _any flags, or
 // else we lose associativity or symmetry.
 
-// Since contains a TMP (and TFP), must implement Cyclic are participates in
+// Since contains a TMP (and TFP), must implement Cyclic and participates in
 // cyclic type construction.
-public class TypeUnion extends TypeNil<TypeUnion> implements Cyclic {
+public class TypeUnion extends Type<TypeUnion> implements Cyclic {
+  private boolean    _any;
   private TypeInt    _int;
-  public  TypeFlt    _flt;
+  private TypeFlt    _flt;
   private TypeMemPtr _tmp;
   private TypeFunPtr _tfp;
   
-  protected TypeUnion init( boolean any, boolean nil, boolean sub, TypeInt int0, TypeFlt flt, TypeMemPtr tmp, TypeFunPtr tfp ) {
-    super.init(any,nil,sub);
+  protected TypeUnion init( boolean any, TypeInt int0, TypeFlt flt, TypeMemPtr tmp, TypeFunPtr tfp ) {
+    super.init();
+    boolean n = int0._nil, s = int0._sub;
+    assert n==flt._nil && n==tmp._nil && n==tfp._nil; // Internal nil flags all align
+    assert s==flt._sub && s==tmp._sub && s==tfp._sub;    
+    _any = any;
     _int = int0;
     _flt = flt;
     _tmp = tmp;
     _tfp = tfp;
-    assert (any==int0._any || int0.is_con()) && (any==flt._any || flt.is_con()) && (tmp==null || (any==tmp._any && any==tfp._any));
-    assert  nil==int0._nil                   &&  nil==flt._nil                  && (tmp==null || (nil==tmp._nil && nil==tfp._nil));
     return this;
   }
 
@@ -55,7 +58,8 @@ public class TypeUnion extends TypeNil<TypeUnion> implements Cyclic {
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeUnion t) ) return false;
-    return _hash == t._hash && super.equals(t) && 
+    return _hash == t._hash && super.equals(t) &&
+      _any==t._any &&
       _int==t._int &&
       _flt==t._flt &&
       _tmp==t._tmp &&
@@ -65,7 +69,7 @@ public class TypeUnion extends TypeNil<TypeUnion> implements Cyclic {
   @Override public boolean cycle_equals( Type o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeUnion tu) ) return false;
-    if( !super.equals(tu) ) return false;
+    if( !super.equals(tu) || _any != tu._any ) return false;
     if( _int != tu._int || _flt != tu._flt ) return false;
     if( _tmp == tu._tmp && _tfp == tu._tfp ) return true;
     return _tmp.cycle_equals(tu._tmp) && _tfp.cycle_equals(tu._tfp);
@@ -88,7 +92,7 @@ public class TypeUnion extends TypeNil<TypeUnion> implements Cyclic {
     _tmp._str(visit,dups, sb, debug, indent );
     sb.p(_any?" + ":" & ");
     _tfp._str(visit,dups, sb, debug, indent );
-    return _str_nil(sb.p(" ]"));
+    return sb.p(" ]");
   }
   
   static TypeUnion valueOf(Parse P, String cid, boolean any) {
@@ -96,7 +100,7 @@ public class TypeUnion extends TypeNil<TypeUnion> implements Cyclic {
     P.require('[');
     TypeInt int0= (TypeInt   )P.type();   P.require(any ? '+' : '&');
     TypeFlt flt = (TypeFlt   )P.type();   P.require(any ? '+' : '&');
-    TypeUnion  tu  = malloc(any,int0._nil,int0._sub,int0,flt,null,null);
+    TypeUnion  tu  = malloc(any,int0,flt,null,null);
     if( cid!=null ) P._dups.put(cid,tu);
     tu._tmp = (TypeMemPtr)P.type();   P.require(any ? '+' : '&');
     tu._tfp = (TypeFunPtr)P.type();
@@ -107,52 +111,33 @@ public class TypeUnion extends TypeNil<TypeUnion> implements Cyclic {
   }
 
   static { new Pool(TUNION,new TypeUnion()); }
-  private static TypeUnion malloc( boolean any, boolean nil, boolean sub, TypeInt int0, TypeFlt flt, TypeMemPtr tmp, TypeFunPtr tfp ) {
+  private static TypeUnion malloc( boolean any, TypeInt int0, TypeFlt flt, TypeMemPtr tmp, TypeFunPtr tfp ) {
     TypeUnion t1 = POOLS[TUNION].malloc();
-    return t1.init(any,nil,sub,int0,flt,tmp,tfp);
+    return t1.init(any,int0,flt,tmp,tfp);
   }
 
-  public static TypeUnion make( boolean any, boolean nil, boolean sub, TypeInt int0, TypeFlt flt, TypeMemPtr tmp, TypeFunPtr tfp ) { return malloc(any,nil,sub,int0,flt,tmp,tfp).hashcons_free(); }
-  // AND bits into all children
-  TypeUnion make_from(boolean any, boolean nil, boolean sub ) {
-    any &= _any;
-    nil &= _nil;
-    sub &= _sub;
-    // If type would fall to subtype YES-nil, fall to AND-nil instead.
-    nil &= sub; 
-    TypeInt    int0= _int.make_from( any, nil, sub );
-    TypeFlt    flt = _flt.make_from( any, nil, sub );
-    TypeMemPtr tmp = _tmp.make_from( any, nil, sub );
-    TypeFunPtr tfp = _tfp.make_from( any, nil, sub );
-    return make(any, nil, sub, int0, flt, tmp, tfp);
-  }
+  public static TypeUnion make( boolean any, TypeInt int0, TypeFlt flt, TypeMemPtr tmp, TypeFunPtr tfp ) { return malloc(any,int0,flt,tmp,tfp).hashcons_free(); }
 
   public TypeInt    _int() { return _int; }
   public TypeFlt    _flt() { return _flt; }
   public TypeMemPtr _tmp() { return _tmp; }
   public TypeFunPtr _tfp() { return _tfp; }
   
-  public static final TypeUnion TEST1 = make(true ,false,true ,TypeInt.NINT64.dual(),TypeFlt.PI   ,TypeMemPtr.ISUSED.dual(),TypeFunPtr.GENERIC_FUNPTR.dual());
-  public static final TypeUnion TEST2 = make(false,false,false,TypeInt.INT8         ,TypeFlt.FLT64,TypeMemPtr.ISUSED0      ,TypeFunPtr.THUNK                );
-  static final TypeUnion[] TYPES = new TypeUnion[]{/*TEST1.dual(),*/TEST2};
+  public static final TypeUnion TEST1 = make(true ,TypeInt.NINT64.dual(),TypeFlt.PI   ,TypeMemPtr.ISUSED.dual(),TypeFunPtr.GENERIC_FUNPTR.dual());
+  public static final TypeUnion TEST2 = make(false,TypeInt.INT8         ,TypeFlt.FLT64,TypeMemPtr.ISUSED0      ,TypeFunPtr.THUNK                );
+  static final TypeUnion[] TYPES = new TypeUnion[]{TEST1.dual(),TEST2};
 
   // The length of Tuples is a constant, and so is its own dual.  Otherwise,
   // just dual each element.  Also flip the infinitely extended tail type.
   @Override protected TypeUnion xdual() {
-    boolean xor = _nil == _sub;
-    return malloc(!_any,_nil^xor,_sub^xor, _int.dual(), _flt.dual(), _tmp.dual(), _tfp.dual());
+    return malloc(!_any, _int.dual(), _flt.dual(), _tmp.dual(), _tfp.dual());
   }
   void rdual() { throw unimpl(); }
 
   // Meet 2 Unions together
-  @Override protected TypeNil xmeet( Type t ) {
+  @Override protected TypeUnion xmeet( Type t ) {
     TypeUnion tu = (TypeUnion)t;
-    boolean any = _any & tu._any;
-    boolean nil = _nil & tu._nil;
-    boolean sub = _sub & tu._sub;
-    if( !this._any ) { sub &= tu  .and_sub(); }
-    if( !tu  ._any ) { sub &= this.and_sub(); }    
-    return make(any,nil,sub,
+    return make(_any & tu._any,
                 (TypeInt   )_int.meet(tu._int),
                 (TypeFlt   )_flt.meet(tu._flt),
                 (TypeMemPtr)_tmp.meet(tu._tmp),
@@ -171,35 +156,41 @@ public class TypeUnion extends TypeNil<TypeUnion> implements Cyclic {
         case TypeFlt    tflt -> tflt.meet(_flt);
         case TypeMemPtr ttmp -> ttmp.meet(_tmp);
         case TypeFunPtr ttfp -> ttfp.meet(_tfp);
-        case TypeRPC    trpc -> TypeNil.make(false,_nil&tn._nil,_sub&tn._sub);
-        case TypeNil    ttn  -> ttn._any
-          ? make_from( tn._any, tn._nil, tn._sub )
-          : TypeNil.make(false,_nil&tn._nil,_sub&tn._sub);
+        case TypeRPC    trpc -> trpc;
+        case TypeNil    ttn  -> ttn._any       
+          ? nil_meet(ttn)     // High TypeNil folds into every member
+          : meet_nil(ttn);    // Low  TypeNil folds every member into a TypeNil
       };
     } else {
       // Low union, subclasses fall "into" the Union.
-      boolean nil = _nil & tn._nil;
-      boolean sub = _sub & tn._sub;
       // If type would fall to subtype YES-nil, fall to AND-nil instead.
-      nil &= sub;
-      TypeInt    int0= _int.make_from(false, nil, _int._sub & tn._sub );
-      TypeFlt    flt = _flt.make_from(false, nil, _flt._sub & tn._sub );
-      TypeMemPtr tmp = _tmp.make_from(false, nil, _tmp._sub & tn._sub );
-      TypeFunPtr tfp = _tfp.make_from(false, nil, _tfp._sub & tn._sub );
+      //  nil &= sub;
+      TypeUnion tu = nil_meet(tn);
+
       return switch (tn) {
-      case TypeInt    tint -> make(false, nil, sub, (TypeInt   )int0.meet(tint), flt, tmp, tfp );
-      case TypeFlt    tflt -> make(false, nil, sub, int0, (TypeFlt   )flt.meet(tflt), tmp, tfp );
-      case TypeMemPtr ttmp -> make(false, nil, sub, int0, flt, (TypeMemPtr)tmp.meet(ttmp), tfp );
-      case TypeFunPtr ttfp -> make(false, nil, sub, int0, flt, tmp, (TypeFunPtr)tfp.meet(ttfp) );
-      case TypeRPC    trpc -> TypeNil.make(false,nil,sub); // TODO: expand and allow
-      case TypeNil    ttn  -> ttn._any
-        ? make(false, nil, sub, int0, flt, tmp, tfp )
-        : TypeNil.make(false,_nil&tn._nil,sub);
+        case TypeInt    tint -> make(false, (TypeInt   )tu._int.meet(tint), tu._flt, tu._tmp, tu._tfp );
+        case TypeFlt    tflt -> make(false, tu._int, (TypeFlt   )tu._flt.meet(tflt), tu._tmp, tu._tfp );
+        case TypeMemPtr ttmp -> make(false, tu._int, tu._flt, (TypeMemPtr)tu._tmp.meet(ttmp), tu._tfp );
+        case TypeFunPtr ttfp -> make(false, tu._int, tu._flt, tu._tmp, (TypeFunPtr)tu._tfp.meet(ttfp) );
+        case TypeRPC    trpc -> this;
+        case TypeNil    ttn  -> ttn._any
+        ? tu                  // High TypeNil folds into every member
+        : meet_nil(ttn);      // Low  TypeNil folds every member into a TypeNil
       };
     }
   }
-
-  boolean and_sub() {
-    return _any ? _sub & _int._sub & _flt._sub & _tmp._sub & _tfp._sub : _sub;
+  // Spray a TypeNil across all members, returning a TypeUnion
+  private TypeUnion nil_meet(TypeNil tn) {
+    return make(_any,
+                _int.make_from(_int._any,_int._nil&tn._nil,_int._sub&tn._sub),
+                _flt.make_from(_flt._any,_flt._nil&tn._nil,_flt._sub&tn._sub),
+                _tmp.make_from(_tmp._any,_tmp._nil&tn._nil,_tmp._sub&tn._sub),
+                _tfp.make_from(_tfp._any,_tfp._nil&tn._nil,_tfp._sub&tn._sub));
   }
+  // Fold all members into a low TypeNil.  Can only be SCALAR or NSCALR
+  private TypeNil meet_nil(TypeNil tn) {
+    return (TypeNil)tn.meet(_int).meet(_flt).meet(_tmp).meet(_tfp);
+  }
+
+  @Override public boolean above_center() { return _any; }
 }

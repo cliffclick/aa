@@ -61,7 +61,10 @@ public class TypeInt extends TypeNil<TypeInt> {
     TypeInt t1 = POOLS[TINT].malloc();
     return t1.init(any,nil,sub,z,con).hashcons_free();
   }
-  @Override TypeInt make_from( boolean any, boolean nil, boolean sub ) { return make(any,nil,sub,_z,_con); }
+  @Override TypeInt make_from( boolean any, boolean nil, boolean sub ) {
+    nil &= sub;
+    return any == _any && nil == _nil && sub == _sub ? this : make(any,nil,sub,_z,_con);
+  }
 
   public static TypeInt con(long con) { return make(false,false,true,0,con); }
 
@@ -77,7 +80,6 @@ public class TypeInt extends TypeNil<TypeInt> {
   public  static final TypeInt C3    = con(3);
   public  static final TypeInt C123  = con(123456789L);
   static final TypeInt[] TYPES = new TypeInt[]{INT64,NINT64,INT32,INT16,INT8,NINT8,BOOL,TRUE,C3,C123};
-  static final TypeInt[][] MINMAX = new TypeInt[][]{ {make(false,false,false,1,0),make(false,false,true,1,0)}, {make(false,true,false,1,0),make(false,true,true,1,0)} };
   static void init1( HashMap<String,Type> types ) {
     types.put("bool" ,BOOL);
     types.put("int1" ,BOOL);

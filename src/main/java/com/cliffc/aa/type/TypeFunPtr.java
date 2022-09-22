@@ -142,6 +142,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     sb.p(_nargs).p(" ->");
     boolean ind = indent && _ret._str_complex(visit,dups);
     if( ind ) sb.nl().ii(1).i();
+    else sb.p(' ');
     _ret._str(visit,dups, sb, debug, indent).p(' ');
     if( ind ) sb.nl().di(1).i();
     return _str_nil(sb.p('}'));
@@ -308,7 +309,6 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     boolean any = pos.above_center();
     boolean nil = any &&  haz_nil;
     boolean sub = any || !haz_nil;
-    assert !haz_nil;             // TODO: Fix side-effect, or intern
     return make(any, nil, sub, pos, nargs,dsp,ret);
   }
   public static TypeFunPtr makex( BitsFun pos, int nargs, Type dsp, Type ret ) {
@@ -334,17 +334,16 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
 
   public TypeFunPtr make_from( Type dsp, Type ret ) { return dsp==_dsp && ret==_ret ? this : make(_pos,_nargs, dsp,ret); }
   @Override TypeFunPtr make_from( boolean any, boolean nil, boolean sub ) {
-    if( any == _any && nil == _nil && sub == _sub ) return this;
-    return makex(any,nil,sub,_pos,_nargs,_dsp,_ret);
+    nil &= sub;
+    return any == _any && nil == _nil && sub == _sub ? this : makex(any,nil,sub,_pos,_nargs,_dsp,_ret);
   }
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.NALL ,1,Type.ALL,Type.ALL);
+  public  static final TypeFunPtr GENERIC_FUNPTR0= make(BitsFun.NALL.set(0),1,Type.ALL,Type.ALL);
   public  static final TypeFunPtr ARG2   =         make(BitsFun.NALL ,2,Type.ALL,Type.ALL);
   public  static final TypeFunPtr THUNK  =         make(false,false,false,BitsFun.NALL ,3,Type.ALL,Type.ALL); // zero-arg function (plus ctrl, mem, display)
   public  static final TypeFunPtr EMPTY  =         make(BitsFun.EMPTY,1,Type.ANY,Type.ANY);
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,ARG2,THUNK};
-  private static final TypeFunPtr FMINMAX = make(BitsFun.EMPTY,999,Type.ANY,Type.ANY);
-  static final TypeFunPtr[][] MINMAX = new TypeFunPtr[][]{ {FMINMAX.make_from(false,false,false),FMINMAX.make_from(false,false,true)}, {FMINMAX.make_from(false,true,false),FMINMAX.make_from(false,true,true)} };
 
   @Override protected TypeFunPtr xdual() {
     boolean xor = _nil == _sub;

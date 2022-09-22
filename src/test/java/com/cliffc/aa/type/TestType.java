@@ -13,6 +13,18 @@ import static org.junit.Assert.assertTrue;
 public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
+    Type t0 = TypeFlt.con(2.3f).dual();
+    Type t1 = TypeMemPtr.STRPTR.dual();
+    Type t2 = t0.meet(t1); // goes low, weirdly does MINMAX to ptrs which is bad...
+    Type t3 = t2.dual();   // is high
+    Type t4 = t3.meet(t1); // should meet back to STRPTR.dual
+    // but is neither STRPTR or STRPTR.dual
+    //assertEquals(TypeNil.SCALAR,t2);
+
+
+    // theory: TU is not a TypeNil and holds 4 unrelated TNILs internally
+    // theory: TU has a ANY flag (choice vs meet, delay vs error)
+    // theory: drop MINMAX
   }
 
 
@@ -30,7 +42,8 @@ public class TestType {
   // Test for a collection of Strings, that toString and valueOf are a bijection
   @Test public void testValueOf() {
     String[] ss = new String[] {
-      "3"
+      "3",
+      "[23]{any,3 -> *[7](3, Scalar) }",
     };
     for( String s : ss ) {
       Type t0 = Type.valueOf(s);
@@ -164,7 +177,7 @@ public class TestType {
     assertEquals( o ,o  .meet(xi8 )); // ~i8 ->  1
     assertEquals(i8 ,i8 .meet(o   )); //  1  -> i8
 
-    // Lattice around n:int8 and n:0 is well formed; exactly 2 edges, 3 nodes
+    // Lattice around n:int8 and n:0 is well-formed; exactly 2 edges, 3 nodes
     // Confirm lattice: {N:~i8 -> N:1 -> N:i8}
     // Confirm lattice: {N:~i8 -> N:0 -> N:i8}
     Type ni8 = i8.set_name("int:__test_enum:");
@@ -319,7 +332,7 @@ public class TestType {
     // Crossing ints and *[ALL]+null
     Type  i8 = TypeInt.INT8;
     Type xi8 = i8.dual();
-    Type tu = TypeInt.INT64._dual.meet(TypeFlt.FLT64._dual);
+    TypeUnion tu = TypeUnion.make(false,(TypeInt)xi8,TypeFlt.FLT64._dual,(TypeMemPtr)xmem0,TypeFunPtr.GENERIC_FUNPTR.dual());
     assertEquals( tu, xi8.meet(xmem0)); // ~OOP+0 & ~i8 -> &[0+int1 0+flt32  highest_low_tmp highest_low_tfp ]
   }
 

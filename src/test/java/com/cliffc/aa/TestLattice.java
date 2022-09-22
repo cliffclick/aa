@@ -2387,6 +2387,109 @@ public class TestLattice {
 
   }
 
+
+  // Looking at simple unions, this one without a nil.
+  //
+  // The join of int and flt is [3 + 3.14] - magic constants.
+  // Which means adding e.g. '2' to the lattice makes it not-a-lattice.
+  
+  //            ~Scalar
+  //        &[~int + ~flt]          
+  // &[~int + 3.14]        &[ 3 + ~flt]
+  //   ~int   &[ 3 + 3.14]        ~flt 
+  //        3               3.14     
+  //    int   &[ 3 & 3.14]         flt
+  // &[ int & 3.14]        &[ 3 &  flt]
+  //        &[ int &  flt]
+  //            Scalar
+  @Test public void testLattice23() {
+    N.reset();
+    N scalar    = new N("Scalar");
+    
+    N _i_AND__f = new N("[ int &  flt]", scalar );
+    N _i_AND_pi = new N("[ int & 3.14]",_i_AND__f);
+    N _3_AND__f = new N("[  3  &  flt]",_i_AND__f);
+    N _i        = new N( " int"        ,_i_AND_pi);
+    N _f        = new N(        " flt" ,_3_AND__f);
+
+    N _3_AND_pi = new N("[  3  & 3.14]",_i_AND_pi,_3_AND__f);
+    N _3        = new N(  " 3 "        ,_3_AND_pi,_i);
+    N _pi       = new N(        "3.14" ,_3_AND_pi,_f);
+    N _3_OR_pi  = new N("[  3  + 3.14]",_3,_pi);
+    
+    N xi        = new N( "~int"        ,_3 );
+    N xf        = new N( "~flt"        ,_pi);
+    N _3_OR_xf  = new N("[  3  + ~flt]",_3_OR_pi,xf);
+    N xi_OR_pi  = new N("[~int + 3.14]",_3_OR_pi,xi);
+    N xi_OR_xf  = new N("[~int + ~flt]",_3_OR_xf,xi_OR_pi);
+    N xscalr    = new N("~Scalar",xi_OR_xf);
+
+    scalar   .set_dual(xscalr);
+    _i_AND__f.set_dual(xi_OR_xf);
+    _i_AND_pi.set_dual(xi_OR_pi);
+    _3_AND__f.set_dual(_3_OR_xf);
+    _i       .set_dual(xi);
+    _f       .set_dual(xf);
+    _3_AND_pi.set_dual(_3_OR_pi);
+
+    test(xscalr);
+  }
+
+  // Same as testLattice23, but with an additional int constant '2'.
+  // NOT A LATTICE
+  
+  //            ~Scalar
+  //        &[~int + ~flt]          
+  // &[~int + 3.14]        &[ 2 + ~flt]   &[ 3 + ~flt]  
+  //   ~int   &[ 3 + 3.14]        ~flt
+  //          &[ 2 + 3.14]
+  //    2 3                       3.14     
+  //          &[ 2 & 3.14]
+  //    int   &[ 3 & 3.14]         flt
+  // &[ int & 3.14]        &[ 2 &  flt]   &[ 3 &  flt]
+  //        &[ int &  flt]
+  //            Scalar
+  @Ignore
+  @Test public void testLattice23a() {
+    N.reset();
+    N scalar    = new N("Scalar");
+    
+    N _i_AND__f = new N("[ int &  flt]", scalar );
+    N _i_AND_pi = new N("[ int & 3.14]",_i_AND__f);
+    N _2_AND__f = new N("[  2  &  flt]",_i_AND__f);
+    N _3_AND__f = new N("[  3  &  flt]",_i_AND__f);
+    N _i        = new N( " int"        ,_i_AND_pi);
+    N _f        = new N(        " flt" ,_2_AND__f,_3_AND__f);
+
+    N _2_AND_pi = new N("[  2  & 3.14]",_i_AND_pi,_2_AND__f);
+    N _3_AND_pi = new N("[  3  & 3.14]",_i_AND_pi,_3_AND__f);
+    N _2        = new N(  " 2 "        ,_2_AND_pi,_i);
+    N _3        = new N(  " 3 "        ,_3_AND_pi,_i);
+    N _pi       = new N(        "3.14" ,_2_AND_pi,_3_AND_pi,_f);
+    N _2_OR_pi  = new N("[  2  + 3.14]",_2,_pi);
+    N _3_OR_pi  = new N("[  3  + 3.14]",_3,_pi);
+    
+    N xi        = new N( "~int"        ,_3, _2 );
+    N xf        = new N( "~flt"        ,_pi);
+    N _2_OR_xf  = new N("[  2  + ~flt]",_2_OR_pi,xf);
+    N _3_OR_xf  = new N("[  3  + ~flt]",_3_OR_pi,xf);
+    N xi_OR_pi  = new N("[~int + 3.14]",_3_OR_pi,_2_OR_pi,xi);
+    N xi_OR_xf  = new N("[~int + ~flt]",_3_OR_xf,_2_OR_xf,xi_OR_pi);
+    N xscalr    = new N("~Scalar",xi_OR_xf);
+
+    scalar   .set_dual(xscalr);
+    _i_AND__f.set_dual(xi_OR_xf);
+    _i_AND_pi.set_dual(xi_OR_pi);
+    _2_AND__f.set_dual(_2_OR_xf);
+    _3_AND__f.set_dual(_3_OR_xf);
+    _i       .set_dual(xi);
+    _f       .set_dual(xf);
+    _2_AND_pi.set_dual(_2_OR_pi);
+    _3_AND_pi.set_dual(_3_OR_pi);
+
+    test(xscalr);
+  }
+
   // Open question for a future testLattice test:
   //
   //    Under what circumstances can 'meet' return a NIL?

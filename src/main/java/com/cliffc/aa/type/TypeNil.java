@@ -168,35 +168,38 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   }
 
   // Meet the nil bits, but the subclass parts are not the same.
-  // Fall to a TypeNil.
-  TypeNil cross_nil( TypeNil tn ) {
+  // Fall to a TypeUnion.
+  Type cross_nil( TypeNil tn ) {
     assert _type!=tn._type && _type!=TNIL && tn._type!=TNIL;   // Unrelated subclass parts
     boolean any = false; // Unrelated sub-parts cannot keep their choices; falls to Scalar-plus-nil-whatever
-    boolean nil = _nil & tn._nil;
-    boolean sub = _sub & tn._sub;
-    int idxn = nil ? 1 : 0;
-    int idxs = sub ? 1 : 0;
-    TypeInt    int0= TypeInt   .MINMAX[idxn][idxs]; //.make(false,nil,sub,1,0);
-    TypeFlt    flt = TypeFlt   .MINMAX[idxn][idxs]; //.make(false,nil,sub,32,0);
-    TypeMemPtr tmp = TypeMemPtr.MINMAX[idxn][idxs]; //.EMTPTR.make_from(false,nil,sub);
-    TypeFunPtr tfp = TypeFunPtr.MINMAX[idxn][idxs]; //.make(BitsFun.EMPTY,999,Type.ANY,Type.ANY).make_from(false,nil,sub);
+    TypeInt    int0= TypeInt   .INT64.dual();
+    TypeFlt    flt = TypeFlt   .FLT64.dual();
+    TypeMemPtr tmp = TypeMemPtr.ISUSED0.dual();
+    TypeFunPtr tfp = TypeFunPtr.GENERIC_FUNPTR0.dual();
     switch( this ) {
-    case TypeInt    tint: { int0=(TypeInt   )int0.meet(tint); break; }
-    case TypeFlt    tflt: { flt =(TypeFlt   )flt .meet(tflt); break; }
-    case TypeMemPtr ttmp: { tmp =(TypeMemPtr)tmp .meet(ttmp); break; }
-    case TypeFunPtr ttfp: { tfp =(TypeFunPtr)tfp .meet(ttfp); break; }
-    case TypeRPC    trpc: return make(any,nil,sub);
+    case TypeInt    tint: { int0=tint; break; }
+    case TypeFlt    tflt: { flt =tflt; break; }
+    case TypeMemPtr ttmp: { tmp =ttmp; break; }
+    case TypeFunPtr ttfp: { tfp =ttfp; break; }
+    case TypeRPC    trpc: return make(any,_nil & tn._nil,_sub & tn._sub);
     default: throw unimpl();
     }
     switch( tn ) {
-    case TypeInt    tint: { int0=(TypeInt   )int0.meet(tint); break; }
-    case TypeFlt    tflt: { flt =(TypeFlt   )flt .meet(tflt); break; }
-    case TypeMemPtr ttmp: { tmp =(TypeMemPtr)tmp .meet(ttmp); break; }
-    case TypeFunPtr ttfp: { tfp =(TypeFunPtr)tfp .meet(ttfp); break; }
-    case TypeRPC    trpc: return make(any,nil,sub);
+    case TypeInt    tint: { int0=tint; break; }
+    case TypeFlt    tflt: { flt =tflt; break; }
+    case TypeMemPtr ttmp: { tmp =ttmp; break; }
+    case TypeFunPtr ttfp: { tfp =ttfp; break; }
+    case TypeRPC    trpc: return make(any,_nil & tn._nil,_sub & tn._sub);
     default: throw unimpl();
     }
-    return TypeUnion.make(any,nil,sub,int0,flt,tmp,tfp);
+    TypeNil tn0 = make(true,_nil&tn._nil,_sub&tn._sub);
+    TypeUnion tu = TypeUnion.make(any,
+                                  (TypeInt   )int0.meet(tn0),
+                                  (TypeFlt   )flt .meet(tn0),
+                                  (TypeMemPtr)tmp .meet(tn0),
+                                  (TypeFunPtr)tfp .meet(tn0));
+    return tu;
+    
   }
   TypeNil as_nil() { return make(false,_nil,_sub); }
 

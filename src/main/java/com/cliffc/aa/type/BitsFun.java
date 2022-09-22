@@ -34,15 +34,17 @@ public class BitsFun extends Bits<BitsFun> {
   // will make more on demand.  But need the first one to make a v-call.
 
   // Internal and external callers, not nil
-  public static final BitsFun NALL  = new BitsFun().make_impl(ALLX,null);
-  public static final BitsFun NANY = NALL.dual();
+  public  static final BitsFun NALL = new BitsFun().make_impl(ALLX,null);
+  public  static final BitsFun NANY = NALL.dual();
+  private static final BitsFun  ALL = NALL.make_impl(1,new long[]{0x3});
+  private static final BitsFun  ANY = ALL.dual();
 
   public static final BitsFun EXT = make0(EXTX);
   public static final BitsFun INT = make0(INTX);
   
   public static final BitsFun EMPTY = make0();
-  @Override public BitsFun NALL () { return NALL; }
-  @Override public BitsFun NANY () { return NANY; }
+  @Override public BitsFun ALL() { return ALL; }
+  @Override public BitsFun ANY() { return ANY; }
   @Override public BitsFun EMPTY() { return EMPTY; }
 
   // Make a NEW fidx, with the given parent, and return the Bits with just it

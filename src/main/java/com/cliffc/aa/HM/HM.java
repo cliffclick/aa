@@ -1114,7 +1114,7 @@ public class HM {
       _old_lift=lift;             // Record updated lift
       if( lift==ret ) return ret; // No change
       if( !test ) rezt2.push_update(this);
-      return ret.join(lift);    // Lifted result
+      return ret.join(lift);      // Lifted result
     }
 
     // Walk the input HM type and CCP flow type in parallel and create a
@@ -2350,7 +2350,7 @@ public class HM {
     }
     static T2 make_str(TypeMemPtr flow) {
       assert flow.is_str();
-      T2 t2str = make_open_struct(new String[]{"str:","0"},new T2[]{make_leaf(),make_base(flow._obj.at(1))});
+      T2 t2str = make_open_struct(new String[]{"str:","0"},new T2[]{make_leaf(),make_base(flow._obj.get("0")._t)});
       return make_ptr(t2str);
     }
     // No fields (yet), filled in during prep-tree

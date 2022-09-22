@@ -26,9 +26,9 @@ public class TestHM {
     JIG=true;
 
     DO_HMT=true;
-    DO_GCP=false;
-    RSEED=0;
-    test06();
+    DO_GCP=true;
+    RSEED=1;
+    test14();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -92,12 +92,12 @@ public class TestHM {
 
   @Test public void test02() { rune( "{ x -> (pair 3 x) }" ,
                                      "{ A -> *( 3, A) }",
-                                     "[23]{any,3 -> *[7](3,Scalar)}",
+                                     "[23]{any,3 -> *[7](_, 3,Scalar)}",
                                      "[7]", "[23]" ); }
 
   @Test public void test03() { rune( "{ z -> (pair (z 0) (z \"abc\")) }" ,
                                     "{ { *str:(97)? -> A } -> *( A, A) }",
-                                    "[23]{any,3 ->*[7](Scalar, Scalar) }",
+                                    "[23]{any,3 ->*[7](_, Scalar, Scalar) }",
                                     "[7]", "[23,24]" );
   }
 
@@ -114,8 +114,8 @@ public class TestHM {
     rune("({ id -> (pair (id 3) (id 5) ) } {x->x})",
          "*( nint8, nint8)",   // HMT result type, using both GCP + HMT
          "*( nint8, nint8)",   // HMT result type, HMT alone
-         "*[7](3, 5)",  // GCP result type, using both GCP + HMT
-         "*[7](nint8, nint8)", // GCP result type, GCP alone
+         "*[7](_, 3, 5)",  // GCP result type, using both GCP + HMT
+         "*[7](_, nint8, nint8)", // GCP result type, GCP alone
           "[7]",null);
   }
 
@@ -125,9 +125,9 @@ public class TestHM {
          "*( 3, *str:(97))",
          "*( 3, *str:(97))",
          // GCP with HM
-         "*[7](3, *[4]str:(97))",
+         "*[7](_, 3, *[4]str:(97))",
          // GCP is weaker without HM, reports error tuple
-         "*[7]( &[nint8 & nflt32 & PA:*[4]str:( 97) & XA:[]{any,999 ->any } ],  &[nint8 & nflt32 & PA & XA ])",
+         "*[7](_, &[nint8 & nflt32 & PA:*[4]str:(97) & XA:[]{any,999 ->any } ],  &[nint8 & nflt32 & PA & XA ])",
          "[4,7]", null );
   }
 
@@ -160,7 +160,7 @@ public class TestHM {
   // example that demonstrates generic and non-generic variables:
   @Test public void test09() { rune( "{ g -> f = { ignore -> g }; (pair (f 3) (f \"abc\"))}",
                                      "{ A -> *( A, A) }",
-                                     "[25]{any,3 ->*[7](Scalar, Scalar) }",
+                                     "[25]{any,3 ->*[7](_, Scalar, Scalar) }",
                                      "[4,7]","[25]"); }
 
   @Test public void test10() { rune( "{ f g -> (f g)}",
@@ -191,8 +191,8 @@ public class TestHM {
          "(pair ((map str) 5) ((map factor) 2.3))",
          "*( *str:(int8), flt64)",
          "*( *str:(int8), flt64)",
-         "*[7](*[4]str:(, int8), flt64)",
-         "*[7]( &[int1 & flt64 & PA:*[4]str:(, int8)? & XA:[]{any,999 ->any }? ]?,  &[int1 & flt64 & PA & XA ]?)",
+         "*[7](_, *[4]str:(int8), flt64)",
+         "*[7](_, &[int1 & flt64 & PA:*[4]str:(int8)? & XA:[]{any,999 ->any }? ]?,  &[int1 & flt64 & PA & XA ]?)",
          "[4,7]",null);
   }
 
