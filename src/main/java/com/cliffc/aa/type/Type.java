@@ -803,7 +803,9 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
 
         // Check for field id
         if( fld_num == 0 )
-          yield cyc(TypeFld.valueOf(this,cid,any,id,fld_num));
+          yield cyc(skipWS() >0 && at(_x+1)!='=' && peek(':') // Named field: FA:v1=123, and not r/w field FA:=123
+                    ? type(id,any,fld_num) 
+                    : TypeFld.valueOf(this,cid,any,id,fld_num)); // Unnamed field: v1=123
         
         // Lookup various constant type names
         t = simple_type(id);

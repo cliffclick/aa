@@ -94,7 +94,7 @@ public class TestHM10 {
     return TypeFld.make(fld,mfun(nargs,ret,fidxs));
   }
   private static TypeFunPtr mfun( int nargs, Type ret, int... fidxs ) {
-    return TypeFunPtr.make(BitsFun.make0(fidxs),nargs,PTR_NDSP,ret);
+    return TypeFunPtr.make(false,BitsFun.make0(fidxs),nargs,PTR_NDSP,ret);
   }
   private static TypeFld bfun2(String fld, int a0, int a1, int nargs ) {
     return TypeFld.make(fld,TypeFunPtr.make(BitsFun.make0(a0,a1),nargs));

@@ -13,20 +13,29 @@ import static org.junit.Assert.assertTrue;
 public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
-    Type t0 = TypeFlt.con(2.3f).dual();
-    Type t1 = TypeMemPtr.STRPTR.dual();
-    Type t2 = t0.meet(t1); // goes low, weirdly does MINMAX to ptrs which is bad...
-    Type t3 = t2.dual();   // is high
-    Type t4 = t3.meet(t1); // should meet back to STRPTR.dual
-    // but is neither STRPTR or STRPTR.dual
-    //assertEquals(TypeNil.SCALAR,t2);
+    int a0 = BitsFun.new_fidx();
+    int a1 = BitsFun.new_fidx();
+    int a2 = BitsFun.new_fidx();
+    Type t0 = tfp(a0,TypeNil.XSCALAR);
+    Type t1 = tfp(a1,t0);
+    //Type t2 = t0.join(t1);
+    Type t2x = tfp(BitsFun.EMPTY,TypeNil.XSCALAR);
+    //assertEquals(t2x,t2);
 
+    Type t3 = tfp(a2,t1);
+    Type t4 = TypeFunPtr.make_cycle(false,false,true,BitsFun.make0(a0),3,Type.ANY);
+    Type t5 = tfp(BitsFun.make0(a0,a1),t4);
 
-    // theory: TU is not a TypeNil and holds 4 unrelated TNILs internally
-    // theory: TU has a ANY flag (choice vs meet, delay vs error)
-    // theory: drop MINMAX
+    Type t3d = t3.dual();
+    Type t5d = t5.dual();
+    
+    Type t6d = t5d.meet(t3d);
+    assertEquals(t2x.dual(),t6d);
+    
+    
   }
-
+  private static TypeFunPtr tfp(int fidx   ,Type ret) { return TypeFunPtr.make(      fidx,3,Type.ANY,ret); }
+  private static TypeFunPtr tfp(BitsFun pos,Type ret) { return TypeFunPtr.make(false,pos ,3,Type.ANY,ret); }
 
   // Test for a collection of Types, that toString and valueOf are a bijection
   @Test public void testToString() {
@@ -89,7 +98,7 @@ public class TestType {
     assertTrue(wx1.isa(wx2));
     assertTrue(wx2.isa(wx3));  // CHECK MONOTONIC
   }
-  static TypeFunPtr make( BitsFun fidxs, Type ret) { return TypeFunPtr.makex(fidxs,1,TypeMemPtr.NO_DISP,ret); }
+  static TypeFunPtr make( BitsFun fidxs, Type ret) { return TypeFunPtr.makex(false,fidxs,1,TypeMemPtr.NO_DISP,ret); }
 
   @Test public void testBits0() {
 
@@ -398,13 +407,13 @@ public class TestType {
     int fidx1 = f1f2f.fidx();
     BitsFun funs = BitsFun.make0(fidx0).meet(BitsFun.make0(fidx1));
     Type tu = TypeInt.INT64.meet(TypeFlt.FLT64);
-    TypeFunPtr f3i2r = TypeFunPtr.make(funs,2,NO_DISP,tu);
+    TypeFunPtr f3i2r = TypeFunPtr.make(false,funs,2,NO_DISP,tu);
     assertEquals(f3i2r,mt);
     assertTrue(f3i2r.isa(gf));
     assertTrue(f1i2i.isa(f3i2r));
     assertTrue(f1f2f.isa(f3i2r));
 
-    TypeFunPtr f2 = TypeFunPtr.make(BitsFun.make0(fidx1),2,NO_DISP,TypeInt.INT64); // Some generic function (happens to be #23, '&')
+    TypeFunPtr f2 = TypeFunPtr.make(false,BitsFun.make0(fidx1),2,NO_DISP,TypeInt.INT64); // Some generic function (happens to be #23, '&')
     assertTrue(f2.isa(gf));
   }
 

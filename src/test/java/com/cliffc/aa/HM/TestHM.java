@@ -27,8 +27,9 @@ public class TestHM {
 
     DO_HMT=true;
     DO_GCP=true;
-    RSEED=1;
-    test14();
+    //r= 0,tst52;  progress cnt=1217
+    RSEED=0;
+    test52();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -53,7 +54,7 @@ public class TestHM {
     if( JIG )
       _run0s(prog,rez_hm,frez_gcp,RSEED,esc_ptrs,esc_funs);
     else
-      for( int rseed=0; rseed<4; rseed++ )
+      for( int rseed=0; rseed<32; rseed++ )
         _run0s(prog,rez_hm,frez_gcp,rseed,esc_ptrs,esc_funs);
   }
 
@@ -127,7 +128,7 @@ public class TestHM {
          // GCP with HM
          "*[7](_, 3, *[4]str:(97))",
          // GCP is weaker without HM, reports error tuple
-         "*[7](_, &[nint8 & nflt32 & PA:*[4]str:(97) & XA:[]{any,999 ->any } ],  &[nint8 & nflt32 & PA & XA ])",
+         "*[7](_, nScalar, nScalar)",
          "[4,7]", null );
   }
 
@@ -192,7 +193,7 @@ public class TestHM {
          "*( *str:(int8), flt64)",
          "*( *str:(int8), flt64)",
          "*[7](_, *[4]str:(int8), flt64)",
-         "*[7](_, &[int1 & flt64 & PA:*[4]str:(int8)? & XA:[]{any,999 ->any }? ]?,  &[int1 & flt64 & PA & XA ]?)",
+         "*[7](_, Scalar, Scalar)",
          "[4,7]",null);
   }
 
@@ -200,14 +201,14 @@ public class TestHM {
   @Test public void test15() { run("map = { fun x -> (fun x)}; (map {a->3} 5)", "3", "3"); }
 
   // map takes a function and an element (collection?) and applies it (applies to collection?)
-  @Test public void test16() { rune("map = { fun x -> (fun x)}; (map { a-> (pair a a)} 5)", "*( 5, 5)", "*[7](5, 5)","[4,7]",null); }
+  @Test public void test16() { rune("map = { fun x -> (fun x)}; (map { a-> (pair a a)} 5)", "*( 5, 5)", "*[7](_, 5, 5)","[4,7]",null); }
 
   @Test public void test17() { rune("""
 fcn = { p -> { a -> (pair a a) }};
 map = { fun x -> (fun x)};
 { q -> (map (fcn q) 5)}
 """,
-                                    "{ A -> *( 5, 5) }", "[27]{any,3 ->*[7](5, 5) }",
+                                    "{ A -> *( 5, 5) }", "[27]{any,3 ->*[7](_, 5, 5) }",
                                     "[4,7]","[27]"); }
 
   // Checking behavior when using "if" to merge two functions with sufficiently
@@ -225,7 +226,7 @@ map = { fun x -> (fun x)};
          "map = { fun x -> (fun x)};"+
          "{ q -> (map (fcn q) 5)}",
          "{ A? -> *( B:[Cannot unify 5 and *( 3, B)], B) }",
-         "[34]{any,3 -> *[7,8](5, nScalar) }",
+         "[34]{any,3 -> *[7,8](_, 5, nScalar) }",
          "[4,7,8,9]","[34]" );
   }
 
@@ -250,8 +251,8 @@ map ={fun parg -> (fun (cdr parg))};
 """,
          "*( *str:(int8), int1)",
          "*( *str:(int8), int1)",
-         "*[7](*[4]str:(, int8), int64)",
-         "*[7](Scalar, Scalar)",
+         "*[7](_, *[4]str:(int8), int64)",
+         "*[7](_, Scalar, Scalar)",
          "[4,7]",null );
   }
 
@@ -288,7 +289,7 @@ map ={fun parg -> (fun (cdr parg))};
 }
 """,
          "{ { nint8 -> A } -> *( A, A) }",
-         "[30]{any,3 ->*[7](Scalar, Scalar) }",
+         "[30]{any,3 ->*[7](_, Scalar, Scalar) }",
          "[4,7]","[24,30]" );
   }
 
@@ -296,7 +297,7 @@ map ={fun parg -> (fun (cdr parg))};
   @Test public void test25() {
     rune("@{x=2; y=3}",
          "*@{ x = 2; y = 3}",
-         "*[7]@{x=2; y=3}",
+         "*[7]@{_; x=2; y=3}",
          "[4,7]",null);
   }
 
@@ -311,7 +312,7 @@ map ={fun parg -> (fun (cdr parg))};
 
   @Test public void test29() { rune("{ g -> @{x=g; y=g}}",
                                     "{ A -> *@{ x = A; y = A} }",
-                                    "[22]{any,3 ->*[7]@{x=Scalar; y=Scalar} }",
+                                    "[22]{any,3 ->*[7]@{_; x=Scalar; y=Scalar} }",
                                     "[4,7]","[22]"); }
 
   // Load common field 'x', ignoring mismatched fields y and z
@@ -335,7 +336,7 @@ map ={fun parg -> (fun (cdr parg))};
   @Test public void test32() {
     rune("map = { fcn lst -> @{ n1 = (map fcn lst.n0); v1 = (fcn lst.v0) } }; map",
          "{ { A -> B } C:*@{ n0 = C; v0 = A; ...} -> D:*@{ n1 = D; v1 = B} }",
-         "[22]{any,4 ->PA:*[7]@{n1=PA; v1=Scalar} }",
+         "[22]{any,4 ->PA:*[7]@{_; n1=PA; v1=Scalar} }",
          "[4,7,10]","[22,24]");
   }
 
@@ -345,7 +346,7 @@ map ={fun parg -> (fun (cdr parg))};
   @Test public void test33() {
     rune("map = { fcn lst -> (if lst @{ n1=(map fcn lst.n0); v1=(fcn lst.v0) } 0) }; map",
          "{ { A -> B } C:*@{ n0 = C; v0 = A; ...}? -> D:*@{ n1 = D; v1 = B}? }",
-         "[26]{any,4 ->PA:*[0,7]@{n1=PA; v1=Scalar} }",
+         "[26]{any,4 ->PA:*[0,7]@{_; n1=PA; v1=Scalar} }",
          "[4,7,10]","[24,26]");
   }
 
@@ -353,7 +354,7 @@ map ={fun parg -> (fun (cdr parg))};
   @Test public void test34() {
     rune("map = { fcn lst -> (if lst @{ n1 = (map fcn lst.n0); v1 = (fcn lst.v0) } 0) }; (map dec @{n0 = 0; v0 = 5})",
          "A:*@{ n1 = A; v1 = int64}?",
-         "PA:*[0,7]@{n1=PA; v1=4}",
+         "PA:*[0,7]@{_; n1=PA; v1=4}",
          "[4,7]",null);
   }
 
@@ -362,7 +363,7 @@ map ={fun parg -> (fun (cdr parg))};
   @Test public void test36() {
     rune("map = { lst -> (if lst @{ n1= arg= lst.n0; (if arg @{ n1=(map arg.n0); v1=(str arg.v0)} 0); v1=(str lst.v0) } 0) }; map",
          "{ A:*@{ n0 = *@{ n0 = A; v0 = int64; ...}?; v0 = int64; ...}? -> B:*@{ n1 = *@{ n1 = B; v1 = *str:(int8)}?; v1 = *str:(int8)}? }",
-         "[32]{any,3 ->PA:*[0,8]@{n1=*[0,7]@{n1=PA; FB:v1=*[4]str:(int8)}; FB} }",
+         "[32]{any,3 ->PA:*[8]@{_; n1=*[7]@{_; n1=PA; FB:v1=*[4]str:(_, int8)}?; FB}? }",
          "[4,7,8,10]","[32]" );
   }
 
@@ -417,8 +418,8 @@ out_bool= (map in_str { xstr -> (eq xstr "def")});
 """,
          "*( *str:(int8), int1)",
          "*( *str:(int8), int1)",
-         "*[9](*[4]str:(, int8), int64)",
-         "*[9](Scalar, Scalar)",
+         "*[9](_, *[4]str:(int8), int64)",
+         "*[9](_, Scalar, Scalar)",
          "[4,9]",null);
   }
 
@@ -463,7 +464,7 @@ loop = { name cnt ->
 """,
         "*str:(nint8)?",      // Both HM and GCP
         "[Cannot unify int8 and *str:(nint8)?]", // HM alone cannot do this one
-        "*[4]str:(, 100)",    // Both HM and GCP
+        "*[4]str:(100)",      // Both HM and GCP
         "nScalar");           // GCP alone gets a very weak answer
   }
 
@@ -495,8 +496,8 @@ loop = { name cnt ->
 """,
          "{ A? -> *( 3, nint8) }",
          "{ A? -> *( 3, nint8) }",
-         "[34]{any,3 ->*[7](nint8, nint8) }",
-         "[34]{any,3 ->*[7](nint8, nint8) }",
+         "[34]{any,3 ->*[7](_, nint8, nint8) }",
+         "[34]{any,3 ->*[7](_, nint8, nint8) }",
          "[4,7]","[34]");
   }
 
@@ -512,8 +513,8 @@ loop = { name cnt ->
 """,
          "{ A? -> *( 3, May be nil when loading field x: 5 ) }",
          "{ A? -> *( 3, May be nil when loading field x: 5 ) }",
-         "[31]{any,3 ->*[7](nint8, nint8) }",
-         "[31]{any,3 ->*[7](nint8, nint8) }",
+         "[31]{any,3 ->*[7](_, nint8, nint8) }",
+         "[31]{any,3 ->*[7](_, nint8, nint8) }",
          "[4,7]","[31]");
   }
 
@@ -557,8 +558,8 @@ loop = { name cnt ->
          "",
          "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
          "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
-         "*[15]@{a=int64 ; b=*[13,14](); bool=*[12]@{false=PA:*[8,9]@{and=[22,26]{any,3 ->Scalar }; or=[23,27]{any,3 ->Scalar }; then=[25,29]{any,4 ->Scalar }}; force=[33]{any,3 ->PA }; true=PA}}",
-         "*[15]@{a=Scalar; b=Scalar    ; bool=*[12]@{false=PA:*[8,9]@{and=[22,26]{any,3 ->Scalar }; or=[23,27]{any,3 ->Scalar }; then=[25,29]{any,4 ->Scalar }}; force=[33]{any,3 ->PA }; true=PA}}",
+         "*[15]@{_; a=int64 ; b=*[13,14](_); bool=*[12]@{_; false=PA:*[8,9]@{_; and=[22,26]{any,3 ->Scalar }; or=[23,27]{any,3 ->Scalar }; then=[25,29]{any,4 ->Scalar }}; force=[33]{any,3 ->PA }; true=PA}}",
+         "*[15]@{_; a=Scalar; b=Scalar     ; bool=*[12]@{_; false=PA:*[8,9]@{_; and=[22,26]{any,3 ->Scalar }; or=[23,27]{any,3 ->Scalar }; then=[25,29]{any,4 ->Scalar }}; force=[33]{any,3 ->PA }; true=PA}}",
          "[4,7,8,9,12,13,14,15]","[22,23,24,25,26,27,28,29,33]");
   }
 
@@ -604,7 +605,7 @@ boolSub ={b ->(if b true false)};
                "then = { { *( ) -> F } { *( ) -> F } -> F }"+
              "}"+
          "}",
-         "*[12]@{false=PB:*[8,9]@{and=[22,27]{any,3 ->Scalar }; not=[25,30]{any,3 ->PA:*[8]@{and=[22]{any,3 ->Scalar }; not=[25]{any,3 ->PA }; or=[23]{any,3 ->PA }; then=[26]{any,4 ->Scalar }} }; or=[23,29]{any,3 ->Scalar }; then=[26,31]{any,4 ->Scalar }}; true=PB}",
+         "*[12]@{_; false=PB:*[8,9]@{_; and=[22,27]{any,3 ->Scalar }; not=[25,30]{any,3 ->PA:*[8]@{_; and=[22]{any,3 ->Scalar }; not=[25]{any,3 ->PA }; or=[23]{any,3 ->PA }; then=[26]{any,4 ->Scalar }} }; or=[23,29]{any,3 ->Scalar }; then=[26,31]{any,4 ->Scalar }}; true=PB}",
            "[4,7,8,9,12]","[22,23,24,25,26,27,28,29,30,31]");
   }
 
@@ -620,7 +621,7 @@ boolSub ={b ->(if b true false)};
          "left"+
          "",
          "A:*@{ n1 = *@{ n1 = A; v1 = 7}; v1 = 7}",
-         "PA:*[8]@{n1=*[7]@{n1=PA; FB:v1=7}; FB}",
+         "PA:*[8]@{_; n1=*[7]@{_; n1=PA; FB:v1=7}; FB}",
          "[4,7,8]",null);
   }
 
@@ -641,11 +642,11 @@ all
 """,
         "*@{ boolSub = { A? -> *@{ not = { B -> C:*@{ not = { D -> C }; then = { { 7 -> E } { 7 -> E } -> E }} }; then = { { 7 -> F } { 7 -> F } -> F }} }; false = C; true = C}",
         """
-*[9]@{
+*[9]@{_;
   boolSub=[31]{any,3 ->
-    PA:*[7,8]@{not=[22,25]{any,3 ->PA }; then=[23,26]{any,4 ->Scalar }}
+    PA:*[7,8]@{_; not=[22,25]{any,3 ->PA }; then=[23,26]{any,4 ->Scalar }}
   };
-  false=PB:*[8]@{not=[25]{any,3 ->PC:*[7]@{not=[22]{any,3 ->PB }; then=[23]{any,4 ->Scalar }} }; then=[26]{any,4 ->Scalar }};
+  false=PB:*[8]@{_; not=[25]{any,3 ->PC:*[7]@{_; not=[22]{any,3 ->PB }; then=[23]{any,4 ->Scalar }} }; then=[26]{any,4 ->Scalar }};
   true=PC
 }
 """,
@@ -788,21 +789,21 @@ three =(n.s two);     // Three is the successor of two
         "}"+
         "",
        """
-*[16]@{
-  b=*[12]@{
-    false=PA:*[9]@{and_=[27]{any,3 ->PA }; or__=[29]{any,3 ->Scalar }; then=[30]{any,4 ->Scalar }};
-    true =PB:*[8]@{and_=[23]{any,3 ->Scalar }; or__=[25]{any,3 ->PB }; then=[26]{any,4 ->Scalar }}
+*[16]@{_;
+  b=*[12]@{_;
+    false=PA:*[9]@{_; and_=[27]{any,3 ->PA }; or__=[29]{any,3 ->Scalar }; then=[30]{any,4 ->Scalar }};
+    true =PB:*[8]@{_; and_=[23]{any,3 ->Scalar }; or__=[25]{any,3 ->PB }; then=[26]{any,4 ->Scalar }}
   };
-  n=*[15]@{
+  n=*[15]@{_;
     s=[38]{any,3 ->
-      PC:*[14]@{
+      PC:*[14]@{_;
         add_=[37]{any,3 ->Scalar };
         pred=[35]{any,3 ->Scalar };
         succ=[36]{any,3 ->PC };
         zero=[34]{any,3 ->PA }
       }
     };
-    z=*[13]@{add_=[33]{any,3 ->Scalar }; pred=[22]{any,3 ->~Scalar }; succ=[32]{any,3 ->PC }; zero=[31]{any,3 ->PB }}
+    z=*[13]@{_; add_=[33]{any,3 ->Scalar }; pred=[22]{any,3 ->~Scalar }; succ=[32]{any,3 ->PC }; zero=[31]{any,3 ->PB }}
   };
   one=PC;
   three=PC;
@@ -810,21 +811,21 @@ three =(n.s two);     // Three is the successor of two
 }
 """,
        """
-*[16]@{
-  b=*[12]@{
-    false=PA:*[9]@{and_=[27]{any,3 ->PA }; or__=[29]{any,3 ->Scalar }; then=[30]{any,4 ->Scalar }};
-    true =PB:*[8]@{and_=[23]{any,3 ->Scalar }; or__=[25]{any,3 ->PB }; then=[26]{any,4 ->Scalar }}
+*[16]@{_;
+  b=*[12]@{_;
+    false=PA:*[9]@{_;and_=[27]{any,3 ->PA }; or__=[29]{any,3 ->Scalar }; then=[30]{any,4 ->Scalar }};
+    true =PB:*[8]@{_;and_=[23]{any,3 ->Scalar }; or__=[25]{any,3 ->PB }; then=[26]{any,4 ->Scalar }}
   };
-  n=*[15]@{
+  n=*[15]@{_;
     s=[38]{any,3 ->
-      PC:*[14]@{
+      PC:*[14]@{_;
         add_=[37]{any,3 ->Scalar };
         pred=[35]{any,3 ->Scalar };
         succ=[36]{any,3 ->PC };
         zero=[34]{any,3 ->PA }
       }
     };
-    z=*[13]@{add_=[33]{any,3 ->Scalar }; pred=[22]{any,3 ->~Scalar }; succ=[32]{any,3 ->PC }; zero=[31]{any,3 ->PB }}
+    z=*[13]@{_; add_=[33]{any,3 ->Scalar }; pred=[22]{any,3 ->~Scalar }; succ=[32]{any,3 ->PC }; zero=[31]{any,3 ->PB }}
   };
   one=PC;
   three=PC;
@@ -854,7 +855,7 @@ three =(n.s two);     // Three is the successor of two
          "(sx self1)"+
          "",
          "A:*@{ succ=A}",
-         "PA:*[7]@{succ=PA}",
+         "PA:*[7]@{_; succ=PA}",
          "[4,7]",null);
   }
 
@@ -863,7 +864,7 @@ three =(n.s two);     // Three is the successor of two
   @Test public void test61() {
     rune("f = { p1 p2 -> (if p2.a p1 p2)}; (f @{a=2} @{b=2.3})",
          "*@{ a= Missing field a: 2 }",
-         "*[7,8]()",
+         "*[7,8](_)",
          "[4,7,8]",null);
   }
 
@@ -880,7 +881,7 @@ three =(n.s two);     // Three is the successor of two
          "rez"+
          "",
          "{ A? -> *@{x=nint8} }",
-         "[26]{any,3 ->*[7,8]@{x=nint8} }",
+         "[26]{any,3 ->*[7,8]@{_; x=nint8} }",
          "[4,7,8]","[26]");
   }
 
@@ -900,8 +901,8 @@ three =(n.s two);     // Three is the successor of two
          "    res1 = *@{ a = Missing field a: 2};"+
          "    res2 = *@{ a=nint8; b=nflt32 }"+
          "}",
-         "*[13]@{f=[23]{any,4 ->*[7,8,9,10,11,12]SA:() }; res1=*[7,8]SA; res2=*[9,12]@{a=nint8; b=nflt32}}",
-         "*[13]@{f=[23]{any,4 ->Scalar }; res1=Scalar; res2=Scalar}",
+         "*[13]@{_; f=[23]{any,4 ->*[7,8,9,10,11,12]SA::(_) }; res1=*[7,8]SA; res2=*[9,12]@{_; a=nint8; b=nflt32}}",
+         "*[13]@{_; f=[23]{any,4 ->Scalar }; res1=Scalar; res2=Scalar}",
          "[4,7,8,9,10,11,12,13]","[23]");
   }
 
@@ -994,17 +995,17 @@ all
   }
 """,
          """
-*[14]@{
-  false=PC:*[8,9]@{and=[23,27]{any,3 ->Scalar }; or=[25,29]{any,3 ->Scalar }; then=[26,30]{any,4 ->Scalar }};
+*[14]@{_;
+  false=PC:*[8,9]@{_; and=[23,27]{any,3 ->Scalar }; or=[25,29]{any,3 ->Scalar }; then=[26,30]{any,4 ->Scalar }};
   s=[45]{any,3 ->
-    PA:*[13]@{
+    PA:*[13]@{_;
       add_=[44]{any,3 ->PA };
-      pred=[42]{any,3 ->PB:*[10,11,12,13,17,18]@{add_=[4,5,22,23,25,27,29,35,36,37,41,42,43,44,45]{any,3 ->Scalar }; pred=[4,5,22,23,24,25,27,28,29,35,36,37,41,42,43,44,45]{any,3 ->PB }; succ=[4,5,22,23,25,27,29,35,36,37,41,42,43,44,45]{any,3 ->PB }; zero=[4,5,22,23,24,25,27,28,29,35,36,37,41,42,43,44,45]{any,3 ->PC }} };
+      pred=[42]{any,3 ->PB:*[10,11,12,13,17,18]@{_; add_=[4,5,22,23,25,27,29,35,36,37,41,42,43,44,45]{any,3 ->Scalar }; pred=[4,5,22,23,24,25,27,28,29,35,36,37,41,42,43,44,45]{any,3 ->PB }; succ=[4,5,22,23,25,27,29,35,36,37,41,42,43,44,45]{any,3 ->PB }; zero=[4,5,22,23,24,25,27,28,29,35,36,37,41,42,43,44,45]{any,3 ->PC }} };
       succ=[43]{any,3 ->PA }; zero=[41]{any,3 ->PC }
     }
   };
   true=PC;
-  z=*[12]@{
+  z=*[12]@{_;
     add_=[37]{any,3 ->Scalar };
     pred=[22]{any,3 ->~Scalar };
     succ=[36]{any,3 ->PA };
@@ -1013,11 +1014,11 @@ all
 }
 """,
          """
-*[14]@{
-  false=PA:*[8,9]@{and=[23,27]{any,3 ->Scalar }; or=[25,29]{any,3 ->Scalar }; then=[26,30]{any,4 ->Scalar }};
+*[14]@{_;
+  false=PA:*[8,9]@{_; and=[23,27]{any,3 ->Scalar }; or=[25,29]{any,3 ->Scalar }; then=[26,30]{any,4 ->Scalar }};
   s=[45]{any,3 ->Scalar };
   true=PA;
-  z=*[12]@{add_=[37]{any,3 ->Scalar }; pred=[22]{any,3 ->~Scalar }; succ=[36]{any,3 ->Scalar }; zero=[35]{any,3 ->PA }}
+  z=*[12]@{_; add_=[37]{any,3 ->Scalar }; pred=[22]{any,3 ->~Scalar }; succ=[36]{any,3 ->Scalar }; zero=[35]{any,3 ->PA }}
 }
 """,
          "[4,7,8,9,10,11,12,13,14,17,18]",
@@ -1055,8 +1056,8 @@ maybepet = petcage.get;
 """,
          "*(nflt32,nflt32,*str:(nint8))",
          "*(nflt32,nflt32,*str:(nint8))",
-         "*[12](Scalar, Scalar, *[4]str:(, nint8))",
-         "*[12](Scalar, Scalar, *[4]str:(, nint8))",
+         "*[12](_, Scalar, Scalar, *[4]str:(nint8))",
+         "*[12](_, Scalar, Scalar, *[4]str:(nint8))",
          "[4,12]",null);
   }
 
@@ -1076,19 +1077,19 @@ all = @{
     rune("dsp = @{  id = { dsp n -> n}}; (pair (dsp.id dsp 3) (dsp.id dsp \"abc\"))",
          "*( 3, *str:(97))",
          "*( 3, *str:(97))",
-         "*[8](3 , *[4]str:(, 97))",
-         "*[8](nScalar, nScalar)",
+         "*[8](_, 3 , *[4]str:(97))",
+         "*[8](_, nScalar, nScalar)",
          "[4,8]",null);
   }
 
   // Test incorrect argument count
   @Test public void test69() {
-    rune("({x y -> (pair x y) } 1 2 3)","Bad arg count: *(1,2)","*[7](1, 2)","[4,7]",null);
+    rune("({x y -> (pair x y) } 1 2 3)","Bad arg count: *(1,2)","*[7](_, 1, 2)","[4,7]",null);
   }
 
   // Test incorrect argument count
   @Test public void test70() {
-    rune("({x y -> (pair x y) } 1 )","Bad arg count: *(1,A)","*[7](1, ~Scalar)","[4,7]",null);
+    rune("({x y -> (pair x y) } 1 )","Bad arg count: *(1,A)","*[7](_, 1, ~Scalar)","[4,7]",null);
   }
 
   // Test example from AA with expanded ints
@@ -1103,7 +1104,7 @@ A:*@{
   i=int64
 }
 """,
-         "PA:*[7]@{i=int64; add=[23]{any,4 ->PA }}",
+         "PA:*[7]@{_; i=int64; add=[23]{any,4 ->PA }}",
            "[4,7,10,11]","[23]");
   }
 
@@ -1124,7 +1125,7 @@ A:*@{
          "p1",
 
          rez_hm,
-         "*[8](XA:[23]{any,5 ->*[7](Scalar, Scalar, Scalar) }, XA, XA)",
+         "*[8](_, XA:[23]{any,5 ->*[7](_, Scalar, Scalar, Scalar) }, XA, XA)",
          "[4,7,8]","[23]"  );
   }
 
@@ -1138,7 +1139,7 @@ A:*@{
          "p3",
 
          rez_hm,
-         "*[12](PB:*[9](PA:*[8](XA:[23]{any,5 ->*[7](Scalar, Scalar, Scalar) }, XA, XA), PA, PA), PB, PB)",
+         "*[12](_, PB:*[9](_, PA:*[8](_, XA:[23]{any,5 ->*[7](_, Scalar, Scalar, Scalar) }, XA, XA), PA, PA), PB, PB)",
          "[4,7,8,9,12]","[23]");
   }
 
@@ -1162,7 +1163,7 @@ A:*@{
          "test = (term W);"+
          "(test {x -> {y -> (pair (x 3) (((y \"a\") \"b\") \"c\")) } })",
          "*( A:[Cannot unify {A->A} and 3 and *str:(nint8)], A )",
-         "*[7]( Scalar, Scalar)",
+         "*[7](_,  Scalar, Scalar)",
          "[4,7]","[]");
   }
 
@@ -1176,6 +1177,7 @@ A:*@{
 
 
   // Ambiguous overload, {int->int}, cannot select
+  @Ignore
   @Test public void test81() {
     rune("&["                    +  // Define overloaded fcns
          "  { x -> (i* x 2  ) };"+  // Arg is 'int'
@@ -1188,6 +1190,7 @@ A:*@{
   }
 
   // Simple overloaded function test.
+  @Ignore
   @Test public void test82() {
     rune("f = &["                +  // Define overloaded fcns 'f'
          "  { x -> (i* x 2  ) };"+  // Arg is 'int'
@@ -1195,11 +1198,12 @@ A:*@{
          "];"+
          "(pair (f 2) (f 1.2))",    // Call with different args
          "*(int64,flt64)", "*(int64,flt64)",
-         "*[7](4,3.6000001f)", "*[7](~Scalar,~Scalar)",
+         "*[7](_, 4,3.6000001f)", "*[7](_, ~Scalar,~Scalar)",
          "[4,7]",null);
   }
 
   // Ambiguous overload, {int->int}, cannot select
+  @Ignore
   @Test public void test83() {
     run("(&["                  +  // Define overloaded fcns
         "   { x -> (i* x 2) };"+  // Arg is 'int'
@@ -1213,6 +1217,7 @@ A:*@{
   }
 
   // Wrong args for all overloads
+  @Ignore
   @Test public void test84() {
     rune("(&[ { x y -> (i* x y) }; { x y z -> (i* y z) };] 4)",
          "Ambiguous overload &[ {int64 int64->int64}; {A int64 int64->int64} ]: int64",
@@ -1221,6 +1226,7 @@ A:*@{
   }
 
   // Mixing unrelated overloads
+  @Ignore
   @Test public void test85() {
     rune("""
 fx = &[ { x -> 3     }; { y -> "abc" }; ];
@@ -1233,6 +1239,7 @@ fz = (if (rand 2) fx fy);
          null,null);
   }
 
+  @Ignore
   @Test public void test86() {
     rune("""
 { pred ->
@@ -1243,13 +1250,14 @@ fz = (if (rand 2) fx fy);
 }
 """,
          "{A? -> *(int64,flt64) }",
-         "[34]{any,3 ->*[7]( Scalar, Scalar) }",
+         "[34]{any,3 ->*[7](_,  Scalar, Scalar) }",
          "[4,7]","[34]");
   }
 
   // Test case here is trying to get HM to do some overload resolution.
   // Without, many simple int/flt tests in main AA using HM alone fail to find
   // a useful type.
+  @Ignore
   @Test public void test87() {
     rune(
 """
@@ -1274,8 +1282,8 @@ con2   = (iwrap 2  );
 con2_1 = (fwrap 2.1);
 (con2_1._*_ con2_1)
 """,
-        "A:*@{_*_={B:*@{_*_=&[{*@{i=int64;...}->B};{*@{f=flt64;...}->B}];f=flt64}->A};f=flt64}",
-        "PA:*[7]@{_*_=[~25+27]{any,3 ->PA }; f=flt64}",
+        "A:*@{_; _*_={B:*@{_; _*_=&[{*@{_; i=int64;...}->B};{*@{_; f=flt64;...}->B}];f=flt64}->A};f=flt64}",
+        "PA:*[7]@{_; _*_=[~25+27]{any,3 ->PA }; f=flt64}",
         "[4,7,10,11]","[25,27]");
   }
 
@@ -1284,7 +1292,7 @@ con2_1 = (fwrap 2.1);
   @Test public void test88() {
     rune("{ p -> (if p @{x=3;y=4} @{y=6;z=\"abc\"})}",
          "{A?->*@{y=nint8}}",
-         "[26]{any,3 ->*[7,8]@{y=nint8} }",
+         "[26]{any,3 ->*[7,8]@{_; y=nint8} }",
          "[4,7,8]","[26]");
   }
   // Recursive structs.  Next: open structs list required fields;
@@ -1300,7 +1308,7 @@ con2_1 = (fwrap 2.1);
   @Test public void test90() {
     rune("fun = { rec -> (pair rec rec.x)}; (pair (fun @{x=3;y=4}) (fun @{x=\"abc\";z=2.1}))",
          "*(*(*@{x=3;y=4},3), *(*@{x=A:*str:(97);z=2.1f},A))",
-         "*[8](PA:*[7](*[9,12]@{x=nScalar}, nScalar), PA)",
+         "*[8](_, PA:*[7](_, *[9,12]@{_; x=nScalar}, nScalar), PA)",
          "[4,7,8,9,12]","[]");
   }
   // Recursive structs.  Next: passing extra fields, but the function requires
@@ -1311,7 +1319,7 @@ con2_1 = (fwrap 2.1);
          "         (fun @{x=\"abc\";z=2.1} )  )"+ // available {x,z}
          "  } { rec -> (pair rec rec.x) } )",     // required  {x}
          "*(A:*(*@{x=B:[Cannot unify 3 and *str:(97)]},B),A)",
-         "*[7](PA:*[12](*[8,9]@{x=nScalar}, nScalar), PA)",
+         "*[7](_, PA:*[12](_, *[8,9]@{_; x=nScalar}, nScalar), PA)",
          "[4,7,8,9,12]","[]");
   }
   // Recursive structs.  Next: passing extra fields, but the function requires
@@ -1322,7 +1330,7 @@ con2_1 = (fwrap 2.1);
          "         (fun @{x=4; z=2.1} )  )"+ // available {x,z}
          "  } { rec -> (pair rec rec.x) } )",// required  {x}
          "*(A:*(*@{x=nint8},nint8),A)",
-         "*[7](PA:*[12](*[8,9]@{x=nint8}, nint8), PA)",
+         "*[7](_, PA:*[12](_, *[8,9]@{_; x=nint8}, nint8), PA)",
          "[4,7,8,9,12]","[]");
   }
   // Recursive structs.  
@@ -1336,7 +1344,7 @@ fun = { ff ->
 (fun 1.2) // required {f} in inner, available {f,mul} in outer
 """,
          "A:*@{f=flt64;mul={*@{f=flt64;...}->A}}", // required {f} in inner, available {f,mul} in outer
-         "PA:*[7]@{f=flt64; mul=[23]{any,3 ->PA }}",
+         "PA:*[7]@{_; f=flt64; mul=[23]{any,3 ->PA }}",
          "[4,7,10]","[23]");
   }
 
@@ -1353,12 +1361,13 @@ con12=(fun 1.2);   // required {f} in inner, available {f,mul} in outer
 (con12.mul con12)  // required {f} in inner, available {f,mul} in outer,middle
 """,
          "A:*@{f=flt64;mul={B:*@{f=flt64;mul={*@{f=flt64;...}->B}}->A}}", // required {f} in inner, available {f,mul} in middle,outer
-         "PA:*[7]@{f=flt64; mul=[23]{any,3 ->PA }}",
+         "PA:*[7]@{_; f=flt64; mul=[23]{any,3 ->PA }}",
          "[4,7,10]","[23]");
   }
 
 
   // Recursive structs.  More like what main AA will do with wrapped primitives.
+  @Ignore
   @Test public void test95() {
     String hm_rez =  "*("+
       "A:*@{_*_={B:*@{_*_=&[{*@{i=int64;...}->B};{*@{f=flt64;...}->C:*@{_*_=&[{*@{i=int64;...}->C};{*@{f=flt64;...}->C}];f=flt64}}];i=int64}->A};f=flt64},"+
@@ -1391,13 +1400,14 @@ mul2 = { x -> (x._*_ con2)};
 (triple (mul2 con2_1)  (con2._*_ con2) (con2_1._*_ con2_1))
 """,
         hm_rez, hm_rez,
-        "*[9](PA:*[7]@{_*_=[~25+27]{any,3 ->PA }; f=flt64}, *[8]@{_*_=[~31+34]{any,3 ->*[]( ...) }; i=int64}, PA)",
-        "*[9](PA:*[7]@{_*_=[~25+27]{any,3 ->PA }; f=flt64}, *[]( ...), PA)",
+        "*[9](PA:*[7]@{_; _*_=[~25+27]{any,3 ->PA }; f=flt64}, *[8]@{_; _*_=[~31+34]{any,3 ->*[]( ...) }; i=int64}, PA)",
+        "*[9](PA:*[7]@{_; _*_=[~25+27]{any,3 ->PA }; f=flt64}, *[]( ...), PA)",
         "[4,7,8,9,10,11,17,18]","[25,27,31,34]");
   }
 
   // Recursive structs, in a loop.  Test of recursive int wrapper type ("occurs
   // check") in a loop.
+  @Ignore
   @Test public void test96() {
     String hm_rez =  "";
     rune(
@@ -1438,35 +1448,38 @@ fact = { n -> (if n.is0 c1 (n.mul (fact n.sub1))) };
   }
 
   // Test overload as union of primitives
-  @Ignore @Test public void test97() {
+  @Ignore
+  @Test public void test97() {
     rune("red=&[ 123; \"red\" ]; (pair (dec red) (isempty red))",
          "*(int64,int1)",
          "*(int64,int1)",
-         "*[7](122,0)",
-         "*[7](~int64,~Scalar)",
+         "*[7](_, 122,0)",
+         "*[7](_, ~int64,~Scalar)",
          null,null);
   }
 
   // Test overload as union of primitives
-  @Ignore @Test public void test98() {
+  @Ignore
+  @Test public void test98() {
     rune("{ pred -> red=(if pred &[ 123; \"red\" ] &[ 456; \"blue\" ]); (pair (dec red) (isempty red))}",         
          "*(int64,int1)",
          "*(int64,int1)",
-         "*[7](122,0)",
-         "*[7](~int64,~Scalar)",
+         "*[7](_, 122,0)",
+         "*[7](_, ~int64,~Scalar)",
          null,null);
   }
 
   // Test overload as union of primitives
-  @Ignore @Test public void test99() {
+  @Ignore
+  @Test public void test99() {
     rune("fun = { a0 -> (dec a0) }; "               + // a0 is an int
          "(pair (fun &[ 0x123; \"abc\" ]        );" + // Correct overload is 0x123
          "      (fun &[ \"def\"; @{x=1}; 0x456 ])"  + // Correct overload is 0x456
          ")",
          "*(int64,int1)",
          "*(int64,int1)",
-         "*[7](122,0)",
-         "*[7](~int64,~Scalar)",
+         "*[7](_, 122,0)",
+         "*[7](_, ~int64,~Scalar)",
          null,null);
   }
 

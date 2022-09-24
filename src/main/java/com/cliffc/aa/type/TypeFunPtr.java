@@ -304,45 +304,44 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     return t1.init(pos.above_center(),pos.test(0),pos.clear(0),nargs,dsp,ret);
   }
 
-  public static TypeFunPtr make( BitsFun pos, int nargs, Type dsp, Type ret ) {
+  public static TypeFunPtr make( boolean any, BitsFun pos, int nargs, Type dsp, Type ret ) {
     boolean haz_nil = pos.test(0);
-    boolean any = pos.above_center();
     boolean nil = any &&  haz_nil;
     boolean sub = any || !haz_nil;
     return make(any, nil, sub, pos, nargs,dsp,ret);
   }
-  public static TypeFunPtr makex( BitsFun pos, int nargs, Type dsp, Type ret ) {
+  public static TypeFunPtr makex( boolean any, BitsFun pos, int nargs, Type dsp, Type ret ) {
     boolean haz_nil = pos.test(0);
-    boolean any = pos.above_center() || pos.is_empty();
     boolean nil = any &&  haz_nil;
     boolean sub = any || !haz_nil;
     return makex(any, nil, sub, pos.clear(0), nargs,dsp,ret);
   }
   public static TypeFunPtr make( int fidx, int nargs, Type dsp, Type ret ) {
-    return make(BitsFun.make0(fidx),nargs,dsp,ret);
+    return make(false,BitsFun.make0(fidx),nargs,dsp,ret);
   }
   public static TypeFunPtr make_new_fidx( int parent, int nargs, Type dsp, Type ret ) {
     return make(BitsFun.new_fidx(parent),nargs,dsp,ret);
   }
   public static TypeFunPtr make( BitsFun pos, int nargs) {
-    return make(pos,nargs,TypeMemPtr.NO_DISP,TypeNil.SCALAR);
+    assert !pos.is_empty();     // Ambiguous
+    return make(pos.above_center(),pos,nargs,TypeMemPtr.NO_DISP,TypeNil.SCALAR);
   }
-  public TypeFunPtr make_from( Type dsp ) { return make(_pos,_nargs, dsp,_ret); }
+  public TypeFunPtr make_from( Type dsp ) { return make(_any, _pos,_nargs, dsp,_ret); }
   public TypeFunPtr make_from( BitsFun pos ) {
     return pos==_pos ? this : malloc( pos.above_center(), _nil, _sub, pos, _nargs,_dsp,_ret).hashcons_free();
   }
 
-  public TypeFunPtr make_from( Type dsp, Type ret ) { return dsp==_dsp && ret==_ret ? this : make(_pos,_nargs, dsp,ret); }
+  public TypeFunPtr make_from( Type dsp, Type ret ) { return dsp==_dsp && ret==_ret ? this : make(_any, _pos,_nargs, dsp,ret); }
   @Override TypeFunPtr make_from( boolean any, boolean nil, boolean sub ) {
     nil &= sub;
     return any == _any && nil == _nil && sub == _sub ? this : makex(any,nil,sub,_pos,_nargs,_dsp,_ret);
   }
 
-  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.NALL ,1,Type.ALL,Type.ALL);
-  public  static final TypeFunPtr GENERIC_FUNPTR0= make(BitsFun.NALL.set(0),1,Type.ALL,Type.ALL);
-  public  static final TypeFunPtr ARG2   =         make(BitsFun.NALL ,2,Type.ALL,Type.ALL);
+  public  static final TypeFunPtr GENERIC_FUNPTR = make(false,BitsFun.NALL ,1,Type.ALL,Type.ALL);
+  public  static final TypeFunPtr GENERIC_FUNPTR0= make(false,BitsFun.NALL.set(0),1,Type.ALL,Type.ALL);
+  public  static final TypeFunPtr ARG2   =         make(false,BitsFun.NALL ,2,Type.ALL,Type.ALL);
   public  static final TypeFunPtr THUNK  =         make(false,false,false,BitsFun.NALL ,3,Type.ALL,Type.ALL); // zero-arg function (plus ctrl, mem, display)
-  public  static final TypeFunPtr EMPTY  =         make(BitsFun.EMPTY,1,Type.ANY,Type.ANY);
+  public  static final TypeFunPtr EMPTY  =         make(false,BitsFun.EMPTY,1,Type.ANY,Type.ANY);
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,ARG2,THUNK};
 
   @Override protected TypeFunPtr xdual() {

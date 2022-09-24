@@ -648,6 +648,10 @@ public class HM {
     abstract SB p1(SB sb, VBitSet dups); // Self short print
     abstract SB p2(SB sb, VBitSet dups); // Recursion print
     static void reset() { CNT=1; }
+    T2 find( int uid ) {
+      return visit( syn -> syn.debug_find().find(uid),
+                    (a,b) -> a==null ? b : a );
+    }
   }
 
   static class Con extends Syntax {
@@ -768,7 +772,7 @@ public class HM {
     static private int xfidx;
 
     Lambda(Syntax body, String... args) {
-      super(TypeFunPtr.makex(BitsFun.make0(xfidx=BitsFun.new_fidx()),args.length+DSP_IDX,Type.ANY,TypeNil.XSCALAR));
+      super(TypeFunPtr.makex(false,BitsFun.make0(xfidx=BitsFun.new_fidx()),args.length+DSP_IDX,Type.ANY,TypeNil.XSCALAR));
       _args=args;
       _body=body;
       // Type variables for all arguments
@@ -842,7 +846,7 @@ public class HM {
     @Override void add_hm_work( @NotNull Work<Syntax> work) { throw unimpl(); }
     @Override Type val(Work<Syntax> work) {
       // Just wrap a function around the body return
-      return TypeFunPtr.makex(BitsFun.make0(_fidx),_args.length+DSP_IDX,Type.ANY,_body._flow);
+      return TypeFunPtr.makex(false,BitsFun.make0(_fidx),_args.length+DSP_IDX,Type.ANY,_body._flow);
     }
     // Meet the formal argument# with a new Apply call site actual arg.
     @Override public boolean arg_meet(int argn, Type cflow, Work<Syntax> work) {
@@ -1023,7 +1027,7 @@ public class HM {
       if( tret!=null && tret._is_copy && _fun._flow instanceof TypeFunPtr tfp ) {
         for( int fidx : tfp.pos() )
           if( fidx!=BitsFun.ALLX && !Lambda.FUNS.get(fidx).as_fun().arg("ret")._is_copy ) {
-            if( work!=null ) tret.clr_cp();
+            if( work!=null ) tret.clr_cp(work);
             return true;
           }
       }
@@ -1105,8 +1109,14 @@ public class HM {
       T2.T2JOIN_LEAF = TypeNil.SCALAR;
       T2.T2JOIN_BASE = TypeNil.SCALAR;
       T2.T2MAP.clear();
-      for( Syntax arg : _args )
-        { T2.WDUPS.clear(true); arg.find().walk_types_in(arg._flow,true); }
+      TypeFunPtr tfp = (TypeFunPtr)_fun._flow;
+      for( int i=0; i<_args.length; i++ ) {
+        Syntax arg = _args[i];
+        if( !arg_is_used(tfp,i) )
+          continue;             // Unused args cannot lift output
+        T2.WDUPS.clear(true);
+        arg.find().walk_types_in(arg._flow,true);
+      }
 
       T2.T2JOIN_LEAFS.clear();
       T2.T2JOIN_BASES.clear();
@@ -1132,6 +1142,24 @@ public class HM {
       // Type.  If !HM_FREEZE, replace with a join of flow types.
       T2.WDUPS.clear(true);
       return rezt2.walk_types_out(ret, this, test);
+    }
+
+    // True if arg is used in the body; false if arg is dead
+    private static boolean arg_is_used(TypeFunPtr tfp, int argn ) {
+      for( int fidx : tfp.pos() ) {
+        Func func = Lambda.FUNS.get(fidx);
+        if( func instanceof Lambda lam ) {
+          if( lam instanceof PrimSyn ) return true; // Prims use their args
+          if( argn < lam._refs.length &&   // arg is not extra
+               lam._refs[argn]!=null &&    // Complicated, because at least 1 use is lazily inserted
+              (lam._refs[argn].length>1 || // Check for single use, with self-parent and not identity
+               lam._refs[argn][0]._par!=lam ||
+               lam._refs[argn][0]==lam._body
+               ) )
+            return true;
+        }
+      }
+      return false;
     }
 
 
@@ -1388,7 +1416,7 @@ public class HM {
       _t2 = t2;
       _fidx = BitsFun.new_fidx(BitsFun.EXTX);
       Lambda.FUNS.put(_fidx,this);
-      t2.get("ret").clr_cp();
+      t2.get("ret").clr_cp(work);
       Root.add_ext_fidx(_fidx,work);
     }
     @Override public String toString() { return "ext lambda"; }
@@ -1768,7 +1796,7 @@ public class HM {
     @Override Type val(Work<Syntax> work) {
       assert _body==null;
       Type ret = apply(_types);
-      return TypeFunPtr.makex(BitsFun.make0(_fidx),_args.length+DSP_IDX,Type.ANY,ret);
+      return TypeFunPtr.makex(false,BitsFun.make0(_fidx),_args.length+DSP_IDX,Type.ANY,ret);
     }
 
     @Override boolean more_work(Work<Syntax> work) { return more_work_impl(work); }
@@ -2458,7 +2486,7 @@ public class HM {
         if( tfun != null ) return tfun;  // TODO: Returning recursive flow-type functions
         ADUPS.put(_uid, TypeNil.XSCALAR);
         Type rez = arg("ret")._as_flow(syn,deep);
-        return TypeFunPtr.makex(fidxs,size()-1+DSP_IDX,Type.ANY,rez);
+        return TypeFunPtr.makex(false,fidxs,size()-1+DSP_IDX,Type.ANY,rez);
       }
       if( is_obj() ) {
         assert HM_FREEZE && deep; // Only for final reporting
@@ -2555,7 +2583,7 @@ public class HM {
       if( that._is_copy && !_is_copy )  { // Progress if setting is_copy
         if( work==null ) return true;
         progress = true;
-        that.clr_cp();
+        that.clr_cp(work);
       }
       Type sf = _tflow, hf = that._tflow;     // Flow of self and that.
       Type se = _eflow, he = that._eflow;     // Error flow of self and that.
@@ -3153,7 +3181,8 @@ public class HM {
       if( !HM_FREEZE && !is_obj() && T2_NEW_LEAF ) {
         T2.push_updates(T2JOIN_LEAFS,apply); // Result is kept high by some leaf
         Root.FREEZE_DEPS.add(apply);
-        tjn = T2.T2JOIN_LEAF==TypeNil.XSCALAR ? TypeNil.XSCALAR : TypeNil.XNSCALR; // Future leafs preserve nilability
+        //tjn = T2.T2JOIN_LEAF==TypeNil.XSCALAR ? TypeNil.XSCALAR : TypeNil.XNSCALR; // Future leafs preserve nilability
+        tjn = TypeNil.XSCALAR;  // Future arg leaf can expand into anything, and lift result
       } else {
         // Lift the internal parts
         tjn = _walk_types_out(t,apply,test);
@@ -3178,12 +3207,12 @@ public class HM {
       }
       if( is_ptr() ) {
         if( t==TypeNil.NIL || t==TypeNil.XNIL ) return t; // Keep a nil
-        if( !(t instanceof TypeMemPtr tmp) ) return TypeNil.XSCALAR;
+        if( !(t instanceof TypeMemPtr tmp) ) return t;
         return tmp.make_from((TypeStruct)arg("*").walk_types_out(tmp._obj,apply,test));
       }
 
       if( is_nil() ) // The wrapped leaf gets lifted, then nil is added
-        return arg("?").walk_types_out(t.join(TypeNil.XNIL),apply, test);
+        return arg("?").walk_types_out(t.join(TypeNil.NSCALR),apply, test);
 
       if( is_fun() ) {          // Walk returns not arguments
         Type tret = t instanceof TypeFunPtr tfp ? tfp._ret  : t.oob(TypeNil.SCALAR);
@@ -3193,7 +3222,7 @@ public class HM {
         WDUPS.remove(_uid);
         return t instanceof TypeFunPtr tfp
           ? tfp.make_from(Type.ANY,trlift)
-          : TypeFunPtr.makex((t.above_center() ? BitsFun.EMPTY : BitsFun.NALL),size()-1+DSP_IDX, Type.ANY, trlift);
+          : TypeFunPtr.makex(t.above_center(),(t.above_center() ? BitsFun.EMPTY : BitsFun.NALL),size()-1+DSP_IDX, Type.ANY, trlift);
       }
 
       if( is_obj() ) return t; // expect ptrs to be simple, so t is ISUSED
@@ -3204,21 +3233,24 @@ public class HM {
     // -----------------
     // Recursively clear _is_copy, through cyclic types
     static final VBitSet UPDATE_VISIT  = new VBitSet();
-    void clr_cp() { UPDATE_VISIT.clear(); _clr_cp();}
-    private void _clr_cp(  ) {
+    void clr_cp(                 ) { UPDATE_VISIT.clear(); _clr_cp(null);}
+    void clr_cp(Work<Syntax> work) { UPDATE_VISIT.clear(); _clr_cp(work);}
+    private void _clr_cp( Work<Syntax> work  ) {
       if( !_is_copy || UPDATE_VISIT.tset(_uid) ) return;
       _is_copy = false;
       if( _deps!=null ) {
         T2 ret;
-        for( Syntax syn : _deps )
+        for( Syntax syn : _deps ) {
+          if( syn instanceof Apply apply && work!=null ) work.add(apply); // Apply-lift widens
           if( syn instanceof Lambda lam && lam.find().arg("ret")==this )
             for( Apply apply : lam._applys )
               if( (ret=apply._fun.find().arg("ret"))!=null )
-                ret._clr_cp();
+                ret._clr_cp(work);
+        }
       }
       if( _args != null )
         for( T2 t2 : _args.values() )
-          t2._clr_cp();
+          t2._clr_cp(work);
     }
 
     // -----------------
