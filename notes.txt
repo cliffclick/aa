@@ -1,4 +1,52 @@
 =======================================
+9/24/2022
+
+Solving the mis-mashed Overloads
+
+Same Overload can be merged at If, or Arg, matching field to field.
+Fresh of an Overload keeps the basic overload type, but has fresh contents.
+Mis-mashed overloads have to resolve at that program point.
+
+Impl: all Over fields have a unique field name.  Matching field names can unify like normal.
+Missing fields accumulate.  Resolution happens once per Over (per set of fields).
+After resolving, find() can collapse.  If multi-Overs have merged, they can resolve
+independently.  Once resolved, their resolved parts also unify.  The whole Over cannot
+be collapsed until all parts resolve.
+
+Impl:
+
+a "multi-over", a mover:
+- args are unique-named T2.is_over's.  Use the T2 over._uid as unique name.
+- maybe with a tag field to mark a mover.
+- unify 2 movers:
+- - matching fields (overs), field by field
+- - unmatched just accumulate, like an open struct
+- unify mover+other
+- - short-cut '&&' in each over, already resolved
+- - trial-unify each over
+- all overs resolved to '&&'
+- - then self resolves to '&&'
+- check for nesting movers
+- - flatten into top multi-over
+- - check for self flatten (cycle), replace with simple leaf.  Makes ambiguous.
+
+
+overs:
+- fields named 0,1,2,3; but unique within a mover; uses the _uid in the mover
+- only expect 2 overs to unify field by field, never an over and something else
+- except trial-unify from mover
+- - record '&&' field per-over; 3 states; null/Missing: not resolved;
+    err-w-self: error (no resolves); other-child: resolved child
+- never see a field isa mover, since mover flattens
+- if field is an over, use its resolve, or declare "unify success" (which typically stalls)
+
+over1 = &[ a b c ]     // T2 mover &[ over1( a, b, c    ) ]&
+over2 = &[ x y over1 ] // T2 mover &[ over2( x, y, over1) ]&
+
+// T2 mover &[ over2( 0:x, 1:y, 2:over1/*if over1 is resolved, use that, else unifies/delay*/) over1(0:a, 1:b, 2:c) ]&
+
+
+=======================================
 9/22/2022
 
 Troubles making TypeUnion a lattice, with constants and nil.

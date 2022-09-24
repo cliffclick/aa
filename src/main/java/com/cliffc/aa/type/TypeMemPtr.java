@@ -27,7 +27,6 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
 
   private TypeMemPtr _init( BitsAlias aliases, TypeStruct obj ) {
     assert !aliases.test(0); // No nil in aliases, use nil/sub instead
-    assert _any==aliases.above_center() || aliases==BitsAlias.EMPTY;
     _aliases = aliases;
     _obj=obj;
     return this;
@@ -91,7 +90,6 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   static TypeMemPtr valueOf(Parse P, String cid, boolean any) {
     P.require('*');
     var aliases = P.bits(BitsAlias.EMPTY);
-    assert any==aliases.above_center() || aliases.is_empty();
     TypeMemPtr tmp = malloc(any, aliases.test(0),aliases.clear(0),null);
     if( cid!=null ) P._dups.put(cid,tmp);
     assert !tmp.interned();
@@ -106,7 +104,11 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     return t1.init(any,nil,aliases,obj);
   }
   public static TypeMemPtr make(boolean nil, BitsAlias aliases, TypeStruct obj ) {
+    assert !aliases.is_empty(); // Ambiguous
     return malloc(aliases.above_center(),nil,aliases,obj).hashcons_free();
+  }
+  public static TypeMemPtr make(boolean any, boolean nil, BitsAlias aliases, TypeStruct obj ) {
+    return malloc(any,nil,aliases,obj).hashcons_free();
   }
   public static TypeMemPtr malloc(boolean any, boolean nil, boolean sub, BitsAlias aliases, TypeStruct obj ) {
     TypeMemPtr t1 = POOLS[TMEMPTR].malloc();
@@ -164,7 +166,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
 
   public  static final TypeMemPtr ISUSED0= make(true ,BitsAlias.NALL,TypeStruct.ISUSED); // Includes nil
   public  static final TypeMemPtr ISUSED = make(false,BitsAlias.NALL,TypeStruct.ISUSED); // Excludes nil
-  public  static final TypeMemPtr EMTPTR = make(false,BitsAlias.EMPTY,TypeStruct.UNUSED);
+  public  static final TypeMemPtr EMTPTR = malloc(false,false,BitsAlias.EMPTY,TypeStruct.UNUSED).hashcons_free();
   public  static final TypeMemPtr DISP_SIMPLE= make(false,BitsAlias.NALL,TypeStruct.ISUSED); // closed display
   public  static final TypeMemPtr STRPTR = make_str(TypeInt.INT8); // For legacy HM tests
 
@@ -295,8 +297,6 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
         fidxs = fidxs.meet(tmem.at(alias)._all_reaching_fidxs(tmem));
     return fidxs;
   }
-
-  private static boolean above_center( BitsAlias aliases ) { return aliases.above_center(); }
 
   @Override public Type widen() { return this; }
 

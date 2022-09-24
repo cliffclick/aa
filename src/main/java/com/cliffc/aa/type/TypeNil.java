@@ -68,10 +68,10 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   }
 
   static final String[][][] NSTRS = new String[][][]{
-    {{ ""    , "n"},  // all, !nil, {!sub,sub}  AND, NOT
-     { "nil=","0+"}}, // all,  nil, {!sub,sub}  YES, OR
-    {{ "0&~" ,"~n"},  // any, !nil, {!sub,sub}  AND, NOT
-     {"xnil~","~" }}  // any,  nil, {!sub,sub}  YES, OR
+    {{ ""    , "n" },  // all, !nil, {!sub,sub}  AND, NOT
+     { "nil_","_0" }}, // all,  nil, {!sub,sub}  YES, OR
+    {{ "~_0" ,"~n" },  // any, !nil, {!sub,sub}  AND, NOT
+     {"~nil_","~"  }}  // any,  nil, {!sub,sub}  YES, OR
   };
   SB _strn(SB sb) { return sb.p(NSTRS[_any ?1:0][_nil ?1:0][_sub ?1:0]); }
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
@@ -86,6 +86,17 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     { "=0", "+0"}  // all,  nil, {!sub,sub}
   };
   SB _str_nil( SB sb ) { return sb.p(XSTRS[_nil ?1:0][_sub ?1:0]); }
+  
+  static Type valueOfNil(String cid) {
+    return switch(cid) {
+    case  "Scalar" ->   SCALAR; // FFF
+    case "nScalar" ->  NSCALR ; // FFT
+    case "nil"     ->  NIL;     // FTF
+    case "xnil"    -> XNIL;     // TTF
+    case "_0Scalar" -> make(false,true,true);
+    default        -> null;
+    };
+  }
 
   N val_nil( Parse P ) {
     if( P.peek('?' ) ) _nil = _sub = false;
@@ -121,15 +132,6 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   public static final TypeNil AND_XSCALAR = make(true,false,false); // Odd choice: 0&~Scalar
   // Collection of sample types for checking type lattice properties.
   static final TypeNil[] TYPES = new TypeNil[]{SCALAR,NSCALR,NIL};
-  static Type valueOfNil(String cid) {
-    return switch(cid) {
-    case  "Scalar" ->  SCALAR;
-    case "nScalar" -> NSCALR;
-    case "xnil"    -> XNIL;
-    case "nil"     -> NIL;
-    default        -> null;
-    };
-  }
 
   // duals:
   //  xs +0 <->  s &0

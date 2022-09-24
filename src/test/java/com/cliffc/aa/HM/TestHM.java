@@ -27,9 +27,8 @@ public class TestHM {
 
     DO_HMT=true;
     DO_GCP=true;
-    //r= 0,tst52;  progress cnt=1217
     RSEED=0;
-    test52();
+    test92();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -1184,7 +1183,7 @@ A:*@{
          "  { x -> (f* x 3.0) };"+  // Arg is 'flt'
          " ]",
          "&[ {int64 -> int64}; {flt64 -> flt64} ]",
-         "[~23+25]{any,3 ->~Scalar0 }", // TODO: [~23+26] need PowerSet to gain precision here
+         "[~23+25]{any,3 -> ~_0Scalar }",
          null,"[23,25]"
         );
   }

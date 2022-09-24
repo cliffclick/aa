@@ -47,7 +47,6 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   private Type _dsp;            // Display; often a TMP to a TS; ANY is dead (not live, nobody uses).
 
   private TypeFunPtr _init(BitsFun pos, int nargs, Type dsp, Type ret) {
-    assert _any == pos.above_center() || pos.is_empty(); // No must-have to be above-center
     assert !(dsp instanceof TypeFld);
     _pos = pos;
     _nargs=nargs; _dsp=dsp; _ret=ret;
@@ -152,10 +151,9 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
 
   static TypeFunPtr valueOf(Parse P, String cid, boolean any) {
     BitsFun pos = P.bits(BitsFun.EMPTY);
-    assert any==pos.above_center();
     if( P.peek('+') ) throw unimpl();
     P.require('{');
-    TypeFunPtr tfp = malloc(pos,0,null,null);
+    TypeFunPtr tfp = malloc(any,pos,0,null,null);
     if( cid!=null ) P._dups.put(cid,tfp);
     tfp.set_dsp(P.type());
     P.require(',');
@@ -299,9 +297,9 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     TypeFunPtr t1 = POOLS[TFUNPTR].malloc();
     return t1.init(any,nil,sub,pos,nargs,dsp,ret);
   }
-  private static TypeFunPtr malloc(BitsFun pos, int nargs, Type dsp, Type ret ) {
+  private static TypeFunPtr malloc(boolean any, BitsFun pos, int nargs, Type dsp, Type ret ) {
     TypeFunPtr t1 = POOLS[TFUNPTR].malloc();
-    return t1.init(pos.above_center(),pos.test(0),pos.clear(0),nargs,dsp,ret);
+    return t1.init(any,pos.test(0),pos.clear(0),nargs,dsp,ret);
   }
 
   public static TypeFunPtr make( boolean any, BitsFun pos, int nargs, Type dsp, Type ret ) {
@@ -323,7 +321,6 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     return make(BitsFun.new_fidx(parent),nargs,dsp,ret);
   }
   public static TypeFunPtr make( BitsFun pos, int nargs) {
-    assert !pos.is_empty();     // Ambiguous
     return make(pos.above_center(),pos,nargs,TypeMemPtr.NO_DISP,TypeNil.SCALAR);
   }
   public TypeFunPtr make_from( Type dsp ) { return make(_any, _pos,_nargs, dsp,_ret); }

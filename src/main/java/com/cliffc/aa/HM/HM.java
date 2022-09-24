@@ -1725,15 +1725,17 @@ public class HM {
     }
 
     @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
-      T2 hmt = T2.make_overload();
-      prep_tree_impl(par, nongen, work, hmt);
-      hmt.push_update(this);
+      T2 hmt  = T2.make_overload();
+      T2 hmts = T2.make_multi_over(_uid, hmt);
+      prep_tree_impl(par, nongen, work, hmts);
+      hmts.push_update(this);
       int cnt = 1;                // One for self
       for(int i = 0; i< _overs.length; i++ ) { // Prep all sub-fields
         cnt += _overs[i].prep_tree(this,nongen,work);
         hmt._args.put("&"+i, _overs[i].find());
       }
-      assert hmt.is_over();
+      assert hmt .is_over();
+      assert hmts.is_movs();
       return cnt;
     }
     @Override boolean more_work(Work<Syntax> work) {
@@ -2252,6 +2254,7 @@ public class HM {
     boolean is_nil () { return get("?" )!=null; }
     boolean is_ptr () { return get("*" )!=null; }
     boolean is_over() { return get("&0")!=null; }
+    boolean is_movs() { return get("&+")!=null; } // Multi-overs
     boolean is_base() { return _tflow != null; }
     boolean is_fun () { return _is_fun; }
     boolean is_obj () { return _is_obj; }
@@ -2330,6 +2333,10 @@ public class HM {
     // No fields (yet), filled in during prep-tree
     static T2 make_overload() {
       return new T2(new NonBlockingHashMap<>());
+    }
+    // Make a multi-overload
+    static T2 make_multi_over(int uid, T2 over) {
+      return new T2(new NonBlockingHashMap<>(){{put("&+"+uid,over); put("&+",make_leaf());}});
     }
 
     void free() {
@@ -2473,7 +2480,7 @@ public class HM {
         // all escaping aliases that are compatible
         BitsAlias aliases = Root.matching_escaped_aliases(this);
         TypeStruct tstr = deep ? (TypeStruct)arg("*")._as_flow(syn,deep) : TypeStruct.ISUSED;
-        return TypeMemPtr.make(_may_nil,aliases,tstr);
+        return TypeMemPtr.make(false,_may_nil,aliases,tstr);
       }
       if( is_nil() )
         return arg("?")._as_flow(syn,deep).meet(TypeNil.AND_XSCALAR);
@@ -3348,6 +3355,7 @@ public class HM {
           if( _eflow!=null) sb.p(_eflow)               .p(" and ");
           if( is_ptr () ) str_ptr(sb,visit,dups,debug, _tflow).p(" and ");
           if( is_over() ) str_ovr(sb,visit,dups,debug).p(" and ");
+          if( is_movs() ) str_mov(sb,visit,dups,debug).p(" and ");
           if( is_obj () ) str_obj(sb,visit,dups,debug).p(" and ");
           return sb.unchar(5).p("]");
         }
@@ -3357,6 +3365,7 @@ public class HM {
       if( is_ptr () ) return str_ptr(sb,visit,dups,debug, _tflow);
       if( is_fun () ) return str_fun(sb,visit,dups,debug);
       if( is_over() ) return str_ovr(sb,visit,dups,debug);
+      if( is_movs() ) return str_mov(sb,visit,dups,debug);
       if( is_obj () ) return str_obj(sb,visit,dups,debug);
       if( is_nil () ) return str0(sb,visit,_args.get("?"),dups,debug).p('?');
 
@@ -3399,6 +3408,12 @@ public class HM {
       }
       return sb.unchar(2).p(" ]");
     }
+
+    // Multi-over, typically with just 1 over
+    private SB str_mov(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
+      throw unimpl();
+    }
+    
     private SB str_obj(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
       if( is_prim() ) return sb.p("@{PRIMS}");
       String is_clz = null;

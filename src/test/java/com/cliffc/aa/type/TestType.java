@@ -53,6 +53,14 @@ public class TestType {
     String[] ss = new String[] {
       "3",
       "[23]{any,3 -> *[7](3, Scalar) }",
+      "Scalar",
+      "nScalar",
+      "nil",
+      "_0Scalar",
+      "~Scalar",
+      "~nScalar",
+      "xnil",
+      "~_0Scalar",
     };
     for( String s : ss ) {
       Type t0 = Type.valueOf(s);
