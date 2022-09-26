@@ -25,10 +25,10 @@ public class TestHM {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_HMT=true;
+    DO_HMT=false;
     DO_GCP=true;
     RSEED=0;
-    test92();
+    test82();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -1176,20 +1176,18 @@ A:*@{
 
 
   // Ambiguous overload, {int->int}, cannot select
-  @Ignore
   @Test public void test81() {
     rune("&["                    +  // Define overloaded fcns
          "  { x -> (i* x 2  ) };"+  // Arg is 'int'
          "  { x -> (f* x 3.0) };"+  // Arg is 'flt'
          " ]",
          "&[ {int64 -> int64}; {flt64 -> flt64} ]",
-         "[~23+25]{any,3 -> ~_0Scalar }",
+         "*[nALL]over26:@{ov0=[23]{any,3 -> int64 }; ov1=[25]{any,3 -> flt64 }}",
          null,"[23,25]"
         );
   }
 
   // Simple overloaded function test.
-  @Ignore
   @Test public void test82() {
     rune("f = &["                +  // Define overloaded fcns 'f'
          "  { x -> (i* x 2  ) };"+  // Arg is 'int'
@@ -1197,19 +1195,18 @@ A:*@{
          "];"+
          "(pair (f 2) (f 1.2))",    // Call with different args
          "*(int64,flt64)", "*(int64,flt64)",
-         "*[7](_, 4,3.6000001f)", "*[7](_, ~Scalar,~Scalar)",
+         "*[7](_, 4,3.6000001f)", "*[7](_, ~Scalar, ~Scalar)",
          "[4,7]",null);
   }
 
   // Ambiguous overload, {int->int}, cannot select
-  @Ignore
   @Test public void test83() {
     run("(&["                  +  // Define overloaded fcns
         "   { x -> (i* x 2) };"+  // Arg is 'int'
         "   { x -> (i* x 3) };"+  // Arg is 'int'
         "  ] 4)",                 // Error, ambiguous
-        "Ambiguous overload &[ {int64->int64}; {int64->int64} ]: int64",
-        "Ambiguous overload &[ {int64->int64}; {int64->int64} ]: int64",
+        "Ambiguous overload &[ {int64->int64}; {int64->int64} ]",
+        "Ambiguous overload &[ {int64->int64}; {int64->int64} ]",
         "nint8",
         "~int64"
       );
