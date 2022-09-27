@@ -498,7 +498,7 @@ public class HM {
     return s;
   }
   private static Syntax number() {
-    if( BUF[X]=='0' ) { X++; return new Con(TypeNil.XNIL); }
+    if( BUF[X]=='0' && BUF[X+1]!='.' ) { X++; return new Con(TypeNil.XNIL); }
     int sum=0;
     while( X<BUF.length && isDigit(BUF[X]) )
       sum = sum*10+BUF[X++]-'0';
@@ -1716,6 +1716,7 @@ public class HM {
       return TypeMemPtr.make(BitsAlias.ALLX,ts);
     }
 
+    // Test a flow type is an Overload (junk TMP to a Struct of overload choices)
     static boolean is_overload(Type t) {
       return t instanceof TypeMemPtr tmp && tmp.aliases().abit()==1;
     }
@@ -2369,7 +2370,7 @@ public class HM {
     // No child fields (yet), filled in during prep-tree.
     // Has "&&x" tag field
     static T2 make_overload(int uid) {
-      return new T2(new NonBlockingHashMap<>(){{put("&&_tag"+uid,T2.make_base(TypeInt.con(uid)));}});
+      return new T2(new NonBlockingHashMap<>(){{put("&&_tag",T2.make_base(TypeInt.con(uid)));}});
     }
 
     void free() {
@@ -2537,7 +2538,7 @@ public class HM {
           tstr = TypeStruct.malloc("",is_open() ? Type.ANY : Type.ALL,TypeFlds.get(0)).add_fld(TypeFld.NO_DISP);
           if( _args!=null ) {
             for( String fld : _args.keySet() )
-              if( fld.endsWith(":") ) tstr._clz = fld;
+              if( fld.endsWith(":") ) tstr._clz = fld; // Move a nomative tag into the clz field
               else tstr.add_fld(TypeFld.malloc(fld));
             ADUPS.put(_uid,tstr); // Stop cycles
             for( String id : _args.keySet() )
@@ -2716,14 +2717,17 @@ public class HM {
       // Special case: overload vs other
       if( this.is_over() && !that.is_over() ) return this._unify_over(that,null,false,false,work);
       if( that.is_over() && !this.is_over() ) return that._unify_over(this,null,false,false,work);
-      if( this.is_over() && that.is_over() && arg("&&_tag")!=that.arg("&&_tag") )
-        throw unimpl();         // Same tag field, unify field by field.  Diff tag field: both are in-error
+      // Two unrelated overloads not allowed.  To equal overloads unify normally.
+      boolean progress=false;
+      if( this.is_over() && that.is_over() && arg("&&_tag")._tflow!=that.arg("&&_tag")._tflow )
+        progress = this.unify_errs("Mismatched overloads",work) &
+                   that.unify_errs("Mismatched overloads",work);
 
       // Cycle check
       long luid = dbl_uid(that);    // long-unique-id formed from this and that
       T2 rez = DUPS.get(luid);
       assert rez==null || rez==that;
-      if( rez!=null ) return false; // Been there, done that
+      if( rez!=null ) return progress; // Been there, done that
       DUPS.put(luid,that);          // Close cycles
 
       if( work==null ) return true; // Here we definitely make progress; bail out early if just testing
@@ -2761,7 +2765,7 @@ public class HM {
             else                  that.del_fld(key, work);              // Drop from RHS
           }
 
-      if( that.debug_find() != that ) throw unimpl(); // Missing a find
+      assert !that.unified(); // Missing a find
     }
 
     // Insert a new field
@@ -2832,11 +2836,12 @@ public class HM {
       // Fresh-unify with an ad-hoc polymorphic overload
       if( this.is_over() && !that.is_over() ) return this._unify_over(that,nongen,true,false,work);
       if( that.is_over() && !this.is_over() ) return that._unify_over(this,nongen,false,true,work);
-      if( this.is_over() &&  that.is_over() && arg("&&_tag")!=that.arg("&&_tag") )
-        throw unimpl();         // Same tag field, fresh_unify field by field.  Diff tag field: both are in-error
+      // Two unrelated overloads not allowed.  To equal overloads unify normally.
+      boolean progress = false;
+      if( this.is_over() &&  that.is_over() && arg("&&_tag")._tflow!=that.arg("&&_tag")._tflow )
+        progress = that.unify_errs("Mismatched overloads",work);
 
       // Progress on the parts
-      boolean progress = false;
       if( _tflow !=null ) progress = unify_base(that, work);
 
       // Check for mismatched LHS and RHS
@@ -2998,7 +3003,7 @@ public class HM {
       }
       
       // Ambiguous never resolved, report instead of stall.
-      boolean progress = that.unify_errs("Ambiguous overload "+p(),work);
+      boolean progress = that.unify_errs("Ambiguous overload "+p()+": ",work);
       // If always 2+ children unify, simply report the ambiguous error
       if( no_err==null )
         return progress;
@@ -3410,6 +3415,7 @@ public class HM {
         }
       }
 
+      if( is_leaf() ) { vname(sb,debug); return sb; } // Happens for error leafs
       if( is_base() ) return str_base(sb);
       if( is_ptr () ) return str_ptr(sb,visit,dups,debug, _tflow);
       if( is_fun () ) return str_fun(sb,visit,dups,debug);
@@ -3462,7 +3468,7 @@ public class HM {
       String is_clz = null;
       if( _args!=null )
         for( String fld : _args.keySet() )
-          if( fld.endsWith(":") )
+          if( fld.endsWith(":") ) // A nomative tag becomes the clazz
             sb.p(is_clz = fld);
       final boolean is_tup = is_tup(); // Distinguish tuple from struct during printing
       sb.p(is_tup ? "(" : "@{");

@@ -25,10 +25,10 @@ public class TestHM {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_HMT=false;
+    DO_HMT=true;
     DO_GCP=true;
     RSEED=0;
-    test82();
+    test87();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -1205,24 +1205,22 @@ A:*@{
         "   { x -> (i* x 2) };"+  // Arg is 'int'
         "   { x -> (i* x 3) };"+  // Arg is 'int'
         "  ] 4)",                 // Error, ambiguous
-        "Ambiguous overload &[ {int64->int64}; {int64->int64} ]",
-        "Ambiguous overload &[ {int64->int64}; {int64->int64} ]",
+        "Ambiguous overload &[ {int64->int64}; {int64->int64} ]: A",
+        "Ambiguous overload &[ {int64->int64}; {int64->int64} ]: A",
         "nint8",
         "~int64"
       );
   }
 
   // Wrong args for all overloads
-  @Ignore
   @Test public void test84() {
     rune("(&[ { x y -> (i* x y) }; { x y z -> (i* y z) };] 4)",
-         "Ambiguous overload &[ {int64 int64->int64}; {A int64 int64->int64} ]: int64",
+         "Ambiguous overload &[ {int64 int64->int64}; {A int64 int64->int64} ]: A",
          "~int64",
          null,null);
   }
 
   // Mixing unrelated overloads
-  @Ignore
   @Test public void test85() {
     rune("""
 fx = &[ { x -> 3     }; { y -> "abc" }; ];
@@ -1230,24 +1228,26 @@ fy = &[ { z -> "def" }; { a -> 4     }; ];
 fz = (if (rand 2) fx fy);
 (isempty (fz 1.2))
 """,
-         "Ambiguous overload &[ {A->[Cannot unify 3 and *str:(100)] };{B->[Cannot unify 4 and *str:(97)] } ]: int1",
-         "~Scalar",
+         "Ambiguous overload Mismatched overloads &[ {A -> [Cannot unify 3 and *str:(100)]}; { B -> [Cannot unify 4 and *str:(97)]}]: int1",
+         "Ambiguous overload Mismatched overloads &[ {A -> [Cannot unify 3 and *str:(100)]}; { B -> [Cannot unify 4 and *str:(97)]}]: int1",
+         "int1", "~Scalar",
          null,null);
   }
 
-  @Ignore
   @Test public void test86() {
     rune("""
 { pred ->
   fx = &[ (if pred { x -> (i* x 2)} { x -> (i* x 3)});
-          { x -> (f* x 2.3) }
+          { x -> (f* x 0.5) }
         ];
-  (pair (fx 2) (fx 2.1))
+  (pair (fx 2) (fx 1.2))
 }
 """,
          "{A? -> *(int64,flt64) }",
-         "[34]{any,3 ->*[7](_,  Scalar, Scalar) }",
-         "[4,7]","[34]");
+         "{A? -> *(int64,flt64) }",
+         "[32]{any,3 -> *[7](_, nint8, 0.6f) }",
+         "[32]{any,3 -> *[7](_, ~Scalar, ~Scalar) }",
+         "[4,7]","[32]");
   }
 
   // Test case here is trying to get HM to do some overload resolution.
@@ -1278,8 +1278,10 @@ con2   = (iwrap 2  );
 con2_1 = (fwrap 2.1);
 (con2_1._*_ con2_1)
 """,
-        "A:*@{_; _*_={B:*@{_; _*_=&[{*@{_; i=int64;...}->B};{*@{_; f=flt64;...}->B}];f=flt64}->A};f=flt64}",
+        "A:*@{ _*_={B:*@{ _*_=&[{*@{ i=int64;...}->B};{*@{ f=flt64;...}->B}];f=flt64}->A};f=flt64}",
+        "A:*@{ _*_={B:*@{ _*_=&[{*@{ i=int64;...}->B};{*@{ f=flt64;...}->B}];f=flt64}->A};f=flt64}",
         "PA:*[7]@{_; _*_=[~25+27]{any,3 ->PA }; f=flt64}",
+        "Scalar",
         "[4,7,10,11]","[25,27]");
   }
 

@@ -1125,7 +1125,7 @@ public class Parse implements Comparable<Parse> {
       _x=x+2;                                // Just return the "->"
     return new String(_buf,x,_x-x);
   }
-  static boolean isOp(String s, boolean prims) {
+  static boolean isOp(String s) {
     if( s==null || s.isEmpty() ) return false;
     byte c = (byte)s.charAt(0);
     if( !Oper.isOp0(c) && (c!='_' || !Oper.isOp0((byte)s.charAt(1))) ) return false;
@@ -1133,9 +1133,6 @@ public class Parse implements Comparable<Parse> {
       if( !Oper.isOp1((byte)s.charAt(i)) ) return false;
     return true;
   }
-
-  // Allows '+' and includes '_+_'
-  boolean isOp(String s) { return isOp(s,_prims); }
 
   // Parse a number; WS already skipped and sitting at a digit.  Relies on
   // Javas number parsing.

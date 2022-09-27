@@ -886,7 +886,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     }
     private static boolean isId1(char c) {
       return isId0(c) || 
-        ('0' <= c && c <= '9');
+        ('0' <= c && c <= '9') ||
+        (c=='*'); // See Oper.isOp
     }
 
     // Examples: [], [0], [5], [2,3,4], [0,ALL]
