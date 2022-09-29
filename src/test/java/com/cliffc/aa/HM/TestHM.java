@@ -26,9 +26,9 @@ public class TestHM {
     JIG=true;
 
     DO_HMT=true;
-    DO_GCP=true;
+    DO_GCP=false;
     RSEED=0;
-    test87();
+    test47();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -53,7 +53,7 @@ public class TestHM {
     if( JIG )
       _run0s(prog,rez_hm,frez_gcp,RSEED,esc_ptrs,esc_funs);
     else
-      for( int rseed=0; rseed<32; rseed++ )
+      for( int rseed=0; rseed<1; rseed++ )
         _run0s(prog,rez_hm,frez_gcp,rseed,esc_ptrs,esc_funs);
   }
 
@@ -870,7 +870,7 @@ three =(n.s two);     // Three is the successor of two
   // Broken from Marco; function 'f' clearly uses 'p2.a' but example 'res1' does not
   // pass in a field 'a'... and still no error.  Fixed.
   @Test public void test62() { run("f = { p1 -> p1.a };"+"(f @{b=2.3})",
-                                    "Missing field a: ",
+                                    "Missing field a",
                                    "Scalar");  }
 
   @Test public void test63() {
@@ -1182,8 +1182,8 @@ A:*@{
          "  { x -> (f* x 3.0) };"+  // Arg is 'flt'
          " ]",
          "&[ {int64 -> int64}; {flt64 -> flt64} ]",
-         "*[nALL]over26:@{ov0=[23]{any,3 -> int64 }; ov1=[25]{any,3 -> flt64 }}",
-         null,"[23,25]"
+         "*[nALL]over26:@{ov0=[23]{any,3 -> int64 }; ov1=[26]{any,3 -> flt64 }}",
+         null,"[23,26]"
         );
   }
 
@@ -1205,8 +1205,8 @@ A:*@{
         "   { x -> (i* x 2) };"+  // Arg is 'int'
         "   { x -> (i* x 3) };"+  // Arg is 'int'
         "  ] 4)",                 // Error, ambiguous
-        "Ambiguous overload &[ {int64->int64}; {int64->int64} ]: A",
-        "Ambiguous overload &[ {int64->int64}; {int64->int64} ]: A",
+        "Ambiguous overload &[ {int64->int64}; {int64->int64} ]",
+        "Ambiguous overload &[ {int64->int64}; {int64->int64} ]",
         "nint8",
         "~int64"
       );
@@ -1215,7 +1215,7 @@ A:*@{
   // Wrong args for all overloads
   @Test public void test84() {
     rune("(&[ { x y -> (i* x y) }; { x y z -> (i* y z) };] 4)",
-         "Ambiguous overload &[ {int64 int64->int64}; {A int64 int64->int64} ]: A",
+         "Ambiguous overload &[ {int64 int64->int64}; {A int64 int64->int64} ]",
          "~int64",
          null,null);
   }
@@ -1228,8 +1228,8 @@ fy = &[ { z -> "def" }; { a -> 4     }; ];
 fz = (if (rand 2) fx fy);
 (isempty (fz 1.2))
 """,
-         "Ambiguous overload Mismatched overloads &[ {A -> [Cannot unify 3 and *str:(100)]}; { B -> [Cannot unify 4 and *str:(97)]}]: int1",
-         "Ambiguous overload Mismatched overloads &[ {A -> [Cannot unify 3 and *str:(100)]}; { B -> [Cannot unify 4 and *str:(97)]}]: int1",
+         "Ambiguous overload Mismatched overloads: &[ {A -> [Cannot unify 3 and *str:(100)]}; { B -> [Cannot unify 4 and *str:(97)]}]: int1",
+         "Ambiguous overload Mismatched overloads: &[ {A -> [Cannot unify 3 and *str:(100)]}; { B -> [Cannot unify 4 and *str:(97)]}]: int1",
          "int1", "~Scalar",
          null,null);
   }
@@ -1245,15 +1245,14 @@ fz = (if (rand 2) fx fy);
 """,
          "{A? -> *(int64,flt64) }",
          "{A? -> *(int64,flt64) }",
-         "[32]{any,3 -> *[7](_, nint8, 0.6f) }",
-         "[32]{any,3 -> *[7](_, ~Scalar, ~Scalar) }",
-         "[4,7]","[32]");
+         "[34]{any,3 -> *[7](_, nint8, 0.6f) }",
+         "[34]{any,3 -> *[7](_, ~Scalar, ~Scalar) }",
+         "[4,7]","[34]");
   }
 
   // Test case here is trying to get HM to do some overload resolution.
   // Without, many simple int/flt tests in main AA using HM alone fail to find
   // a useful type.
-  @Ignore
   @Test public void test87() {
     rune(
 """
@@ -1279,10 +1278,8 @@ con2_1 = (fwrap 2.1);
 (con2_1._*_ con2_1)
 """,
         "A:*@{ _*_={B:*@{ _*_=&[{*@{ i=int64;...}->B};{*@{ f=flt64;...}->B}];f=flt64}->A};f=flt64}",
-        "A:*@{ _*_={B:*@{ _*_=&[{*@{ i=int64;...}->B};{*@{ f=flt64;...}->B}];f=flt64}->A};f=flt64}",
-        "PA:*[7]@{_; _*_=[~25+27]{any,3 ->PA }; f=flt64}",
-        "Scalar",
-        "[4,7,10,11]","[25,27]");
+        "*[7]@{_; _*_=*[nALL]over35:(); f=flt64}",
+        "[4,7,9,10]","[24,26]");
   }
 
   // Recursive structs.  First: closed structs list available fields;
@@ -1397,9 +1394,8 @@ con2_1 = (fwrap 2.1);
 mul2 = { x -> (x._*_ con2)};
 (triple (mul2 con2_1)  (con2._*_ con2) (con2_1._*_ con2_1))
 """,
-        hm_rez, hm_rez,
-        "*[9](PA:*[7]@{_; _*_=[~25+27]{any,3 ->PA }; f=flt64}, *[8]@{_; _*_=[~31+34]{any,3 ->*[]( ...) }; i=int64}, PA)",
-        "*[9](PA:*[7]@{_; _*_=[~25+27]{any,3 ->PA }; f=flt64}, *[]( ...), PA)",
+        hm_rez,
+        "*[9](_, 0=PA:*[7]@{_; _*_=*[nALL]over35:(); f=flt64}, *[7]@{_; _*_=*[nALL]over37:(); i=int64}, 2=PA)",
         "[4,7,8,9,10,11,17,18]","[25,27,31,34]");
   }
 

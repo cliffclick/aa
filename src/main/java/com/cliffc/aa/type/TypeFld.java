@@ -91,15 +91,19 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   static TypeFld valueOf(Parse P, String cid, boolean any, String fld, int fld_num) {
     assert !any;                // Discovered via SHORTS
     assert fld_num>=0;          // Only called in a field context
-    String[] eqs = Access.SHORTS;
-    int i; for( i=0; i<eqs.length; i++ ) // Find assignment flavor
-      if( P.peek(eqs[i]) )
-        break;
-    if( i==eqs.length ) return null; // Not a assignment flavor
+    int i = valueOfEq(P);
+    if( i == -1  ) return null;                     // Not a assignment flavor
     TypeFld tf = malloc(fld,null,Access.values[i]); // Make TypeFld without type yet
     if( cid!=null ) P._dups.put(cid,tf);            // Close cyclic types
     tf._t = P.type();                               // Fill in field type
     return tf;
+  }
+  static int valueOfEq(Parse P) {
+    String[] eqs = Access.SHORTS;
+    for( int i=0; i<eqs.length; i++ ) // Find assignment flavor
+      if( P.peek(eqs[i]) )
+        return i;
+    return -1;
   }
 
   static { new Pool(TFLD,new TypeFld()); }

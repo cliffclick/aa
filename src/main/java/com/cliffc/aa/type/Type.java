@@ -746,8 +746,20 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     Parse(String str) { _str = str; }
     Type type() { return type(null,false,-1); }
     Type type(String cid, boolean any, int fld_num) {
-      if( fld_num>0 )           // Normal type parse (no field name), then wrap in a numbered field
+      if( fld_num>0 ) {         // Normal type parse (no field name), then wrap in a numbered field
+        // Can also have the label as a number: "0=DUP:type"  vs "DUP:type"  vs "label=type", etc
+        int oldx = _x;
+        String id = id();
+        if( Util.eq(id,TypeFld.TUPS[fld_num]) ) { // Either "0=DUP:type" or simple "123"
+          int oldxx = _x;
+          if( TypeFld.valueOfEq(this) != -1  ) { // Yes 0=DUP:type
+            _x = oldxx;
+            return TypeFld.valueOf(this,cid,any,id,0);
+          }
+        }
+        _x = oldx;
         return TypeFld.make(TypeFld.TUPS[fld_num],type(null,any,-1));
+      }
 
       return switch( skipWS() ) {
       case '0','1','2','3','4','5','6','7','8','9','-' -> num();
@@ -804,8 +816,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         // Check for field id
         if( fld_num == 0 )
           yield cyc(skipWS() >0 && at(_x+1)!='=' && peek(':') // Named field: FA:v1=123, and not r/w field FA:=123
-                    ? type(id,any,fld_num) 
-                    : TypeFld.valueOf(this,cid,any,id,fld_num)); // Unnamed field: v1=123
+                    ? type(id,any,0) 
+                    : TypeFld.valueOf(this,cid,any,id,0)); // Unnamed field: v1=123
         
         // Lookup various constant type names
         t = simple_type(id);

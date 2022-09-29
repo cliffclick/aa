@@ -47,8 +47,29 @@ HM and GCP types fully support recursive/cyclic types.
 HM includes ad-hoc polymorphim via overloading.  A set of overloads are
 unambiguously resolved to a single type, or else error-typed as ambiguous.
 This is done by doing *trial-unifications* until only a single overload target
-resolves without an error.  Unifying two overloads requires their parts to
-unify.
+resolves without an error.  Two overloads from the same Syntax will unify
+choice by choice.  Two unrelated overloads will each have to resolve, and then
+the resolved parts will unify.  
+
+Overload resolution happens at some Syntax based on the HM Types.
+
+//  &[ @{ x=1 }; @{ y=2 } ].x // Overload struct resolves to have field 'x'
+//  @{ x=1; y=2 } &[ .x; .z ] // Overload field 'x' resolves but not 'z'
+//  (dec &[ 2 2.3])           // Overload chooses the 'int' argument
+//  (&[ dec isempty] "abc")   // Overload function resolves as 'isempty'
+//  Named overload resolves differently in each context
+//    color = { hex str -> &[ hex str ] }; 
+//    red   = (color 0x123 "red" ); 
+//    blue  = (color 0x456 "blue"); 
+//    (pair red blue)
+//  Same overload can unify to itself
+//         (if rand red           blue   )  // Types as a 'color' overload
+//  Different overloads must resolve first
+//         (if rand red &[ 0x456 "blue" ])  // Error: unrelated overloads did not resolve
+//  Different overloads resolve based on unsafe
+//    (dec (if rand red &[ 0x456 "blue" ])) // Resolves as 'int'; same as "(if rand 0x122 0x455)"
+//  Same overloads resolve the same way
+//    (dec (if rand red           blue   )) // Resolves as 'int'; same as "(if rand 0x122 0x455)"
 
 HM errors keep all the not-unifiable types, all at once, as a special case of a
 union type.  Further unifications with the error either add a new not-unifiable
@@ -340,20 +361,18 @@ public class HM {
         // Nil check on fields
         if( syn instanceof Field fld ) {
           T2 ptr = fld._ptr.find();
-          if( ptr.is_nil() || ptr._may_nil ) {
+          if( ptr.is_nil() || ptr._may_nil )
             self._err = "May be nil when loading field "+fld._id;
-            if( !self.is_leaf() ) self._err += ": ";
-          }
+          
           // Expand "Missing field" error with the full pointer type
           if( self._err!=null && self._err.startsWith("Missing field") ) {
             T2 rec=null, bad=null;
             // If the ptr is a full struct, then do not re-print the missing
-            // field when printinfg the ptr type.
+            // field when printing the ptr type.
             boolean miss2 = ptr.is_ptr() && ((rec=ptr.arg("*"))!=null ) && rec.is_obj();
             if( miss2 )  bad = rec._args.remove(fld._id); // Remove bad field
             self._err = "Missing field "+fld._id+" in "+ptr.p();
             if( miss2 )  rec._args.put(fld._id,bad); // Put it back after printing
-            if( !self.is_leaf() ) self._err += ": "; // A colon between a following type
           }
         }
 
@@ -498,7 +517,8 @@ public class HM {
     return s;
   }
   private static Syntax number() {
-    if( BUF[X]=='0' && BUF[X+1]!='.' ) { X++; return new Con(TypeNil.XNIL); }
+    if( BUF[X]=='0' && (BUF[X+1]!='.' || !isDigit(BUF[X+2])) )
+      { X++; return new Con(TypeNil.XNIL); }
     int sum=0;
     while( X<BUF.length && isDigit(BUF[X]) )
       sum = sum*10+BUF[X++]-'0';
@@ -1009,14 +1029,14 @@ public class HM {
         for( int i=0; i<_args.length; i++ ) {
           T2 farg = tfun.arg(Lambda.ARGNAMES[i]);
           progress |= farg==null
-            ? find().unify_errs("Bad arg count: ",work) // more args than the lambda takes
+            ? find().unify_errs("Bad arg count ",work) // more args than the lambda takes
             : farg.unify(_args[i].find(),work);
           if( farg==null ) miss++;                  // 
           if( progress && work==null ) return true; // Will-progress & just-testing early exit
           tfun = tfun.find();
         }
         if( (tfun.size()-1)-(_args.length-miss) > 0 && !tfun.is_err() )
-          progress |= find().unify_errs("Bad arg count: ",work); // less args than the lambda takes
+          progress |= find().unify_errs("Bad arg count ",work); // less args than the lambda takes
         // Check for progress on the return
         progress |= find().unify(tfun.arg("ret"),work);
         tfun=tfun.find();
@@ -1457,6 +1477,8 @@ public class HM {
   }
   private static Type add_sig(Type t) {
     if( ADD_SIG.tset(t._uid) ) return t;
+    if( Overload.is_overload(t) )
+      return t;
     if( t instanceof TypeMemPtr tmp )
       return tmp.is_str() ? t : ASIG_MEM.sharpen(tmp); // Special string hack
     if( t instanceof TypeFunPtr fun )
@@ -1596,7 +1618,7 @@ public class HM {
       T2 rec = ptr.arg("*");
       if( rec==null ) {
         if( ptr.is_base() )     // Short-cut to a nicer error
-          return self.unify_errs("Missing field "+_id+":",work);
+          return self.unify_errs("Missing field "+_id,work);
         if( work==null ) return true;
         if( ptr._args ==null ) ptr._args = new NonBlockingHashMap<>();
         ptr._args.put("*", rec = T2.make_leaf());
@@ -1618,7 +1640,7 @@ public class HM {
         return fld.unify(self, work);
       // If field must be there, and it is not, then it is missing
       if( !rec.is_open() )
-        self.unify_errs("Missing field "+_id+":",work);
+        self.unify_errs("Missing field "+_id,work);
       
       // Add the field
       return work==null || rec.add_fld(_id,self,work);
@@ -1720,14 +1742,18 @@ public class HM {
     static boolean is_overload(Type t) {
       return t instanceof TypeMemPtr tmp && tmp.aliases().abit()==1;
     }
+
     // Take the join of overload members that can trial-unify against self.
     // As a short-cut, look for pre-resolution
     static Type resolve_val(T2 over, T2 self, Type flow, boolean is_apply) {
       assert !over.unified() && !self.unified();
-      if( !(is_overload(flow) && over.is_over()) )
-        return flow;            // Not a struct vs overload situation
+      if( !is_overload(flow) ) return flow;
       TypeStruct ts = ((TypeMemPtr)flow)._obj;
-
+      if( !over.is_over() )
+        // If after DO_AMBI, this Overload will never resolve.
+        // Flip to doing the meet of children.
+        return (DO_HM && DO_AMBI) ? _meet(null,self,ts,is_apply) : _join(null,self,ts,is_apply); 
+        
       T2 rez = over.arg("&&");
       if( rez==over ) throw unimpl(); // Error overload, meet of fields
       if( rez==null )                 // Not yet resolved, join of unifiable children
@@ -1746,7 +1772,7 @@ public class HM {
     private static Type _meet(T2 over, T2 self, TypeStruct ts, boolean is_apply) {
       Type t = Type.ANY;
       for( int i=0; i<ts.len(); i++ )
-        if( !over.arg(("&"+i).intern()).trial_unify(self) &&
+        if( (over==null || !over.arg(("&"+i).intern()).trial_unify(self)) &&
             (!is_apply || ts.at(i).isa(TypeFunPtr.GENERIC_FUNPTR)) )
           t = t.meet(ts.at(i));
       return t;
@@ -1754,7 +1780,7 @@ public class HM {
     private static Type _join(T2 over, T2 self, TypeStruct ts, boolean is_apply) {
       Type t = Type.ALL;
       for( int i=0; i<ts.len(); i++ )
-        if( !over.arg(("&"+i).intern()).trial_unify(self) &&
+        if( (over==null || !over.arg(("&"+i).intern()).trial_unify(self)) &&
             (!is_apply || ts.at(i).isa(TypeFunPtr.GENERIC_FUNPTR)) )
           t = t.join(ts.at(i));
       return t;
@@ -2554,6 +2580,8 @@ public class HM {
         }
         return tstr;
       }
+      if( is_over() )
+        throw unimpl();
 
       throw unimpl();
     }
@@ -2885,7 +2913,7 @@ public class HM {
               if( work==null ) return true; // Will definitely make progress
               T2 nrhs = lhs._fresh(nongen); // New RHS value
               if( !that.is_open() ) {
-                nrhs._err = "Missing field " + key+": "; // TODO: merge errors
+                nrhs._err = "Missing field " + key; // TODO: merge errors
                 this.add_deps_work(work);
               }
               progress |= that.add_fld(key,nrhs,work);
@@ -3003,7 +3031,7 @@ public class HM {
       }
       
       // Ambiguous never resolved, report instead of stall.
-      boolean progress = that.unify_errs("Ambiguous overload "+p()+": ",work);
+      boolean progress = that.unify_errs("Ambiguous overload "+p(),work);
       // If always 2+ children unify, simply report the ambiguous error
       if( no_err==null )
         return progress;
@@ -3180,6 +3208,7 @@ public class HM {
         if( !has_t2 && !(t instanceof TypeStruct) )
           T2.T2JOIN_LEAF = T2.T2JOIN_LEAF.join(t); // NO leaf, but might be one later
         // Walk structure on flow type, to compute JOIN_LEAF
+        if( Overload.is_overload(t) ) throw unimpl();
         if( t instanceof TypeFunPtr tfp ) walk_types_in(tfp._ret,false);
         if( t instanceof TypeMemPtr tmp ) walk_types_in(tmp._obj,false);
       }
@@ -3210,7 +3239,8 @@ public class HM {
             arg(id).walk_types_in(at_fld(t, id), true);
         if( is_open() && t.above_center() ) T2_NEW_LEAF = true; // Can add a new leaf later
       }
-
+      if( is_over() )
+        throw unimpl();
     }
 
     private static Type at_fld(Type t, String id) { // TODO: FAILURE TO SHARPEN
@@ -3413,9 +3443,9 @@ public class HM {
           if( is_obj () ) str_obj(sb,visit,dups,debug).p(" and ");
           return sb.unchar(5).p("]");
         }
+        if( !is_leaf() ) sb.p(": "); // Separate error from self msg
       }
 
-      if( is_leaf() ) { vname(sb,debug); return sb; } // Happens for error leafs
       if( is_base() ) return str_base(sb);
       if( is_ptr () ) return str_ptr(sb,visit,dups,debug, _tflow);
       if( is_fun () ) return str_fun(sb,visit,dups,debug);

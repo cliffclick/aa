@@ -61,6 +61,7 @@ public class TestType {
       "~nScalar",
       "xnil",
       "~_0Scalar",
+      "*[9](_, 0=PA:*[7]@{_; _*_=*[nALL]over35:(); f=flt64}, *[](), 2=PA)"
     };
     for( String s : ss ) {
       Type t0 = Type.valueOf(s);
