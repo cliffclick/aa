@@ -1801,7 +1801,7 @@ public class HM {
         cnt += _overs[i].prep_tree(this,nongen,work);
         hmt._args.put("&"+i, _overs[i].find());
       }
-      assert hmt .is_over();
+      assert hmt.is_over();
       return cnt;
     }
     @Override boolean more_work(Work<Syntax> work) {
@@ -3005,7 +3005,7 @@ public class HM {
           if( !over.trial_unify(that) ) { // If no error
             if( no_err!=null ) { no_err=null; break; } // Two or more no-errors: need to delay
             no_err = over; // Collect non-errors
-            that.push_update(over._deps); // If deps changes, and we no longer trial unify, need to revisit
+            if( work != null ) that.push_update(over._deps); // If deps changes, and we no longer trial unify, need to revisit
           }
         }
       } else {                  // Resolved one-way already
@@ -3025,9 +3025,10 @@ public class HM {
       
       // Stall ambiguous until things can be resolved      
       if( !DO_AMBI ) {
-        if( work!=null ) DelayedOverload.delay(this,that,nongen,fresh_this,fresh_that);
+        if( work==null ) return false; // No change if testing
+        DelayedOverload.delay(this,that,nongen,fresh_this,fresh_that);
         push_update(that._deps); // Changes to 'that' might now resolve overload
-        return false;    // No change if testing, or onto the delay list
+        return false;           // No change if testing, or onto the delay list
       }
       
       // Ambiguous never resolved, report instead of stall.
@@ -3319,6 +3320,7 @@ public class HM {
 
       if( is_obj() ) return t; // expect ptrs to be simple, so t is ISUSED
 
+      if( is_over() ) throw unimpl();
       throw unimpl();           // Handled all cases
     }
 

@@ -26,9 +26,9 @@ public class TestHM {
     JIG=true;
 
     DO_HMT=true;
-    DO_GCP=false;
+    DO_GCP=true;
     RSEED=0;
-    test47();
+    test98();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -53,7 +53,7 @@ public class TestHM {
     if( JIG )
       _run0s(prog,rez_hm,frez_gcp,RSEED,esc_ptrs,esc_funs);
     else
-      for( int rseed=0; rseed<1; rseed++ )
+      for( int rseed=0; rseed<4; rseed++ )
         _run0s(prog,rez_hm,frez_gcp,rseed,esc_ptrs,esc_funs);
   }
 
@@ -1447,9 +1447,9 @@ fact = { n -> (if n.is0 c1 (n.mul (fact n.sub1))) };
     rune("red=&[ 123; \"red\" ]; (pair (dec red) (isempty red))",
          "*(int64,int1)",
          "*(int64,int1)",
-         "*[7](_, 122,0)",
+         "*[7](_, 122,xnil)",
          "*[7](_, ~int64,~Scalar)",
-         null,null);
+         "[4,7]",null);
   }
 
   // Test overload as union of primitives
