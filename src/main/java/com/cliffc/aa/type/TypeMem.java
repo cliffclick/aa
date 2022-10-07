@@ -431,7 +431,7 @@ public class TypeMem extends Type<TypeMem> {
       for( int alias : aliases )
         for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
           t = (TypeStruct)t.meet(at(kid));
-      t = t.set_name(tmp._obj._clz);
+      t = t.set_name(t._clz);
 
       DULLV.clear();
       if( _is_sharp(t)==null )       // If sharp, install and return

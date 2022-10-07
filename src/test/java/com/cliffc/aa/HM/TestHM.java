@@ -26,16 +26,16 @@ public class TestHM {
     JIG=true;
 
     DO_HMT=true;
-    DO_GCP=true;
+    DO_GCP=false;
     RSEED=0;
-    test98();
+    test95();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
     HM.reset();
     Root syn = HM.hm(prog, rseed, rez_hm!=null, frez_gcp!=null );
-    if(  rez_hm !=null )  assertEquals(stripIndent(rez_hm),stripIndent(syn._hmt.p()));
     if( frez_gcp!=null )  assertEquals(Type.valueOf(frez_gcp),syn.flow_type());
+    if(  rez_hm !=null )  assertEquals(stripIndent(rez_hm),stripIndent(syn._hmt.p()));
     if( rez_hm!=null && frez_gcp!=null && !rez_hm.contains("Cannot") ) {
       // Track expected Root escapes
       String esc_ptrs2 = "*"+esc_ptrs+"()";
@@ -1175,113 +1175,6 @@ A:*@{
   }
 
 
-  // Ambiguous overload, {int->int}, cannot select
-  @Test public void test81() {
-    rune("&["                    +  // Define overloaded fcns
-         "  { x -> (i* x 2  ) };"+  // Arg is 'int'
-         "  { x -> (f* x 3.0) };"+  // Arg is 'flt'
-         " ]",
-         "&[ {int64 -> int64}; {flt64 -> flt64} ]",
-         "*[nALL]over26:@{ov0=[23]{any,3 -> int64 }; ov1=[26]{any,3 -> flt64 }}",
-         null,"[23,26]"
-        );
-  }
-
-  // Simple overloaded function test.
-  @Test public void test82() {
-    rune("f = &["                +  // Define overloaded fcns 'f'
-         "  { x -> (i* x 2  ) };"+  // Arg is 'int'
-         "  { x -> (f* x 3.0) };"+  // Arg is 'flt'
-         "];"+
-         "(pair (f 2) (f 1.2))",    // Call with different args
-         "*(int64,flt64)", "*(int64,flt64)",
-         "*[7](_, 4,3.6000001f)", "*[7](_, ~Scalar, ~Scalar)",
-         "[4,7]",null);
-  }
-
-  // Ambiguous overload, {int->int}, cannot select
-  @Test public void test83() {
-    run("(&["                  +  // Define overloaded fcns
-        "   { x -> (i* x 2) };"+  // Arg is 'int'
-        "   { x -> (i* x 3) };"+  // Arg is 'int'
-        "  ] 4)",                 // Error, ambiguous
-        "Ambiguous overload &[ {int64->int64}; {int64->int64} ]",
-        "Ambiguous overload &[ {int64->int64}; {int64->int64} ]",
-        "nint8",
-        "~int64"
-      );
-  }
-
-  // Wrong args for all overloads
-  @Test public void test84() {
-    rune("(&[ { x y -> (i* x y) }; { x y z -> (i* y z) };] 4)",
-         "Ambiguous overload &[ {int64 int64->int64}; {A int64 int64->int64} ]",
-         "~int64",
-         null,null);
-  }
-
-  // Mixing unrelated overloads
-  @Test public void test85() {
-    rune("""
-fx = &[ { x -> 3     }; { y -> "abc" }; ];
-fy = &[ { z -> "def" }; { a -> 4     }; ];
-fz = (if (rand 2) fx fy);
-(isempty (fz 1.2))
-""",
-         "Ambiguous overload Mismatched overloads: &[ {A -> [Cannot unify 3 and *str:(100)]}; { B -> [Cannot unify 4 and *str:(97)]}]: int1",
-         "Ambiguous overload Mismatched overloads: &[ {A -> [Cannot unify 3 and *str:(100)]}; { B -> [Cannot unify 4 and *str:(97)]}]: int1",
-         "int1", "~Scalar",
-         null,null);
-  }
-
-  @Test public void test86() {
-    rune("""
-{ pred ->
-  fx = &[ (if pred { x -> (i* x 2)} { x -> (i* x 3)});
-          { x -> (f* x 0.5) }
-        ];
-  (pair (fx 2) (fx 1.2))
-}
-""",
-         "{A? -> *(int64,flt64) }",
-         "{A? -> *(int64,flt64) }",
-         "[34]{any,3 -> *[7](_, nint8, 0.6f) }",
-         "[34]{any,3 -> *[7](_, ~Scalar, ~Scalar) }",
-         "[4,7]","[34]");
-  }
-
-  // Test case here is trying to get HM to do some overload resolution.
-  // Without, many simple int/flt tests in main AA using HM alone fail to find
-  // a useful type.
-  @Test public void test87() {
-    rune(
-"""
-fwrap = { ff ->
-  @{ f = ff;
-     _*_ = &[
-       { y -> (fwrap (f* ff (i2f y.i))) };
-       { y -> (fwrap (f* ff      y.f)) }
-     ]
-   }
-};
-iwrap = { ii ->
-  @{ i = ii;
-     _*_ = &[
-       { y -> (iwrap (i*      ii  y.i)) };
-       { y -> (fwrap (f* (i2f ii) y.f)) }
-     ]
-   }
-};
-
-con2   = (iwrap 2  );
-con2_1 = (fwrap 2.1);
-(con2_1._*_ con2_1)
-""",
-        "A:*@{ _*_={B:*@{ _*_=&[{*@{ i=int64;...}->B};{*@{ f=flt64;...}->B}];f=flt64}->A};f=flt64}",
-        "*[7]@{_; _*_=*[nALL]over35:(); f=flt64}",
-        "[4,7,9,10]","[24,26]");
-  }
-
   // Recursive structs.  First: closed structs list available fields;
   // unification produces the set intersection.
   @Test public void test88() {
@@ -1360,14 +1253,118 @@ con12=(fun 1.2);   // required {f} in inner, available {f,mul} in outer
          "[4,7,10]","[23]");
   }
 
+  // Simple overload def.  Since no uses, no Field to resolve.
+  @Test public void test81() {
+    rune("&["                    +  // Define overloaded fcns
+         "  { x -> (i* x 2  ) };"+  // Arg is 'int'
+         "  { x -> (f* x 3.0) };"+  // Arg is 'flt'
+         " ]",
+         "*&[ {int64 -> int64}; {flt64 -> flt64} ]",
+         "*[7]ov:(_, [23]{any,3 -> int64 }, [26]{any,3 -> flt64 })",
+         "[4,7]","[23,26]"
+        );
+  }
+
+  // Simple overloaded function test.
+  // Insert Fields for all 'f' uses, but some or all may go away.
+  @Test public void test82() {
+    rune("f = &["                +  // Define overloaded fcns 'f'
+         "  { x -> (i* x 2  ) };"+  // Arg is 'int'
+         "  { x -> (f* x 3.0) };"+  // Arg is 'flt'
+         "];"+
+         "(pair (f 2) (f 1.2))",    // Call with different args
+         "*(int64,flt64)", "*(int64,flt64)",
+         "*[8](_, 4,3.6000001f)", "*[8](_, Scalar, Scalar)",
+         "[4,8]",null);
+  }
+
+  // Ambiguous overload, {int->int}, cannot select.
+  // Parent of overload is Apply, so 
+  @Test public void test83() {
+    run("(&["                  +  // Define overloaded fcns
+        "   { x -> (i* x 2) };"+  // Arg is 'int'
+        "   { x -> (i* x 3) };"+  // Arg is 'int'
+        "  ] 4)",                 // Error, ambiguous
+        "Ambiguous overload",
+        "nint8"
+      );
+  }
+
+  // Wrong args for all overloads
+  @Test public void test84() {
+    run("(&[ { x y -> (i* x y) }; { x y z -> (i* y z) };] 4)",
+        "Bad arg count: int64",
+        "~int64");
+  }
+
+  // Mixing unrelated overloads
+  @Test public void test85() {
+    rune("""
+fx = &[ { x -> 3     }; { y -> "abc" }; ];
+fy = &[ { z -> "def" }; { a -> 4     }; ];
+fz = (if (rand 2) fx fy);
+(isempty (fz 1.2))
+""",
+         "Ambiguous overload: int1",
+         "int1",
+         null,null);
+  }
+
+  @Test public void test86() {
+    rune("""
+{ pred ->
+  fx = &[ (if pred { x -> (i* x 2)} { x -> (i* x 3)});
+          { x -> (f* x 0.5) }
+        ];
+  (pair (fx 2) (fx 1.2))
+}
+""",
+         "{ A? -> *(int64,flt64) }",
+         "{ A? -> *(int64,flt64) }",
+         "[34]{any,3 -> *[8](_, nint8, 0.6f) }",
+         "[34]{any,3 -> *[8](_, Scalar, Scalar) }",
+         "[4,8]","[34]");
+  }
+
+  // Test case here is trying to get HM to do some overload resolution.
+  // Without, many simple int/flt tests in main AA using HM alone fail to find
+  // a useful type.
+  @Test public void test87() {
+    rune(
+"""
+fwrap = { ff ->
+  @{ f = ff;
+     _*_ = &[
+       { y -> (fwrap (f* ff (i2f y.i))) };
+       { y -> (fwrap (f* ff      y.f)) }
+     ]
+   }
+};
+iwrap = { ii ->
+  @{ i = ii;
+     _*_ = &[
+       { y -> (iwrap (i*      ii  y.i)) };
+       { y -> (fwrap (f* (i2f ii) y.f)) }
+     ]
+   }
+};
+
+con2   = (iwrap 2  );
+con2_1 = (fwrap 2.1);
+(con2_1._*_ con2_1)
+""",
+        "A:*@{_*_=*&[{*@{i=int64;...}->A};{B:*@{_*_=*&[{*@{i=int64;...}->B};{*@{f=flt64;...}->B}];f=flt64}->A}];f=flt64}",
+        "PA:*[8]@{_; _*_=*[7]ov:(_, [25]{any,3 -> PA }, [27]{any,3 -> PA }); f=flt64}",
+        "[4,7,8,10,11]","[25,27]");
+  }
 
   // Recursive structs.  More like what main AA will do with wrapped primitives.
   @Ignore
   @Test public void test95() {
     String hm_rez =  "*("+
-      "A:*@{_*_={B:*@{_*_=&[{*@{i=int64;...}->B};{*@{f=flt64;...}->C:*@{_*_=&[{*@{i=int64;...}->C};{*@{f=flt64;...}->C}];f=flt64}}];i=int64}->A};f=flt64},"+
-      "D:*@{_*_={E:*@{_*_=&[{*@{i=int64;...}->E};{*@{f=flt64;...}->F:*@{_*_=&[{*@{i=int64;...}->F};{*@{f=flt64;...}->F}];f=flt64}}];i=int64}->D};i=int64},"+
-      "G:*@{_*_={H:*@{_*_=&[{*@{i=int64;...}->H};{*@{f=flt64;...}->H}];f=flt64}->G};f=flt64}"+
+      "  *@{_*_=A:*&[{B:*@{_*_=*&[{*@{i=int64;...}->B};{*@{f=flt64;...}->C:*@{_*_=*&[{*@{i=int64;...}->C};{*@{f=flt64;...}->C}];f=flt64}}];i=int64}->D:*@{_*_=A;f=flt64}};{*@{f=flt64;...}->D}];f=flt64},"+
+      "E:*@{_*_=  *&[{F:*@{_*_=*&[{*@{i=int64;...}->F};{*@{f=flt64;...}->G:*@{_*_=*&[{*@{i=int64;...}->G};{*@{f=flt64;...}->G}];f=flt64}}];i=int64}->E};{*@{f=flt64;...}->H:*@{_*_=*&[{*@{i=int64;...}->H};{*@{f=flt64;...}->H}];f=flt64}}];i=int64},"+
+      "I:*@{_*_=  *&[  {*@{i=int64;...}->I};{J:*@{_*_=*&[{*@{i=int64;...}->J};{*@{f=flt64;...}->J}];f=flt64}->I}];f=flt64}"+
       ")";
 
     rune(
@@ -1395,15 +1392,16 @@ mul2 = { x -> (x._*_ con2)};
 (triple (mul2 con2_1)  (con2._*_ con2) (con2_1._*_ con2_1))
 """,
         hm_rez,
-        "*[9](_, 0=PA:*[7]@{_; _*_=*[nALL]over35:(); f=flt64}, *[7]@{_; _*_=*[nALL]over37:(); i=int64}, 2=PA)",
-        "[4,7,8,9,10,11,17,18]","[25,27,31,34]");
+        hm_rez,
+        "*[11](_, 0=PA:*[8]@{_; _*_=*[7]ov:(_, [24]{any,3 -> PA }, [26]{any,3 -> PA }); f=flt64}, 1=PB:*[  10]@{_; _*_=*[  9]ov:(_, [   29]{any,3 -> PB }, [   32]{any,3 -> PA }); i=int64}, 2=PA)",
+        "*[11](_, 0=PA:*[8]@{_; _*_=*[7]ov:(_, [24]{any,3 -> PA }, [26]{any,3 -> PA }); f=flt64}, 1=PB:*[8,10]@{_; _*_=*[7,9]ov:(_, [24,29]{any,3 -> PB }, [26,32]{any,3 -> PA })         }, 2=PA)",
+        "[4,7,8,9,10,11,12,13,14,15]","[4,5,6,24,26,29,32]");
   }
 
   // Recursive structs, in a loop.  Test of recursive int wrapper type ("occurs
   // check") in a loop.
   @Ignore
   @Test public void test96() {
-    String hm_rez =  "";
     rune(
 """
 // fwrap: a wrapped float
@@ -1416,7 +1414,7 @@ fwrap = { ff ->                 // fwrap is a function which takes a float 'ff' 
    }
 };
 
-// iwrap: a "wrapped" integer.
+// iwrap: a wrapped integer.
 iwrap = { ii ->                 // iwrap is a function which takes an integer 'ii' and...
   @{ i = ii;                    //   ...returns a struct with fields f, mul, is0, sub1.
      mul = &[                   // mul is an overloaded function, which does a widening multiply
@@ -1436,45 +1434,74 @@ fact = { n -> (if n.is0 c1 (n.mul (fact n.sub1))) };
 // Compute 5!
 (fact c5)
 """,
-        "A:*@{i=int64; is0=int1; mul = {A->A}; sub1=A }",
-        "PA:*[8]@{i=int64; is0=int1; mul=[~31+34]{any,3 ->*[]( ...) }; sub1=PA}",
-        "[4,8,10,11]","[31,34]");
+        "A:*@{i=int64;is0=int1;mul=*&[{*@{i=int64;...}->A};{*@{f=flt64;...}->B:*@{f=flt64;mul=*&[{*@{i=int64;...}->B};{*@{f=flt64;...}->B}]}}];sub1=A}",
+        "PA:*[8,10]@{_; mul=*[7,9]ov:(_, [24,29]{any,3 -> PA }, [26,32]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7]ov:(_, [24]{any,3 -> PB }, [26]{any,3 -> PB })} })}",
+        "[4,7,8,9,10,11,12,13,14]","[4,5,6,24,26,29,32]");
   }
 
   // Test overload as union of primitives
-  @Ignore
   @Test public void test97() {
     rune("red=&[ 123; \"red\" ]; (pair (dec red) (isempty red))",
          "*(int64,int1)",
          "*(int64,int1)",
-         "*[7](_, 122,xnil)",
-         "*[7](_, ~int64,~Scalar)",
+         "*[8](_, 122,xnil)",
+         "*[8](_, int64, int1)",
+         "[4,8]",null);
+  }
+
+  // Test overload as union of primitives.  Merge of 2 unrelated overloads
+  // forces resolution at the 'if'; hence 'red' is typed as either 'int' or
+  // 'str' and one of '(dec red)' or '(isempty red)' must fail.
+  @Test public void test98() {
+    rune("{ pred -> red=(if pred &[ 123; \"red\" ] &[456;  \"blue\" ]); (pair (dec red) (isempty red))}",
+         "{ A? -> *(Mismatched overloads: int64, Mismatched overloads: int1) }",
+         "{ A? -> *(Mismatched overloads: int64, Mismatched overloads: int1) }",
+         "[30]{any,3 -> *[9](_, int64, xnil) }",
+         "[30]{any,3 -> *[9](_, int64, int1) }",
+         "[4,9]","[4,5,6,30]");
+  }
+
+  // Test overload as union of primitives.  Merge of 2 related overloads stalls
+  // resolution until use at 'dec' and 'isempty'.  Each use resolves separately.
+  @Test public void test99() {
+    rune("color = { hex name -> &[ hex; name ]};"+
+         "red  = (color 123 \"red\" );"+
+         "blue = (color 456 \"blue\");"+
+         "{ pred -> c =(if pred red blue); (pair (dec c) (isempty c))}",         
+         "{ A? -> *(int64,int1) }",
+         "{ A? -> *(int64,int1) }",
+         "[31]{any,3 -> *[8](_, int64, xnil) })",
+         "[31]{any,3 -> *[8](_, int64, int1) }",
+         "[4,8]","[4,5,6,31]");
+  }
+
+  // Test overload as union of primitives.  Overload resolution before
+  // calling 'fun'
+  @Ignore
+  @Test public void test100() {
+    rune("fun = { a0 -> (dec a0) }; "            + // a0 is an int
+         "(pair (fun &[ 123; \"abc\" ]        )" + // Correct overload is 0x123
+         "      (fun &[ \"def\"; @{x=1}; 456 ])" + // Correct overload is 0x456
+         ")",
+         "*(int64,int64)",
+         "*[7](_, int64, int64)",
          "[4,7]",null);
   }
 
-  // Test overload as union of primitives
+  // 'lite' needs to be told to take an overload with syntax
   @Ignore
-  @Test public void test98() {
-    rune("{ pred -> red=(if pred &[ 123; \"red\" ] &[ 456; \"blue\" ]); (pair (dec red) (isempty red))}",         
-         "*(int64,int1)",
-         "*(int64,int1)",
-         "*[7](_, 122,0)",
-         "*[7](_, ~int64,~Scalar)",
-         null,null);
-  }
-
-  // Test overload as union of primitives
-  @Ignore
-  @Test public void test99() {
-    rune("fun = { a0 -> (dec a0) }; "               + // a0 is an int
-         "(pair (fun &[ 0x123; \"abc\" ]        );" + // Correct overload is 0x123
-         "      (fun &[ \"def\"; @{x=1}; 0x456 ])"  + // Correct overload is 0x456
-         ")",
-         "*(int64,int1)",
-         "*(int64,int1)",
-         "*[7](_, 122,0)",
-         "*[7](_, ~int64,~Scalar)",
-         null,null);
+  @Test public void test101() {
+    rune("color = { hex name -> &[ hex; name ]};"+
+         "red  = (color 123 \"red\" );"+
+         "blue = (color 456 \"blue\");"+
+         "lite = {c -> (color (dec c) (isempty c))};"+ // Should be "(color (sub c 0x111) (cat "light" c))"
+         "(pair (lite red) (lite blue))",
+         
+         "*( &[int,*str:(nint8)], &[int,*str:(nint8)])",
+         "*( &[int,*str:(nint8)], &[int,*str:(nint8)])",
+         "*[8](_, 0=PA:*[7]ov:(_, int64, *[4]str:(nint8)), 1=PA)",
+         "*[8](_, 0=PA:*[7]ov:(_, int64, Scalar), 1=PA)",
+         "[4,8]","[4,5,6,29]");
   }
 
 }
