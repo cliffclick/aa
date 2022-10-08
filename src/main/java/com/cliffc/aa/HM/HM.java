@@ -1634,6 +1634,7 @@ public class HM {
         boolean progress = ptr.unify_over(self,work);
         // Find which child unified
         self = find();          // Reload after unify
+        rec = rec.find();       // Reload after unify
         assert rec.is_over();
         String cid=null;
         for( String id : rec._args.keySet() )
