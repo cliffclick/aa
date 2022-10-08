@@ -29,9 +29,9 @@ public class TestHM {
     JIG=true;
 
     DO_HMT=true;
-    DO_GCP=false;
-    RSEED=0;
-    a_basic_00();
+    DO_GCP=true;
+    RSEED=1;
+    g_overload_04();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -804,7 +804,19 @@ loop = { name cnt ->
          "[4,7]","[23,26]"
         );
   }
+  // Simple overloaded function test.
+  // Insert Fields for all 'f' uses, but some or all may go away.
   @Test public void g_overload_01() {
+    rune("f = &["                +  // Define overloaded fcns 'f'
+         "  { x -> (i* x 2  ) };"+  // Arg is 'int'
+         "  { x -> (f* x 3.0) };"+  // Arg is 'flt'
+         "];"+
+         "(pair (f 2) (f 1.2))",    // Call with different args
+         "*(int64,flt64)", "*(int64,flt64)",
+         "*[8](_, 4,3.6000001f)", "*[8](_, Scalar, Scalar)",
+         "[4,8]",null);
+  }
+  @Test public void g_overload_02() {
     rune("""
 { pred ->
   fx = &[ (if pred { x -> (i* x 2)} { x -> (i* x 3)});
@@ -819,10 +831,61 @@ loop = { name cnt ->
          "[34]{any,3 -> *[8](_, Scalar, Scalar) }",
          "[4,8]","[34]");
   }
+  // Test overload as union of primitives
+  @Test public void g_overload_03() {
+    rune("red=&[ 123; \"red\" ]; (pair (dec red) (isempty red))",
+         "*(int64,int1)",
+         "*(int64,int1)",
+         "*[8](_, 122,xnil)",
+         "*[8](_, int64, int1)",
+         "[4,8]",null);
+  }
+
+  // Test overload as union of primitives.  Merge of 2 related overloads stalls
+  // resolution until use at 'dec' and 'isempty'.  Each use resolves separately.
+  @Test public void g_overload_04() {
+    rune("color = { hex name -> &[ hex; name ]};"+
+         "red  = (color 123 \"red\" );"+
+         "blue = (color 456 \"blue\");"+
+         "{ pred -> c =(if pred red blue); (pair (dec c) (isempty c))}",         
+         "{ A? -> *(int64,int1) }",
+         "{ A? -> *(int64,int1) }",
+         "[30]{any,3 -> *[8](_, int64, xnil) })",
+         "[30]{any,3 -> *[8](_, int64, int1) }",
+         "[4,8]","[4,5,6,30]");
+  }
+
+  // Test overload as union of primitives.  Overload resolution before
+  // calling 'fun'
+  @Test public void g_overload_05() {
+    rune("fun = { a0 -> (dec a0) }; "            + // a0 is an int
+         "(pair (fun &[ 123; \"abc\" ]        )" + // Correct overload is 0x123
+         "      (fun &[ \"def\"; @{x=1}; 456 ])" + // Correct overload is 0x456
+         ")",
+         "*(int64,int64)",
+         "*[7](_, int64, int64)",
+         "[4,7]",null);
+  }
+
+  // 'lite' needs to be told to take an overload with syntax
+  @Ignore
+  @Test public void g_overload_06() {
+    rune("color = { hex name -> &[ hex; name ]};"+
+         "red  = (color 123 \"red\" );"+
+         "blue = (color 456 \"blue\");"+
+         "lite = {c -> (color (dec c) (isempty c))};"+ // Should be "(color (sub c 0x111) (cat "light" c))"
+         "(pair (lite red) (lite blue))",
+         
+         "*( &[int,*str:(nint8)], &[int,*str:(nint8)])",
+         "*( &[int,*str:(nint8)], &[int,*str:(nint8)])",
+         "*[8](_, 0=PA:*[7]ov:(_, int64, *[4]str:(nint8)), 1=PA)",
+         "*[8](_, 0=PA:*[7]ov:(_, int64, Scalar), 1=PA)",
+         "[4,8]","[4,5,6,29]");
+  }
   // Test case here is trying to get HM to do some overload resolution.
   // Without, many simple int/flt tests in main AA using HM alone fail to find
   // a useful type.
-  @Test public void g_overload_02() {
+  @Test public void g_overload_07() {
     rune(
 """
 fwrap = { ff ->
@@ -852,8 +915,7 @@ con2_1 = (fwrap 2.1);
   }
 
   // Recursive structs.  More like what main AA will do with wrapped primitives.
-  @Ignore
-  @Test public void g_overload_03() {
+  @Test public void g_overload_08() {
     String hm_rez =  "*("+
       "  *@{_*_=A:*&[{B:*@{_*_=*&[{*@{i=int64;...}->B};{*@{f=flt64;...}->C:*@{_*_=*&[{*@{i=int64;...}->C};{*@{f=flt64;...}->C}];f=flt64}}];i=int64}->D:*@{_*_=A;f=flt64}};{*@{f=flt64;...}->D}];f=flt64},"+
       "E:*@{_*_=  *&[{F:*@{_*_=*&[{*@{i=int64;...}->F};{*@{f=flt64;...}->G:*@{_*_=*&[{*@{i=int64;...}->G};{*@{f=flt64;...}->G}];f=flt64}}];i=int64}->E};{*@{f=flt64;...}->H:*@{_*_=*&[{*@{i=int64;...}->H};{*@{f=flt64;...}->H}];f=flt64}}];i=int64},"+
@@ -886,15 +948,15 @@ mul2 = { x -> (x._*_ con2)};
 """,
         hm_rez,
         hm_rez,
-        "*[11](_, 0=PA:*[8]@{_; _*_=*[7]ov:(_, [24]{any,3 -> PA }, [26]{any,3 -> PA }); f=flt64}, 1=PB:*[  10]@{_; _*_=*[  9]ov:(_, [   29]{any,3 -> PB }, [   32]{any,3 -> PA }); i=int64}, 2=PA)",
-        "*[11](_, 0=PA:*[8]@{_; _*_=*[7]ov:(_, [24]{any,3 -> PA }, [26]{any,3 -> PA }); f=flt64}, 1=PB:*[8,10]@{_; _*_=*[7,9]ov:(_, [24,29]{any,3 -> PB }, [26,32]{any,3 -> PA })         }, 2=PA)",
-        "[4,7,8,9,10,11,12,13,14,15]","[4,5,6,24,26,29,32]");
+        "*[12](_, 0=PA:*[8]@{_; _*_=*[7]ov:(_, [25]{any,3 -> PA }, [27]{any,3 -> PA }); f=flt64}, 1=PB:*[11]@{_; _*_=*[9]ov:(_, [30]{any,3 -> PB }, [34]{any,3 -> PA }); i=int64}, 2=PA)",
+        "*[12](_, 0=PA:*[8]@{_; _*_=*[7]ov:(_, [25]{any,3 -> PA }, [27]{any,3 -> PA }); f=flt64}, 1=PB:*[8,11]@{_; _*_=*[7,9]ov:(_, [25,30]{any,3 -> PB }, [27,34]{any,3 -> PA })}, 2=PA)",
+        "[4,7,8,9,10,11,12,13,14,15]","[4,5,6,25,27,30,34]");
   }
 
   // Recursive structs, in a loop.  Test of recursive int wrapper type ("occurs
   // check") in a loop.
   @Ignore
-  @Test public void g_overload_04() {
+  @Test public void g_overload_09() {
     rune(
 """
 // fwrap: a wrapped float
@@ -927,75 +989,11 @@ fact = { n -> (if n.is0 c1 (n.mul (fact n.sub1))) };
 // Compute 5!
 (fact c5)
 """,
-        "A:*@{i=int64;is0=int1;mul=*&[{*@{i=int64;...}->A};{*@{f=flt64;...}->B:*@{f=flt64;mul=*&[{*@{i=int64;...}->B};{*@{f=flt64;...}->B}]}}];sub1=A}",
-        "PA:*[8,10]@{_; mul=*[7,9]ov:(_, [24,29]{any,3 -> PA }, [26,32]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7]ov:(_, [24]{any,3 -> PB }, [26]{any,3 -> PB })} })}",
-        "[4,7,8,9,10,11,12,13,14]","[4,5,6,24,26,29,32]");
-  }
-
-  // Test overload as union of primitives
-  @Test public void g_overload_05() {
-    rune("red=&[ 123; \"red\" ]; (pair (dec red) (isempty red))",
-         "*(int64,int1)",
-         "*(int64,int1)",
-         "*[8](_, 122,xnil)",
-         "*[8](_, int64, int1)",
-         "[4,8]",null);
-  }
-
-  // Test overload as union of primitives.  Merge of 2 related overloads stalls
-  // resolution until use at 'dec' and 'isempty'.  Each use resolves separately.
-  @Test public void g_overload_06() {
-    rune("color = { hex name -> &[ hex; name ]};"+
-         "red  = (color 123 \"red\" );"+
-         "blue = (color 456 \"blue\");"+
-         "{ pred -> c =(if pred red blue); (pair (dec c) (isempty c))}",         
-         "{ A? -> *(int64,int1) }",
-         "{ A? -> *(int64,int1) }",
-         "[30]{any,3 -> *[8](_, int64, xnil) })",
-         "[30]{any,3 -> *[8](_, int64, int1) }",
-         "[4,8]","[4,5,6,30]");
-  }
-
-  // Test overload as union of primitives.  Overload resolution before
-  // calling 'fun'
-  @Ignore
-  @Test public void g_overload_07() {
-    rune("fun = { a0 -> (dec a0) }; "            + // a0 is an int
-         "(pair (fun &[ 123; \"abc\" ]        )" + // Correct overload is 0x123
-         "      (fun &[ \"def\"; @{x=1}; 456 ])" + // Correct overload is 0x456
-         ")",
-         "*(int64,int64)",
-         "*[7](_, int64, int64)",
-         "[4,7]",null);
-  }
-
-  // 'lite' needs to be told to take an overload with syntax
-  @Ignore
-  @Test public void g_overload_08() {
-    rune("color = { hex name -> &[ hex; name ]};"+
-         "red  = (color 123 \"red\" );"+
-         "blue = (color 456 \"blue\");"+
-         "lite = {c -> (color (dec c) (isempty c))};"+ // Should be "(color (sub c 0x111) (cat "light" c))"
-         "(pair (lite red) (lite blue))",
-         
-         "*( &[int,*str:(nint8)], &[int,*str:(nint8)])",
-         "*( &[int,*str:(nint8)], &[int,*str:(nint8)])",
-         "*[8](_, 0=PA:*[7]ov:(_, int64, *[4]str:(nint8)), 1=PA)",
-         "*[8](_, 0=PA:*[7]ov:(_, int64, Scalar), 1=PA)",
-         "[4,8]","[4,5,6,29]");
-  }
-
-  // Simple overloaded function test.
-  // Insert Fields for all 'f' uses, but some or all may go away.
-  @Test public void g_overload_09() {
-    rune("f = &["                +  // Define overloaded fcns 'f'
-         "  { x -> (i* x 2  ) };"+  // Arg is 'int'
-         "  { x -> (f* x 3.0) };"+  // Arg is 'flt'
-         "];"+
-         "(pair (f 2) (f 1.2))",    // Call with different args
-         "*(int64,flt64)", "*(int64,flt64)",
-         "*[8](_, 4,3.6000001f)", "*[8](_, Scalar, Scalar)",
-         "[4,8]",null);
+        "A:*@{i=int64;is0=int1;mul=B:*&[{C:*@{i=int64;is0=int1;mul=B;sub1=C}->C};{*@{f=flt64;...}->D:*@{f=flt64;mul=*&[{*@{i=int64;...}->D};{*@{f=flt64;...}->D}]}}];sub1=A}",
+        "A:*@{i=int64;is0=int1;mul=*&[{A->A};{*@{f=flt64;...}->B:*@{f=flt64;mul=*&[{*@{i=int64;...}->B};{*@{f=flt64;...}->B}]}}];sub1=A}",
+        "PA:*[  11]@{_; i=int64; is0=int1; mul=*[  9]ov:(_, [   30]{any,3 -> PA }, [   34]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7]ov:(_, [25]{any,3 -> PB }, [27]{any,3 -> PB })} }); sub1=PA}",
+        "PA:*[8,11]@{_;                    mul=*[7,9]ov:(_, [25,30]{any,3 -> PA }, [27,34]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7]ov:(_, [25]{any,3 -> PB }, [27]{any,3 -> PB })} })}",
+        "[4,7,8,9,10,11,13,14,15]","[4,5,6,25,27,30,34]");
   }
 
 
@@ -1065,9 +1063,9 @@ fz = (if (rand 2) fx fy);
          "",
          "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
          "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
-         "*[15]@{_; a=int64 ; b=*[12,14](_); bool=*[11]@{_; false=PA:*[8,9]@{_; and=[22,26]{any,3 ->Scalar }; or=[23,27]{any,3 ->Scalar }; then=[25,28]{any,4 ->Scalar }}; force=[33]{any,3 ->PA }; true=PA}}",
-         "*[15]@{_; a=Scalar; b=Scalar     ; bool=*[11]@{_; false=PA:*[8,9]@{_; and=[22,26]{any,3 ->Scalar }; or=[23,27]{any,3 ->Scalar }; then=[25,28]{any,4 ->Scalar }}; force=[33]{any,3 ->PA }; true=PA}}",
-         "[4,7,8,9,11,12,14,15]","[22,23,24,25,26,27,28,32,33]");
+         "*[17]@{_; a=int64; b=*[12,16](_); bool=*[11]@{_; false=PA:*[8,9]@{_; and=[22,26]{any,3 -> Scalar }; or=[23,27]{any,3 -> Scalar }; then=[25,28]{any,4 -> Scalar }}; force=[33]{any,3 -> PA }; true=PA}}",
+         "*[17]@{_; a=Scalar; b=Scalar; bool=*[11]@{_; false=PA:*[8,9]@{_; and=[22,26]{any,3 -> Scalar }; or=[23,27]{any,3 -> Scalar }; then=[25,28]{any,4 -> Scalar }}; force=[33]{any,3 -> PA }; true=PA}}",
+         "[4,7,8,9,11,12,16,17]","[22,23,24,25,26,27,28,32,33]");
   }
 
 
@@ -1136,14 +1134,14 @@ all
   // Full on Peano arithmetic.
   @Test public void x_peano_03() {
     String gcp_rez = """
-*[16]@{_;
+*[18]@{_;
   b=*[11]@{_;
     false=PA:*[9]@{_; and_=[27]{any,3 -> PA     }; or__=[28]{any,3 -> Scalar }; then=[29]{any,4 -> Scalar }};
     true =PB:*[8]@{_; and_=[23]{any,3 -> Scalar }; or__=[25]{any,3 -> PB     }; then=[26]{any,4 -> Scalar }}
   };
-  n=*[15]@{_;
+  n=*[17]@{_;
     s=[38]{any,3 ->
-      PC:*[14]@{_;
+      PC:*[16]@{_;
         add_=[37]{any,3 -> Scalar };
         pred=[35]{any,3 -> Scalar };
         succ=[36]{any,3 -> PC };
@@ -1292,7 +1290,7 @@ three =(n.s two);     // Three is the successor of two
         "}"+
         "",
         gcp_rez, gcp_rez,
-        "[4,7,8,9,10,11,12,13,14,15,16]","[4,5,6,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38]");
+        "[4,7,8,9,10,11,12,13,16,17,18]","[4,5,6,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38]");
   }
 
   // Regression during the HM/GCP Apply lift.
@@ -1383,13 +1381,13 @@ all
   }
 """,
          """
-*[14]@{_;
+*[16]@{_;
   false=PC:*[8,9]@{_; and=[23,27]{any,3 -> Scalar }; or=[25,28]{any,3 -> Scalar }; then=[26,29]{any,4 -> Scalar }};
   true =PC;
   s=[45]{any,3 ->
     PA:*[12]@{_;
       add_=[44]{any,3 -> PA };
-      pred=[42]{any,3 -> PB:*[10,11,12,13,17,18]@{_; add_=[4,5,22,23,25,27,28,35,36,37,41,42,43,44,45]{any,3 -> Scalar }; pred=[4,5,22,23,24,25,27,28,32,35,36,37,41,42,43,44,45]{any,3 -> PB }; succ=[4,5,22,23,25,27,28,35,36,37,41,42,43,44,45]{any,3 -> PB }; zero=[4,5,22,23,24,25,27,28,32,35,36,37,41,42,43,44,45]{any,3 -> PC }} };
+      pred=[42]{any,3 -> PB:*[10,11,12,13,14,15]@{_; add_=[4,5,22,23,25,27,28,35,36,37,41,42,43,44,45]{any,3 -> Scalar }; pred=[4,5,22,23,24,25,27,28,32,35,36,37,41,42,43,44,45]{any,3 -> PB }; succ=[4,5,22,23,25,27,28,35,36,37,41,42,43,44,45]{any,3 -> PB }; zero=[4,5,22,23,24,25,27,28,32,35,36,37,41,42,43,44,45]{any,3 -> PC }} };
       succ=[43]{any,3 -> PA };
       zero=[41]{any,3 -> PC }
     }
@@ -1403,14 +1401,14 @@ all
 }
 """,
          """
-*[14]@{_;
+*[16]@{_;
   false=PA:*[8,9]@{_; and=[23,27]{any,3 -> Scalar }; or=[25,28]{any,3 -> Scalar }; then=[26,29]{any,4 -> Scalar }};
-  true= PA;
-  s=[45]{any,3 -> Scalar };
-  z=*[11]@{_; add_=[37]{any,3 -> Scalar }; pred=[22]{any,3 -> ~Scalar }; succ=[36]{any,3 -> Scalar }; zero=[35]{any,3 -> PA }}
+  true =PA;
+  s    =[45]{any,3 -> Scalar };
+  z    =*[11]@{_; add_=[37]{any,3 -> Scalar }; pred=[22]{any,3 -> ~Scalar }; succ=[36]{any,3 -> Scalar }; zero=[35]{any,3 -> PA }}
 }
 """,
-         "[4,7,8,9,10,11,12,13,14,17,18]",
+         "[4,7,8,9,10,11,12,13,14,15,16]",
          "[4,5,6,22,23,24,25,26,27,28,29,32,35,36,37,41,42,43,44,45]"
          );
   }
