@@ -146,7 +146,7 @@ BNF for the "core AA" syntax:
 
 BNF for the "core AA" pretty-printed types:
    T = Vnnn               | // Leaf number nnn
-       >>T1               | // Unified; lazyily collapsed with 'find()' calls
+       >>T1               | // Unified; lazily collapsed with 'find()' calls
        base               | // any lattice element, all are nilable
        T0?T1              | // T1 is a not-nil T0; stacked not-nils collapse
        { T* -> Tret }     | // Lambda, arg count is significant
@@ -798,6 +798,8 @@ public class HM {
     public Ident[] refs(int idx) {
       if( idx>=_refs.length ) return null; // Happens for too-many-args cases
       if( _refs[idx]==null ) {
+        if( !(this instanceof PrimSyn ) )
+          return null; // CNC: TODO: Do this when cloning prims during parse
         Ident id = new Ident(_args[idx]);
         id.init(this,idx,targ(idx),false)._hmt = id._idt;
         id._par = this;
@@ -1066,22 +1068,31 @@ public class HM {
             flow = flow.meet(tfp);
       }
       TypeFunPtr tfp = (TypeFunPtr)flow;
-      if( !tfp.is_empty() ) {   // Nothing being called
-        // Meet all calling arguments over all called function args.  Lazily
-        // building a call-graph, needed to track arg_meet.  We got here
-        // because, e.g. _fun._flow added some more functions, all those new
-        // functions need the arg_meet.  Overloads must stall until resolved
-        // so we do not mix arg_meets from the wrong Overload.
-        if( !tfp.above_center() && work!=null && !tfp.is_full() )
-          for( int fidx : tfp.fidxs() )
-            // new call site for lambda; all args must meet into this lambda;
-            Lambda.FUNS.get(fidx).apply_push(this,work);
-      }
 
+      // Meet arguments to Lambda args.  This code appears in Ident as well,
+      // but is needed here in case the arg is unused in the Lambda body.
+      if( work!=null && !tfp.is_full() )
+        arg_meet(tfp,work);
+      
       // Attempt to lift the result, based on HM types.
       Type lifted = do_apply_lift(find(),tfp, work==null);
       assert _flow.isa(lifted); // Monotonic...
       return lifted;
+    }
+    
+    void arg_meet(TypeFunPtr tfp, Work<Syntax> work) {
+      assert !tfp.above_center();
+      for( int fidx : tfp.fidxs() ) {
+        Func func = Lambda.FUNS.get(fidx);
+        func.apply_push(this,work);      // External functions gather escaping arguments
+        if( func instanceof Lambda lam ) // Filter out external lambdas
+          for( int i=0; i<_args.length; i++ ) {
+            Type t = this instanceof Root
+              ? lam.targ(i).as_flow(null,false)
+              : _args[i]._flow;
+            lam.arg_meet(i,t,work); // Internal functions gather meet of all args
+          }
+      }
     }
 
     // Gate around apply_lift.  Assert monotonic lifting and apply the lift.
@@ -1110,8 +1121,8 @@ public class HM {
       T2.T2MAP.clear();
       for( int i=0; i<_args.length; i++ ) {
         Syntax arg = _args[i];
-        if( !arg_is_used(tfp,i) )
-          continue;             // Unused args cannot lift output
+        //if( !arg_is_used(tfp,i) )
+        //  continue;             // Unused args cannot lift output
         T2.WDUPS.clear(true);
         arg.find().walk_types_in(arg._flow,true);
       }
@@ -1142,23 +1153,25 @@ public class HM {
       return rezt2.walk_types_out(tfp._ret, this, test);
     }
 
-    // True if arg is used in the body; false if arg is dead
-    private static boolean arg_is_used(TypeFunPtr tfp, int argn ) {
-      for( int fidx : tfp.pos() ) {
-        Func func = Lambda.FUNS.get(fidx);
-        if( func instanceof Lambda lam ) {
-          if( lam instanceof PrimSyn ) return true; // Prims use their args
-          if( argn < lam._refs.length &&   // arg is not extra
-               lam._refs[argn]!=null &&    // Complicated, because at least 1 use is lazily inserted
-              (lam._refs[argn].length>1 || // Check for single use, with self-parent and not identity
-               lam._refs[argn][0]._par!=lam ||
-               lam._refs[argn][0]==lam._body
-               ) )
-            return true;
-        }
-      }
-      return false;
-    }
+    // CNC - disabled, because believe is incorrect: not monotonic.
+    // Args get *less* dead over time, and more args can *lift* more.
+    //// True if arg is used in the body; false if arg is dead
+    //private static boolean arg_is_used(TypeFunPtr tfp, int argn ) {
+    //  for( int fidx : tfp.pos() ) {
+    //    Func func = Lambda.FUNS.get(fidx);
+    //    if( func instanceof Lambda lam ) {
+    //      if( lam instanceof PrimSyn ) return true; // Prims use their args
+    //      if( argn < lam._refs.length &&   // arg is not extra
+    //           lam._refs[argn]!=null &&    // Complicated, because at least 1 use is lazily inserted
+    //          (lam._refs[argn].length>1 || // Check for single use, with self-parent and not identity
+    //           lam._refs[argn][0]._par!=lam ||
+    //           lam._refs[argn][0]==lam._body
+    //           ) )
+    //        return true;
+    //    }
+    //  }
+    //  return false;
+    //}
 
 
     @Override void add_val_work( Syntax child, @NotNull Work<Syntax> work) {
@@ -1255,6 +1268,10 @@ public class HM {
     }
     @Override void add_hm_work( @NotNull Work<Syntax> work) { throw unimpl(); }
     @Override Type val(Work<Syntax> work) {
+      // arg_meet Root-called Lambdas with Root args.      
+      if( _fun._flow instanceof TypeFunPtr tfp )
+        arg_meet(tfp,work);
+      
       if( work!=null )
         escapes(_fun._flow,work);
       TypeMemPtr tmp = TypeMemPtr.make(false,EXT_ALIASES,TypeStruct.ISUSED);
@@ -1411,6 +1428,8 @@ public class HM {
     }
     @Override public void push(Syntax f) { }
   }
+
+  // External function: any function from outside of Root this program might get handed.
   static class EXTLambda implements Func {
     final int _fidx;
     final T2 _t2;
@@ -2845,7 +2864,12 @@ public class HM {
       // Force 'that' to forget his progress and become the overload.
       // Will eventually force a lazy resolving Field to inline.
       if( this.is_overp() && !that.is_overp() ) return that._union(_fresh(nongen),work);
-      if( that.is_overp() && !this.is_overp() ) return this._union(that,work);
+      if( that.is_overp() && !this.is_overp() )
+        // After doing a fresh unify-over of 'that' overload, force 'this' to
+        // forget his progress and become the overload.  Will eventually force
+        // a lazy resolving Field to inline.
+        return that._unify_over(this,nongen,false,true,work) && this._union(that,work);
+    
       // Two unrelated overloads not allowed.  To equal overloads unify normally.
       boolean progress = false;
       if( this.is_overp() &&  that.is_overp() && arg("*").arg("&&_alias")._tflow != that.arg("*").arg("&&_alias")._tflow ) {
@@ -2885,26 +2909,33 @@ public class HM {
       if( _args==that._args ) return progress;
 
       // Structural recursion unification, lazy on LHS
-      boolean missing = size()!= that.size();
-      if( _args != null )
-        for( String key : _args.keySet() ) {
-          T2 lhs = this.arg(key);
+      return fresh_unify_flds(this,that,nongen,work,progress);
+    }
+    private boolean vput(T2 that, boolean progress) { VARS.put(this,that); return progress; }
+
+    private static boolean fresh_unify_flds(T2 thsi, T2 that, VStack nongen, Work<Syntax> work, boolean progress) {
+      assert !thsi.unified() && !that.unified();
+      boolean missing = thsi.size()!= that.size();
+      if( thsi._args != null )
+        for( String key : thsi._args.keySet() ) {
+          T2 lhs = thsi.arg(key);
           T2 rhs = that.arg(key);
           if( rhs==null ) {         // No RHS to unify against
             missing = true;         // Might be missing RHS
-            this.merge_deps(that,work);
-            if( is_open() || that.is_open() || lhs.is_err() || (is_fun() && that.is_fun()) ) {
+            thsi.merge_deps(that,work);
+            if( thsi.is_open() || that.is_open() || lhs.is_err() || (thsi.is_fun() && that.is_fun()) ) {
               if( work==null ) return true; // Will definitely make progress
               T2 nrhs = lhs._fresh(nongen); // New RHS value
               if( !that.is_open() ) {
                 nrhs._err = "Missing field " + key; // TODO: merge errors
-                this.add_deps_work(work);
+                thsi.add_deps_work(work);
               }
               progress |= that.add_fld(key,nrhs,work);
             } // Else neither side is open, field is not needed in RHS
           } else {
             progress |= lhs._fresh_unify(rhs,nongen,work);
           }
+          thsi=thsi.find();
           that=that.find();
           if( progress && work==null ) return true;
         }
@@ -2912,17 +2943,16 @@ public class HM {
       // just copy the missing fields into it, then unify the structs (shortcut:
       // just skip the copy).  If the LHS is closed, then the extra RHS fields
       // are removed.
-      if( missing && is_obj() && !is_open() && that._args!=null )
+      if( missing && thsi.is_obj() && !thsi.is_open() && that._args!=null )
         for( String id : that._args.keySet() ) // For all fields in RHS
-          if( arg(id)==null && !that.arg(id).is_err()) {   // Missing in LHS
+          if( thsi.arg(id)==null && !that.arg(id).is_err()) {   // Missing in LHS
             if( work == null ) return true;    // Will definitely make progress
             progress |= that.del_fld(id,work);
           }
-      if( is_obj() && that._open && !_open) { progress = true; that._open = false; }
+      if( thsi.is_obj() && that._open && !thsi._open) { progress = true; that._open = false; }
       if( progress && work!=null ) that.add_deps_work(work);
       return progress;
     }
-    private boolean vput(T2 that, boolean progress) { VARS.put(this,that); return progress; }
 
     private boolean unify_nil_this( Work<Syntax> work ) {
       if( work==null ) return unify_nil_this_test();
