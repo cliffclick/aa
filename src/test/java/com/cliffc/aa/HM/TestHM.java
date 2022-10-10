@@ -31,7 +31,7 @@ public class TestHM {
     DO_HMT=true;
     DO_GCP=true;
     RSEED=0;
-    f_gcp_hmt_04();
+    b_recursive_07();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -952,7 +952,6 @@ mul2 = { x -> (x._*_ con2)};
 
   // Recursive structs, in a loop.  Test of recursive int wrapper type ("occurs
   // check") in a loop.
-  @Ignore
   @Test public void g_overload_09() {
     rune("""
 // fwrap: a wrapped float
@@ -988,13 +987,13 @@ fact = { n -> (if n.is0 c1 (n.mul (fact n.sub1))) };
          "A:*@{i=int64;is0=int1;mul=*&[{A->A};{*@{f=flt64;...}->B:*@{f=flt64;mul=*&[{*@{i=int64;...}->B};{*@{f=flt64;...}->B}]}}];sub1=A}",
          "A:*@{i=int64;is0=int1;mul=*&[{A->A};{*@{f=flt64;...}->B:*@{f=flt64;mul=*&[{*@{i=int64;...}->B};{*@{f=flt64;...}->B}]}}];sub1=A}",
          // bulk test answers
-         //"PA:*[  11]@{_; i=int64; is0=int1; mul=*[  9]ov:(_, [   30]{any,3 -> PA }, [   34]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7]ov:(_, [25]{any,3 -> PB }, [27]{any,3 -> PB })} }); sub1=PA}",
-         //"PA:*[8,11]@{_;                    mul=*[7,9]ov:(_, [25,30]{any,3 -> PA }, [27,34]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7]ov:(_, [25]{any,3 -> PB }, [27]{any,3 -> PB })} })}",
-         //"[4,7,8,9,10,11,13,14,15]","[4,5,6,25,27,30,34]");
+         "PA:*[  11]@{_; i=int64; is0=int1; mul=*[  9]ov:(_, [   30]{any,3 -> PA }, [   34]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7]ov:(_, [25]{any,3 -> PB }, [27]{any,3 -> PB })} }); sub1=PA}",
+         "PA:*[8,11]@{_;                    mul=*[7,9]ov:(_, [25,30]{any,3 -> PA }, [27,34]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7]ov:(_, [25]{any,3 -> PB }, [27]{any,3 -> PB })} })}",
+         "[4,7,8,9,10,11,13,14,15]","[4,5,6,25,27,30,34]");
          // jig answers
-         "PA:*[10]@{_; i=int64; is0=int1; mul=*[9]ov:(_, [29]{any,3 -> PA }, [32]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7]ov:(_, [24]{any,3 -> PB }, [26]{any,3 -> PB })} }); sub1=PA}",
-         "PA:*[8,10]@{_; mul=*[7,9]ov:(_, [24,29]{any,3 -> PA }, [26,32]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7]ov:(_, [24]{any,3 -> PB }, [26]{any,3 -> PB })} })}",
-         "[4,7,8,9,10,11,12,13,14]","[4,5,6,24,26,29,32]");
+         //"PA:*[10]@{_; i=int64; is0=int1; mul=*[9]ov:(_, [29]{any,3 -> PA }, [32]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7]ov:(_, [24]{any,3 -> PB }, [26]{any,3 -> PB })} }); sub1=PA}",
+         //"PA:*[8,10]@{_; mul=*[7,9]ov:(_, [24,29]{any,3 -> PA }, [26,32]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7]ov:(_, [24]{any,3 -> PB }, [26]{any,3 -> PB })} })}",
+         //"[4,7,8,9,10,11,12,13,14]","[4,5,6,24,26,29,32]");
   }
 
 

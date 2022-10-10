@@ -168,8 +168,9 @@ public class HM {
   static boolean DO_HM ;        // Do Hindley-Milner typing
   static boolean DO_GCP;        // Do forwards-flow Global Constant Propagation typing
 
-  static boolean DO_AMBI;       // After first pass, unresolved Overloads are an error
-  static boolean HM_FREEZE;     // After 2nd pass, HM types are frozen but GCP types continue to fall
+  static boolean HM_NEW_LEAF;   // After 1st pass, potential HM new leafs will no longer lift Apply results
+  static boolean DO_AMBI;       // After 2nd pass, unresolved Overloads are an error
+  static boolean HM_FREEZE;     // After 3rd pass, HM types are frozen but GCP types continue to fall
 
   static Root ROOT;
 
@@ -194,17 +195,24 @@ public class HM {
     prog.prep_tree(null,-1,null,work);
 
     // Pass 1: Everything starts high/top/leaf and falls; escaping function args are assumed high
-    HM_FREEZE = false;
+    HM_NEW_LEAF=false;
     DO_AMBI = false;
+    HM_FREEZE = false;
     main_work_loop(prog,work);
 
-    // Pass 2: failed overloads propagate as errors
+    // Pass 2: Potential new Leafs quit lifting GCP in Apply
+    HM_NEW_LEAF = true;
+    prog.add_new_leaf_work(work);
+    assert prog.more_work(work);
+    main_work_loop(prog,work);
+    
+    // Pass 3: failed overloads propagate as errors
     DO_AMBI = true;           // Allow HM work to propagate errors
     work.addAll(DELAYS2);
     assert prog.more_work(work);
     main_work_loop(prog,work);
 
-    // Pass 3: H-M types freeze, escaping function args are assumed called with lowest H-M compatible
+    // Pass 4: H-M types freeze, escaping function args are assumed called with lowest H-M compatible
     // GCP types continue to run downhill.
     HM_FREEZE = true;
     prog.add_freeze_work(work);
@@ -1236,12 +1244,14 @@ public class HM {
   static class Root extends Apply {
     private static BitsAlias EXT_ALIASES = BitsAlias.EMPTY;
     private static BitsFun   EXT_FIDXS   = BitsFun  .EMPTY;
+    private static final Work<Syntax> NEW_LEAF_DEPS = new Work<>();
     private static final Work<Syntax> FREEZE_DEPS = new Work<>();
     private static final Work<Syntax> EXT_DEPS = new Work<>();
     static final Ary<EXTLambda> EXTS = new Ary<>(EXTLambda.class);
     static void reset() {
       EXT_ALIASES = BitsAlias.EMPTY;
       EXT_FIDXS = BitsFun.EMPTY;
+      NEW_LEAF_DEPS.clear();
       FREEZE_DEPS.clear();
       EXT_DEPS.clear();
       EXTS.clear();
@@ -1305,6 +1315,12 @@ public class HM {
       _hmt = _fun.find();
       return cnt;
     }
+
+    void add_new_leaf_work(Work<Syntax> work) {
+      work.addAll(NEW_LEAF_DEPS);
+      NEW_LEAF_DEPS.clear();
+    }
+
 
     void add_freeze_work(Work<Syntax> work) {
       // Freezing HM; all escaped function arguments get called with the most
@@ -1380,9 +1396,8 @@ public class HM {
         // Walk all escaped function args, and call them (like an external
         // Apply might) with the most conservative flow arguments possible.
         // Escaping overloads only count after freezing.
-        if( !tfp.above_center() || HM_FREEZE )
-          for( int fidx : tfp.pos() )
-            do_fidx(fidx, work);
+        for( int fidx : tfp.pos() )
+          do_fidx(fidx, work);
         // The flow return also escapes
         _escapes(tfp._ret,work);
       }
@@ -3275,25 +3290,20 @@ public class HM {
       Type tmap = T2MAP.get(this);
       if( tmap!=null ) {
         Type tw = tmap.widen();
-        if( _is_copy ) {        // Is_copy, so do not widen
-          if( tw != tmap ) push_update(apply); // If is_copy falls, then widen applies and needs a revisit
-        } else
-          tmap = tw;            // Not a direct copy, so widen
+        if( tw == tmap ) return tmap;
+        if( !_is_copy ) return tw; // Not a copy, so must widen
+        push_update(apply);   // If is_copy falls, then widen applies and needs a revisit
         return tmap;
       }
 
       // Check for some future leaf appearing with XSCALAR
-      Type tjn;
-      if( !HM_FREEZE && !is_obj() && T2_NEW_LEAF ) {
+      if( !HM_NEW_LEAF && T2_NEW_LEAF ) {
         T2.push_updates(T2JOIN_LEAFS,apply); // Result is kept high by some leaf
-        Root.FREEZE_DEPS.add(apply);
-        //tjn = T2.T2JOIN_LEAF==TypeNil.XSCALAR ? TypeNil.XSCALAR : TypeNil.XNSCALR; // Future leafs preserve nilability
-        tjn = TypeNil.XSCALAR;  // Future arg leaf can expand into anything, and lift result
-      } else {
-        // Lift the internal parts
-        tjn = _walk_types_out(t,apply,test);
-      }
-      return tjn;
+        Root.NEW_LEAF_DEPS.add(apply);
+        return TypeNil.XSCALAR;  // Future arg leaf can expand into anything, and lift result
+      } 
+      // Lift the internal parts
+      return _walk_types_out(t,apply,test);
     }
 
     private Type _walk_types_out( Type t, Apply apply, boolean test ) {
@@ -3302,7 +3312,8 @@ public class HM {
       // Leaf/base computes join of existing compatible leafs.  No new leafs
       // can appear (already checked).
       if( is_leaf() || is_base() ) {
-        if( HM_FREEZE ) return TypeNil.SCALAR; // Post-free, no lift (and no direct hits)
+        if( HM_NEW_LEAF ) return t; // Post-NEW_LEAF, no lift (and no direct hits)
+        Root.NEW_LEAF_DEPS.add(apply); // TODO: Cleanup
         // Pre-freeze, might unify with anything compatible
         Type trez = is_leaf() ? T2JOIN_LEAF : T2JOIN_BASE;
         if( is_base() && !_is_copy ) trez = trez.widen();
