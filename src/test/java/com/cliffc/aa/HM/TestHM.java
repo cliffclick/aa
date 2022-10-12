@@ -30,8 +30,8 @@ public class TestHM {
 
     DO_HMT=true;
     DO_GCP=true;
-    RSEED=0;
-    b_recursive_07();
+    RSEED=5;
+    g_overload_09();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -56,7 +56,7 @@ public class TestHM {
     if( JIG )
       _run0s(prog,rez_hm,frez_gcp,RSEED,esc_ptrs,esc_funs);
     else
-      for( int rseed=0; rseed<4; rseed++ )
+      for( int rseed=0; rseed<32; rseed++ )
         _run0s(prog,rez_hm,frez_gcp,rseed,esc_ptrs,esc_funs);
   }
 

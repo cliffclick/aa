@@ -580,17 +580,8 @@ public class HM {
       Syntax par = _par;
       fld._par = par;
       fld._hmt = that;
-      fld._flow = _flow;
-      // If this is a GCP known overload, need to take join of overload
-      // choices, not the overload itself.
-      if( _flow instanceof TypeMemPtr tmp ) {
-        Type t = TypeNil.XSCALAR; // Meet of joins
-        for( int a : tmp.aliases() )
-          if( ALIASES.at(a) instanceof Overload over )
-            t = t.meet(over.join());
-        fld._flow = t;
-      }
-      
+      // Compute a new conservative flow: the meet-of-joins.
+      fld._flow = Overload.val(_flow);      
       _par = fld;
       par.update_child(_pidx,fld,this);
       return fld;
@@ -1124,34 +1115,31 @@ public class HM {
       // Walk the input types, finding all the Leafs.  Repeats of the same Leaf
       // has its flow Types MEETed.
       T2.T2_NEW_LEAF = false; // Assume new leafs can appear
-      T2.T2JOIN_LEAF = TypeNil.SCALAR;
-      T2.T2JOIN_BASE = TypeNil.SCALAR;
+      //T2.T2JOIN_LEAF = TypeNil.SCALAR;
+      //T2.T2JOIN_BASE = TypeNil.SCALAR;
       T2.T2MAP.clear();
-      for( int i=0; i<_args.length; i++ ) {
-        Syntax arg = _args[i];
-        //if( !arg_is_used(tfp,i) )
-        //  continue;             // Unused args cannot lift output
+      for( Syntax arg : _args ) {
         T2.WDUPS.clear(true);
-        arg.find().walk_types_in(arg._flow,true);
+        arg.find().walk_types_in(arg._flow);
       }
 
-      T2.T2JOIN_LEAFS.clear();
-      T2.T2JOIN_BASES.clear();
-      // Pre-freeze, might unify with anything compatible
-      if( !HM_FREEZE ) {
-        // Lift by all other compatible T2 base types, since might unify later.
-        // Ignore incompatible ones, since if they unify we'll get an error
-        for( Map.Entry<T2,Type> e : T2.T2MAP.entrySet() ) {
-          T2 t2 = e.getKey();  Type flow = e.getValue();
-          if( !t2._is_copy ) flow = flow.widen();
-          T2.T2JOIN_LEAF = T2.T2JOIN_LEAF.join(flow); // Self is a leaf, so always
-          if( t2._is_copy) T2.T2JOIN_LEAFS.add(t2);
-          if( t2.is_base() || t2.is_leaf() ) {
-            T2.T2JOIN_BASE = T2.T2JOIN_BASE.join(flow); // Self and t2 is a base, or t2 is a leaf
-            if( t2._is_copy) T2.T2JOIN_BASES.add(t2);
-          }
-        }
-      }
+      //T2.T2JOIN_LEAFS.clear();
+      //T2.T2JOIN_BASES.clear();
+      //// Pre-freeze, might unify with anything compatible
+      //if( !HM_FREEZE ) {
+      //  // Lift by all other compatible T2 base types, since might unify later.
+      //  // Ignore incompatible ones, since if they unify we'll get an error
+      //  for( Map.Entry<T2,Type> e : T2.T2MAP.entrySet() ) {
+      //    T2 t2 = e.getKey();  Type flow = e.getValue();
+      //    if( !t2._is_copy ) flow = flow.widen();
+      //    T2.T2JOIN_LEAF = T2.T2JOIN_LEAF.join(flow); // Self is a leaf, so always
+      //    if( t2._is_copy) T2.T2JOIN_LEAFS.add(t2);
+      //    if( t2.is_base() || t2.is_leaf() ) {
+      //      T2.T2JOIN_BASE = T2.T2JOIN_BASE.join(flow); // Self and t2 is a base, or t2 is a leaf
+      //      if( t2._is_copy) T2.T2JOIN_BASES.add(t2);
+      //    }
+      //  }
+      //}
 
       // Then walk the output types, building a corresponding flow Type, but
       // matching against input Leafs.  If HM_FREEZE Leafs must match
@@ -1160,27 +1148,6 @@ public class HM {
       T2.WDUPS.clear(true);
       return rezt2.walk_types_out(tfp._ret, this, test);
     }
-
-    // CNC - disabled, because believe is incorrect: not monotonic.
-    // Args get *less* dead over time, and more args can *lift* more.
-    //// True if arg is used in the body; false if arg is dead
-    //private static boolean arg_is_used(TypeFunPtr tfp, int argn ) {
-    //  for( int fidx : tfp.pos() ) {
-    //    Func func = Lambda.FUNS.get(fidx);
-    //    if( func instanceof Lambda lam ) {
-    //      if( lam instanceof PrimSyn ) return true; // Prims use their args
-    //      if( argn < lam._refs.length &&   // arg is not extra
-    //           lam._refs[argn]!=null &&    // Complicated, because at least 1 use is lazily inserted
-    //          (lam._refs[argn].length>1 || // Check for single use, with self-parent and not identity
-    //           lam._refs[argn][0]._par!=lam ||
-    //           lam._refs[argn][0]==lam._body
-    //           ) )
-    //        return true;
-    //    }
-    //  }
-    //  return false;
-    //}
-
 
     @Override void add_val_work( Syntax child, @NotNull Work<Syntax> work) {
       // push self, because self returns the changed-functions' ret.
@@ -1346,7 +1313,7 @@ public class HM {
     static BitsAlias matching_escaped_aliases(T2 t2) {
       BitsAlias aliases = BitsAlias.EMPTY;
       for( int alias : EXT_ALIASES )
-        if( !t2.trial_unify(ALIASES.at(alias).t2()) )
+        if( t2.trial_unify_ok(ALIASES.at(alias).t2(),false) )
           aliases = aliases.set(alias); // Compatible escaping alias
       return aliases;
     }
@@ -1364,7 +1331,7 @@ public class HM {
         for( int fidx : EXT_FIDXS ) {
           Func fun = Lambda.FUNS.get(fidx);
           // Dunno (yet), since trial_unify can pass, then filter as HM proceeds
-          if( !t2.trial_unify(fun.as_fun()) )
+          if( t2.trial_unify_ok(fun.as_fun(),false) )
             fidxs = fidxs.set(fidx); // Compatible escaping fidx
         }
       return fidxs;
@@ -1818,6 +1785,24 @@ public class HM {
       return t instanceof TypeMemPtr tmp &&
         (a=tmp.aliases().abit())!=-1 &&
         ALIASES.at(Math.abs(a)) instanceof Overload over ? over : null;
+    }
+    static Overload get_overload(T2 t2) {
+      assert t2.is_overp();
+      T2 over = t2.arg("*");
+      T2 tag = over.arg("&&_alias");
+      int alias = (int)tag._tflow.getl();
+      return (Overload)ALIASES.at(alias);
+    }
+
+    // Meet-of-Joins.  Compute the meet over all overload pointers, and within
+    // each overload use the join of fields.
+    static Type val(Type t) {
+      if( !(t instanceof TypeMemPtr tmp) ) return t.oob(TypeNil.SCALAR);
+      Type tj = TypeNil.XSCALAR; // Meet of joins
+      for( int a : tmp.aliases() )
+        if( ALIASES.at(a) instanceof Overload over )
+          tj = tj.meet(over.join());
+      return tj;
     }
   }
 
@@ -3038,7 +3023,7 @@ public class HM {
       for( String id : overs._args.keySet() ) {
         if( Util.eq("&&_alias",id) ) continue; // Ignore the overload tag
         T2 over = overs.arg(id);               // Get an overload
-        if( !over.trial_unify(that) ) {        // If no error
+        if( over.trial_unify_ok(that,false) ) { // If no error
           if( no_err==null ) {                 // No child unified yet
             no_err = over;                     // Collect a non-error
             if( work != null ) that.push_update(over._deps); // If deps changes, and we no longer trial unify, need to revisit
@@ -3090,43 +3075,48 @@ public class HM {
     // Do a trial unification between this and that.  Report back if any error
     // happens.  No change to either side, this is a trial only.
     private static final NonBlockingHashMapLong<T2> TDUPS = new NonBlockingHashMapLong<>();
-    private boolean trial_unify(T2 that) {
+    private boolean trial_unify_ok(T2 that, boolean extras) {
       TDUPS.clear();
-      return _trial_unify(that);
+      return _trial_unify_ok(that, extras);
     }
-    private boolean _trial_unify(T2 that) {
+    private boolean _trial_unify_ok(T2 that, boolean extras) {
       assert !unified() && !that.unified();
       long duid = dbl_uid(that._uid);
       if( TDUPS.putIfAbsent(duid,this)!=null )
-        return false;                    // Visit only once, and assume will resolve
-      if( this==that ) return false;     // No error
-      if( this.is_leaf() ) return false; // No error
-      if( that.is_leaf() ) return false; // No error
-      if( this.is_base() && that.is_base() )
-        // No error if same base class.  Might be progress, but no error.
-        // Note: still too weak if looking at trial unify of errors,
-        // as might have same class in one of the error types.
-        return _tflow.getClass()!=that._tflow.getClass();
+        return true;                    // Visit only once, and assume will resolve
+      if( this==that )     return true; // No error
+      if( this.is_leaf() ) return true; // No error
+      if( that.is_leaf() ) return true; // No error
+      if( this.is_base() && that.is_base() &&
+          _tflow.getClass()!=that._tflow.getClass() )
+        return false;           // Different base classes means a new error
 
       // Overloads (recursively) check all children
-      if( this.is_over() ) return this._trial_unify_over(that);
-      if( that.is_over() ) return that._trial_unify_over(this);
+      if( this.is_over() ) return this._trial_unify_over(that, extras);
+      if( that.is_over() ) return that._trial_unify_over(this, extras);
 
       // Same basic tvar class checks children
-      if( is_fun() && that.is_fun() ||
-          is_ptr() && that.is_ptr() ||
-          is_obj() && that.is_obj() ) {
-        if( _args!=null )
-          for( String id : _args.keySet() ) {
-            if( Util.eq(id,RET) ) continue; // Do not unify based on return types
-            T2 lhs = this.arg(id);
-            T2 rhs = that.arg(id);
-            if( rhs!=null && lhs._trial_unify(rhs) ) return true;
-          }
-        return this.mismatched_child(that) || that.mismatched_child(this);
-      }
-      return true;
+      if( is_fun() != that.is_fun() ||
+          is_ptr() != that.is_ptr() ||
+          is_obj() != that.is_obj() ||
+          is_nil() != that.is_nil() ||
+          is_base()!= that.is_base() )
+        return false;            // Unrelated tvar class is a fail
+      
+      // Check children
+      if( _args!=null )
+        for( String id : _args.keySet() ) {
+          if( Util.eq(id,RET) ) continue; // Do not unify based on return types
+          T2 lhs = this.arg(id);
+          T2 rhs = that.arg(id);
+          if( rhs!=null && !lhs._trial_unify_ok(rhs, extras) ) return false;
+        }
+
+      // Allow unification with extra fields.  The normal unification path
+      // will not declare an error, it will just remove the extra fields.        
+      return extras || (this.mismatched_child(that) && that.mismatched_child(this));
     }
+    
     // Recursively expand overloads.  This is where I might go exponential.  If
     // instead I succeed here I basically allow too many overloads to succeed,
     // which stalls the top-level overload until this nested overload resolves.
@@ -3135,20 +3125,22 @@ public class HM {
     // In any given pass the visit bit prevents me from going exponential; it
     // is however, quadratic (at least the product of 2 overloads unifying
     // against each other, probably the sum-of-products).
-    private boolean _trial_unify_over( T2 that ) {
+    private boolean _trial_unify_over( T2 that, boolean extras ) {
       assert is_over();
-      for( T2 t2 : _args.values() )
-        if( !t2.find()._trial_unify(that) )
-          return false;         // Something succeeds, so this whole trial succeeds
-      return true;
+      for( String id : _args.keySet() ) {
+        if( id.charAt(0)=='&' ) continue;
+        if( arg(id)._trial_unify_ok(that, extras) )
+          return true;      // Something succeeds, so this whole trial succeeds
+      }
+      return false;
     }
     // True if 'this' has extra children and 'that' does not allow extras
     private boolean mismatched_child( T2 that ) {
       if( !that.is_open() && _args!=null )   // If RHS is closed
         for( String id : _args.keySet() )
           if( that.arg(id)==null ) // And missing key in RHS
-            return true;           // Trial unification failed
-      return false;
+            return false;          // Trial unification failed
+      return true;
     }
 
     // -----------------
@@ -3225,51 +3217,61 @@ public class HM {
     // Walk a T2 and a matching flow-type, and build a map from T2 to flow-types.
     // Stop if either side loses corresponding structure.  This operation must be
     // monotonic because the result is JOINd with GCP types.
-    void walk_types_in(Type t, boolean has_t2 ) {
+    void walk_types_in( Type t ) {
+      assert !unified();
       long duid = dbl_uid(t._uid);
       if( WDUPS.putIfAbsent(duid,TypeStruct.ISUSED)!=null ) return;
-      assert !unified();
-      if( has_t2 && !is_obj() )
-        T2MAP.merge(this, t, Type::meet);
-      // Free variables keep the input flow type.
-      if( is_leaf() ) {
-        if( t.above_center() || t instanceof TypeFunPtr || (t instanceof TypeMemPtr tmp && tmp._obj.above_center()) )
-          T2_NEW_LEAF = true;   // Might expand to a new leaf later
-        if( !has_t2 && !(t instanceof TypeStruct) )
-          T2.T2JOIN_LEAF = T2.T2JOIN_LEAF.join(t); // NO leaf, but might be one later
-        // Walk structure on flow type, to compute JOIN_LEAF
-        if( Overload.is_overload(t) ) throw unimpl();
-        if( t instanceof TypeFunPtr tfp ) walk_types_in(tfp._ret,false);
-        if( t instanceof TypeMemPtr tmp ) walk_types_in(tmp._obj,false);
+      T2MAP.merge(this, t, Type::meet);
+      // TODO: stop lifting on error inputs; then can take early-exit from each choice.
+
+      // The overload itself does not go in the T2MAP.
+      // Overloads walk all choices; you *may* unify with one of them, so must lift now.
+      if( is_overp() ) {
+        //Overload sover = Overload.get_overload(this);
+        //Type t2 = Type.ALL;
+        //for( Syntax syn : sover._flds )
+        //  t2 = t2.join(syn._flow);
+        //for( Syntax syn : sover._flds )
+        //  syn.find().walk_types_in(t2);
+        T2_NEW_LEAF = true;
+        return;                 // Do not walk the is_ptr test
       }
-      // Bases can (sorta) act like a leaf: they can keep their polymorphic "shape" and induce it on the result
-      //if( is_base() ) return t;
+      assert !is_over();
+      
+      // Free variables keep the input flow type.
+      if( is_leaf() ) T2_NEW_LEAF = true;   // Might expand to a new leaf later
+
+      // Bases can (sorta) act like a leaf: they can keep their polymorphic
+      // "shape" and induce it on the result
+      //if( is_base() ) /*nothing*/;
+      
       // Pointers recurse on their object
       if( is_ptr() ) {
-        arg("*").walk_types_in(t instanceof TypeMemPtr tmp ? tmp._obj : t, true);
+        arg("*").walk_types_in(t instanceof TypeMemPtr tmp ? tmp._obj : t);
         T2 nptr = arg("??");
         if( nptr != null ) // Also map the not-nilable version
           T2MAP.merge(nptr,t.join(TypeNil.NSCALR),Type::meet);
       }
+      
       // Nilable, recurse on the not-nil
       if( is_nil() && !t.isa(TypeNil.XNIL) ) {
         Type tn = t.join(TypeNil.NSCALR);
-        arg("?").walk_types_in(tn, true);
+        arg("?").walk_types_in(tn);
         T2 nptr = arg("??");
         if( nptr != null ) // Also map the not-nilable version
           T2MAP.merge(nptr,tn,Type::meet);
       }
+      
       // Walk return not arguments
       if( is_fun() )
-        arg(RET).walk_types_in(t instanceof TypeFunPtr tfp ? tfp._ret : t.oob(TypeNil.SCALAR), true);
+        arg(RET).walk_types_in(t instanceof TypeFunPtr tfp ? tfp._ret : t.oob(TypeNil.SCALAR));
       // Objects walk all fields
       if( is_obj() && _args != null ) {
         for( String id : _args.keySet() )
           if( !id.endsWith(":") ) // No lifting from class args
-            arg(id).walk_types_in(at_fld(t, id), true);
-        if( is_open() && t.above_center() ) T2_NEW_LEAF = true; // Can add a new leaf later
+            arg(id).walk_types_in(at_fld(t, id));
+        if( is_open() ) T2_NEW_LEAF = true; // Can add a new leaf later
       }
-
     }
 
     private static Type at_fld(Type t, String id) { // TODO: FAILURE TO SHARPEN
@@ -3285,23 +3287,45 @@ public class HM {
 
       // Fast-path cutout
       if( t==TypeNil.XSCALAR ) return TypeNil.XSCALAR; // No lift, do not bother
+      if( this.is_err() )      return t; // Do not lift errors
 
       // Check for a direct hit
       Type tmap = T2MAP.get(this);
       if( tmap!=null ) {
-        Type tw = tmap.widen();
-        if( tw == tmap ) return tmap;
-        if( !_is_copy ) return tw; // Not a copy, so must widen
+        Type tw = tmap.widen();       // Check widened bases
+        if( tw == tmap ) return tmap; // Direct hit after widen, always works
+        if( !_is_copy ) return tw;    // Not a copy, so must widen
         push_update(apply);   // If is_copy falls, then widen applies and needs a revisit
-        return tmap;
+        return tmap;          // While a copy, can return the direct hit
       }
 
       // Check for some future leaf appearing with XSCALAR
       if( !HM_NEW_LEAF && T2_NEW_LEAF ) {
-        T2.push_updates(T2JOIN_LEAFS,apply); // Result is kept high by some leaf
+        // walk T2MAP for leafs or open structs; push Apply.
+        // TODO: can optimize this if becomes expensive, because these are 1-shot transitions
+        for( T2 t2 : T2.T2MAP.keySet() )
+          if( t2.is_leaf() || t2.is_open() )
+            t2.push_update(apply);
         Root.NEW_LEAF_DEPS.add(apply);
         return TypeNil.XSCALAR;  // Future arg leaf can expand into anything, and lift result
-      } 
+      }
+
+      // Until we freeze, check for "may unify in the future".  For all
+      // successful trials, join all results since we might unify with any of
+      // them.
+      if( !HM_FREEZE ) {
+        if( is_leaf() ) return TypeNil.XSCALAR; // Will unify with everything
+        Type tj = Type.ALL;
+        for( T2 t2 : T2.T2MAP.keySet() )
+          if( t2.trial_unify_ok(this,true) )
+            tj = tj.join(T2.T2MAP.get(t2));
+        if( !_is_copy )
+          tj = tj.widen();
+        if( tj != Type.ALL ) // Some trial succeeds, use this result "as if" we got a direct hit
+          return tj.join(t); 
+        // No trial succeeds, fall into the recursive walk to lift internal parts
+      }
+      
       // Lift the internal parts
       return _walk_types_out(t,apply,test);
     }
@@ -3309,19 +3333,15 @@ public class HM {
     private Type _walk_types_out( Type t, Apply apply, boolean test ) {
       if( is_err2() ) return TypeNil.SCALAR; // No lift for mixed ground terms
 
-      // Leaf/base computes join of existing compatible leafs.  No new leafs
-      // can appear (already checked).
-      if( is_leaf() || is_base() ) {
-        if( HM_NEW_LEAF ) return t; // Post-NEW_LEAF, no lift (and no direct hits)
-        Root.NEW_LEAF_DEPS.add(apply); // TODO: Cleanup
-        // Pre-freeze, might unify with anything compatible
-        Type trez = is_leaf() ? T2JOIN_LEAF : T2JOIN_BASE;
-        if( is_base() && !_is_copy ) trez = trez.widen();
-        Type lift = t.join(trez);
-        if( lift != t )
-          for( T2 t2 : (is_leaf() ? T2JOIN_LEAFS : T2JOIN_BASES) ) t2.push_update(apply);
-        return lift;
-      }
+      if( is_leaf() ) { assert HM_NEW_LEAF; return t; }
+
+      if( is_base() ) return _tflow; // return t;
+
+      // Lifting an overload really just lifts the parts - but they are kept in
+      // a shallow ptr.  Nothing to lift.
+      if( is_overp() ) return t;
+      assert !is_over();
+      
       if( is_ptr() ) {
         if( t==TypeNil.NIL || t==TypeNil.XNIL ) return t; // Keep a nil
         if( !(t instanceof TypeMemPtr tmp) ) return t;
@@ -3344,7 +3364,6 @@ public class HM {
 
       if( is_obj() ) return t; // expect ptrs to be simple, so t is ISUSED
 
-      if( is_over() ) return t;
       throw unimpl();           // Handled all cases
     }
 
