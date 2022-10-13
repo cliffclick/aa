@@ -194,6 +194,11 @@ public class HM {
     Work<Syntax> work = new Work<>(rseed);
     prog.prep_tree(null,-1,null,work);
 
+    // Pass Over Resolve: insert Fields to resolve Overloads.  Requires a HM
+    // pass (I think).  Hope to unify with main pass#1 someday.
+    prog.visit( Syntax::resolve, (a,b)->null );
+    if( true ) return prog;
+    
     // Pass 1: Everything starts high/top/leaf and falls; escaping function args are assumed high
     HM_NEW_LEAF=false;
     DO_AMBI = false;
@@ -442,6 +447,7 @@ public class HM {
     X++;
     float f = (float)sum;
     f = f + (BUF[X++]-'0')/10.0f;
+    require('f');
     return new Con(TypeFlt.con(f));
   }
   private static Syntax string() {
@@ -606,10 +612,10 @@ public class HM {
     // Line-by-line print with more detail
     public String p() { return p0(new SB(), new VBitSet()).toString(); }
     final SB p0(SB sb, VBitSet dups) {
-      _hmt._get_dups(new VBitSet(),dups);
+      if( _hmt!=null ) _hmt._get_dups(new VBitSet(),dups);
       VBitSet visit = new VBitSet();
       p1(sb.i(),dups);
-      if( DO_HM  ) _hmt .str(sb.p(", HMT="), visit,dups,true);
+      if( DO_HM  && _hmt!=null ) _hmt .str(sb.p(", HMT="), visit,dups,true);
       if( DO_GCP ) _flow.str(sb.p(", GCP="), true, false );
       sb.nl();
       return p2(sb.ii(2),dups).di(2);
@@ -622,13 +628,34 @@ public class HM {
       return visit( syn -> syn.debug_find().find(uid),
                     (a,b) -> a==null ? b : a );
     }
+
+    // Walk the program inserting overload-resolving Field loads as needed
+    T2 resolve() {
+      return _resolve();
+    }
+    T2 _resolve() {
+      return find();
+    }
+    
   }
 
   static class Con extends Syntax {
     final Type _con;
     Con(Type con) { super(con); _con=con; }
     @Override SB str(SB sb) { return p1(sb,null); }
-    @Override SB p1(SB sb, VBitSet dups) { return sb.p(_con.toString()); }
+    @Override SB p1(SB sb, VBitSet dups) {
+      if( _con==TypeNil.XNIL ) return sb.p("0");
+      if( _con instanceof TypeMemPtr cptr && cptr.is_str() )
+        return sb.p('"').p(switch( (char)cptr._obj.at(0).getl() ) {
+          case 'a' -> "abc";
+          case 'd' -> "def";
+          case 'r' -> "red";
+          case 'b' -> "blue";
+          default -> throw unimpl();
+          }).p('"');
+
+      return _con.str(sb,true,false);
+    }
     @Override SB p2(SB sb, VBitSet dups) { return sb; }
     @Override boolean hm(Work<Syntax> work) { return false; }
     @Override Type val(Work<Syntax> work) { return _con; }
@@ -1468,11 +1495,11 @@ public class HM {
     final Syntax[] _flds;
     final Ary<Syntax> _rflds = new Ary<>(Syntax.class);
     Struct( String[] ids, Syntax[] flds ) {
-      // Sort fields by name.  They are otherwise unordered.
-      TreeMap<String,Syntax> sort = new TreeMap<>();
-      for( int i=0; i<ids.length; i++ ) sort.put(ids[i], flds[i]);
-      int i=0; for( Map.Entry<String,Syntax> e : sort.entrySet() )
-                 { ids[i]=e.getKey(); flds[i]=e.getValue(); i++; }
+      //// Sort fields by name.  They are otherwise unordered.
+      //TreeMap<String,Syntax> sort = new TreeMap<>();
+      //for( int i=0; i<ids.length; i++ ) sort.put(ids[i], flds[i]);
+      //int i=0; for( Map.Entry<String,Syntax> e : sort.entrySet() )
+      //           { ids[i]=e.getKey(); flds[i]=e.getValue(); i++; }
       _ids=ids;
       _flds=flds;
       // Make a TMP
@@ -1480,11 +1507,11 @@ public class HM {
       ALIASES.setX(_alias,this);
     }
     @Override SB str(SB sb) {
-      sb.p("@{").p(_alias);
+      sb.p("@{");
       for( int i=0; i<_ids.length; i++ ) {
         sb.p(' ').p(_ids[i]).p(" = ");
         _flds[i].str(sb);
-        if( i < _ids.length-1 ) sb.p(',');
+        if( i < _ids.length-1 ) sb.p(';');
       }
       return sb.p("}");
     }
@@ -1751,7 +1778,7 @@ public class HM {
       return ids;
     }
     @Override SB str(SB sb) {
-      sb.p("&[").p(_alias).p(' ');
+      sb.p("&[ ");
       for( Syntax syn : _flds )
         syn.str(sb).p("; ");
       return sb.unchar(2).p(" ]");
