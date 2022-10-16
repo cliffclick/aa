@@ -29,9 +29,9 @@ public class TestHM {
     JIG=true;
 
     DO_HMT=true;
-    DO_GCP=true;
-    RSEED=6;
-    g_overload_05();
+    DO_GCP=false;
+    RSEED=0;
+    g_overload_10();
   }
 
   private void _run0s( String prog, String rprog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -880,6 +880,7 @@ loop = { name cnt ->
          "[4,7]","[23,26]"
         );
   }
+
   // Simple overloaded function test.
   // Insert Fields for all 'f' uses, but some or all may go away.
   @Test public void g_overload_01() {
@@ -888,11 +889,16 @@ loop = { name cnt ->
         "  { x -> (f* x 3.0f) } "+  // Arg is 'flt'
         "];"+
         "(pair (f 2) (f 1.2f))",    // Call with different args
-        null,
+        "f = &["                 +  // Define overloaded fcns 'f'
+        "  { x -> (i* x 2   ) };"+  // Arg is 'int'
+        "  { x -> (f* x 3.0f) } "+  // Arg is 'flt'
+        "];"+
+        "(pair (f.0 2) (f.1 1.2f))",    // Call with different args
         "*(int64,flt64)", "*(int64,flt64)",
         "*[8](_, 4,3.6000001f)", "*[8](_, Scalar, Scalar)",
         "[4,8]",null);
   }
+
   @Test public void g_overload_02() {
     run("""
 { pred ->
@@ -907,7 +913,7 @@ loop = { name cnt ->
   fx = &[ (if pred ({_pred -> { x -> (i* x 2)}}(notnil pred)) { x -> (i* x 3)});
           { x -> (f* x 0.5f) }
         ];
-  (pair (fx 2) (fx 1.2f))
+  (pair (fx.0 2) (fx.1 1.2f))
 }
 """,
         "{ A? -> *(int64,flt64) }",
@@ -919,7 +925,7 @@ loop = { name cnt ->
   // Test overload as union of primitives
   @Test public void g_overload_03() {
     run("red=&[ 123; \"red\" ]; (pair (dec red) (isempty red))",
-        null,
+        "red=&[ 123; \"red\" ]; (pair (dec red.&) (isempty red.&))",
         "*(int64,int1)",
         "*(int64,int1)",
         "*[8](_, 122,xnil)",
@@ -938,7 +944,7 @@ loop = { name cnt ->
         "color = { hex name -> &[ hex; name ]};"+
         "red  = (color 123 \"red\" );"+
         "blue = (color 456 \"blue\");"+
-        "{ pred -> c =(if pred ({_pred -> red}(notnil pred)) blue); (pair (dec c) (isempty c))}",
+        "{ pred -> c =(if pred ({_pred -> red}(notnil pred)) blue); (pair (dec c.0) (isempty c.1))}",
           
         "{ A? -> *(int64,int1) }",
         "{ A? -> *(int64,int1) }",
@@ -954,7 +960,12 @@ loop = { name cnt ->
         "(pair (fun &[ 123; \"abc\" ]        )" + // Correct overload is 0x123
         "      (fun &[ \"def\"; @{x=1}; 456 ])" + // Correct overload is 0x456
         ")",
-        null,
+
+        "fun = { a0 -> (dec a0) }; "              + // a0 is an int
+        "(pair (fun &[ 123; \"abc\" ]        .0)" + // Correct overload is 0x123
+        "      (fun &[ \"def\"; @{x=1}; 456 ].2)" + // Correct overload is 0x456
+        ")",
+
         "*(int64,int64)",
         "*[7](_, int64, int64)",
         "[4,7]",null);
@@ -965,7 +976,7 @@ loop = { name cnt ->
     run("color = { hex name -> &[ hex; name ]};"+
         "red  = (color 123 \"red\" );"+
         "blue = (color 456 \"blue\");"+
-        "lite = {c -> (color (dec c) (isempty c))};"+ // Should be "(color (sub c 0x111) (cat "light" c))"
+        "lite = {c -> (color (dec c.0) (isempty c.1))};"+ // Should be "(color (sub c 0x111) (cat "light" c))"
         "(pair (lite red) (lite blue))",
         null,
          
@@ -1089,6 +1100,13 @@ fact = { n -> (if n.is0 c1 (n.mul (fact n.sub1))) };
          //"[4,7,8,9,10,11,12,13,14]","[4,5,6,24,26,29,32]");
   }
 
+
+  @Test public void g_overload_10() {
+    run("(&[ 1; {x->x}]   2.1f)",
+        "(&[ 1; {x->x}].& 2.1f)",
+        "2.1f","2.1f",
+        null,null );
+  }
 
   // Ambiguous overload, {int->int}, cannot select.
   // Parent of overload is Apply, so 

@@ -168,9 +168,12 @@ public class HM {
   static boolean DO_HM ;        // Do Hindley-Milner typing
   static boolean DO_GCP;        // Do forwards-flow Global Constant Propagation typing
 
+  static Work<Syntax> WORK;
+  
   static boolean HM_NEW_LEAF;   // After 1st pass, potential HM new leafs will no longer lift Apply results
   static boolean DO_AMBI;       // After 2nd pass, unresolved Overloads are an error
   static boolean HM_FREEZE;     // After 3rd pass, HM types are frozen but GCP types continue to fall
+  static boolean FIELDS;
 
   static Root ROOT;
 
@@ -181,6 +184,7 @@ public class HM {
     Type.RECURSIVE_MEET=0;      // Reset between failed tests
     DO_HM  = do_hm ;
     DO_GCP = do_gcp;
+    FIELDS = true;
 
     // Initialize the primitives
     for( PrimSyn prim : new PrimSyn[]{ new If(), new Pair(), new EQ(), new EQ0(), new IMul(), new FMul(), new I2F(), new Add(), new Dec(), new IRand(), new Str(), new Triple(), new Factor(), new IsEmpty(), new NotNil()} )
@@ -191,15 +195,16 @@ public class HM {
     Root prog = ROOT = parse( sprog );
 
     // Pass 0: Prep for SSA; pre-gather all the (unique) ids
-    Work<Syntax> work = new Work<>(rseed);
+    Work<Syntax> work = WORK = new Work<>(rseed);
     prog.prep_tree(null,-1,null,work);
 
     // Pass Over Resolve: insert Fields to resolve Overloads.  Requires a HM
     // pass (I think).  Hope to unify with main pass#1 someday.
-    prog.visit( Syntax::resolve, (a,b)->null );
+    prog.resolve();
     if( true ) return prog;
     
     // Pass 1: Everything starts high/top/leaf and falls; escaping function args are assumed high
+    FIELDS=false;
     HM_NEW_LEAF=false;
     DO_AMBI = false;
     HM_FREEZE = false;
@@ -352,7 +357,7 @@ public class HM {
       // Guarding if-nil test inserts an upcast.  This is a syntactic transform only.
       if( fun instanceof If &&
           args.at(0) instanceof Ident id )
-        args.set(1,new Apply(new Lambda(args.at(1), true, id._name),
+        args.set(1,new Apply(new Lambda(args.at(1), id._name),
                              new Apply(new NotNil(),new Ident(id._name))));
       return new Apply(fun,args.asAry());
     }
@@ -364,7 +369,7 @@ public class HM {
       require();
       Syntax body = fterm();
       require('}');
-      return new Lambda(body, false,args.asAry());
+      return new Lambda(body, args.asAry());
     }
     // Let or Id
     if( isAlpha0(BUF[X]) ) {
@@ -569,28 +574,14 @@ public class HM {
       // Must resolve here
       if( self.is_overp() && self.over_must_resolve(that) ) {
         if( work==null ) return true; // Progress, would insert a resolving Field load
-        work.add(_par);
-        work.add(insert_overload_resolve(that));
-        return true;
+        //work.add(_par);
+        //work.add(insert_overload_resolve(that));
+        //return true;
+        throw unimpl();
       }
       // Should not need to resolve in reverse direction
       assert !(that.is_overp() && that.over_must_resolve(self));
       return self.unify(that,work);
-    }
-
-    // Insert a resolving Field (changes the program Syntax) to make the
-    // overload resolution point obvious.  The actual field choice is made in
-    // Field and not here.
-    Field insert_overload_resolve(T2 that) {
-      Field fld = new Field(null,this);
-      Syntax par = _par;
-      fld._par = par;
-      fld._hmt = that;
-      // Compute a new conservative flow: the meet-of-joins.
-      fld._flow = Overload.val(_flow);      
-      _par = fld;
-      par.update_child(_pidx,fld,this);
-      return fld;
     }
     
     // Giant Assert: True if OK; all Syntaxs off worklist do not make progress
@@ -615,8 +606,8 @@ public class HM {
       if( _hmt!=null ) _hmt._get_dups(new VBitSet(),dups);
       VBitSet visit = new VBitSet();
       p1(sb.i(),dups);
-      if( DO_HM  && _hmt!=null ) _hmt .str(sb.p(", HMT="), visit,dups,true);
-      if( DO_GCP ) _flow.str(sb.p(", GCP="), true, false );
+      if( DO_HM  ||  FIELDS ) _hmt .str(sb.p(", HMT="), visit,dups,true);
+      if( DO_GCP && !FIELDS ) _flow.str(sb.p(", GCP="), true, false );
       sb.nl();
       return p2(sb.ii(2),dups).di(2);
     }
@@ -630,13 +621,7 @@ public class HM {
     }
 
     // Walk the program inserting overload-resolving Field loads as needed
-    T2 resolve() {
-      return _resolve();
-    }
-    T2 _resolve() {
-      return find();
-    }
-    
+    abstract T2 resolve();
   }
 
   static class Con extends Syntax {
@@ -668,6 +653,7 @@ public class HM {
       prep_tree_impl(par, pidx, nongen, work, base);
       return 1;
     }
+    @Override T2 resolve() { return find(); }
     @Override boolean more_work(Work<Syntax> work) { return more_work_impl(work); }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
     @Override void update_child(int idx, Syntax syn, Syntax old) { throw unimpl(); }
@@ -703,8 +689,9 @@ public class HM {
       if( idt.is_overp() && idt.over_must_resolve(hmt) ) {
         if( work==null ) return true; // Progress, would insert a resolving Field load
         _hmt = idt;
-        work.add(insert_overload_resolve(hmt));
-        return true;
+        //work.add(insert_overload_resolve(hmt));
+        //return true;
+        throw unimpl();
       }
       assert !(hmt.is_overp() && hmt.over_must_resolve(idt));
       return _fresh ? idt.fresh_unify(hmt,_nongen,work) : idt.unify(hmt,work);
@@ -753,7 +740,6 @@ public class HM {
           assert (idx >= 0 && syn instanceof Lambda) ||
                  (idx <  0 && syn instanceof Let   );
           T2 t2 = syn instanceof Lambda lam ? lam.targ(idx) : ((Let)syn).targ();
-          find()._may_over=t2._may_over;
           // Fresh in body of Let, not-fresh in Let def or Lambda arg
           init(syn,idx,t2,idx == -2);
           return 1;
@@ -761,6 +747,12 @@ public class HM {
       }
       throw new RuntimeException("Parse error, "+_name+" is undefined in "+_par);
     }
+    @Override T2 resolve() {
+      T2 idt = idt(), hmt=find();
+      boolean ignore = _fresh ? idt.fresh_unify(hmt,_nongen,WORK) : idt.unify(hmt,WORK);
+      return find();
+    }
+    
     @Override boolean more_work(Work<Syntax> work) { return more_work_impl(work); }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
     @Override void update_child(int idx, Syntax syn, Syntax old) { throw unimpl(); }
@@ -780,9 +772,10 @@ public class HM {
     final int _fidx;            // Unique function idx
     final Ary<Apply> _applys;   // Applys using this Lambda
     static final String[] ARGNAMES = new String[]{" x"," y"," z"};
+
     static private int xfidx;
 
-    Lambda(Syntax body, boolean may_over, String... args) {
+    Lambda(Syntax body, String... args) {
       super(TypeFunPtr.makex(false,BitsFun.make0(xfidx=BitsFun.new_fidx()),args.length+DSP_IDX,Type.ANY,TypeNil.XSCALAR));
       _args=args;
       _body=body;
@@ -790,7 +783,6 @@ public class HM {
       _targs = new T2[args.length];
       for( int i=0; i<args.length; i++ ) _targs[i] = T2.make_leaf();
       // Inserted Lambda for not-nil specifically allows overload.
-      if( may_over ) { _targs[0]._may_over=true; }
       // Flow types for all arguments
       _types = new Type[args.length];
       for( int i=0; i<args.length; i++ ) _types[i] = TypeNil.XSCALAR;
@@ -812,8 +804,8 @@ public class HM {
       sb.p("{ ");
       for( int i=0; i<_args.length; i++ ) {
         sb.p(_args[i]);
-        if( DO_HM  ) _targs[i].str(sb.p(", HMT=" ),new VBitSet(),dups,true);
-        if( DO_GCP ) sb.p(", GCP=").p(_types[i]);
+        if( DO_HM  ||  FIELDS ) _targs[i].str(sb.p(", HMT=" ),new VBitSet(),dups,true);
+        if( DO_GCP && !FIELDS ) sb.p(", GCP=").p(_types[i]);
         sb.nl().i().p("  ");
       }
       return sb.p(" -> ... } ");
@@ -925,6 +917,13 @@ public class HM {
         }
       return -99;
     }
+    @Override T2 resolve() {
+      T2[] targs = Arrays.copyOf(_targs,_targs.length+1);
+      targs[_targs.length] = _body.resolve();
+      // TODO: specify over-per-arg
+      find().unify(T2.make_fun(targs),WORK);
+      return find();
+    }
     @Override boolean more_work(Work<Syntax> work) {
       if( !more_work_impl(work) ) return false;
       return _body.more_work(work);
@@ -958,7 +957,6 @@ public class HM {
     @Override int prep_tree( Syntax par, int pidx, VStack nongen, Work<Syntax> work ) {
       prep_tree_impl(par,pidx,nongen,work,T2.make_leaf());
       T2 targ = T2.make_leaf();
-      targ._may_over = true;
       int cnt = _def .prep_tree(this,0,new VStack(nongen,targ),work) +
                 _body.prep_tree(this,1,           nongen      ,work);
       targ.unify(targ(),work);       // Unify targ with _def._hmt
@@ -975,6 +973,10 @@ public class HM {
       _refs[_refs.length-1] = id;
       assert prior==_def || prior==_body;
       return prior==_def ? -1 : -2;
+    }
+    @Override T2 resolve() {
+      _def.resolve();
+      return _body.resolve();
     }
     @Override boolean more_work(Work<Syntax> work) {
       if( !more_work_impl(work) ) return false;
@@ -1202,11 +1204,66 @@ public class HM {
 
     @Override int prep_tree(Syntax par, int pidx, VStack nongen, Work<Syntax> work) {
       prep_tree_impl(par,pidx,nongen,work,T2.make_leaf());
-      _hmt._may_over=true;      // Can return an overload
-      int i=0, cnt = 1+_fun.prep_tree(this,i++,nongen,work);
-      for( Syntax arg : _args ) cnt += arg.prep_tree(this,i++,nongen,work);
+      int cnt = 1+_fun.prep_tree(this,0,nongen,work);
+      for( int i=0; i<_args.length; i++ )
+        cnt += _args[i].prep_tree(this,i+1,nongen,work);
       return cnt;
     }
+    
+    @Override T2 resolve() {
+      T2 fun = _fun.resolve(), xfun=fun;
+      Field fld=null;
+      if( fun.is_overp() ) {
+        // Insert a resolve point.  All the functions in over that match on
+        // nargs must also match on arg-over.  If they don't we'll get a type
+        // error. Pick a sample one.
+        xfun = _sample_fun(fun);
+        _fun = fld = new Field(this,_fun);
+      }
+
+      // Insert resolving Fields for args based on the sample function
+      for( int i=0; i<_args.length; i++ ) {
+        T2 formal = xfun.arg(Lambda.ARGNAMES[i]);
+        T2 actual = _args[i].resolve();
+        if( actual.is_overp() &&   // Overload argument
+            formal!=null )         // Function does not accept it
+          _args[i] = new Field(this,_args[i]);
+        
+      }
+      
+      if( fun.is_overp() ) {
+        T2[] ts = new T2[_args.length+1];
+        for( int i=0; i<_args.length; i++ ) ts[i] = _args[i].find();
+        ts[_args.length] = find();
+        T2 over = fun.arg("*");
+        T2 nfun = T2.make_fun(ts);
+        fun.unify_over(nfun,WORK);
+        for( String id : over._args.keySet() )
+          if( over.arg(id)==nfun )
+            { fld._id=id; break; } // TODO: ambiguous will need help here
+        assert fld._id!=null;
+        fun = nfun;
+      }
+            
+      // Normal unification
+      for( int i=0; i<_args.length; i++ ) {
+        T2 formal = fun.arg(Lambda.ARGNAMES[i]); // TODO: ARGNAMES for OVERS-ALLOWED
+        T2 actual = _args[i].find();
+        actual.unify(formal,WORK);        
+      }
+      
+      find().unify(fun.arg(RET),WORK);
+      return fun.arg(RET);
+    }
+    
+    // Pick a sample
+    T2 _sample_fun(T2 overp) {
+      for( T2 ov : overp.arg("*")._args.values() )
+        if( (ov = ov.find()).is_fun() && ov.nargs()==_args.length )
+          return ov;
+      return null;
+    }
+    
     @Override boolean more_work(Work<Syntax> work) {
       if( !more_work_impl(work) ) return false;
       if( !_fun.more_work(work) ) return false;
@@ -1309,6 +1366,7 @@ public class HM {
       _hmt = _fun.find();
       return cnt;
     }
+    @Override T2 resolve() { return _fun.resolve(); }
 
     void add_new_leaf_work(Work<Syntax> work) {
       work.addAll(NEW_LEAF_DEPS);
@@ -1596,6 +1654,16 @@ public class HM {
       }
       return cnt;
     }
+    @Override T2 resolve() {
+      T2 ptr = find();
+      T2 rec = ptr.arg("*");
+      T2 rec2 = rec.copy();
+      for( int i=0; i<_ids.length; i++ ) { 
+        T2 x = _flds[i].resolve();
+        rec2._args.put(_ids[i],x);
+      }
+      return T2.make_ptr(rec2);
+    }
     @Override boolean more_work(Work<Syntax> work) {
       if( !more_work_impl(work) ) return false;
       for( Syntax fld : _flds )
@@ -1621,8 +1689,9 @@ public class HM {
     String _id;
     Syntax _ptr;
     Field( String id, Syntax str ) { _id=id; _ptr =str; }
-    @Override SB str(SB sb) { return _ptr.str(sb).p(".").p(_id); }
-    @Override SB p1(SB sb, VBitSet dups) { return sb.p(".").p(_id); }
+    Field( Syntax par, Syntax str ) { _id=null; _ptr =str; _par=par; _hmt = T2.make_leaf(); }
+    @Override SB str(SB sb) {   return  _ptr.str(sb).p(".").p(_id==null ?"&":_id); }
+    @Override SB p1(SB sb, VBitSet dups) { return sb.p(".").p(_id==null ?"&":_id); }
     @Override SB p2(SB sb, VBitSet dups) { return _ptr.p0(sb,dups); }
     @Override boolean hm(Work<Syntax> work) {
       T2 self = find();
@@ -1745,6 +1814,7 @@ public class HM {
       prep_tree_impl(par, pidx, nongen, work, T2.make_leaf());
       return _ptr.prep_tree(this,0,nongen,work)+1;
     }
+    @Override T2 resolve() { throw unimpl(); }
     @Override boolean more_work(Work<Syntax> work) {
       if( !more_work_impl(work) ) return false;
       return _ptr.more_work(work);
@@ -1847,7 +1917,7 @@ public class HM {
       {"x","y","z"},
     };
     PrimSyn(String[] ids, T2 ...t2s) {
-      super(null,false,ids);
+      super(null, ids);
       _hmt = T2.make_fun(t2s);
       for( int i=0; i<_targs.length; i++ )
         _targs[i] = _hmt.arg(Lambda.ARGNAMES[i]).push_update(this);
@@ -1881,6 +1951,7 @@ public class HM {
       return TypeFunPtr.makex(false,BitsFun.make0(_fidx),_args.length+DSP_IDX,Type.ANY,ret);
     }
 
+    @Override T2 resolve() { return find(); }
     @Override boolean more_work(Work<Syntax> work) { return more_work_impl(work); }
     @Override SB str(SB sb){ return sb.p(name()); }
 
@@ -1889,8 +1960,8 @@ public class HM {
       sb.p(name()).p("={ ").nl().i().p("  ");
       for( int i=0; i<_args.length; i++ ) {
         sb.p(_args[i]);
-        if( DO_HM  ) _targs[i].str(sb.p(", HMT=" ),new VBitSet(),dups,true);
-        if( DO_GCP ) sb.p(", GCP=").p(_types[i]);
+        if( DO_HM  ||  FIELDS ) _targs[i].str(sb.p(", HMT=" ),new VBitSet(),dups,true);
+        if( DO_GCP && !FIELDS ) sb.p(", GCP=").p(_types[i]);
         sb.nl().i().p("  ");
       }
       return sb.unchar(2).p("} ");
@@ -1912,8 +1983,6 @@ public class HM {
             var2=T2.make_leaf(),
             T2.make_ptr(T2.make_open_struct(FLDS,new T2[]{var1,var2})));
       _alias = BitsAlias.new_alias(BitsAlias.INTX);
-      var1._may_over=true;
-      var2._may_over=true;
       ALIASES.setX(_alias,this);
     }
     @Override public T2 t2() { return find().get(RET); }
@@ -1942,9 +2011,6 @@ public class HM {
             var2=T2.make_leaf(),
             var3=T2.make_leaf(),
             T2.make_ptr(T2.make_open_struct(FLDS,new T2[]{var1,var2,var3})));
-      var1._may_over=true;
-      var2._may_over=true;
-      var3._may_over=true;
       _alias = BitsAlias.new_alias(BitsAlias.INTX);
       ALIASES.setX(_alias,this);
     }
@@ -1964,14 +2030,9 @@ public class HM {
   // Special form of a Lambda body for IF, which changes the H-M rules.
   // None-executing paths do not unify args.
   static class If extends PrimSyn {
+    ..CNC... need an allow-overs bits carried along as bonus field in T2... IFs allow overloads
     @Override String name() { return "if"; }
-    public If() {
-      super(IDS[3],T2.make_leaf(),T2.make_leaf(),T2.make_leaf(),T2.make_leaf());
-      // Overloads allowed on any argument... but special: if two overloads do
-      // not match, will flip to false and force resolve.
-      _targs[1]._may_over=true;
-      _targs[2]._may_over=true;
-    }
+    public If() { super(IDS[3],T2.make_leaf(),T2.make_leaf(),T2.make_leaf(),T2.make_leaf()); }
     @Override PrimSyn make() { return new If(); }
     @Override boolean hm(Work<Syntax> work) {
       T2 rez = find().arg(RET);
@@ -1996,6 +2057,12 @@ public class HM {
       if( !(pred instanceof TypeNil tn) ) return pred.oob(TypeNil.SCALAR);
       if( tn._nil ) return tn._sub ? TypeNil.XSCALAR : t2; // OR, YES
       else          return tn._sub ? t1              : t1.meet(t2); // NO, AND
+    }
+    @Override T2 resolve() {
+      T2 rez = find().arg(RET);
+      rez       .unify(targ(1),WORK);
+      rez.find().unify(targ(2),WORK);
+      return find();
     }
   }
 
@@ -2295,9 +2362,6 @@ public class HM {
 
     // Can be nil
     boolean _may_nil;
-
-    // Leaf and allowed to unify with an Overload
-    boolean _may_over;
     
     // True for any primitive which might widen its result or
     // root args.  Otherwise, in cases like:
@@ -2329,7 +2393,6 @@ public class HM {
       t._tflow = _tflow;
       t._eflow = _eflow;
       t._may_nil = _may_nil;
-      t._may_over = _may_over;
       t._is_obj = _is_obj;
       t._open = _open;
       t._is_copy = _is_copy;
@@ -2342,7 +2405,7 @@ public class HM {
     boolean unified() { return get(">>")!=null; }
     boolean is_nil () { return get("?" )!=null; }
     boolean is_ptr () { return get("*" )!=null; }
-    boolean is_over() { return _is_obj && get("&&_alias")!=null; } 
+    boolean is_over() { return _is_obj && get("&&_alias")!=null; }
     boolean is_base() { return _tflow != null; }
     boolean is_fun () { return get(RET)!=null; }
     boolean is_obj () { return _is_obj && get("&&_alias")==null; }
@@ -2389,7 +2452,6 @@ public class HM {
       for( int i=0; i<t2s.length-1; i++ )
         args.put(Lambda.ARGNAMES[i], t2s[i]);
       T2 last = t2s[t2s.length-1];
-      last._may_over=true;      // By default lambdas allow overload returns
       args.put(RET,last);
       T2 t2 = new T2(args);
       t2._may_nil = false;
@@ -2410,7 +2472,6 @@ public class HM {
       return t2;
     }
     static T2 make_ptr(T2 obj) {
-      assert obj.is_obj();
       NonBlockingHashMap<String,T2> args = new NonBlockingHashMap<>(){{put("*",obj);}};
       T2 t2 = new T2(args);
       assert t2.is_ptr();
@@ -2425,7 +2486,7 @@ public class HM {
     void free() {
       if( _args!=null ) _args.clear();
       _tflow = _eflow = null;
-      _is_obj = _may_nil = _may_over =_open = false;
+      _is_obj = _may_nil =_open = false;
       _is_copy = true;
       _deps = null;
       _err  = null;
@@ -2515,7 +2576,6 @@ public class HM {
       int hash = 0;
       if( _tflow!=null ) hash+= _tflow._hash;
       if( _eflow!=null ) hash+= _eflow._hash;
-      if( _may_over)hash = (hash+ 7)*23;
       if( _may_nil) hash = (hash+13)*23;
       if( _is_obj ) hash = (hash+23)*29;
       if( _args!=null )
@@ -2538,8 +2598,7 @@ public class HM {
 
     // True if an overload-ptr must hard resolve against 'that'
     boolean over_must_resolve( T2 that ) {
-      assert is_overp();
-      return !(that.is_leaf() && that._may_over) && !that.is_overp();
+      throw unimpl();
     }
 
     // -----------------
@@ -2619,7 +2678,6 @@ public class HM {
 
       // Merge all the hard bits
       that._may_nil  |= _may_nil ;
-      that._may_over &= _may_over;
       if( _is_obj ) {
         that._open = that._is_obj ? (that._open & _open) : _open;
         that._is_obj = true;
@@ -2646,7 +2704,7 @@ public class HM {
       // Kill extra information, to prevent accidentally using it
       _args = new NonBlockingHashMap<>() {{put(">>", that);}};
       _tflow = _eflow = null;
-      _is_obj = _may_nil = _may_over = _open = false;
+      _is_obj = _may_nil = _open = false;
       _is_copy = true;
       _deps = null;
       _err  = null;
@@ -2768,15 +2826,21 @@ public class HM {
       // Special case: overload vs other.  The overload wins withOUT unification,
       // and makes 'that' forget what it used to be.  The overload gets 'pushed
       // out' and eventually triggers a lazy resolve-Field insertion.
-      if( this.is_overp() && !that.is_overp() ) { that.add_deps_work(work); return that._union(this,work); }
-      if( that.is_overp() && !this.is_overp() ) assert false; // TODO: Missing test case for inverted situation
+      if( this.is_overp() && !that.is_overp() ) {
+        //that.add_deps_work(work);
+        //return that._union(this,work);
+        throw unimpl();
+      }
+      if( that.is_overp() && !this.is_overp() ) {
+        throw unimpl();
+      }
+        
       // Two unrelated overloads not allowed.  To equal overloads unify normally.
       boolean progress=false;
-      if( this.is_overp() && that.is_overp() && arg("*").arg("&&_alias")._tflow != that.arg("*").arg("&&_alias")._tflow ) {
-        progress = this.unify_errs("Mismatched overloads",work) &
-                   that.unify_errs("Mismatched overloads",work);
-        this._may_over = that._may_over = false;
-      }
+      //if( this.is_overp() && that.is_overp() && arg("*").arg("&&_alias")._tflow != that.arg("*").arg("&&_alias")._tflow ) {
+      //  progress = this.unify_errs("Mismatched overloads",work) &
+      //             that.unify_errs("Mismatched overloads",work);
+      //}
 
       // Cycle check
       long luid = dbl_uid(that);    // long-unique-id formed from this and that
@@ -2890,19 +2954,21 @@ public class HM {
       // Fresh-unify with an ad-hoc polymorphic overload.
       // Force 'that' to forget his progress and become the overload.
       // Will eventually force a lazy resolving Field to inline.
-      if( this.is_overp() && !that.is_overp() ) return that._union(_fresh(nongen),work);
+      if( this.is_overp() && !that.is_overp() )
+        //return that._union(_fresh(nongen),work);
+        throw unimpl();
       if( that.is_overp() && !this.is_overp() )
         // After doing a fresh unify-over of 'that' overload, force 'this' to
         // forget his progress and become the overload.  Will eventually force
         // a lazy resolving Field to inline.
-        return that._unify_over(this,nongen,false,true,work) && this._union(that,work);
-    
+        //return that._unify_over(this,nongen,false,true,work) && this._union(that,work);
+        throw unimpl();
+      
       // Two unrelated overloads not allowed.  To equal overloads unify normally.
       boolean progress = false;
-      if( this.is_overp() &&  that.is_overp() && arg("*").arg("&&_alias")._tflow != that.arg("*").arg("&&_alias")._tflow ) {
-        progress = that.unify_errs("Mismatched overloads",work);
-        that._may_over = false;
-      }
+      //if( this.is_overp() &&  that.is_overp() && arg("*").arg("&&_alias")._tflow != that.arg("*").arg("&&_alias")._tflow ) {
+      //  progress = that.unify_errs("Mismatched overloads",work);
+      //}
 
       // Progress on the parts
       if( _tflow !=null ) progress = unify_base(that, work);
@@ -3208,7 +3274,6 @@ public class HM {
       if( _tflow   !=t._tflow   ) return false; // Base-cases have to be completely identical
       if( _eflow   !=t._eflow   ) return false;
       if( _may_nil !=t._may_nil ) return false; // Base-cases have to be completely identical
-      if( _may_over!=t._may_over) return false; // Base-cases have to be completely identical
       if( _is_obj  !=t._is_obj  ) return false; // Base-cases have to be completely identical
       if( _err!=null && !_err.equals(t._err) ) return false; // Base-cases have to be completely identical
       if( is_leaf() ) return false;               // Two leaves must be the same leaf, already checked for above
@@ -3558,6 +3623,12 @@ public class HM {
           str0(sb,visit,fun,dups,debug).p("; ");
       }
       return sb.unchar(2).p(" ]");
+    }
+    private SB str_res(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
+      T2 t2 = _args.get(".&");
+      str0(sb,visit,t2,dups,debug);
+      sb.p(".null");
+      return sb;
     }
 
     private SB str_obj(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
