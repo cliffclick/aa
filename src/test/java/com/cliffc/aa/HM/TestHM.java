@@ -40,7 +40,7 @@ public class TestHM {
     if( rprog==null ) rprog=prog;
     assertEquals(stripIndent("("+rprog+")"),stripIndent(syn.toString()));
     if( true ) return;
-    
+
     if( frez_gcp!=null )  assertEquals(Type.valueOf(frez_gcp),syn.flow_type());
     if(  rez_hm !=null )  assertEquals(stripIndent(rez_hm),stripIndent(syn._hmt.p()));
     if( rez_hm!=null && frez_gcp!=null && !rez_hm.contains("Cannot") ) {
@@ -63,11 +63,11 @@ public class TestHM {
       for( int rseed=0; rseed<1; rseed++ )
         _run0s(prog,rprog,rez_hm,frez_gcp,rseed,esc_ptrs,esc_funs);
   }
-  
+
   // Run same program in all 3 combinations, but answers vary across combos
   private void run( String prog, String rprog, String rez_hm_gcp, String rez_hm_alone, String frez_gcp_hm, String frez_gcp_alone, String esc_ptrs, String esc_funs ) {
-    if( rez_hm_alone==null ) rez_hm_alone = rez_hm_gcp;
-    if( frez_gcp_hm ==null ) frez_gcp_hm  = frez_gcp_alone;
+    if(   rez_hm_alone == null )   rez_hm_alone = rez_hm_gcp;
+    if( frez_gcp_alone == null ) frez_gcp_alone = frez_gcp_hm;
     if( JIG ) {
       _run1s(prog, rprog,
              DO_HMT ? (DO_GCP ?  rez_hm_gcp :  rez_hm_alone ) : null,
@@ -85,7 +85,7 @@ public class TestHM {
 
   private static String stripIndent(String s){ return s.replace("\n","").replace(" ",""); }
 
-  
+
   @Test public void a_basic_00() { run( "3", "3", "3");  }
 
   @Test public void a_basic_01() {
@@ -162,7 +162,7 @@ public class TestHM {
   // let f0 = fn f x => (if (eq0 x) 1 (* (f0 f (dec x)) 2) ) in f0 f0 99
   // let f0 = fn f x => (if (eq0 x) 1 (f (f0 f (dec x)) 2) ) in f0 *  99
   @Test public void b_recursive_03() { run("f0 = { f x -> (if (eq0 x) 1 (i* (f0 f (dec x)) 2))}; (f0 f0 99)", "int64", "int64"); }
-  
+
   // Mutual recursion
   @Test public void b_recursive_04() {
     run("is_even = "+
@@ -240,9 +240,9 @@ public class TestHM {
         "[Cannot unify 1 and *str:(97)]", "nScalar" );
   }
 
-  
+
   @Test public void c_composition_00() { run( "g = {f -> 5}; (g g)",  "5", "5"); }
-  
+
   @Test public void c_composition_01() {
     run( "{ f g -> (f g)}",
           "{ { A -> B } A -> B }",
@@ -262,7 +262,7 @@ public class TestHM {
          "{ A:{ A -> A } -> B }", "[22]{any,3 ->~Scalar }",
          null,"[22,24]");
   }
-  
+
   // Stacked functions ignoring all function arguments
   @Test public void c_composition_04() { run( "map = { fun -> { x -> 2 } }; ((map 3) 5)", "2", "2"); }
 
@@ -326,7 +326,7 @@ map ={fun parg -> (fun (cdr parg))};
         "*[7](_, *[4]str:(int8), int64)",
         "*[7](_, Scalar, Scalar)",
         "[4,7]",null );
-  }  
+  }
   // Toss a function into a pair & pull it back out
   @Test public void c_composition_12() {
     run("""
@@ -342,7 +342,7 @@ map ={fun parg -> (fun (cdr parg))};
          "[4,7]","[24,29]" );
   }
 
-  
+
   // Checking behavior when using "if" to merge two functions with sufficiently
   // different signatures, then attempting to pass them to a map & calling internally.
   // fcn takes a predicate 'p' and returns one of two fcns.
@@ -357,7 +357,7 @@ map ={fun parg -> (fun (cdr parg))};
     run("fcn = {p -> (if p {a -> (pair a a)} {b -> (pair b (pair 3 b))})};"+
         "map = { fun x -> (fun x)};"+
         "{ q -> (map (fcn q) 5)}",
-          
+
         "fcn = {p -> (if p ({_p->{a -> (pair a a)}}(notnil p)) {b -> (pair b (pair 3 b))})};"+
         "map = { fun x -> (fun x)};"+
         "{ q -> (map (fcn q) 5)}",
@@ -397,12 +397,12 @@ map ={fun parg -> (fun (cdr parg))};
         "B=@{x=4; z=\"abc\"};"+
         "rez = { pred -> (if pred A B)};"+
         "rez",
-      
+
         "A=@{x=3; y=3.2f};"+
         "B=@{x=4; z=\"abc\"};"+
         "rez = { pred -> (if pred ({_pred -> A}(notnil pred)) B)};"+
         "rez",
-          
+
         "{ A? -> *@{x=nint8} }",
         "[26]{any,3 ->*[7,8]@{_; x=nint8} }",
         "[4,7,8]","[26]");
@@ -505,7 +505,7 @@ map ={fun parg -> (fun (cdr parg))};
         "res2 = (f @{a=2;b=1.2f;c=\"def\"} @{a=3;b=2.3f;d=\"abc\"});"+
         "@{f=f;res1=res1;res2=res2}",
         null,
-        
+
         "*@{ f    =  { A:*@{ a=B;... } A -> A };"+
         "    res1 = *@{ a = Missing field a: 2};"+
         "    res2 = *@{ a=nint8; b=nflt32 }"+
@@ -673,7 +673,7 @@ A:*@{
          "*[7](_, PA:*[11](_, *[8,9]@{_; x=nint8}, nint8), PA)",
          "[4,7,8,9,11]","[]");
   }
-  // Recursive structs.  
+  // Recursive structs.
   @Test public void e_recur_struct_14() {
     run("""
 fun = { ff ->
@@ -816,7 +816,7 @@ loop = { name cnt ->
         "  )"+                      // End of (if as...)
         "};" +                      // End of total_size={...}
         "total_size",               // What is this type?
-        
+
         "total_size = { a as ->" +  // Total_size takes an 'a' and a list of 'as'
         "  (if as "+
         "      ({_as -> (+ a.size "+
@@ -940,12 +940,12 @@ loop = { name cnt ->
         "red  = (color 123 \"red\" );"+
         "blue = (color 456 \"blue\");"+
         "{ pred -> c =(if pred red blue); (pair (dec c) (isempty c))}",
-        
+
         "color = { hex name -> &[ hex; name ]};"+
         "red  = (color 123 \"red\" );"+
         "blue = (color 456 \"blue\");"+
-        "{ pred -> c =(if pred ({_pred -> red}(notnil pred)) blue); (pair (dec c.0) (isempty c.1))}",
-          
+        "{ pred -> c =(if pred ({_pred -> red}(notnil pred)) blue); (pair (dec c.&) (isempty c.&))}",
+
         "{ A? -> *(int64,int1) }",
         "{ A? -> *(int64,int1) }",
         "[30]{any,3 -> *[8](_, int64, xnil) })",
@@ -962,8 +962,8 @@ loop = { name cnt ->
         ")",
 
         "fun = { a0 -> (dec a0) }; "              + // a0 is an int
-        "(pair (fun &[ 123; \"abc\" ]        .0)" + // Correct overload is 0x123
-        "      (fun &[ \"def\"; @{x=1}; 456 ].2)" + // Correct overload is 0x456
+        "(pair (fun &[ 123; \"abc\" ]        .&)" + // Correct overload is 0x123
+        "      (fun &[ \"def\"; @{x=1}; 456 ].&)" + // Correct overload is 0x456
         ")",
 
         "*(int64,int64)",
@@ -976,10 +976,15 @@ loop = { name cnt ->
     run("color = { hex name -> &[ hex; name ]};"+
         "red  = (color 123 \"red\" );"+
         "blue = (color 456 \"blue\");"+
-        "lite = {c -> (color (dec c.0) (isempty c.1))};"+ // Should be "(color (sub c 0x111) (cat "light" c))"
+        "lite = {c -> (color (dec c) (isempty c))};"+ // Should be "(color (sub c 0x111) (cat "light" c))"
         "(pair (lite red) (lite blue))",
-        null,
-         
+        
+        "color = { hex name -> &[ hex; name ]};"+
+        "red  = (color 123 \"red\" );"+
+        "blue = (color 456 \"blue\");"+
+        "lite = {c -> (color (dec c.&) (isempty c.&))};"+ // Should be "(color (sub c 0x111) (cat "light" c))"
+        "(pair (lite red) (lite blue))",
+
         "*( &[int,*str:(nint8)], &[int,*str:(nint8)])",
         "*( &[int,*str:(nint8)], &[int,*str:(nint8)])",
         "*[8](_, 0=PA:*[7]ov:(_, int64, *[4]str:(nint8)), 1=PA)",
@@ -1011,6 +1016,28 @@ iwrap = { ii ->
 con2   = (iwrap 2   );
 con2_1 = (fwrap 2.1f);
 (con2_1._*_ con2_1)
+""",
+    """
+fwrap = { ff ->
+  @{ f = ff;
+     _*_ = &[
+       { y -> (fwrap (f* ff (i2f y.i))) };
+       { y -> (fwrap (f* ff      y.f)) }
+     ]
+   }
+};
+iwrap = { ii ->
+  @{ i = ii;
+     _*_ = &[
+       { y -> (iwrap (i*      ii  y.i)) };
+       { y -> (fwrap (f* (i2f ii) y.f)) }
+     ]
+   }
+};
+
+con2   = (iwrap 2   );
+con2_1 = (fwrap 2.1f);
+(con2_1._*_.1 con2_1)
 """,
          "A:*@{_*_=*&[{*@{i=int64;...}->A};{B:*@{_*_=*&[{*@{i=int64;...}->B};{*@{f=flt64;...}->B}];f=flt64}->A}];f=flt64}",
          "PA:*[8]@{_; _*_=*[7]ov:(_, [25]{any,3 -> PA }, [27]{any,3 -> PA }); f=flt64}",
@@ -1109,7 +1136,7 @@ fact = { n -> (if n.is0 c1 (n.mul (fact n.sub1))) };
   }
 
   // Ambiguous overload, {int->int}, cannot select.
-  // Parent of overload is Apply, so 
+  // Parent of overload is Apply, so
   @Test public void g_overload_err_00() {
     run("(&["                  +  // Define overloaded fcns
         "   { x -> (i* x 2) };"+  // Arg is 'int'
@@ -1173,7 +1200,7 @@ fz = (if (rand 2) fx fy);
         // Look at the results
         "@{a=testa; b=testb; bool=bool}"+
         "",
-        
+
         "void = @{};"+              // Same as '()'; all empty structs are alike
         "true = @{"+                // 'true' is a struct with and,or,then
         "  and= {b -> b};"+
@@ -1320,7 +1347,7 @@ all
   two  =Scalar
 }
 """;
-    
+
    run("""
 void = @{};
 err  = {unused->(err unused)};
