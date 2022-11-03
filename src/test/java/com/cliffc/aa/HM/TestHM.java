@@ -924,8 +924,8 @@ loop = { name cnt ->
   }
   // Test overload as union of primitives
   @Test public void g_overload_03() {
-    run("red=&[ 123; \"red\" ]; (pair (dec red) (isempty red))",
-        "red=&[ 123; \"red\" ]; (pair (dec red.&) (isempty red.&))",
+    run("red=&[ 123; \"red\" ]; (pair (dec red  ) (isempty red  ))",
+        "red=&[ 123; \"red\" ]; (pair (dec red.0) (isempty red.1))",
         "*(int64,int1)",
         "*(int64,int1)",
         "*[8](_, 122,xnil)",
@@ -944,7 +944,7 @@ loop = { name cnt ->
         "color = { hex name -> &[ hex; name ]};"+
         "red  = (color 123 \"red\" );"+
         "blue = (color 456 \"blue\");"+
-        "{ pred -> c =(if pred ({_pred -> red}(notnil pred)) blue); (pair (dec c.&) (isempty c.&))}",
+        "{ pred -> c =(if pred ({_pred -> red}(notnil pred)) blue); (pair (dec c.0) (isempty c.1))}",
 
         "{ A? -> *(int64,int1) }",
         "{ A? -> *(int64,int1) }",
@@ -962,8 +962,8 @@ loop = { name cnt ->
         ")",
 
         "fun = { a0 -> (dec a0) }; "              + // a0 is an int
-        "(pair (fun &[ 123; \"abc\" ]        .&)" + // Correct overload is 0x123
-        "      (fun &[ \"def\"; @{x=1}; 456 ].&)" + // Correct overload is 0x456
+        "(pair (fun &[ 123; \"abc\" ]        .0)" + // Correct overload is 0x123
+        "      (fun &[ \"def\"; @{x=1}; 456 ].2)" + // Correct overload is 0x456
         ")",
 
         "*(int64,int64)",
