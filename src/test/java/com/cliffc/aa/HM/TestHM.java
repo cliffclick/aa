@@ -422,29 +422,38 @@ map ={fun parg -> (fun (cdr parg))};
   // type.  Bug is actually a core HM algorithm change to handle cycles.
   @Test public void d_struct_06() {
     run("left =     "+
-         "  rite = @{n1 = left; v1 = 7 }; "+
-         "  @{ n1 = rite; v1 = 7 };"+
-         "left"+
-         "",
-         "A:*@{ n1 = *@{ n1 = A; v1 = 7}; v1 = 7}",
-         "PA:*[8]@{_; n1=*[7]@{_; n1=PA; FB:v1=7}; FB}",
-         "[4,7,8]",null);
+        "  rite = @{n1 = left; v1 = 7 }; "+
+        "  @{ n1 = rite; v1 = 7 };"+
+        "left"+
+        "",
+        "A:*@{ n1 = *@{ n1 = A; v1 = 7}; v1 = 7}",
+        "PA:*[8]@{_; n1=*[7]@{_; n1=PA; FB:v1=7}; FB}",
+        "[4,7,8]",null);
   }
   // Unexpected restriction on extra fields.
   @Test public void d_struct_07() {
     run("sx = { ignore -> "+
-         "  self0=@{ succ = (sx self0)}; "+
-         "  self0 "+
-         "};"+
-         "self1=@{ succ = self1; nope=7 };"+
-         "(sx self1)"+
-         "",
-         "A:*@{ succ=A}",
-         "PA:*[7]@{_; succ=PA}",
-         "[4,7]",null);
+        "  self0=@{ succ = (sx self0)}; "+
+        "  self0 "+
+        "};"+
+        "self1=@{ succ = self1; nope=7 };"+
+        "(sx self1)"+
+        "",
+        "A:*@{ succ=A}",
+        "PA:*[7]@{_; succ=PA}",
+        "[4,7]",null);
   }
   @Test public void d_struct_08() { run( "fun = { ptr -> ptr.x }; fun", "{ *@{x=A; ... } -> A }", "[22]{any,3 -> Scalar}","[4,10]","[22]");  }
   @Test public void d_struct_09() { run(       "{ ptr -> ptr.x }",      "{ *@{x=A; ... } -> A }", "[22]{any,3 -> Scalar}","[4,10]","[22]");  }
+
+  // Awful flow-type: function can be called from the REPL with any
+  // argument type - and the worse case will be an error.
+  @Test public void d_struct_10() {
+    run("x = { z -> z}; (x { y -> y.u})",
+        "{ *@{ u = A; ...} -> A }",
+        "[23]{any,3 ->Scalar }",
+        "[4,10]","[23]");
+  }
 
 
   // Basic field test
@@ -457,17 +466,10 @@ map ={fun parg -> (fun (cdr parg))};
   // 'v', and also a function type - specifically disallowed in 'aa'.
   @Test public void d_struct_err_02() {
     run("{ x -> y = ( x x.v ); 0}",
-         "{ [Cannot unify {A->B} and *@{ v=A;...}] -> C? }",
-         "[22]{any,3 ->xnil }",
-         "[4,10]","[22,24]");
-  }
-  // Awful flow-type: function can be called from the REPL with any
-  // argument type - and the worse case will be an error.
-  @Test public void d_struct_err_03() {
-    run("x = { z -> z}; (x { y -> y.u})",
-         "{ *@{ u = A; ...} -> A }",
-         "[23]{any,3 ->Scalar }",
-         "[4,10]","[23]");
+        // { x:&[ {A->B}; @{v=A;...} ] -> y = ( x.0 x.1.v ); 0}",
+        "{ [Cannot unify {A->B} and *@{ v=A;...}] -> C? }",
+        "[22]{any,3 ->xnil }",
+        "[4,10]","[22,24]");
   }
 
   // Example from SimpleSub requiring 'x' to be both:
@@ -476,9 +478,9 @@ map ={fun parg -> (fun (cdr parg))};
   // The first arg to x is two different kinds of functions, so fails unification.
   @Test public void d_struct_err_04() {
     run("x = w = (x x); { z -> z}; (x { y -> y.u})",
-         "A:[Cannot unify { A -> A } and *@{ u = A; ... }]",
-         "Scalar",
-         "[4,7]","[22,23,24,25]");
+        "A:[Cannot unify { A -> A } and *@{ u = A; ... }]",
+        "Scalar",
+        "[4,7]","[22,23,24,25]");
   }
 
   // Broken from Marco; function 'f' clearly uses 'p2.a' but example 'res1' does not
@@ -655,17 +657,6 @@ A:*@{
   // the structures to be the same.  Extra fields dropped.  Unify required fields.
   @Test public void e_recur_struct_12() {
     run("({fun -> "+
-         "   (pair (fun @{x=3      ;y=4   } )"+    // available {x,y}
-         "         (fun @{x=\"abc\";z=2.1f} )  )"+ // available {x,z}
-         "  } { rec -> (pair rec rec.x) } )",      // required  {x}
-         "*(A:*(*@{x=B:[Cannot unify 3 and *str:(97)]},B),A)",
-         "*[7](_, PA:*[11](_, *[8,9]@{_; x=nScalar}, nScalar), PA)",
-         "[4,7,8,9,11]","[]");
-  }
-  // Recursive structs.  Next: passing extra fields, but the function requires
-  // the structures to be the same.  Extra fields dropped.  Unify required fields.
-  @Test public void e_recur_struct_13() {
-    run("({fun -> "+
          "   (pair (fun @{x=3; y=4   } )"+    // available {x,y}
          "         (fun @{x=4; z=2.1f} )  )"+ // available {x,z}
          "  } { rec -> (pair rec rec.x) } )", // required  {x}
@@ -674,7 +665,7 @@ A:*@{
          "[4,7,8,9,11]","[]");
   }
   // Recursive structs.
-  @Test public void e_recur_struct_14() {
+  @Test public void e_recur_struct_13() {
     run("""
 fun = { ff ->
   @{ f = ff;
@@ -690,7 +681,7 @@ fun = { ff ->
 
   // Recursive structs, with deeper expressions.  The type expands with
   // expression depth.
-  @Test public void e_recur_struct_15() {
+  @Test public void e_recur_struct_14() {
     run("""
 fun = { ff ->
   @{ f = ff;
@@ -703,6 +694,18 @@ con12=(fun 1.2f);
          "A:*@{f=flt64;mul={B:*@{f=flt64;mul={*@{f=flt64;...}->B}}->A}}", // required {f} in inner, available {f,mul} in middle,outer
          "PA:*[7]@{_; f=flt64; mul=[23]{any,3 ->PA }}",
          "[4,7,10]","[23]");
+  }
+
+  // Recursive structs.  Next: passing extra fields, but the function requires
+  // the structures to be the same.  Extra fields dropped.  Unify required fields.
+  @Test public void e_recur_struct_err_00() {
+    run("({fun -> "+
+        "   (pair (fun @{x=3      ;y=4   } )"+    // available {x,y}
+        "         (fun @{x=\"abc\";z=2.1f} )  )"+ // available {x,z}
+        "  } { rec -> (pair rec rec.x) } )",      // required  {x}
+        "*(A:*(*@{x=B:[Cannot unify 3 and *str:(97)]},B),A)",
+        "*[7](_, PA:*[11](_, *[8,9]@{_; x=nScalar}, nScalar), PA)",
+        "[4,7,8,9,11]","[]");
   }
 
 
@@ -922,6 +925,7 @@ loop = { name cnt ->
         "[34]{any,3 -> *[8](_, Scalar, Scalar) }",
         "[4,8]","[34]");
   }
+
   // Test overload as union of primitives
   @Test public void g_overload_03() {
     run("red=&[ 123; \"red\" ]; (pair (dec red  ) (isempty red  ))",
@@ -933,9 +937,24 @@ loop = { name cnt ->
         "[4,8]",null);
   }
 
+// Explicit overload argument
+  @Ignore @Test public void g_overload_04() {
+    run("{ &x -> (x   x  .v)}",
+        "{ &x -> (x.0 x.1.v)}",
+        "[22]{any,3 ->xnil }",
+        "[4,10]","[22,24]");
+  }
+
+  @Test public void g_overload_05() {
+    run("(&[ 1; {x->x}]   2.1f)",
+        "(&[ 1; {x->x}].1 2.1f)",
+        "2.1f","2.1f",
+        null,null );
+  }
+
   // Test overload as union of primitives.  Merge of 2 related overloads stalls
   // resolution until use at 'dec' and 'isempty'.  Each use resolves separately.
-  @Test public void g_overload_04() {
+  @Test public void g_overload_06() {
     run("color = { hex name -> &[ hex; name ]};"+
         "red  = (color 123 \"red\" );"+
         "blue = (color 456 \"blue\");"+
@@ -955,7 +974,7 @@ loop = { name cnt ->
 
   // Test overload as union of primitives.  Overload resolution before
   // calling 'fun'.  Error under the new model.
-  @Test public void g_overload_05() {
+  @Test public void g_overload_07() {
     run("fun = { a0 -> (dec a0) }; "            + // a0 is an int
         "(pair (fun &[ 123; \"abc\" ]        )" + // Correct overload is 0x123
         "      (fun &[ \"def\"; @{x=1}; 456 ])" + // Correct overload is 0x456
@@ -972,17 +991,17 @@ loop = { name cnt ->
   }
 
   // 'lite' needs to be told to take an overload with syntax
-  @Ignore @Test public void g_overload_06() {
+  @Ignore @Test public void g_overload_08() {
     run("color = { hex name -> &[ hex; name ]};"+
         "red  = (color 123 \"red\" );"+
         "blue = (color 456 \"blue\");"+
-        "lite = {c -> (color (dec c) (isempty c))};"+ // Should be "(color (sub c 0x111) (cat "light" c))"
+        "lite = { c -> (color (dec c) (isempty c))};"+ // Should be "(color (sub c 0x111) (cat "light" c))"
         "(pair (lite red) (lite blue))",
         
         "color = { hex name -> &[ hex; name ]};"+
         "red  = (color 123 \"red\" );"+
         "blue = (color 456 \"blue\");"+
-        "lite = {c -> (color (dec c.&) (isempty c.&))};"+ // Should be "(color (sub c 0x111) (cat "light" c))"
+        "lite = { c -> (color (dec c.0) (isempty c.1))};"+ // Should be "(color (sub c 0x111) (cat "light" c))"
         "(pair (lite red) (lite blue))",
 
         "*( &[int,*str:(nint8)], &[int,*str:(nint8)])",
@@ -994,7 +1013,7 @@ loop = { name cnt ->
   // Test case here is trying to get HM to do some overload resolution.
   // Without, many simple int/flt tests in main AA using HM alone fail to find
   // a useful type.
-  @Test public void g_overload_07() {
+  @Test public void g_overload_09() {
     run("""
 fwrap = { ff ->
   @{ f = ff;
@@ -1045,7 +1064,7 @@ con2_1 = (fwrap 2.1f);
   }
 
   // Recursive structs.  More like what main AA will do with wrapped primitives.
-  @Test public void g_overload_08() {
+  @Test public void g_overload_10() {
     String hm_rez =  "*("+
       "A:*@{_*_=*&[{B:*@{_*_=*&[{*@{i=int64;...}->B};{*@{f=flt64;...}->C:*@{_*_=*&[{*@{i=int64;...}->C};{*@{f=flt64;...}->C}];f=flt64}}];i=int64}->A};{*@{f=flt64;...}->A}];f=flt64},"+
       "D:*@{_*_=*&[{E:*@{_*_=*&[{*@{i=int64;...}->E};{*@{f=flt64;...}->F:*@{_*_=*&[{*@{i=int64;...}->F};{*@{f=flt64;...}->F}];f=flt64}}];i=int64}->D};{*@{f=flt64;...}->G:*@{_*_=*&[{*@{i=int64;...}->G};{*@{f=flt64;...}->G}];f=flt64}}];i=int64},"+
@@ -1085,7 +1104,7 @@ mul2 = { x -> (x._*_ con2)};
 
   // Recursive structs, in a loop.  Test of recursive int wrapper type ("occurs
   // check") in a loop.
-  @Test public void g_overload_09() {
+  @Test public void g_overload_11() {
     run("""
 fwrap = { ff ->
   @{ f = ff;
@@ -1127,12 +1146,20 @@ fact = { n -> (if n.is0 c1 (n.mul (fact n.sub1))) };
          //"[4,7,8,9,10,11,12,13,14]","[4,5,6,24,26,29,32]");
   }
 
+  @Test public void g_overload_err_99() {
+    run("{ ptr -> (ptr.x ptr.x) }",
+        "{ ptr -> (ptr.x ptr.x) }",
+        "{ @{x= A:{ A-> B}} -> B }",
+        null,
+        null);
+  }
 
-  @Test public void g_overload_10() {
-    run("(&[ 1; {x->x}]   2.1f)",
-        "(&[ 1; {x->x}].& 2.1f)",
-        "2.1f","2.1f",
-        null,null );
+  @Test public void g_overload_err_99() {
+    run("{ ptr -> (ptr.x ptr.x) }",
+        "{ ptr -> (ptr.x ptr.x) }",
+        "{ @{x= A:{ A-> B}} -> B }",
+        null,
+        null);
   }
 
   // Ambiguous overload, {int->int}, cannot select.
@@ -1142,8 +1169,10 @@ fact = { n -> (if n.is0 c1 (n.mul (fact n.sub1))) };
         "   { x -> (i* x 2) };"+  // Arg is 'int'
         "   { x -> (i* x 3) } "+  // Arg is 'int'
         "  ] 4)",                 // Error, ambiguous
+        "(&[ { x -> (i* x 2 ) }; { x -> (i* x 3 ) } ].& 4)",
         "Ambiguous overload",
-        "nint8"
+        "nint8",
+        null,null
       );
   }
   // Wrong args for all overloads
@@ -1175,6 +1204,13 @@ fz = (if (rand 2) fx fy);
         "[29]{any,3 -> *[9](_, int64, xnil) }",
         "[29]{any,3 -> *[9](_, int64, int1) }",
          "[4,9]","[4,5,6,29]");
+  }
+
+  @Ignore @Test public void g_overload_err_05() {
+    run("{ &x -> (x x.v)}",
+        "{ &x -> ( x.0 x.1.v )}",
+        "[22]{any,3 ->xnil }",
+        "[4,10]","[22,24]");
   }
 
 

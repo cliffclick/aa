@@ -1237,6 +1237,8 @@ public class HM {
         fun.unify(nfun,WORK);
         fun = nfun;
       }
+      if( fun.is_overp() )
+        fun = _fun.insert_overload_resolve(make_nfun());
       _fun.resolve();
 
       for( int i=0; i<_args.length; i++ ) {
@@ -3706,9 +3708,8 @@ public class HM {
       sb.p("{ ");
       for( int i=0; i<Lambda.ARGNAMES.length; i++ ) {
         T2 arg = _args.get(Lambda.ARGNAMES[i]);
-        if( arg!=null ) {
+        if( arg!=null )
           str0(sb,visit,arg,dups,debug).p(' ');
-        }
       }
       return str0(sb.p("-> "),visit,_args.get(RET),dups,debug).p(" }").p(_may_nil ? "?" : "");
     }
