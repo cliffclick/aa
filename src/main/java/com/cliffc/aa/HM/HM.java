@@ -142,6 +142,7 @@ BNF for the "core AA" syntax:
         @{ (label = fe0;)* } | Structures.  Numbered uniquely.  ';' is a field-separator not a field-end
         fe = e         | // No  field after expression
         fe.label       | // Yes field after expression
+        fe._           | // Yes field after expression; field label will be inferred
 
 BNF for the "core AA" pretty-printed types:
    T = Vnnn               | // Leaf number nnn
@@ -151,6 +152,7 @@ BNF for the "core AA" pretty-printed types:
        { T* -> Tret }     | // Lambda, arg count is significant
        *T0                | // Ptr-to-struct; T0 is either a leaf, or unified, or a struct
        @{ (label = T;)* } | // ';' is a field-separator not a field-end
+       @{ (_nnn = T;)* }  | // Some field labels are inferred; nnn is the Field uid, and will be inferred to the actual label
        [Error base* T0*]  | // A union of base and not-nil, lambda, ptr, struct
 
 */
@@ -171,7 +173,6 @@ public class HM {
   static boolean HM_NEW_LEAF;   // After 1st pass, potential HM new leafs will no longer lift Apply results
   static boolean DO_AMBI;       // After 2nd pass, unresolved Overloads are an error
   static boolean HM_FREEZE;     // After 3rd pass, HM types are frozen but GCP types continue to fall
-  static boolean FIELDS;
 
   static Root ROOT;
 
@@ -182,7 +183,6 @@ public class HM {
     Type.RECURSIVE_MEET=0;      // Reset between failed tests
     DO_HM  = do_hm ;
     DO_GCP = do_gcp;
-    FIELDS = true;
 
     // Initialize the primitives
     for( PrimSyn prim : new PrimSyn[]{ new If(), new Pair(), new EQ(), new EQ0(), new IMul(), new FMul(), new I2F(), new Add(), new Dec(), new IRand(), new Str(), new Triple(), new Factor(), new IsEmpty(), new NotNil()} )
@@ -196,18 +196,7 @@ public class HM {
     Work<Syntax> work = WORK = new Work<>(rseed);
     prog.prep_tree(null,null,work);
 
-    // Pass Over Resolve: insert Fields to resolve Overloads.  Requires a HM
-    // pass (I think).  Hope to unify with main pass#1 someday.
-    prog.visit(Syntax::resolve,(a,b)->null);
-    int cnt=0; 
-    while( !work.isEmpty() ) {
-      cnt++; assert cnt < 10000;
-      work.pop().resolve();
-    }
-    if( true ) return prog;
-
     // Pass 1: Everything starts high/top/leaf and falls; escaping function args are assumed high
-    FIELDS=false;
     HM_NEW_LEAF=false;
     DO_AMBI = false;
     HM_FREEZE = false;
@@ -250,9 +239,7 @@ public class HM {
       if( DO_HM ) {
         T2 old = syn._hmt;      // Old value for progress assert
         if( syn.hm(work) ) {
-          assert syn.debug_find()==old.debug_find() || // monotonic: unifying with the result is no-progress
-                  // Or inserted a Field to resolve an overload
-                  (syn instanceof Ident id && id._par instanceof Field fld && fld._id==null);
+          assert syn.debug_find()==old.debug_find(); // monotonic: unifying with the result is no-progress
           syn.add_hm_work(work);// Push affected neighbors on worklist
         }
       }
@@ -575,8 +562,8 @@ public class HM {
       if( _hmt!=null ) _hmt._get_dups(new VBitSet(),dups);
       VBitSet visit = new VBitSet();
       p1(sb.i(),dups);
-      if( DO_HM  ||  FIELDS ) _hmt .str(sb.p(", HMT="), visit,dups,true);
-      if( DO_GCP && !FIELDS ) _flow.str(sb.p(", GCP="), true, false );
+      if( DO_HM  ) _hmt .str(sb.p(", HMT="), visit,dups,true);
+      if( DO_GCP ) _flow.str(sb.p(", GCP="), true, false );
       sb.nl();
       return p2(sb.ii(2),dups).di(2);
     }
@@ -761,8 +748,8 @@ public class HM {
       sb.p("{ ");
       for( int i=0; i<_args.length; i++ ) {
         sb.p(_args[i]);
-        if( DO_HM  ||  FIELDS ) _targs[i].str(sb.p(", HMT=" ),new VBitSet(),dups,true);
-        if( DO_GCP && !FIELDS ) sb.p(", GCP=").p(_types[i]);
+        if( DO_HM  ) _targs[i].str(sb.p(", HMT=" ),new VBitSet(),dups,true);
+        if( DO_GCP ) sb.p(", GCP=").p(_types[i]);
         sb.nl().i().p("  ");
       }
       return sb.p(" -> ... } ");
@@ -813,12 +800,12 @@ public class HM {
       return TypeFunPtr.makex(false,BitsFun.make0(_fidx),_args.length+DSP_IDX,Type.ANY,_body._flow);
     }
     // Meet the formal argument# with a new Apply call site actual arg.
-    public boolean arg_meet(int argn, Type cflow, Work<Syntax> work) {
-      if( argn >= _types.length ) return false; // Bad argument count
+    public void arg_meet(int argn, Type cflow, Work<Syntax> work) {
+      if( argn >= _types.length ) return; // Bad argument count
       Type old = _types[argn];
       Type mt = old.meet(cflow);
-      if( mt==old ) return false; // No change
-      if( work==null ) return true;
+      if( mt==old ) return;     // No change
+      if( work==null ) return;
       _types[argn]=mt;          // Yes change, update
       work.add(_refs[argn]);    // And revisit referrers
       if( this instanceof PrimSyn ) work.add(this); // Primitives recompute
@@ -826,7 +813,6 @@ public class HM {
       if( this instanceof Alloc alloc && Root.ext_aliases().test(alloc.alias()) &&
           (mt instanceof TypeMemPtr || mt instanceof TypeFunPtr) )
         work.add(ROOT);
-      return true;
     }
 
     // Ignore arguments, and return body type for a particular call site.  Very conservative.
@@ -1088,32 +1074,11 @@ public class HM {
       // Walk the input types, finding all the Leafs.  Repeats of the same Leaf
       // has its flow Types MEETed.
       T2.T2_NEW_LEAF = false; // Assume new leafs can appear
-      //T2.T2JOIN_LEAF = TypeNil.SCALAR;
-      //T2.T2JOIN_BASE = TypeNil.SCALAR;
       T2.T2MAP.clear();
       for( Syntax arg : _args ) {
         T2.WDUPS.clear(true);
         arg.find().walk_types_in(arg._flow);
       }
-
-      //T2.T2JOIN_LEAFS.clear();
-      //T2.T2JOIN_BASES.clear();
-      //// Pre-freeze, might unify with anything compatible
-      //if( !HM_FREEZE ) {
-      //  // Lift by all other compatible T2 base types, since might unify later.
-      //  // Ignore incompatible ones, since if they unify we'll get an error
-      //  for( Map.Entry<T2,Type> e : T2.T2MAP.entrySet() ) {
-      //    T2 t2 = e.getKey();  Type flow = e.getValue();
-      //    if( !t2._is_copy ) flow = flow.widen();
-      //    T2.T2JOIN_LEAF = T2.T2JOIN_LEAF.join(flow); // Self is a leaf, so always
-      //    if( t2._is_copy) T2.T2JOIN_LEAFS.add(t2);
-      //    if( t2.is_base() || t2.is_leaf() ) {
-      //      T2.T2JOIN_BASE = T2.T2JOIN_BASE.join(flow); // Self and t2 is a base, or t2 is a leaf
-      //      if( t2._is_copy) T2.T2JOIN_BASES.add(t2);
-      //    }
-      //  }
-      //}
-
       // Then walk the output types, building a corresponding flow Type, but
       // matching against input Leafs.  If HM_FREEZE Leafs must match
       // exactly, replacing the input flow Type with the corresponding flow
@@ -1648,7 +1613,7 @@ public class HM {
       for( int alias : tmp._aliases ) {
         if( alias==0 ) continue; // May be nil error
         Alloc alloc = ALIASES.at(alias);
-        if( _id==null ) {       // Field is resolving an overload
+        if( is_resolving(_id) ) { // Field is resolving an overload
           Struct st = (Struct)alloc;
           // Still resolving, use the join of fields.
           // If failed resolving, use the meet of fields.
@@ -1834,8 +1799,8 @@ public class HM {
       sb.p(name()).p("={ ").nl().i().p("  ");
       for( int i=0; i<_args.length; i++ ) {
         sb.p(_args[i]);
-        if( DO_HM  ||  FIELDS ) _targs[i].str(sb.p(", HMT=" ),new VBitSet(),dups,true);
-        if( DO_GCP && !FIELDS ) sb.p(", GCP=").p(_types[i]);
+        if( DO_HM  ) _targs[i].str(sb.p(", HMT=" ),new VBitSet(),dups,true);
+        if( DO_GCP ) sb.p(", GCP=").p(_types[i]);
         sb.nl().i().p("  ");
       }
       return sb.unchar(2).p("} ");
@@ -3012,21 +2977,6 @@ public class HM {
       return extras || (this.mismatched_child(that) && that.mismatched_child(this));
     }
 
-    // Recursively expand overloads.  This is where I might go exponential.  If
-    // instead I succeed here I basically allow too many overloads to succeed,
-    // which stalls the top-level overload until this nested overload resolves.
-    // Doing so probably brings me back down to near-linear.
-    //
-    // In any given pass the visit bit prevents me from going exponential; it
-    // is however, quadratic (at least the product of 2 overloads unifying
-    // against each other, probably the sum-of-products).
-    private boolean _trial_unify_over( T2 that, boolean extras ) {
-      for( String id : _args.keySet() ) {
-        if( arg(id)._trial_unify_ok(that, extras) )
-          return true;      // Something succeeds, so this whole trial succeeds
-      }
-      return false;
-    }
     // True if 'this' has extra children and 'that' does not allow extras
     private boolean mismatched_child( T2 that ) {
       if( !that.is_open() && _args!=null )   // If RHS is closed
@@ -3279,7 +3229,6 @@ public class HM {
         for( T2 t2 : _args.values() )
           t2.debug_find().push_update_impl(a);
     }
-    static void push_updates( Ary<T2> t2s, Syntax a ) { for( T2 t2 : t2s ) t2.push_update(a);  }
 
     // Recursively add-deps to worklist
     void add_deps_work( Work<Syntax> work ) { UPDATE_VISIT.clear(); add_deps_work_impl(work); }
@@ -3429,19 +3378,12 @@ public class HM {
 
     private void vname( SB sb, boolean debug) {
       final boolean vuid = debug && (unified()||is_leaf());
-      sb.p(VNAMES.computeIfAbsent(Long.valueOf(_uid),
+      sb.p(VNAMES.computeIfAbsent((long) _uid,
                                   (k -> (vuid ? ((is_leaf() ? "V" : "X") + k) : ((++VCNT) - 1 + 'A' < 'V' ? ("" + (char) ('A' + VCNT - 1)) : ("V" + VCNT))))));
     }
     private boolean is_tup() { return _args==null || _args.isEmpty() || _args.containsKey("0"); }
     private Collection<String> sorted_flds() { return new TreeMap<>(_args).keySet(); }
     boolean is_prim() { return is_obj() && _args!=null && _args.containsKey("!"); }
-    // Return a widened base type, preserving the special string hack
-    private static Type widen(Type t) {
-      if( t==null ) return null;
-      return t instanceof TypeMemPtr tmp && tmp.is_str()
-          ? tmp.make_from((TypeStruct)tmp._obj.widen())
-          : t.widen();
-    }
 
     // Debugging tool
     T2 find(int uid) { return _find(uid,new VBitSet()); }

@@ -28,23 +28,28 @@ public class TestHM {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_HMT=true;
-    DO_GCP=false;
+    DO_HMT=false;
+    DO_GCP=true;
     RSEED=0;
-    g_overload_10();
+    a_basic_02();
   }
 
   private void _run0s( String prog, String rprog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
+    // Type the program
     HM.reset();
     Root syn = HM.hm(prog, rseed, rez_hm!=null, frez_gcp!=null );
+    // Check the expected syntactic rewriting.  'if id e0 e1' expressions are
+    // rewritten so that 'id' is known not-nul in 'e0'.  Also inferred field
+    // names are actually inferred (or program is in-error).
     if( rprog==null ) rprog=prog;
     assertEquals(stripIndent("("+rprog+")"),stripIndent(syn.toString()));
-    if( true ) return;
 
+    // Check expected types for HMT and GCP
     if( frez_gcp!=null )  assertEquals(Type.valueOf(frez_gcp),syn.flow_type());
     if(  rez_hm !=null )  assertEquals(stripIndent(rez_hm),stripIndent(syn._hmt.p()));
+
+    // Track expected Root escapes
     if( rez_hm!=null && frez_gcp!=null && !rez_hm.contains("Cannot") ) {
-      // Track expected Root escapes
       String esc_ptrs2 = "*"+esc_ptrs+"()";
       String esc_funs2 =     esc_funs+"{any,3->Scalar}";
       BitsAlias aliases = esc_ptrs==null ? BitsAlias.EMPTY : ((TypeMemPtr)Type.valueOf(esc_ptrs2))._aliases;
@@ -60,7 +65,7 @@ public class TestHM {
     if( JIG )
       _run0s(prog,rprog,rez_hm,frez_gcp,RSEED,esc_ptrs,esc_funs);
     else
-      for( int rseed=0; rseed<1; rseed++ )
+      for( int rseed=0; rseed<4; rseed++ )
         _run0s(prog,rprog,rez_hm,frez_gcp,rseed,esc_ptrs,esc_funs);
   }
 
@@ -952,9 +957,55 @@ loop = { name cnt ->
         null,null );
   }
 
+  // No overload 
+  @Test public void g_overload_06() {
+    run("{ ptr -> (ptr.x ptr.x) }",
+        "{ @{x= A:{ A-> B}} -> B }",
+        null);
+  }
+
+  // Field order specified
+  @Test public void g_overload_07() {
+    run("({ ptr -> (ptr._.x ptr._.x) } (pair @{x=3} @{x=str}) )",
+        "({ ptr -> (ptr.1.x ptr.0.x) } (pair @{x=3} @{x=str}) )",
+        "{ *( @{x={ A-> B}}, @{x=A} ) -> B }",
+        "",
+        null,
+        null);
+  }
+  // Field order under-specified, so ambiguous
+  @Test public void g_overload_err_07() {
+    run("{ ptr -> (ptr._.x ptr._.x) }",
+        "{ ptr -> (ptr._.x ptr._.x) }",
+        "{ *( @{x={ A-> B}}, @{x=A} ) -> B }",
+        "",
+        null,
+        null);
+  }
+
+  // Field order specified
+  @Test public void g_overload_08() {
+    run("({ ptr -> (ptr.x._ ptr.x._) } @{x=(pair 3 str)})",
+        "({ ptr -> (ptr.x.1 ptr.x.0) } @{x=(pair 3 str)})",
+        "{ @{x=*({ A-> B},A) -> B }",
+        "",
+        null,
+        null);
+  }
+
+  // Field order under-specified, so ambiguous
+  @Test public void g_overload_err_08() {
+    run("{ ptr -> (ptr.x._ ptr.x._) }",
+        "{ ptr -> (ptr.x._ ptr.x._) }",
+        "{ @{x=*({ A-> B},A) -> B }",
+        "",
+        null,
+        null);
+  }
+
   // Test overload as union of primitives.  Merge of 2 related overloads stalls
   // resolution until use at 'dec' and 'isempty'.  Each use resolves separately.
-  @Test public void g_overload_06() {
+  @Test public void g_overload_09() {
     run("color = { hex name -> (pair hex name )};"+
         "red  = (color 123 \"red\" );"+
         "blue = (color 456 \"blue\");"+
@@ -973,8 +1024,8 @@ loop = { name cnt ->
   }
 
   // Test overload as union of primitives.  Overload resolution before
-  // calling 'fun'.  Error under the new model.
-  @Test public void g_overload_07() {
+  // calling 'fun'.
+  @Test public void g_overload_10() {
     run("fun = { a0 -> (dec a0) }; "  + // a0 is an int
         "(pair (fun (pair   123 \"abc\"        )._)" + // Correct overload is 0x123
         "      (fun (triple \"def\" @{x=1} 456 )._)" + // Correct overload is 0x456
@@ -991,7 +1042,7 @@ loop = { name cnt ->
   }
 
   // 'lite' needs to be told to take an overload with syntax
-  @Ignore @Test public void g_overload_08() {
+  @Ignore @Test public void g_overload_11() {
     run("color = { hex name -> (pair hex name )};"+
         "red  = (color 123 \"red\" );"+
         "blue = (color 456 \"blue\");"+
@@ -1013,7 +1064,7 @@ loop = { name cnt ->
   // Test case here is trying to get HM to do some overload resolution.
   // Without, many simple int/flt tests in main AA using HM alone fail to find
   // a useful type.
-  @Test public void g_overload_09() {
+  @Test public void g_overload_12() {
     run("""
 fwrap = { ff ->
   @{ f = ff;
@@ -1064,7 +1115,7 @@ con2_1 = (fwrap 2.1f);
   }
 
   // Recursive structs.  More like what main AA will do with wrapped primitives.
-  @Test public void g_overload_10() {
+  @Test public void g_overload_13() {
     String hm_rez =  "*("+
       "A:*@{_*_=*&[{B:*@{_*_=*&[{*@{i=int64;...}->B};{*@{f=flt64;...}->C:*@{_*_=*&[{*@{i=int64;...}->C};{*@{f=flt64;...}->C}];f=flt64}}];i=int64}->A};{*@{f=flt64;...}->A}];f=flt64},"+
       "D:*@{_*_=*&[{E:*@{_*_=*&[{*@{i=int64;...}->E};{*@{f=flt64;...}->F:*@{_*_=*&[{*@{i=int64;...}->F};{*@{f=flt64;...}->F}];f=flt64}}];i=int64}->D};{*@{f=flt64;...}->G:*@{_*_=*&[{*@{i=int64;...}->G};{*@{f=flt64;...}->G}];f=flt64}}];i=int64},"+
@@ -1126,7 +1177,7 @@ mul2 = { x -> (x._*_.0 con2)};
 
   // Recursive structs, in a loop.  Test of recursive int wrapper type ("occurs
   // check") in a loop.
-  @Test public void g_overload_11() {
+  @Test public void g_overload_14() {
     run("""
 fwrap = { ff ->
   @{ f = ff;
@@ -1195,51 +1246,6 @@ fact = { n -> (if n.is0 c1 (n.mul.0 (fact n.sub1))) };
          //"[4,7,8,9,10,11,12,13,14]","[4,5,6,24,26,29,32]");
   }
 
-  @Test public void g_overload_err_95() {
-    run("{ ptr -> (ptr.x ptr.x) }",
-        "{ @{x= A:{ A-> B}} -> B }",
-        null);
-  }
-
-  // Field order under-specified, so ambiguous
-  @Test public void g_overload_err_96() {
-    run("{ ptr -> (ptr._.x ptr._.x) }",
-        "{ ptr -> (ptr._.x ptr._.x) }",
-        "{ *( @{x={ A-> B}}, @{x=A} ) -> B }",
-        "",
-        null,
-        null);
-  }
-  // Field order specified
-  @Test public void g_overload_err_97() {
-    run("({ ptr -> (ptr._.x ptr._.x) } (pair @{x=3} @{x=str}) )",
-        "({ ptr -> (ptr.1.x ptr.0.x) } (pair @{x=3} @{x=str}) )",
-        "{ *( @{x={ A-> B}}, @{x=A} ) -> B }",
-        "",
-        null,
-        null);
-  }
-
-  // Field order under-specified, so ambiguous
-  @Test public void g_overload_err_98() {
-    run("{ ptr -> (ptr.x._ ptr.x._) }",
-        "{ ptr -> (ptr.x._ ptr.x._) }",
-        "{ @{x=*({ A-> B},A) -> B }",
-        "",
-        null,
-        null);
-  }
-
-  // Field order specified
-  @Test public void g_overload_err_99() {
-    run("({ ptr -> (ptr.x._ ptr.x._) } @{x=(pair 3 str)})",
-        "({ ptr -> (ptr.x.1 ptr.x.0) } @{x=(pair 3 str)})",
-        "{ @{x=*({ A-> B},A) -> B }",
-        "",
-        null,
-        null);
-  }
-
   // Ambiguous overload, {int->int}, cannot select.
   // Parent of overload is Apply, so
   @Test public void g_overload_err_00() {
@@ -1286,7 +1292,7 @@ fz = (if (rand 2) fx fy);
   }
 
   // Another ambiguous field layout
-  @Test public void g_overload_err_05() {
+  @Test public void g_overload_err_04() {
     run("{ x -> (x._ x._.v)}",
         "{ x -> (x._ x._.v )}",
         "[22]{any,3 ->xnil }",
