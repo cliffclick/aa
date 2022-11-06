@@ -874,12 +874,12 @@ loop = { name cnt ->
 
   // Simple overload def.  Since no uses, no Field to resolve.
   @Test public void g_overload_00() {
-    run("&["                    +  // Define overloaded fcns
-         "  { x -> (i* x 2   ) };"+  // Arg is 'int'
-         "  { x -> (f* x 3.0f) } "+  // Arg is 'flt'
-         " ]",
-         "*&[ {int64 -> int64}; {flt64 -> flt64} ]",
-         "*[7]ov:(_, [23]{any,3 -> int64 }, [26]{any,3 -> flt64 })",
+    run("(pair"                  +  // Define a pair of fcns
+         "  { x -> (i* x 2   ) }"+  // Arg is 'int'
+         "  { x -> (f* x 3.0f) }"+  // Arg is 'flt'
+         ")",
+         "*( {int64 -> int64}; {flt64 -> flt64} )",
+         "*[7](_, [23]{any,3 -> int64 }, [26]{any,3 -> flt64 })",
          "[4,7]","[23,26]"
         );
   }
@@ -887,15 +887,15 @@ loop = { name cnt ->
   // Simple overloaded function test.
   // Insert Fields for all 'f' uses, but some or all may go away.
   @Test public void g_overload_01() {
-    run("f = &["                 +  // Define overloaded fcns 'f'
-        "  { x -> (i* x 2   ) };"+  // Arg is 'int'
+    run("f = (pair"             +  // Define overloaded fcns 'f'
+        "  { x -> (i* x 2   ) }"+  // Arg is 'int'
+        "  { x -> (f* x 3.0f) }"+  // Arg is 'flt'
+        ");"+
+        "(pair (f._ 2) (f._ 1.2f))",// Call with different args
+        "f = (pair"              +  // Define overloaded fcns 'f'
+        "  { x -> (i* x 2   ) }" +  // Arg is 'int'
         "  { x -> (f* x 3.0f) } "+  // Arg is 'flt'
-        "];"+
-        "(pair (f 2) (f 1.2f))",    // Call with different args
-        "f = &["                 +  // Define overloaded fcns 'f'
-        "  { x -> (i* x 2   ) };"+  // Arg is 'int'
-        "  { x -> (f* x 3.0f) } "+  // Arg is 'flt'
-        "];"+
+        ");"+
         "(pair (f.0 2) (f.1 1.2f))",    // Call with different args
         "*(int64,flt64)", "*(int64,flt64)",
         "*[8](_, 4,3.6000001f)", "*[8](_, Scalar, Scalar)",
@@ -905,17 +905,17 @@ loop = { name cnt ->
   @Test public void g_overload_02() {
     run("""
 { pred ->
-  fx = &[ (if pred { x -> (i* x 2)} { x -> (i* x 3)});
-          { x -> (f* x 0.5f) }
-        ];
-  (pair (fx 2) (fx 1.2f))
+  fx = (pair (if pred { x -> (i* x 2)} { x -> (i* x 3)})
+             { x -> (f* x 0.5f) }
+        );
+  (pair (fx._ 2) (fx._ 1.2f))
 }
 """,
         """
 { pred ->
-  fx = &[ (if pred ({_pred -> { x -> (i* x 2)}}(notnil pred)) { x -> (i* x 3)});
+  fx = (pair (if pred ({_pred -> { x -> (i* x 2)}}(notnil pred)) { x -> (i* x 3)})
           { x -> (f* x 0.5f) }
-        ];
+        );
   (pair (fx.0 2) (fx.1 1.2f))
 }
 """,
@@ -928,8 +928,8 @@ loop = { name cnt ->
 
   // Test overload as union of primitives
   @Test public void g_overload_03() {
-    run("red=&[ 123; \"red\" ]; (pair (dec red  ) (isempty red  ))",
-        "red=&[ 123; \"red\" ]; (pair (dec red.0) (isempty red.1))",
+    run("red = (pair 123 \"red\" ); (pair (dec red._) (isempty red._))",
+        "red = (pair 123 \"red\" ); (pair (dec red.0) (isempty red.1))",
         "*(int64,int1)",
         "*(int64,int1)",
         "*[8](_, 122,xnil)",
@@ -937,17 +937,17 @@ loop = { name cnt ->
         "[4,8]",null);
   }
 
-// Explicit overload argument
-  @Ignore @Test public void g_overload_04() {
-    run("{ &x -> (x   x  .v)}",
-        "{ &x -> (x.0 x.1.v)}",
+  // Explicit overload argument
+  @Test public void g_overload_04() {
+    run("{ x -> (x._ x._.v)}",
+        "{ x -> (x.0 x.1.v)}",
         "[22]{any,3 ->xnil }",
         "[4,10]","[22,24]");
   }
 
   @Test public void g_overload_05() {
-    run("(&[ 1; {x->x}]   2.1f)",
-        "(&[ 1; {x->x}].1 2.1f)",
+    run("((pair 1 {x->x})._ 2.1f)",
+        "((pair 1 {x->x}).1 2.1f)",
         "2.1f","2.1f",
         null,null );
   }
@@ -955,12 +955,12 @@ loop = { name cnt ->
   // Test overload as union of primitives.  Merge of 2 related overloads stalls
   // resolution until use at 'dec' and 'isempty'.  Each use resolves separately.
   @Test public void g_overload_06() {
-    run("color = { hex name -> &[ hex; name ]};"+
+    run("color = { hex name -> (pair hex name )};"+
         "red  = (color 123 \"red\" );"+
         "blue = (color 456 \"blue\");"+
-        "{ pred -> c =(if pred red blue); (pair (dec c) (isempty c))}",
+        "{ pred -> c =(if pred red blue); (pair (dec c._) (isempty c._))}",
 
-        "color = { hex name -> &[ hex; name ]};"+
+        "color = { hex name -> (pair hex name )};"+
         "red  = (color 123 \"red\" );"+
         "blue = (color 456 \"blue\");"+
         "{ pred -> c =(if pred ({_pred -> red}(notnil pred)) blue); (pair (dec c.0) (isempty c.1))}",
@@ -975,14 +975,14 @@ loop = { name cnt ->
   // Test overload as union of primitives.  Overload resolution before
   // calling 'fun'.  Error under the new model.
   @Test public void g_overload_07() {
-    run("fun = { a0 -> (dec a0) }; "            + // a0 is an int
-        "(pair (fun &[ 123; \"abc\" ]        )" + // Correct overload is 0x123
-        "      (fun &[ \"def\"; @{x=1}; 456 ])" + // Correct overload is 0x456
+    run("fun = { a0 -> (dec a0) }; "  + // a0 is an int
+        "(pair (fun (pair   123 \"abc\"        )._)" + // Correct overload is 0x123
+        "      (fun (triple \"def\" @{x=1} 456 )._)" + // Correct overload is 0x456
         ")",
 
-        "fun = { a0 -> (dec a0) }; "              + // a0 is an int
-        "(pair (fun &[ 123; \"abc\" ]        .0)" + // Correct overload is 0x123
-        "      (fun &[ \"def\"; @{x=1}; 456 ].2)" + // Correct overload is 0x456
+        "fun = { a0 -> (dec a0) }; "  + // a0 is an int
+        "(pair (fun (pair   123 \"abc\" )       .0)" + // Correct overload is 0x123
+        "      (fun (triple \"def\" @{x=1} 456 ).2)" + // Correct overload is 0x456
         ")",
 
         "*(int64,int64)",
@@ -992,13 +992,13 @@ loop = { name cnt ->
 
   // 'lite' needs to be told to take an overload with syntax
   @Ignore @Test public void g_overload_08() {
-    run("color = { hex name -> &[ hex; name ]};"+
+    run("color = { hex name -> (pair hex name )};"+
         "red  = (color 123 \"red\" );"+
         "blue = (color 456 \"blue\");"+
-        "lite = { c -> (color (dec c) (isempty c))};"+ // Should be "(color (sub c 0x111) (cat "light" c))"
+        "lite = { c -> (color (dec c._) (isempty c._))};"+ // Should be "(color (sub c 0x111) (cat "light" c))"
         "(pair (lite red) (lite blue))",
         
-        "color = { hex name -> &[ hex; name ]};"+
+        "color = { hex name -> (pair hex name )};"+
         "red  = (color 123 \"red\" );"+
         "blue = (color 456 \"blue\");"+
         "lite = { c -> (color (dec c.0) (isempty c.1))};"+ // Should be "(color (sub c 0x111) (cat "light" c))"
@@ -1017,40 +1017,40 @@ loop = { name cnt ->
     run("""
 fwrap = { ff ->
   @{ f = ff;
-     _*_ = &[
-       { y -> (fwrap (f* ff (i2f y.i))) };
-       { y -> (fwrap (f* ff      y.f)) }
-     ]
+     _*_ = (pair
+       { y -> (fwrap (f* ff (i2f y.i))) }
+       { y -> (fwrap (f* ff      y.f )) }
+     )
    }
 };
 iwrap = { ii ->
   @{ i = ii;
-     _*_ = &[
-       { y -> (iwrap (i*      ii  y.i)) };
+     _*_ = (pair
+       { y -> (iwrap (i*      ii  y.i)) }
        { y -> (fwrap (f* (i2f ii) y.f)) }
-     ]
+     )
    }
 };
 
 con2   = (iwrap 2   );
 con2_1 = (fwrap 2.1f);
-(con2_1._*_ con2_1)
+(con2_1._*_._ con2_1)
 """,
     """
 fwrap = { ff ->
   @{ f = ff;
-     _*_ = &[
-       { y -> (fwrap (f* ff (i2f y.i))) };
-       { y -> (fwrap (f* ff      y.f)) }
-     ]
+     _*_ = (pair
+       { y -> (fwrap (f* ff (i2f y.i))) }
+       { y -> (fwrap (f* ff      y.f )) }
+     )
    }
 };
 iwrap = { ii ->
   @{ i = ii;
-     _*_ = &[
-       { y -> (iwrap (i*      ii  y.i)) };
+     _*_ = (pair
+       { y -> (iwrap (i*      ii  y.i)) }
        { y -> (fwrap (f* (i2f ii) y.f)) }
-     ]
+     )
    }
 };
 
@@ -1074,27 +1074,49 @@ con2_1 = (fwrap 2.1f);
     run("""
 fwrap = { ff ->
   @{ f = ff;
-     _*_ = &[
-       { y -> (fwrap (f* ff (i2f y.i))) };
+     _*_ = (pair
+       { y -> (fwrap (f* ff (i2f y.i))) }
        { y -> (fwrap (f* ff      y.f)) }
-     ]
+     )
    }
 };
 iwrap = { ii ->
   @{ i = ii;
-     _*_ = &[
-       { y -> (iwrap (i*      ii  y.i)) };
+     _*_ = (pair
+       { y -> (iwrap (i*      ii  y.i)) }
        { y -> (fwrap (f* (i2f ii) y.f)) }
-     ]
+     )
    }
 };
 
 con2   = (iwrap 2  );
 con2_1 = (fwrap 2.1f);
-mul2 = { x -> (x._*_ con2)};
-(triple (mul2 con2_1)  (con2._*_ con2) (con2_1._*_ con2_1))
+mul2 = { x -> (x._*_._ con2)};
+(triple (mul2 con2_1)  (con2._*_._ con2) (con2_1._*_._ con2_1))
 """,
-        null,
+        """
+fwrap = { ff ->
+  @{ f = ff;
+     _*_ = (pair
+       { y -> (fwrap (f* ff (i2f y.i))) }
+       { y -> (fwrap (f* ff      y.f )) }
+     )
+   }
+};
+iwrap = { ii ->
+  @{ i = ii;
+     _*_ = (pair
+       { y -> (iwrap (i*      ii  y.i)) }
+       { y -> (fwrap (f* (i2f ii) y.f)) }
+     )
+   }
+};
+
+con2   = (iwrap 2  );
+con2_1 = (fwrap 2.1f);
+mul2 = { x -> (x._*_.0 con2)};
+(triple (mul2 con2_1)  (con2._*_.0 con2) (con2_1._*_.1 con2_1))
+""",
         hm_rez,
         hm_rez,
         "*[12](_, 0=PA:*[8]@{_; _*_=*[7]ov:(_, [25]{any,3 -> PA }, [27]{any,3 -> PA }); f=flt64}, 1=PB:*[11]@{_; _*_=*[9]ov:(_, [30]{any,3 -> PB }, [34]{any,3 -> PA }); i=int64}, 2=PA)",
@@ -1108,19 +1130,19 @@ mul2 = { x -> (x._*_ con2)};
     run("""
 fwrap = { ff ->
   @{ f = ff;
-     mul = &[
-       { y -> (fwrap (f* ff (i2f y.i))) };
-       { y -> (fwrap (f* ff      y.f)) }
-     ]
+     mul = (pair
+       { y -> (fwrap (f* ff (i2f y.i))) }
+       { y -> (fwrap (f* ff      y.f )) }
+     )
    }
 };
 
 iwrap = { ii ->
   @{ i = ii;
-     mul = &[
-       { y -> (iwrap (i*      ii  y.i)) };
+     mul = (pair
+       { y -> (iwrap (i*      ii  y.i)) }
        { y -> (fwrap (f* (i2f ii) y.f)) }
-     ];
+     );
      is0 = (eq0 ii);
      sub1= (iwrap (dec ii))
    }
@@ -1129,11 +1151,38 @@ iwrap = { ii ->
 c1 = (iwrap 1);
 c5 = (iwrap 5);
 
-fact = { n -> (if n.is0 c1 (n.mul (fact n.sub1))) };
+fact = { n -> (if n.is0 c1 (n.mul._ (fact n.sub1))) };
 
 (fact c5)
 """,
-        null,
+        """
+fwrap = { ff ->
+  @{ f = ff;
+     mul = (pair
+       { y -> (fwrap (f* ff (i2f y.i))) }
+       { y -> (fwrap (f* ff      y.f )) }
+     )
+   }
+};
+
+iwrap = { ii ->
+  @{ i = ii;
+     mul = (pair
+       { y -> (iwrap (i*      ii  y.i)) }
+       { y -> (fwrap (f* (i2f ii) y.f)) }
+     );
+     is0 = (eq0 ii);
+     sub1= (iwrap (dec ii))
+   }
+};
+
+c1 = (iwrap 1);
+c5 = (iwrap 5);
+
+fact = { n -> (if n.is0 c1 (n.mul.0 (fact n.sub1))) };
+
+(fact c5)
+""",
          "A:*@{i=int64;is0=int1;mul=*&[{A->A};{*@{f=flt64;...}->B:*@{f=flt64;mul=*&[{*@{i=int64;...}->B};{*@{f=flt64;...}->B}]}}];sub1=A}",
          "A:*@{i=int64;is0=int1;mul=*&[{A->A};{*@{f=flt64;...}->B:*@{f=flt64;mul=*&[{*@{i=int64;...}->B};{*@{f=flt64;...}->B}]}}];sub1=A}",
          // bulk test answers
@@ -1146,18 +1195,47 @@ fact = { n -> (if n.is0 c1 (n.mul (fact n.sub1))) };
          //"[4,7,8,9,10,11,12,13,14]","[4,5,6,24,26,29,32]");
   }
 
-  @Test public void g_overload_err_99() {
+  @Test public void g_overload_err_95() {
     run("{ ptr -> (ptr.x ptr.x) }",
-        "{ ptr -> (ptr.x ptr.x) }",
         "{ @{x= A:{ A-> B}} -> B }",
+        null);
+  }
+
+  // Field order under-specified, so ambiguous
+  @Test public void g_overload_err_96() {
+    run("{ ptr -> (ptr._.x ptr._.x) }",
+        "{ ptr -> (ptr._.x ptr._.x) }",
+        "{ *( @{x={ A-> B}}, @{x=A} ) -> B }",
+        "",
+        null,
+        null);
+  }
+  // Field order specified
+  @Test public void g_overload_err_97() {
+    run("({ ptr -> (ptr._.x ptr._.x) } (pair @{x=3} @{x=str}) )",
+        "({ ptr -> (ptr.1.x ptr.0.x) } (pair @{x=3} @{x=str}) )",
+        "{ *( @{x={ A-> B}}, @{x=A} ) -> B }",
+        "",
         null,
         null);
   }
 
+  // Field order under-specified, so ambiguous
+  @Test public void g_overload_err_98() {
+    run("{ ptr -> (ptr.x._ ptr.x._) }",
+        "{ ptr -> (ptr.x._ ptr.x._) }",
+        "{ @{x=*({ A-> B},A) -> B }",
+        "",
+        null,
+        null);
+  }
+
+  // Field order specified
   @Test public void g_overload_err_99() {
-    run("{ ptr -> (ptr.x ptr.x) }",
-        "{ ptr -> (ptr.x ptr.x) }",
-        "{ @{x= A:{ A-> B}} -> B }",
+    run("({ ptr -> (ptr.x._ ptr.x._) } @{x=(pair 3 str)})",
+        "({ ptr -> (ptr.x.1 ptr.x.0) } @{x=(pair 3 str)})",
+        "{ @{x=*({ A-> B},A) -> B }",
+        "",
         null,
         null);
   }
@@ -1165,11 +1243,11 @@ fact = { n -> (if n.is0 c1 (n.mul (fact n.sub1))) };
   // Ambiguous overload, {int->int}, cannot select.
   // Parent of overload is Apply, so
   @Test public void g_overload_err_00() {
-    run("(&["                  +  // Define overloaded fcns
-        "   { x -> (i* x 2) };"+  // Arg is 'int'
-        "   { x -> (i* x 3) } "+  // Arg is 'int'
-        "  ] 4)",                 // Error, ambiguous
-        "(&[ { x -> (i* x 2 ) }; { x -> (i* x 3 ) } ].& 4)",
+    run("((pair"              +  // Define overloaded fcns
+        "   { x -> (i* x 2) }"+  // Arg is 'int'
+        "   { x -> (i* x 3) }"+  // Arg is 'int'
+        "  )._ 4)",              // Error, ambiguous
+        "((pair { x -> (i* x 2 ) } { x -> (i* x 3 ) } )._ 4)",
         "Ambiguous overload",
         "nint8",
         null,null
@@ -1177,28 +1255,29 @@ fact = { n -> (if n.is0 c1 (n.mul (fact n.sub1))) };
   }
   // Wrong args for all overloads
   @Test public void g_overload_err_01() {
-    run("(&[ { x y -> (i* x y) }; { x y z -> (i* y z) }] 4)",
+    run("((pair { x y -> (i* x y) } { x y z -> (i* y z) })._ 4)",
         "Bad arg count: int64",
         "~int64");
   }
   // Mixing unrelated overloads
   @Test public void g_overload_err_02() {
     run("""
-fx = &[ { x -> 3     }; { y -> "abc" } ];
-fy = &[ { z -> "def" }; { a -> 4     } ];
+fx = (pair { x -> 3     } { y -> "abc" });
+fy = (pair { z -> "def" } { a -> 4     });
 fz = (if (rand 2) fx fy);
-(isempty (fz 1.2f))
+(isempty (fz._ 1.2f))
 """,
          "Ambiguous overload: int1",
          "int1",
          null,null);
   }
+
   // Test overload as union of primitives.  Merge of 2 unrelated overloads
   // forces resolution at the 'if'; hence 'red' is typed as either 'int' or
   // 'str' and one of '(dec red)' or '(isempty red)' must fail.
   @Test public void g_overload_err_03() {
-    run("{ pred -> red=(if pred &[ 123; \"red\" ] &[456;  \"blue\" ]); (pair (dec red) (isempty red))}",
-        "{ pred -> red=(if pred ({_pred -> &[ 123; \"red\" ]}(notnil pred)) &[456;  \"blue\" ]); (pair (dec red) (isempty red))}",
+    run("{ pred -> c =(if pred            (pair 123 \"red\" )                (pair 456  \"blue\" )); (pair (dec c._) (isempty c._))}",
+        "{ pred -> c =(if pred ({_pred -> (pair 123 \"red\" )}(notnil pred)) (pair 456  \"blue\" )); (pair (dec c.0) (isempty c.1))}",
         "{ A? -> *(Mismatched overloads: int64, Mismatched overloads: int1) }",
         "{ A? -> *(Mismatched overloads: int64, Mismatched overloads: int1) }",
         "[29]{any,3 -> *[9](_, int64, xnil) }",
@@ -1206,9 +1285,10 @@ fz = (if (rand 2) fx fy);
          "[4,9]","[4,5,6,29]");
   }
 
-  @Ignore @Test public void g_overload_err_05() {
-    run("{ &x -> (x x.v)}",
-        "{ &x -> ( x.0 x.1.v )}",
+  // Another ambiguous field layout
+  @Test public void g_overload_err_05() {
+    run("{ x -> (x._ x._.v)}",
+        "{ x -> (x._ x._.v )}",
         "[22]{any,3 ->xnil }",
         "[4,10]","[22,24]");
   }
