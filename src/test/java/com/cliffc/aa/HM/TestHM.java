@@ -28,10 +28,10 @@ public class TestHM {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_HMT=false;
-    DO_GCP=true;
+    DO_HMT=true;
+    DO_GCP=false;
     RSEED=0;
-    a_basic_02();
+    g_overload_04();
   }
 
   private void _run0s( String prog, String rprog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -160,7 +160,6 @@ public class TestHM {
   // Obscure factorial-like
   @Test public void b_recursive_02() {
     run("f0 = { f x -> (if (eq0 x) 1 (f (f0 f (dec x)) 2))}; (f0 i* 99)",
-        "int64","int64",
         "int64","int64");
   }
   // Obscure factorial-like
@@ -198,7 +197,7 @@ public class TestHM {
         "{ { 1 2 -> 1 } -> 1 }",
         "{ { 1 2 -> 1 } -> 1 }",
         "[25]{any,3 ->1 }",
-        "[25]{any,3 ->Scalar }",
+        "[25]{any,3 ->1 }",
         null,"[24,25]");
   }
   @Test public void b_recursive_07() {
@@ -223,14 +222,14 @@ public class TestHM {
   }
   @Test public void b_recursive_err_02() {
     run("I = {x->x};"+
-         "K = {x->{y->x}};"+
-         "W = {x->(x x)};"+
-         "term = {z->{y ->((y (z I))(z K))}};"+
-         "test = (term W);"+
-         "(test {x -> {y -> (pair (x 3) (((y \"abc\") \"def\") \"red\")) } })",
-         "*( A:[Cannot unify {A->A} and 3 and *str:(nint8)], A )",
-         "*[7](_,  Scalar, Scalar)",
-         "[4,7]","[]");
+        "K = {x->{y->x}};"+
+        "W = {x->(x x)};"+
+        "term = {z->{y ->((y (z I))(z K))}};"+
+        "test = (term W);"+
+        "(test {x -> {y -> (pair (x 3) (((y \"abc\") \"def\") \"red\")) } })",
+        "*( A:[Cannot unify {A->A} and 3 and *str:(nint8)], A )",
+        "*[7](_,  Scalar, Scalar)",
+        "[4,7]","[]");
   }
   // Stacked if functions "carry through" precision.
   // Test was buggy, since 'rand' is a known non-zero function pointer constant,
@@ -441,7 +440,7 @@ map ={fun parg -> (fun (cdr parg))};
         "  self0=@{ succ = (sx self0)}; "+
         "  self0 "+
         "};"+
-        "self1=@{ succ = self1; nope=7 };"+
+        "self1=@{ nope=7; succ = self1 };"+
         "(sx self1)"+
         "",
         "A:*@{ succ=A}",
@@ -522,7 +521,7 @@ map ={fun parg -> (fun (cdr parg))};
         "    res2 = *@{ a=nint8; b=nflt32 }"+
         "}",
         "*[12]@{_; f=[23]{any,4 ->*[7,8,9,10,11,13]SA::(_) }; res1=*[7,8]SA; res2=*[9,11]@{_; a=nint8; b=nflt32}}",
-        "*[12]@{_; f=[23]{any,4 ->Scalar }; res1=Scalar; res2=Scalar}",
+        "*[12]@{_; f=[23]{any,4 ->PA:*[7,8,9,10,11,13](_) }; res1=PA; res2=PA}",
         "[4,7,8,9,10,11,12,13]","[23]");
   }
 
@@ -618,7 +617,7 @@ all = @{
   }
   // Test example from AA with expanded ints
   @Test public void e_recur_struct_08() {
-    run("int = { i -> @{ i=i; add={ x y -> (int (+ x.i y.i))} } }; x=(int 3); y=(int 4); (x.add x y)",
+    run("int = { i -> @{ add={ x y -> (int (+ x.i y.i))}; i=i } }; x=(int 3); y=(int 4); (x.add x y)",
         """
 A:*@{
   add={
@@ -628,7 +627,7 @@ A:*@{
   i=int64
 }
 """,
-         "PA:*[7]@{_; i=int64; add=[23]{any,4 ->PA }}",
+         "PA:*[7]@{_; add=[23]{any,4 -> PA }; i=int64}",
          "[4,7,10,13]","[23]");
   }
 
@@ -718,10 +717,9 @@ con12=(fun 1.2f);
   @Test public void f_gcp_hmt_00() {
     run("pred = 0; s1 = @{ x=\"abc\" }; s2 = @{ y=3.4f }; (if pred s1 s2).y",
         "pred = 0; s1 = @{ x=\"abc\" }; s2 = @{ y=3.4f }; (if pred ({_pred -> s1}(notnil pred)) s2).y",
-        "3.4f",
-        "Missing field y in *(): 3.4f",
-        "3.4f",
-        "3.4f");
+        "3.4f", "Missing field y in *(): 3.4f",
+        "3.4f", "3.4f",
+        null,null);
   }
   // The z-merge is ignored; the last s2 is a fresh (unmerged) copy.
   @Test public void f_gcp_hmt_01() {
@@ -731,9 +729,10 @@ con12=(fun 1.2f);
   }
   @Test public void f_gcp_hmt_02() {
     run("fun = (if (isempty \"abc\") {x->x} {x->1.2f}); (fun @{})",
-        "1.2f",
-        "[Cannot unify 1.2f and *()]",
-        "1.2f","1.2f");
+        "fun = (if (isempty \"abc\") {x->x} {x->1.2f}); (fun @{})",
+        "1.2f", "[Cannot unify 1.2f and *()]",
+        "1.2f","1.2f",
+        null,null);
 
   }
   // Requires a combo of HM and GCP to get the good answer
@@ -769,7 +768,8 @@ loop = { name cnt ->
         "*str:(nint8)?",      // Both HM and GCP
         "[Cannot unify int8 and *str:(nint8)?]", // HM alone cannot do this one
         "*[4]str:(100)",      // Both HM and GCP
-        "nScalar");           // GCP alone gets a very weak answer
+        "nScalar",            // GCP alone gets a very weak answer
+        null,null);
   }
   // Basic uplifting after check
   @Test public void f_gcp_hmt_04() {
@@ -837,7 +837,7 @@ loop = { name cnt ->
          "{ A:*@{ size = int64; ...} B:*@{ next = B; val = A; ...}? -> int64 }",
          "{ A:*@{ size = int64; ...} B:*@{ next = B; val = A; ...}? -> int64 }",
          "[27]{any,4 ->int64 }",
-         "[27]{any,4 ->Scalar }",
+         "[27]{any,4 ->int64 }",
          "[4,10,13]","[27]");
   }
 
@@ -883,9 +883,9 @@ loop = { name cnt ->
          "  { x -> (i* x 2   ) }"+  // Arg is 'int'
          "  { x -> (f* x 3.0f) }"+  // Arg is 'flt'
          ")",
-         "*( {int64 -> int64}; {flt64 -> flt64} )",
-         "*[7](_, [23]{any,3 -> int64 }, [26]{any,3 -> flt64 })",
-         "[4,7]","[23,26]"
+         "*( {int64 -> int64}, {flt64 -> flt64} )",
+         "*[7](_, [25]{any,3 -> int64 }, [27]{any,3 -> flt64 })",
+         "[4,7]","[25,27]"
         );
   }
 
@@ -903,7 +903,7 @@ loop = { name cnt ->
         ");"+
         "(pair (f.0 2) (f.1 1.2f))",    // Call with different args
         "*(int64,flt64)", "*(int64,flt64)",
-        "*[8](_, 4,3.6000001f)", "*[8](_, Scalar, Scalar)",
+        "*[8](_, 4,3.6000001f)", "*[8](_, 4, 3.6000001f)",
         "[4,8]",null);
   }
 
@@ -926,9 +926,9 @@ loop = { name cnt ->
 """,
         "{ A? -> *(int64,flt64) }",
         "{ A? -> *(int64,flt64) }",
-        "[34]{any,3 -> *[8](_, nint8, 0.6f) }",
-        "[34]{any,3 -> *[8](_, Scalar, Scalar) }",
-        "[4,8]","[34]");
+        "[35]{any,3 -> *[8](_, nint8, 0.6f) }",
+        "[35]{any,3 -> *[8](_, nint8, 0.6f) }",
+        "[4,8]","[35]");
   }
 
   // Test overload as union of primitives
@@ -937,17 +937,18 @@ loop = { name cnt ->
         "red = (pair 123 \"red\" ); (pair (dec red.0) (isempty red.1))",
         "*(int64,int1)",
         "*(int64,int1)",
-        "*[8](_, 122,xnil)",
-        "*[8](_, int64, int1)",
+        "*[8](_, 122, xnil)",
+        "*[8](_, 122, xnil)",
         "[4,8]",null);
   }
 
   // Explicit overload argument
   @Test public void g_overload_04() {
     run("{ x -> (x._ x._.v)}",
-        "{ x -> (x.0 x.1.v)}",
-        "[22]{any,3 ->xnil }",
-        "[4,10]","[22,24]");
+        "{ x -> (x._ x._.v)}",
+        "{*@{&17 = Unresolved field &17: { A:Unresolvedfield&19 -> B:Unresolvedfield&17}; &19 = Unresolvedfield&19:*@{v=A;...};...}->B}",
+        "[22]{any,3 -> Scalar }",
+        "[10]","[22]");
   }
 
   @Test public void g_overload_05() {
@@ -960,7 +961,7 @@ loop = { name cnt ->
   // No overload 
   @Test public void g_overload_06() {
     run("{ ptr -> (ptr.x ptr.x) }",
-        "{ @{x= A:{ A-> B}} -> B }",
+        "{ *@{x= A:{ A-> B}; ...} -> B }",
         null);
   }
 
@@ -968,8 +969,8 @@ loop = { name cnt ->
   @Test public void g_overload_07() {
     run("({ ptr -> (ptr._.x ptr._.x) } (pair @{x=3} @{x=str}) )",
         "({ ptr -> (ptr.1.x ptr.0.x) } (pair @{x=3} @{x=str}) )",
-        "{ *( @{x={ A-> B}}, @{x=A} ) -> B }",
-        "",
+        "*str:(int8)",
+        "*[4]str:(51)",
         null,
         null);
   }
@@ -977,30 +978,27 @@ loop = { name cnt ->
   @Test public void g_overload_err_07() {
     run("{ ptr -> (ptr._.x ptr._.x) }",
         "{ ptr -> (ptr._.x ptr._.x) }",
-        "{ *( @{x={ A-> B}}, @{x=A} ) -> B }",
-        "",
-        null,
-        null);
+        "{*@{&17 = Unresolved field &17:*@{x={A->B};...}; &20 = Unresolved field &20:*@{x=A;...};...}->B}",
+        "[22]{any,3 -> ~Scalar }",
+        "[7]", "[22]");
   }
 
   // Field order specified
   @Test public void g_overload_08() {
     run("({ ptr -> (ptr.x._ ptr.x._) } @{x=(pair 3 str)})",
         "({ ptr -> (ptr.x.1 ptr.x.0) } @{x=(pair 3 str)})",
-        "{ @{x=*({ A-> B},A) -> B }",
-        "",
-        null,
-        null);
+        "*str:(int8)",
+        "*[4]str:(51)",
+        null,null);
   }
 
   // Field order under-specified, so ambiguous
   @Test public void g_overload_err_08() {
     run("{ ptr -> (ptr.x._ ptr.x._) }",
         "{ ptr -> (ptr.x._ ptr.x._) }",
-        "{ @{x=*({ A-> B},A) -> B }",
-        "",
-        null,
-        null);
+        "{*@{x=*@{&18 = Unresolved field &18:{ A:Unresolved field &21 -> B }; &21=A;...};...}->B}",
+        "[22]{any,3 -> ~Scalar }",
+        "[7]","[22]");
   }
 
   // Test overload as union of primitives.  Merge of 2 related overloads stalls
@@ -1018,9 +1016,9 @@ loop = { name cnt ->
 
         "{ A? -> *(int64,int1) }",
         "{ A? -> *(int64,int1) }",
-        "[30]{any,3 -> *[8](_, int64, xnil) })",
-        "[30]{any,3 -> *[8](_, int64, int1) }",
-        "[4,8]","[4,5,6,30]");
+        "[31]{any,3 -> *[8](_, int64, xnil) })",
+        "[31]{any,3 -> *[8](_, int64, xnil) }",
+        "[4,8]","[4,5,6,31]");
   }
 
   // Test overload as union of primitives.  Overload resolution before
@@ -1067,19 +1065,19 @@ loop = { name cnt ->
   @Test public void g_overload_12() {
     run("""
 fwrap = { ff ->
-  @{ f = ff;
-     _*_ = (pair
+  @{ _*_ = (pair
        { y -> (fwrap (f* ff (i2f y.i))) }
        { y -> (fwrap (f* ff      y.f )) }
-     )
+     );
+     f = ff
    }
 };
 iwrap = { ii ->
-  @{ i = ii;
-     _*_ = (pair
+  @{ _*_ = (pair
        { y -> (iwrap (i*      ii  y.i)) }
        { y -> (fwrap (f* (i2f ii) y.f)) }
-     )
+     );
+     i = ii;
    }
 };
 
@@ -1089,19 +1087,19 @@ con2_1 = (fwrap 2.1f);
 """,
     """
 fwrap = { ff ->
-  @{ f = ff;
-     _*_ = (pair
+  @{ _*_ = (pair
        { y -> (fwrap (f* ff (i2f y.i))) }
        { y -> (fwrap (f* ff      y.f )) }
-     )
+     );
+     f = ff
    }
 };
 iwrap = { ii ->
-  @{ i = ii;
-     _*_ = (pair
+  @{ _*_ = (pair
        { y -> (iwrap (i*      ii  y.i)) }
        { y -> (fwrap (f* (i2f ii) y.f)) }
-     )
+     );
+     i = ii
    }
 };
 
@@ -1109,9 +1107,9 @@ con2   = (iwrap 2   );
 con2_1 = (fwrap 2.1f);
 (con2_1._*_.1 con2_1)
 """,
-         "A:*@{_*_=*&[{*@{i=int64;...}->A};{B:*@{_*_=*&[{*@{i=int64;...}->B};{*@{f=flt64;...}->B}];f=flt64}->A}];f=flt64}",
-         "PA:*[8]@{_; _*_=*[7]ov:(_, [25]{any,3 -> PA }, [27]{any,3 -> PA }); f=flt64}",
-         "[4,7,8,10,13]","[25,27]");
+         "A:*@{_*_=*( {*@{i=int64;...}->A}, {B:*@{_*_=*( {*@{i=int64;...}->B}, {*@{f=flt64;...}->B}); f=flt64}->A});f=flt64}",
+         "PA:*[8]@{_; _*_=*[7](_, [26]{any,3 -> PA }, [28]{any,3 -> PA }); f=flt64}",
+         "[4,7,8,10,13]","[26,28]");
   }
 
   // Recursive structs.  More like what main AA will do with wrapped primitives.
@@ -1124,19 +1122,19 @@ con2_1 = (fwrap 2.1f);
 
     run("""
 fwrap = { ff ->
-  @{ f = ff;
-     _*_ = (pair
+  @{ _*_ = (pair
        { y -> (fwrap (f* ff (i2f y.i))) }
        { y -> (fwrap (f* ff      y.f)) }
-     )
+     );
+     f = ff
    }
 };
 iwrap = { ii ->
-  @{ i = ii;
-     _*_ = (pair
+  @{ _*_ = (pair
        { y -> (iwrap (i*      ii  y.i)) }
        { y -> (fwrap (f* (i2f ii) y.f)) }
-     )
+     );
+     i = ii
    }
 };
 
@@ -1147,19 +1145,19 @@ mul2 = { x -> (x._*_._ con2)};
 """,
         """
 fwrap = { ff ->
-  @{ f = ff;
-     _*_ = (pair
+  @{ _*_ = (pair
        { y -> (fwrap (f* ff (i2f y.i))) }
        { y -> (fwrap (f* ff      y.f )) }
-     )
+     );
+     f = ff
    }
 };
 iwrap = { ii ->
-  @{ i = ii;
-     _*_ = (pair
+  @{ _*_ = (pair
        { y -> (iwrap (i*      ii  y.i)) }
        { y -> (fwrap (f* (i2f ii) y.f)) }
-     )
+     );
+     i = ii
    }
 };
 
@@ -1170,9 +1168,9 @@ mul2 = { x -> (x._*_.0 con2)};
 """,
         hm_rez,
         hm_rez,
-        "*[12](_, 0=PA:*[8]@{_; _*_=*[7]ov:(_, [25]{any,3 -> PA }, [27]{any,3 -> PA }); f=flt64}, 1=PB:*[11]@{_; _*_=*[9]ov:(_, [30]{any,3 -> PB }, [34]{any,3 -> PA }); i=int64}, 2=PA)",
-        "*[12](_, 0=PA:*[8]@{_; _*_=*[7]ov:(_, [25]{any,3 -> PA }, [27]{any,3 -> PA }); f=flt64}, 1=PB:*[8,11]@{_; _*_=*[7,9]ov:(_, [25,30]{any,3 -> PB }, [27,34]{any,3 -> PA })}, 2=PA)",
-        "[4,7,8,9,10,11,12,13,14,15]","[4,5,6,25,27,30,34]");
+        "*[12](_, 0=PA:*[8]@{_; _*_=*[7](_, [26]{any,3 -> PA }, [28]{any,3 -> PA }); f=flt64}, 1=PB:*[11]@{_; _*_=*[9](_, [33]{any,3 -> PB }, [36]{any,3 -> PA }); i=int64}, 2=PA)",
+        "*[12](_, 0=PA:*[8]@{_; _*_=*[7](_, [26]{any,3 -> PA }, [28]{any,3 -> PA }); f=flt64}, 1=PB:*[11]@{_; _*_=*[9](_, [33]{any,3 -> PB }, [36]{any,3 -> PA }); i=int64}, 2=PA)",
+        "[4,7,8,9,10,11,12,13,14,15]","[4,5,6,26,28,33,36]");
   }
 
   // Recursive structs, in a loop.  Test of recursive int wrapper type ("occurs
@@ -1180,20 +1178,20 @@ mul2 = { x -> (x._*_.0 con2)};
   @Test public void g_overload_14() {
     run("""
 fwrap = { ff ->
-  @{ f = ff;
-     mul = (pair
+  @{ mul = (pair
        { y -> (fwrap (f* ff (i2f y.i))) }
        { y -> (fwrap (f* ff      y.f )) }
-     )
+     );
+     f = ff
    }
 };
 
 iwrap = { ii ->
-  @{ i = ii;
-     mul = (pair
+  @{ mul = (pair
        { y -> (iwrap (i*      ii  y.i)) }
        { y -> (fwrap (f* (i2f ii) y.f)) }
      );
+     i = ii;
      is0 = (eq0 ii);
      sub1= (iwrap (dec ii))
    }
@@ -1208,20 +1206,20 @@ fact = { n -> (if n.is0 c1 (n.mul._ (fact n.sub1))) };
 """,
         """
 fwrap = { ff ->
-  @{ f = ff;
-     mul = (pair
+  @{ mul = (pair
        { y -> (fwrap (f* ff (i2f y.i))) }
        { y -> (fwrap (f* ff      y.f )) }
-     )
+     );
+     f = ff
    }
 };
 
 iwrap = { ii ->
-  @{ i = ii;
-     mul = (pair
+  @{ mul = (pair
        { y -> (iwrap (i*      ii  y.i)) }
        { y -> (fwrap (f* (i2f ii) y.f)) }
      );
+     i = ii;
      is0 = (eq0 ii);
      sub1= (iwrap (dec ii))
    }
@@ -1254,7 +1252,7 @@ fact = { n -> (if n.is0 c1 (n.mul.0 (fact n.sub1))) };
         "   { x -> (i* x 3) }"+  // Arg is 'int'
         "  )._ 4)",              // Error, ambiguous
         "((pair { x -> (i* x 2 ) } { x -> (i* x 3 ) } )._ 4)",
-        "Ambiguous overload",
+        "Unresolved field &28",
         "nint8",
         null,null
       );

@@ -35,7 +35,7 @@ public class Util {
     long sum=0, ssum=0;
     for( int i=0; i<ps._len; i++ ) {
       System.out.print(""+i+":"+ps.at(i)+", ");
-      long l = (long)ps.at(i);
+      long l = ps.at(i);
       sum  += l;
       ssum += l*(i+1);
     }

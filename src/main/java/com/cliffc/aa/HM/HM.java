@@ -171,13 +171,12 @@ public class HM {
   static Work<Syntax> WORK;
 
   static boolean HM_NEW_LEAF;   // After 1st pass, potential HM new leafs will no longer lift Apply results
-  static boolean DO_AMBI;       // After 2nd pass, unresolved Overloads are an error
+  static boolean HM_AMBI;       // After 2nd pass, unresolved Fields are ambiguous
   static boolean HM_FREEZE;     // After 3rd pass, HM types are frozen but GCP types continue to fall
 
   static Root ROOT;
 
   static final String RET = " ret";
-  static final Work<Syntax> DELAYS2 = new Work<>();
 
   public static Root hm( String sprog, int rseed, boolean do_hm, boolean do_gcp ) {
     Type.RECURSIVE_MEET=0;      // Reset between failed tests
@@ -198,7 +197,7 @@ public class HM {
 
     // Pass 1: Everything starts high/top/leaf and falls; escaping function args are assumed high
     HM_NEW_LEAF=false;
-    DO_AMBI = false;
+    HM_AMBI   = false;
     HM_FREEZE = false;
     main_work_loop(prog,work);
 
@@ -208,12 +207,12 @@ public class HM {
     assert prog.more_work(work);
     main_work_loop(prog,work);
 
-    // Pass 3: failed overloads propagate as errors
-    DO_AMBI = true;           // Allow HM work to propagate errors
-    work.addAll(DELAYS2);
+    // Pass 3:Unresolved Fields are ambiguous; propagate errors
+    HM_AMBI = true;
+    prog.add_ambi_work(work);
     assert prog.more_work(work);
     main_work_loop(prog,work);
-
+    
     // Pass 4: H-M types freeze, escaping function args are assumed called with lowest H-M compatible
     // GCP types continue to run downhill.
     HM_FREEZE = true;
@@ -223,7 +222,7 @@ public class HM {
 
     // Error propagation, no types change.
     assert prog.more_work(work);
-    pass_err(prog, work);
+    pass_err(prog);
 
     return prog;
   }
@@ -235,8 +234,8 @@ public class HM {
       cnt++; assert cnt<10000;  // Check for infinite loops
       Syntax syn = work.pop();  // Get work
 
-      // Do Hindley-Milner work
-      if( DO_HM ) {
+      // Do Hindley-Milner work always, to set unresolved Field labels
+      {
         T2 old = syn._hmt;      // Old value for progress assert
         if( syn.hm(work) ) {
           assert syn.debug_find()==old.debug_find(); // monotonic: unifying with the result is no-progress
@@ -267,7 +266,7 @@ public class HM {
     }
   }
 
-  static void pass_err( Root prog, Work<Syntax> work ) {
+  static void pass_err( Root prog ) {
     prog.visit( syn -> {
         T2 self = syn.find();
         // Nil check on fields
@@ -283,7 +282,7 @@ public class HM {
             // field when printing the ptr type.
             boolean miss2 = ptr.is_ptr() && ((rec=ptr.arg("*"))!=null ) && rec.is_obj();
             if( miss2 )  bad = rec._args.remove(fld._id); // Remove bad field
-            self._err = "Missing field "+fld._id+" in "+ptr.p();
+            self._err = miss_fld(fld._id)+" in "+ptr.p();
             if( miss2 )  rec._args.put(fld._id,bad); // Put it back after printing
           }
         }
@@ -297,7 +296,8 @@ public class HM {
         return null;
       }, (a,b)->null);
   }
-
+  static String miss_fld(String id) { return ("Missing field "+id).intern(); }
+  
 
   // Reset global statics between tests.  Tests fail leaving wreckage and
   // broken statics in their wake... and then the next test attempts to start.
@@ -314,7 +314,6 @@ public class HM {
     Lambda.FUNS.clear();
     Field.reset();
     Root.reset();
-    DELAYS2.clear();
     PRIMSYNS.clear();
     ALIASES.clear();
     Syntax.reset();
@@ -813,6 +812,9 @@ public class HM {
       if( this instanceof Alloc alloc && Root.ext_aliases().test(alloc.alias()) &&
           (mt instanceof TypeMemPtr || mt instanceof TypeFunPtr) )
         work.add(ROOT);
+      // Changing _types in Pair or Triple updates referring fields
+      if( this instanceof Alloc alloc )
+        work.addAll(alloc.rflds());
     }
 
     // Ignore arguments, and return body type for a particular call site.  Very conservative.
@@ -1025,7 +1027,7 @@ public class HM {
     @Override Type val(Work<Syntax> work) {
       Type flow = _fun._flow;
       if( !(flow instanceof TypeFunPtr tfp) )
-        return TypeNil.XSCALAR;
+        return flow.oob(TypeNil.SCALAR);
 
       // Meet arguments to Lambda args.  This code appears in Ident as well,
       // but is needed here in case the arg is unused in the Lambda body.
@@ -1033,7 +1035,9 @@ public class HM {
         arg_meet(tfp,work);
 
       // Attempt to lift the result, based on HM types.
-      Type lifted = do_apply_lift(find(),tfp, work==null);
+      Type lifted = DO_HM
+        ? do_apply_lift(find(),tfp, work==null)
+        : tfp._ret;
       assert _flow.isa(lifted); // Monotonic...
       return lifted;
     }
@@ -1241,6 +1245,15 @@ public class HM {
       NEW_LEAF_DEPS.clear();
     }
 
+    void add_ambi_work(Work<Syntax> work) {
+      for( Field fld : Field.FIELDS.values() )
+        if( Field.is_resolving(fld._id) ) {
+          fld.find().unify_errs("Unresolved field "+fld._id,work);
+          work.add(fld);        // Type changes as well
+          work.addAll(fld.find()._deps);
+        }
+
+    }
 
     void add_freeze_work(Work<Syntax> work) {
       // Freezing HM; all escaped function arguments get called with the most
@@ -1260,7 +1273,6 @@ public class HM {
 
       work.addAll(FREEZE_DEPS);
       FREEZE_DEPS.clear();
-      work.add(this);  // Always need self, if returning an overload
     }
 
     static BitsAlias matching_escaped_aliases(T2 t2) {
@@ -1361,7 +1373,9 @@ public class HM {
       Root.FREEZE_DEPS.add(fld); // Depends on HM_FREEZE
       return tfld.as_flow(fld,false);
     }
-    @Override public void push(Syntax f) { }
+    @Override public Ary<Syntax> rflds() { return null; }
+    @Override public Type meet() { return TypeNil. SCALAR; }
+    @Override public Type join() { return TypeNil.XSCALAR; }
   }
 
   // External function: any function from outside of Root this program might get handed.
@@ -1421,11 +1435,11 @@ public class HM {
     final Syntax[] _flds;
     final Ary<Syntax> _rflds = new Ary<>(Syntax.class);
     Struct( boolean user, String[] ids, Syntax[] flds ) {
-      //// Sort fields by name.  They are otherwise unordered.
-      //TreeMap<String,Syntax> sort = new TreeMap<>();
-      //for( int i=0; i<ids.length; i++ ) sort.put(ids[i], flds[i]);
-      //int i=0; for( Map.Entry<String,Syntax> e : sort.entrySet() )
-      //           { ids[i]=e.getKey(); flds[i]=e.getValue(); i++; }
+      // Sort fields by name.  They are otherwise unordered.
+      TreeMap<String,Syntax> sort = new TreeMap<>();
+      for( int i=0; i<ids.length; i++ ) sort.put(ids[i], flds[i]);
+      int i=0; for( Map.Entry<String,Syntax> e : sort.entrySet() )
+                 { ids[i]=e.getKey(); flds[i]=e.getValue(); i++; }
       _ids=ids;
       _flds=flds;
       // Make a TMP
@@ -1459,7 +1473,7 @@ public class HM {
       int idx = Util.find(_ids,id);
       return idx==-1 ? null : _flds[idx]._flow;
     }
-    @Override public void push(Syntax f) { if( _rflds.find(f)==-1 ) _rflds.push(f);  }
+    @Override public Ary<Syntax> rflds() { return _rflds; }
     @Override boolean hm(Work<Syntax> work) {
       // Force result to be a struct with at least these fields.
       // Do not allocate a T2 unless we need to pick up fields.
@@ -1490,13 +1504,13 @@ public class HM {
       if( Root.ext_aliases().test(_alias) ) work.add(ROOT);
     }
 
-    Type meet() {
+    @Override public Type meet() {
       Type t = TypeNil.XSCALAR;
       for( Syntax syn : _flds )
         t = t.meet(syn._flow);
       return t;
     }
-    Type join() {
+    @Override public Type join() {
       Type t = TypeNil.SCALAR;
       for( Syntax syn : _flds )
         t = t.join(syn._flow);
@@ -1552,7 +1566,7 @@ public class HM {
     final Syntax _ptr;
     Field( String id, Syntax str ) {
       _ptr = str;
-      if( id==null ) FIELDS.put(id="&"+_uid,this);
+      if( id==null ) FIELDS.put(id=("&"+_uid).intern(),this);
       _id=id; 
     }
     @Override SB str(SB sb) {   return  _ptr.str(sb).p(".").p(is_resolving(_id) ? "_" : _id); }
@@ -1560,8 +1574,6 @@ public class HM {
     @Override SB p2(SB sb, VBitSet dups) { return _ptr.p0(sb,dups); }
     static boolean is_resolving(String id) { return id.charAt(0)=='&'; }
     @Override boolean hm(Work<Syntax> work) {
-      assert _id!=null;         // Already resolved
-      T2 self = find();
       T2 ptr = _ptr.find();
       if( work!=null ) ptr.push_update(this);
 
@@ -1570,7 +1582,7 @@ public class HM {
       T2 rec = ptr.arg("*");
       if( rec==null ) {
         if( ptr.is_base() )     // Short-cut to a nicer error
-          return self.unify_errs("Missing field "+_id,work);
+          return find().unify_miss_fld(_id,work);
         if( work==null ) return true;
         if( ptr._args ==null ) ptr._args = new NonBlockingHashMap<>();
         ptr._args.put("*", rec = T2.make_leaf());
@@ -1583,16 +1595,31 @@ public class HM {
         rec._open = true;
         rec._is_obj = true;
         if( rec._args==null ) rec._args = new NonBlockingHashMap<>();
-        assert rec.is_obj();
       }
+      assert rec.is_obj();
 
+      // Attempt resolve
+      boolean progress=false;
+      if( is_resolving(_id) ) {
+        progress = trial_resolve(rec, work);
+        if( progress && work==null ) return true;
+      }
+      
       // Look up field
       T2 fld = rec.arg(_id);
+      T2 self = find();
       if( fld!=null )           // Unify against a pre-existing field
-        return self.unify_errs(ptr._err,work) & fld.unify(self, work);
+        return (self.unify_errs(ptr._err,work) & fld.unify(self, work)) | progress;
+
+      // If field is doing overload resolution, inject even if rec is closed
+      if( is_resolving(_id) ) {
+        if( work!=null ) rec._args.put(_id,self);
+        return true;
+      }
+      
       // If field must be there, and it is not, then it is missing
       if( !rec.is_open() )
-        self.unify_errs("Missing field "+_id,work);
+        self.unify_miss_fld(_id,work);
 
       // Add the field
       return work==null || rec.add_fld(_id,self,work);
@@ -1614,10 +1641,8 @@ public class HM {
         if( alias==0 ) continue; // May be nil error
         Alloc alloc = ALIASES.at(alias);
         if( is_resolving(_id) ) { // Field is resolving an overload
-          Struct st = (Struct)alloc;
           // Still resolving, use the join of fields.
-          // If failed resolving, use the meet of fields.
-          afld = DO_AMBI ? st.meet() : st.join();
+          afld = HM_AMBI ? alloc.meet() : alloc.join();
         } else {
           // Get field to meet
           afld = alloc.fld(_id,this);
@@ -1625,7 +1650,10 @@ public class HM {
           if( afld==null ) afld = missing_field(alloc);
         }
         t = t.meet(afld);
-        if( work!=null ) alloc.push(this);
+        if( work!=null ) {
+          Ary<Syntax> rflds = alloc.rflds();
+          if( rflds != null ) rflds.push(this);
+        }
       }
       return t;
     }
@@ -1689,45 +1717,58 @@ public class HM {
 
       // If field must be there, and it is not, then it is missing
       if( !rec.is_open() )
-        self.unify_errs("Missing field "+_id,WORK);
+        self.unify_miss_fld(_id,WORK);
       
       // Add the field
       rec.add_fld(_id,self,WORK);
       return null;
     }
-
+    
+    // Attempt to resolve all unresolved labels in a struct
+    static boolean trial_resolve_all(T2 obj, Work<Syntax> work) {
+      if( obj._args==null || !obj.is_obj() ) return false;
+      if( work==null ) return false;
+      boolean progress=false;
+      for( String key : obj._args.keySet() )
+        if( is_resolving(key) )
+          progress |= trial_resolve(key,obj,work);
+      return progress;
+    }
+    
     // Attempts to set a soft-label to a hard-label; if it succeeds unifies them both.
     static boolean trial_resolve(String key, T2 obj, Work<Syntax> work) { return FIELDS.get(key).trial_resolve(obj,work); }
     boolean trial_resolve(T2 obj, Work<Syntax> work) {
       assert obj.is_obj();
       T2 self = find();
-      if( !is_resolving(_id) ) { // Already resolved, just update in-place
-        if( work!=null ) {
-          obj._args.remove("&"+_uid); // Remove resolved soft-label
-          T2 old = obj._args.get(_id);
-          if( old!=null ) old.unify(self,work); // Merge with hard-label
-          else obj._args.put(_id,self); // Insert hard-label
-        }
+      // If already resolved, just update-in-p-lace
+      if( !is_resolving(_id) ) {
+        if( work==null ) return true;
+        obj._args.remove("&"+_uid);  // Remove resolved soft-label
+        T2 old = obj._args.get(_id); // Get resolved label T2
+        if( old!=null ) old.unify(self,work); // Merge  resolved-label
+        else obj._args.put(_id,self);         // Insert resolved-label
         return true;
       }
+
+      // Not yet resolved.  See if there is exactly 1 choice.
       String lab = null;
       for( String id : obj._args.keySet() ) {
         T2 rhs = obj.arg(id);
         if( is_resolving(id) ) continue;
         if( self.trial_unify_ok(rhs,false) ) {
-          if( lab==null ) lab=id;
-          else {                // Ambiguous (yet)
+          if( lab==null ) lab=id;   // No choices yet, so take this one
+          else {                    // Ambiguous (yet)
             self.push_update(this); // Revisit if self changes
-            return false; 
+            // Either cannot resolve (yet), or too late and will never resolve
+            return false;
           }
         }
       }
-      if( lab==null ) return false; // No match
-      if( work!=null ) {
-        self.unify(obj.arg(_id),work);
-        obj._args.remove(_id);    // Remove 
-        _id=lab;
-      }
+      if( lab==null ) return false; // No match, so error and never resolves
+      if( work==null ) return true;   // Singleton match
+      T2 old = obj._args.remove(_id); // Get unresolved label
+      if( old!=null ) self.unify(old,work);
+      _id=lab;                  // Change field label
       return true;
     }
     
@@ -1831,7 +1872,18 @@ public class HM {
       int idx = Util.find(FLDS,id);
       return idx==-1 ? null : _types[idx];
     }
-    @Override public void push(Syntax f) { if( _rflds.find(f)==-1 ) _rflds.push(f);  }
+    @Override public Ary<Syntax> rflds() { return _rflds; }
+    @Override public Type meet() {
+      Type t = TypeNil.XSCALAR;
+      for( Type t2 : _types ) t = t.meet(t2);
+      return t;
+    }
+    @Override public Type join() {
+      Type t = TypeNil.SCALAR;
+      for( Type t2 : _types ) t = t.join(t2);
+      return t;
+    }
+    
     @Override PrimSyn make() { return new Pair(); }
     @Override boolean hm(Work<Syntax> work) { return false; }
     @Override Type apply(Type[] flows) { return TypeMemPtr.make(_alias,TypeStruct.ISUSED); }
@@ -1860,7 +1912,17 @@ public class HM {
       int idx = Util.find(FLDS,id);
       return idx==-1 ? null : _types[idx];
     }
-    @Override public void push(Syntax f) { if( _rflds.find(f)==-1 ) _rflds.push(f);  }
+    @Override public Ary<Syntax> rflds() { return _rflds; }
+    @Override public Type meet() {
+      Type t = TypeNil.XSCALAR;
+      for( Type t2 : _types ) t = t.meet(t2);
+      return t;
+    }
+    @Override public Type join() {
+      Type t = TypeNil.SCALAR;
+      for( Type t2 : _types ) t = t.join(t2);
+      return t;
+    }
     @Override PrimSyn make() { return new Triple(); }
     @Override boolean hm(Work<Syntax> work) { return false; }
     @Override Type apply(Type[] flows) { return TypeMemPtr.make(_alias,TypeStruct.ISUSED);  }
@@ -2150,14 +2212,19 @@ public class HM {
     TypeMemPtr tmp();
     // Assemble a rich / deep pointer from parts
     default TypeMemPtr _tmp(int alias, String[] ids, Type[] ts) {
-      TypeFld[] tfs = TypeFlds.get(ts.length+1);
-      tfs[0] = TypeFld.NO_DISP;  // Display
-      for( int i=0; i<ts.length; i++ ) tfs[i+1] = TypeFld.make(ids[i],ts[i]);
+      TypeFld[] tfs = TypeFlds.make(TypeFld.NO_DISP); // Display
+      for( int i=0; i<ts.length; i++ )                // Insert and alpha sort 
+        tfs = TypeFlds.add(tfs,TypeFld.make(ids[i],ts[i]));
       return TypeMemPtr.make(alias,TypeStruct.make("", Type.ALL,TypeFlds.hash_cons(tfs)));
     }
     // Get a flow type from a field id
     Type fld(String id, Syntax foo);
-    void push(Syntax fld);
+    // Referring field labels
+    Ary<Syntax> rflds();
+    // Meet and join over all fields
+    Type meet();
+    Type join();
+
   }
 
   interface Func {
@@ -2555,6 +2622,8 @@ public class HM {
       add_deps_work(work);
       return true;
     }
+    boolean unify_miss_fld(String id, Work<Syntax> work) { return unify_errs(miss_fld(id),work); }
+
 
     // Unify this._flow into that._flow.  Flow is limited to only one of
     // {int,flt,ptr} and a 2nd unrelated flow type is kept as an error in
@@ -2680,19 +2749,14 @@ public class HM {
     // Structural recursion unification.  Always progress.
     static void unify_flds( T2 thsi, T2 that, Work<Syntax> work ) {
       if( thsi._args==that._args ) return;  // Already equal (and probably both nil)
-      for( String key : thsi._args.keySet() )
-        if( Field.is_resolving(key) )
-          Field.trial_resolve(key,thsi,work);
-      for( String key : that._args.keySet() )
-        if( Field.is_resolving(key) )
-          Field.trial_resolve(key,that,work);
+      Field.trial_resolve_all(thsi,work);
+      Field.trial_resolve_all(that,work);
       
       for( String key : thsi._args.keySet() ) {
         T2 fthis = thsi.arg(key); // Field of this
         T2 fthat = that.arg(key); // Field of that
         if( fthat==null ) {       // Missing field in that
-          if( Field.is_resolving(key) ) // Do not add or remove until resolved
-            continue;                                       
+          if( Field.is_resolving(key) ) continue; // Do not add or remove until resolved
           if( that.is_open() ) that.add_fld(key,fthis,work); // Add to RHS
           else                 thsi.del_fld(key, work); // Remove from LHS
         } else fthis._unify(fthat, work);
@@ -2704,8 +2768,7 @@ public class HM {
       if( that._args!=null )
         for( String key : that._args.keySet() ) {
           if( thsi.arg(key)==null ) { // Missing field in this
-            if( Field.is_resolving(key) )  // Do not add or remove until resolved
-              continue;
+            if( Field.is_resolving(key) ) continue; // Do not add or remove until resolved
             if( thsi.is_open() )  thsi.add_fld(key,that.arg(key),work); // Add to LHS
             else                  that.del_fld(key, work);              // Drop from RHS
           }
@@ -2819,14 +2882,8 @@ public class HM {
     private static boolean fresh_unify_flds(T2 thsi, T2 that, VStack nongen, Work<Syntax> work, boolean progress) {
       assert !thsi.unified() && !that.unified();
       // Attempt resolve and unresolved fields
-      if( thsi._args!=null )
-        for( String key : thsi._args.keySet() )
-          if( Field.is_resolving(key) )
-            progress |= Field.trial_resolve(key,thsi,work);
-      if( that._args!=null )
-        for( String key : that._args.keySet() )
-          if( Field.is_resolving(key) )
-            progress |= Field.trial_resolve(key,that,work);
+      progress |= Field.trial_resolve_all(thsi,work);
+      progress |= Field.trial_resolve_all(that,work);
       
       boolean missing = thsi.size()!= that.size();
       if( thsi._args != null )
@@ -2834,15 +2891,14 @@ public class HM {
           T2 lhs = thsi.arg(key);
           T2 rhs = that.arg(key);
           if( rhs==null ) {         // No RHS to unify against
-            if( Field.is_resolving(key) ) // No progress until field is resolved
-              continue;
+            if( Field.is_resolving(key) ) continue; // No progress until field is resolved
             missing = true;         // Might be missing RHS
             thsi.merge_deps(that,work);
             if( thsi.is_open() || that.is_open() || lhs.is_err() || (thsi.is_fun() && that.is_fun()) ) {
               if( work==null ) return true; // Will definitely make progress
               T2 nrhs = lhs._fresh(nongen); // New RHS value
               if( !that.is_open() ) {
-                nrhs._err = "Missing field " + key; // TODO: merge errors
+                nrhs._err = miss_fld(key); // TODO: merge errors
                 thsi.add_deps_work(work);
               }
               progress |= that.add_fld(key,nrhs,work);
@@ -2860,8 +2916,7 @@ public class HM {
       // are removed.
       if( missing && thsi.is_obj() && !thsi.is_open() && that._args!=null )
         for( String id : that._args.keySet() ) { // For all fields in RHS
-          if( Field.is_resolving(id) ) // No progress until field is resolved
-            continue;
+          if( Field.is_resolving(id) ) continue; // No progress until field is resolved
           if( thsi.arg(id)==null && !that.arg(id).is_err()) {   // Missing in LHS
             if( work == null ) return true;    // Will definitely make progress
             progress |= that.del_fld(id,work);
@@ -2918,23 +2973,6 @@ public class HM {
           t._args.put(key, arg(key)._fresh(nongen));
       assert !t.unified();
       return t;
-    }
-
-    // Given a record @{ label0=A, label1=B, label2=C, ...}, and another type F
-    // report back the single field which can unify with F, or null if many
-    // can, or " none" if none can.  Does no unification.
-    private String unify_over( T2 that ) {
-      assert is_obj();      
-      String lab = null;        // First child that unifies without error
-      for( String id : _args.keySet() ) {
-        T2 fld = arg(id);                      // Get a field choice
-        if( fld.trial_unify_ok(that,false) ) { // If no error          
-          if( lab!=null ) return null;         // Flag: 2 or more valid choices
-          lab = id;                            // First ok unify
-        }
-      }
-      if( lab!=null ) return lab; // lab==child, means one child unifies
-      return is_open() ? null : " none";
     }
 
     // Do a trial unification between this and that.  Report back if any error
@@ -3145,7 +3183,7 @@ public class HM {
         if( is_leaf() ) return TypeNil.XSCALAR; // Will unify with everything
         Type tj = Type.ALL;
         for( T2 t2 : T2.T2MAP.keySet() )
-          if( t2.trial_unify_ok(this,true) )
+          if( t2.trial_unify_ok(this,false) ) // true fails b_recursive_err_02/both/rseed=0
             tj = tj.join(T2.T2MAP.get(t2));
         if( !_is_copy )
           tj = tj.widen();
