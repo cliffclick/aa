@@ -1054,7 +1054,7 @@ loop = { name cnt ->
   }
 
   // 'lite' needs to be told to take an overload with syntax
-  @Ignore @Test public void g_overload_12() {
+  @Test public void g_overload_12() {
     run("color = { hex name -> (pair hex name )};"+
         "red  = (color 123 \"red\" );"+
         "blue = (color 456 \"blue\");"+
@@ -1067,11 +1067,11 @@ loop = { name cnt ->
         "lite = { c -> (color (dec c.0) (isempty c.1))};"+ // Should be "(color (sub c 0x111) (cat "light" c))"
         "(pair (lite red) (lite blue))",
 
-        "*( &[int,*str:(nint8)], &[int,*str:(nint8)])",
-        "*( &[int,*str:(nint8)], &[int,*str:(nint8)])",
-        "*[8](_, 0=PA:*[7]ov:(_, int64, *[4]str:(nint8)), 1=PA)",
-        "*[8](_, 0=PA:*[7]ov:(_, int64, Scalar), 1=PA)",
-        "[4,8]","[4,5,6,29]");
+        "*( *(int64,int1), *(int64,int1))",
+        "*( *(int64,int1), *(int64,int1))",
+        "*[8](_, 0=PA:*[7](_, int64, *[4]str:(nint8)?), 1=PA)",
+        "*[8](_, 0=PA:*[7](_, int64, *[4]str:(nint8)?), 1=PA)",
+        "[7,8]",null);
   }
   // Test case here is trying to get HM to do some overload resolution.
   // Without, many simple int/flt tests in main AA using HM alone fail to find

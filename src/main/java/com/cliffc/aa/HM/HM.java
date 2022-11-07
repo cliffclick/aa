@@ -2018,7 +2018,7 @@ public class HM {
       Type pred = flows[0];
       if( pred.above_center() ) return TypeNil.XSCALAR;
       if( pred instanceof TypeMemPtr tmp && tmp.is_str() ) {
-        Type chr = tmp._obj._def;
+        Type chr = tmp._obj.at(0);
         return chr==TypeInt.ZERO ? TypeInt.TRUE : TypeNil.XNIL;
       }
       return TypeInt.BOOL;
@@ -2901,6 +2901,7 @@ public class HM {
               // Hacking _args mid-iteration to update for the Field resolve
               thsi._args.remove(key);
               thsi._args.put(fld._id,lhs);
+              work.add(fld);
               // Hacked _args mid-iteration, just re-run from the start
               return fresh_unify_flds(thsi,that.find(),nongen,work,true);
             }
