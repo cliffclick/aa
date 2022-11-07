@@ -1613,7 +1613,9 @@ public class HM {
 
       // If field is doing overload resolution, inject even if rec is closed
       if( is_resolving(_id) ) {
-        if( work!=null ) rec._args.put(_id,self);
+        if( work==null ) return true;
+        rec._args.put(_id,self);
+        rec.merge_deps(self,work);
         return true;
       }
       
@@ -2891,7 +2893,18 @@ public class HM {
           T2 lhs = thsi.arg(key);
           T2 rhs = that.arg(key);
           if( rhs==null ) {         // No RHS to unify against
-            if( Field.is_resolving(key) ) continue; // No progress until field is resolved
+            if( Field.is_resolving(key) ) {
+              if( that.is_open() ) continue;  // Open RHS allows more fields which might add choices
+              Field fld = Field.FIELDS.get(key);
+              if( !fld.trial_resolve(that,work) ) continue;
+              if( work==null ) return true;
+              // Hacking _args mid-iteration to update for the Field resolve
+              thsi._args.remove(key);
+              thsi._args.put(fld._id,lhs);
+              // Hacked _args mid-iteration, just re-run from the start
+              return fresh_unify_flds(thsi,that.find(),nongen,work,true);
+            }
+
             missing = true;         // Might be missing RHS
             thsi.merge_deps(that,work);
             if( thsi.is_open() || that.is_open() || lhs.is_err() || (thsi.is_fun() && that.is_fun()) ) {

@@ -30,8 +30,8 @@ public class TestHM {
 
     DO_HMT=true;
     DO_GCP=false;
-    RSEED=0;
-    g_overload_04();
+    RSEED=3;
+    g_overload_13();
   }
 
   private void _run0s( String prog, String rprog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -942,8 +942,21 @@ loop = { name cnt ->
         "[4,8]",null);
   }
 
-  // Explicit overload argument
+  // Test overload as union of primitives.  Merge of 2 unrelated overloads
+  // forces resolution at the 'if'; hence 'red' is typed as either 'int' or
+  // 'str' and one of '(dec red)' or '(isempty red)' must fail.
   @Test public void g_overload_04() {
+    run("{ pred -> c =(if pred            (pair 123 \"red\" )                (pair 456  \"blue\" )); (pair (dec c._) (isempty c._))}",
+        "{ pred -> c =(if pred ({_pred -> (pair 123 \"red\" )}(notnil pred)) (pair 456  \"blue\" )); (pair (dec c.0) (isempty c.1))}",
+        "{A? -> *(int64,int1) }",
+        "{A? -> *(int64,int1) }",
+        "[31]{any,3 -> *[9](_, int64, xnil) }",
+        "[31]{any,3 -> *[9](_, int64, xnil) }",
+         "[9]","[31]");
+  }
+
+  // Explicit overload argument
+  @Test public void g_overload_05() {
     run("{ x -> (x._ x._.v)}",
         "{ x -> (x._ x._.v)}",
         "{*@{&17 = Unresolved field &17: { A:Unresolvedfield&19 -> B:Unresolvedfield&17}; &19 = Unresolvedfield&19:*@{v=A;...};...}->B}",
@@ -951,7 +964,7 @@ loop = { name cnt ->
         "[10]","[22]");
   }
 
-  @Test public void g_overload_05() {
+  @Test public void g_overload_06() {
     run("((pair 1 {x->x})._ 2.1f)",
         "((pair 1 {x->x}).1 2.1f)",
         "2.1f","2.1f",
@@ -959,14 +972,14 @@ loop = { name cnt ->
   }
 
   // No overload 
-  @Test public void g_overload_06() {
+  @Test public void g_overload_07() {
     run("{ ptr -> (ptr.x ptr.x) }",
         "{ *@{x= A:{ A-> B}; ...} -> B }",
         null);
   }
 
   // Field order specified
-  @Test public void g_overload_07() {
+  @Test public void g_overload_08() {
     run("({ ptr -> (ptr._.x ptr._.x) } (pair @{x=3} @{x=str}) )",
         "({ ptr -> (ptr.1.x ptr.0.x) } (pair @{x=3} @{x=str}) )",
         "*str:(int8)",
@@ -975,16 +988,17 @@ loop = { name cnt ->
         null);
   }
   // Field order under-specified, so ambiguous
-  @Test public void g_overload_err_07() {
+  @Test public void g_overload_err_08() {
     run("{ ptr -> (ptr._.x ptr._.x) }",
         "{ ptr -> (ptr._.x ptr._.x) }",
-        "{*@{&17 = Unresolved field &17:*@{x={A->B};...}; &20 = Unresolved field &20:*@{x=A;...};...}->B}",
-        "[22]{any,3 -> ~Scalar }",
-        "[7]", "[22]");
+        "{*@{&17=Unresolvedfield&17:*@{x=Unresolvedfield&17:{A:Unresolvedfield&20->B:Unresolvedfield&17};...};&20=Unresolvedfield&20:*@{x=A;...};...}->B}",
+        //"{*@{&17 = Unresolved field &17:*@{x={A->B};...}; &20 = Unresolved field &20:*@{x=A;...};...}->B}",
+        "[22]{any,3 -> Scalar }",
+        "[10]", "[22]");
   }
 
   // Field order specified
-  @Test public void g_overload_08() {
+  @Test public void g_overload_09() {
     run("({ ptr -> (ptr.x._ ptr.x._) } @{x=(pair 3 str)})",
         "({ ptr -> (ptr.x.1 ptr.x.0) } @{x=(pair 3 str)})",
         "*str:(int8)",
@@ -993,17 +1007,17 @@ loop = { name cnt ->
   }
 
   // Field order under-specified, so ambiguous
-  @Test public void g_overload_err_08() {
+  @Test public void g_overload_err_09() {
     run("{ ptr -> (ptr.x._ ptr.x._) }",
         "{ ptr -> (ptr.x._ ptr.x._) }",
-        "{*@{x=*@{&18 = Unresolved field &18:{ A:Unresolved field &21 -> B }; &21=A;...};...}->B}",
-        "[22]{any,3 -> ~Scalar }",
-        "[7]","[22]");
+        "{*@{x=*@{&18=Unresolvedfield&18:{A:Unresolvedfield&21->B:Unresolvedfield&18};&21=A;...};...}->B}",
+        "[22]{any,3 -> Scalar }",
+        "[10]","[22]");
   }
 
   // Test overload as union of primitives.  Merge of 2 related overloads stalls
   // resolution until use at 'dec' and 'isempty'.  Each use resolves separately.
-  @Test public void g_overload_09() {
+  @Test public void g_overload_10() {
     run("color = { hex name -> (pair hex name )};"+
         "red  = (color 123 \"red\" );"+
         "blue = (color 456 \"blue\");"+
@@ -1023,7 +1037,7 @@ loop = { name cnt ->
 
   // Test overload as union of primitives.  Overload resolution before
   // calling 'fun'.
-  @Test public void g_overload_10() {
+  @Test public void g_overload_11() {
     run("fun = { a0 -> (dec a0) }; "  + // a0 is an int
         "(pair (fun (pair   123 \"abc\"        )._)" + // Correct overload is 0x123
         "      (fun (triple \"def\" @{x=1} 456 )._)" + // Correct overload is 0x456
@@ -1040,7 +1054,7 @@ loop = { name cnt ->
   }
 
   // 'lite' needs to be told to take an overload with syntax
-  @Ignore @Test public void g_overload_11() {
+  @Ignore @Test public void g_overload_12() {
     run("color = { hex name -> (pair hex name )};"+
         "red  = (color 123 \"red\" );"+
         "blue = (color 456 \"blue\");"+
@@ -1062,7 +1076,7 @@ loop = { name cnt ->
   // Test case here is trying to get HM to do some overload resolution.
   // Without, many simple int/flt tests in main AA using HM alone fail to find
   // a useful type.
-  @Test public void g_overload_12() {
+  @Test public void g_overload_13() {
     run("""
 fwrap = { ff ->
   @{ _*_ = (pair
@@ -1113,11 +1127,11 @@ con2_1 = (fwrap 2.1f);
   }
 
   // Recursive structs.  More like what main AA will do with wrapped primitives.
-  @Test public void g_overload_13() {
+  @Test public void g_overload_14() {
     String hm_rez =  "*("+
-      "A:*@{_*_=*&[{B:*@{_*_=*&[{*@{i=int64;...}->B};{*@{f=flt64;...}->C:*@{_*_=*&[{*@{i=int64;...}->C};{*@{f=flt64;...}->C}];f=flt64}}];i=int64}->A};{*@{f=flt64;...}->A}];f=flt64},"+
-      "D:*@{_*_=*&[{E:*@{_*_=*&[{*@{i=int64;...}->E};{*@{f=flt64;...}->F:*@{_*_=*&[{*@{i=int64;...}->F};{*@{f=flt64;...}->F}];f=flt64}}];i=int64}->D};{*@{f=flt64;...}->G:*@{_*_=*&[{*@{i=int64;...}->G};{*@{f=flt64;...}->G}];f=flt64}}];i=int64},"+
-      "H:*@{_*_=*&[{*@{i=int64;...}->H};{I:*@{_*_=*&[{*@{i=int64;...}->I};{*@{f=flt64;...}->I}];f=flt64}->H}];f=flt64}"+
+      "A:*@{_*_=*({B:*@{_*_=*({*@{i=int64;...}->B},{*@{f=flt64;...}->C:*@{_*_=*({*@{i=int64;...}->C},{*@{f=flt64;...}->C});f=flt64}});i=int64}->A},{*@{f=flt64;...}->A});f=flt64},"+
+      "D:*@{_*_=*({E:*@{_*_=*({*@{i=int64;...}->E},{*@{f=flt64;...}->F:*@{_*_=*({*@{i=int64;...}->F},{*@{f=flt64;...}->F});f=flt64}});i=int64}->D},{*@{f=flt64;...}->G:*@{_*_=*({*@{i=int64;...}->G},{*@{f=flt64;...}->G});f=flt64}});i=int64},"+
+      "H:*@{_*_=*({*@{i=int64;...}->H},{I:*@{_*_=*({*@{i=int64;...}->I},{*@{f=flt64;...}->I});f=flt64}->H});f=flt64}"+
       ")";
 
     run("""
@@ -1175,24 +1189,24 @@ mul2 = { x -> (x._*_.0 con2)};
 
   // Recursive structs, in a loop.  Test of recursive int wrapper type ("occurs
   // check") in a loop.
-  @Test public void g_overload_14() {
+  @Test public void g_overload_15() {
     run("""
 fwrap = { ff ->
-  @{ mul = (pair
+  @{ f = ff;
+     mul = (pair
        { y -> (fwrap (f* ff (i2f y.i))) }
        { y -> (fwrap (f* ff      y.f )) }
      );
-     f = ff
    }
 };
 
 iwrap = { ii ->
-  @{ mul = (pair
+  @{ i = ii;
+     is0 = (eq0 ii);
+     mul = (pair
        { y -> (iwrap (i*      ii  y.i)) }
        { y -> (fwrap (f* (i2f ii) y.f)) }
      );
-     i = ii;
-     is0 = (eq0 ii);
      sub1= (iwrap (dec ii))
    }
 };
@@ -1206,21 +1220,21 @@ fact = { n -> (if n.is0 c1 (n.mul._ (fact n.sub1))) };
 """,
         """
 fwrap = { ff ->
-  @{ mul = (pair
+  @{ f = ff;
+     mul = (pair
        { y -> (fwrap (f* ff (i2f y.i))) }
        { y -> (fwrap (f* ff      y.f )) }
-     );
-     f = ff
+     )
    }
 };
 
 iwrap = { ii ->
-  @{ mul = (pair
+  @{ i = ii;
+     is0 = (eq0 ii);
+     mul = (pair
        { y -> (iwrap (i*      ii  y.i)) }
        { y -> (fwrap (f* (i2f ii) y.f)) }
      );
-     i = ii;
-     is0 = (eq0 ii);
      sub1= (iwrap (dec ii))
    }
 };
@@ -1232,15 +1246,15 @@ fact = { n -> (if n.is0 c1 (n.mul.0 (fact n.sub1))) };
 
 (fact c5)
 """,
-         "A:*@{i=int64;is0=int1;mul=*&[{A->A};{*@{f=flt64;...}->B:*@{f=flt64;mul=*&[{*@{i=int64;...}->B};{*@{f=flt64;...}->B}]}}];sub1=A}",
-         "A:*@{i=int64;is0=int1;mul=*&[{A->A};{*@{f=flt64;...}->B:*@{f=flt64;mul=*&[{*@{i=int64;...}->B};{*@{f=flt64;...}->B}]}}];sub1=A}",
+         "A:*@{i=int64;is0=int1;mul=*({A->A},{*@{f=flt64;...}->B:*@{f=flt64;mul=*({*@{i=int64;...}->B},{*@{f=flt64;...}->B})}});sub1=A}",
+         "A:*@{i=int64;is0=int1;mul=*({A->A},{*@{f=flt64;...}->B:*@{f=flt64;mul=*({*@{i=int64;...}->B},{*@{f=flt64;...}->B})}});sub1=A}",
          // bulk test answers
-         "PA:*[  11]@{_; i=int64; is0=int1; mul=*[  9]ov:(_, [   30]{any,3 -> PA }, [   34]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7]ov:(_, [25]{any,3 -> PB }, [27]{any,3 -> PB })} }); sub1=PA}",
-         "PA:*[8,11]@{_;                    mul=*[7,9]ov:(_, [25,30]{any,3 -> PA }, [27,34]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7]ov:(_, [25]{any,3 -> PB }, [27]{any,3 -> PB })} })}",
-         "[4,7,8,9,10,11,13,14,15]","[4,5,6,25,27,30,34]");
+         "PA:*[11]@{_; i=int64; is0=int1; mul=*[9](_, [34]{any,3 -> PA }, [37]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7](_, [26]{any,3 -> PB }, [28]{any,3 -> PB })} }); sub1=PA}",
+         "PA:*[11]@{_; i=int64; is0=int1; mul=*[9](_, [34]{any,3 -> PA }, [37]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7](_, [26]{any,3 -> PB }, [28]{any,3 -> PB })} }); sub1=PA}",
+         "[7,8,9,10,11,13,14,15]","[26,28,34,37]");
          // jig answers
-         //"PA:*[10]@{_; i=int64; is0=int1; mul=*[9]ov:(_, [29]{any,3 -> PA }, [32]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7]ov:(_, [24]{any,3 -> PB }, [26]{any,3 -> PB })} }); sub1=PA}",
-         //"PA:*[8,10]@{_; mul=*[7,9]ov:(_, [24,29]{any,3 -> PA }, [26,32]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7]ov:(_, [24]{any,3 -> PB }, [26]{any,3 -> PB })} })}",
+         //"PA:*[10]@{_; i=int64; is0=int1; mul=*[9](_, [29]{any,3 -> PA }, [32]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7](_, [24]{any,3 -> PB }, [26]{any,3 -> PB })} }); sub1=PA}",
+         //"PA:*[8,10]@{_; mul=*[7,9](_, [24,29]{any,3 -> PA }, [26,32]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7](_, [24]{any,3 -> PB }, [26]{any,3 -> PB })} })}",
          //"[4,7,8,9,10,11,12,13,14]","[4,5,6,24,26,29,32]");
   }
 
@@ -1260,7 +1274,7 @@ fact = { n -> (if n.is0 c1 (n.mul.0 (fact n.sub1))) };
   // Wrong args for all overloads
   @Test public void g_overload_err_01() {
     run("((pair { x y -> (i* x y) } { x y z -> (i* y z) })._ 4)",
-        "Bad arg count: int64",
+        "Unresolved field &28",
         "~int64");
   }
   // Mixing unrelated overloads
@@ -1271,30 +1285,18 @@ fy = (pair { z -> "def" } { a -> 4     });
 fz = (if (rand 2) fx fy);
 (isempty (fz._ 1.2f))
 """,
-         "Ambiguous overload: int1",
+         "Unresolved field &37: int1",
          "int1",
          null,null);
   }
 
-  // Test overload as union of primitives.  Merge of 2 unrelated overloads
-  // forces resolution at the 'if'; hence 'red' is typed as either 'int' or
-  // 'str' and one of '(dec red)' or '(isempty red)' must fail.
-  @Test public void g_overload_err_03() {
-    run("{ pred -> c =(if pred            (pair 123 \"red\" )                (pair 456  \"blue\" )); (pair (dec c._) (isempty c._))}",
-        "{ pred -> c =(if pred ({_pred -> (pair 123 \"red\" )}(notnil pred)) (pair 456  \"blue\" )); (pair (dec c.0) (isempty c.1))}",
-        "{ A? -> *(Mismatched overloads: int64, Mismatched overloads: int1) }",
-        "{ A? -> *(Mismatched overloads: int64, Mismatched overloads: int1) }",
-        "[29]{any,3 -> *[9](_, int64, xnil) }",
-        "[29]{any,3 -> *[9](_, int64, int1) }",
-         "[4,9]","[4,5,6,29]");
-  }
-
   // Another ambiguous field layout
-  @Test public void g_overload_err_04() {
+  @Test public void g_overload_err_03() {
     run("{ x -> (x._ x._.v)}",
         "{ x -> (x._ x._.v )}",
-        "[22]{any,3 ->xnil }",
-        "[4,10]","[22,24]");
+        "{*@{ &17 = Unresolved field &17: { A:Unresolved field &19 -> B:Unresolved field &17 }; &19 = Unresolvedfield &19: *@{v=A;...};...}->B}",
+        "[22]{any,3 ->Scalar }",
+        "[10]","[22]");
   }
 
 
@@ -1313,7 +1315,7 @@ fz = (if (rand 2) fx fy);
         "};"+
         "forceSubtyping ={b ->(if b true false)};"+ // A unified version
         // Trying really hard here to unify 'true' and 'false'
-        "bool=@{true=(forceSubtyping 1); false=(forceSubtyping 0); force=forceSubtyping};"+
+        "bool=@{false=(forceSubtyping 0); true=(forceSubtyping 1); force=forceSubtyping};"+
         // Apply the unified 'false' to two different return contexts
         "testa=(bool.false.then { x-> 3 } { y-> 4 });"+
         "testb=(bool.false.then { z->@{}} { z->@{}});"+
@@ -1334,7 +1336,7 @@ fz = (if (rand 2) fx fy);
         "};"+
         "forceSubtyping ={b ->(if b ({_b -> true}(notnil b)) false)};"+ // A unified version
         // Trying really hard here to unify 'true' and 'false'
-        "bool=@{true=(forceSubtyping 1); false=(forceSubtyping 0); force=forceSubtyping};"+
+        "bool=@{false=(forceSubtyping 0); force=forceSubtyping; true=(forceSubtyping 1)};"+
         // Apply the unified 'false' to two different return contexts
         "testa=(bool.false.then { x-> 3 } { y-> 4 });"+
         "testb=(bool.false.then { z->@{}} { z->@{}});"+
@@ -1373,18 +1375,18 @@ boolSub ={b ->(if b true false)};
 void = @{};
 true = @{
   and      = {b -> b};
-  or       = {b -> true};
   not      = {unused ->true};
+  or       = {b -> true};
   then = {then else->(then void) }
 };
 false = @{
   and      = {b -> false};
-  or       = {b -> b};
   not      = {unused ->true};
+  or       = {b -> b};
   then = {then else->(else void) }
 };
 boolSub ={b ->(if b ({_b -> true}(notnil b)) false)};
-@{true=(boolSub 1); false=(boolSub 0)}
+@{false=(boolSub 0); true=(boolSub 1)}
 """,
          "*@{ false = A:*@{ and = { A -> A }; "+
                "not = { B -> A }; "+
@@ -1427,7 +1429,7 @@ false = @{
   then = {then else->(else 7) }
 };
 boolSub ={b ->(if b ({_b -> true}(notnil b)) false)};
-@{true=true; false=false; boolSub=boolSub};
+@{boolSub=boolSub; false=false; true=true };
 all
 """,
         "*@{ boolSub = { A? -> *@{ not = { B -> C:*@{ not = { D -> C }; then = { { 7 -> E } { 7 -> E } -> E }} }; then = { { 7 -> F } { 7 -> F } -> F }} }; false = C; true = C}",
@@ -1454,13 +1456,13 @@ all
   n=*[17]@{_;
     s=[38]{any,3 ->
       PC:*[16]@{_;
-        add_=[37]{any,3 -> Scalar };
+        add_=[34]{any,3 -> Scalar };
         pred=[35]{any,3 -> Scalar };
         succ=[36]{any,3 -> PC };
-        zero=[34]{any,3 -> PA }
+        zero=[37]{any,3 -> PA }
       }
     };
-    z=*[12]@{_; add_=[33]{any,3 -> Scalar }; pred=[22]{any,3 -> ~Scalar }; succ=[31]{any,3 -> PC }; zero=[30]{any,3 -> PB }}
+    z=*[12]@{_; add_=[30]{any,3 -> Scalar }; pred=[22]{any,3 -> ~Scalar }; succ=[31]{any,3 -> PC }; zero=[33]{any,3 -> PB }}
   };
   one  =PC;
   three=PC;
@@ -1482,20 +1484,20 @@ b=
     or__ = {o -> o};
     then = {then else->(else void) }
   };
-  @{true=true; false=false};
+  @{ false=false; true=true };
 n=
   z = @{
-    zero = {unused ->b.true};
+    add_ = {o-> o};
     pred = err;
     succ = {unused -> (n.s n.z)};
-    add_ = {o-> o}
+    zero = {unused ->b.true}
   };
   s = { pred ->
     self=@{
-      zero = {unused ->b.false};
+      add_ = {m -> ((pred.add_ m).succ void)};
       pred = {unused -> pred };
       succ = {unused -> (n.s self)};
-      add_ = {m -> ((pred.add_ m).succ void)}
+      zero = {unused ->b.false}
     };
     self
   };
@@ -1503,7 +1505,7 @@ n=
 one = (n.s n.z);
 two = (one.add_ one);
 three =(n.s two);
-@{b=b;n=n; one=one;two=two;three=three}
+@{b=b; n=n; one=one; three=three; two=two}
 """,
        null,
         "*@{" +
@@ -1650,23 +1652,23 @@ all=
     };
   boolSub ={b ->(if b ({_b -> true}(notnil b)) false)};
   z = @{
-    zero = {unused ->all.true};
+    add_ = {n-> n};
     pred = err;
     succ = {n -> (all.s n)};
-    add_ = {n-> n}
+    zero = {unused ->all.true}
     };
   orZero = {n ->(true.then {unused ->n} {unused ->z})};
   s = {pred ->
     self=@{
-      zero = {unused ->all.false};
+      add_ ={m -> (self.succ (pred.add_ m))};
       pred = {unused->pred};
       succ = {unused -> (all.s self)};
-      add_ ={m -> (self.succ (pred.add_ m))}
+      zero = {unused ->all.false}
       };
     (orZero self)
     };
   one =(s z);
-  @{true=(boolSub 1); false=(boolSub 0); z=z; s=s};
+  @{false=(boolSub 0); s=s; true=(boolSub 1); z=z};
 all
 """,
          """
@@ -1784,8 +1786,8 @@ maybepet = petcage.get;
 rand = (factor 1.2f);
 cage = { ->
   put = { pet ->
-    @{ put = put;
-       get = pet
+    @{ get = pet;
+       put = put
      }
   };
   (put 0)
