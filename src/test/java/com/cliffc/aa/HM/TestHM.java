@@ -28,10 +28,12 @@ public class TestHM {
   @Ignore @Test public void testJig() {
     JIG=true;
 
+    // d_struct_07, T/T/8
+    // x_peano_00, T/T/15
     DO_HMT=true;
-    DO_GCP=false;
-    RSEED=3;
-    g_overload_13();
+    DO_GCP=true;
+    RSEED=15;
+    x_peano_00();
   }
 
   private void _run0s( String prog, String rprog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -65,7 +67,7 @@ public class TestHM {
     if( JIG )
       _run0s(prog,rprog,rez_hm,frez_gcp,RSEED,esc_ptrs,esc_funs);
     else
-      for( int rseed=0; rseed<4; rseed++ )
+      for( int rseed=0; rseed<32; rseed++ )
         _run0s(prog,rprog,rez_hm,frez_gcp,rseed,esc_ptrs,esc_funs);
   }
 
@@ -880,12 +882,14 @@ loop = { name cnt ->
   // Simple overload def.  Since no uses, no Field to resolve.
   @Test public void g_overload_00() {
     run("(pair"                  +  // Define a pair of fcns
-         "  { x -> (i* x 2   ) }"+  // Arg is 'int'
-         "  { x -> (f* x 3.0f) }"+  // Arg is 'flt'
-         ")",
-         "*( {int64 -> int64}, {flt64 -> flt64} )",
-         "*[7](_, [25]{any,3 -> int64 }, [27]{any,3 -> flt64 })",
-         "[4,7]","[25,27]"
+        "  { x -> (i* x 2   ) }"+  // Arg is 'int'
+        "  { x -> (f* x 3.0f) }"+  // Arg is 'flt'
+        ")",
+        "*( {int64 -> int64}, {flt64 -> flt64} )",
+        "*[7](_, [25]{any,3 -> int64 }, [27]{any,3 -> flt64 })",
+        "[4,7]","[25,27]"
+        //"*[7](_, [24]{any,3 -> int64 }, [26]{any,3 -> flt64 })",
+        //"[4,7]","[24,26]"
         );
   }
 
@@ -929,6 +933,9 @@ loop = { name cnt ->
         "[35]{any,3 -> *[8](_, nint8, 0.6f) }",
         "[35]{any,3 -> *[8](_, nint8, 0.6f) }",
         "[4,8]","[35]");
+        //"[33]{any,3 -> *[8](_, nint8, 0.6f) }",
+        //"[33]{any,3 -> *[8](_, nint8, 0.6f) }",
+        //"[4,8]","[33]");
   }
 
   // Test overload as union of primitives
@@ -952,7 +959,10 @@ loop = { name cnt ->
         "{A? -> *(int64,int1) }",
         "[31]{any,3 -> *[9](_, int64, xnil) }",
         "[31]{any,3 -> *[9](_, int64, xnil) }",
-         "[9]","[31]");
+        "[9]","[31]");
+        //"[30]{any,3 -> *[9](_, int64, xnil) }",
+        //"[30]{any,3 -> *[9](_, int64, xnil) }",
+        //"[9]","[30]");
   }
 
   // Explicit overload argument
@@ -962,6 +972,7 @@ loop = { name cnt ->
         "{*@{&17 = Unresolved field &17: { A:Unresolvedfield&19 -> B:Unresolvedfield&17}; &19 = Unresolvedfield&19:*@{v=A;...};...}->B}",
         "[22]{any,3 -> Scalar }",
         "[10]","[22]");
+        //"[7]","[22]");
   }
 
   @Test public void g_overload_06() {
@@ -992,9 +1003,9 @@ loop = { name cnt ->
     run("{ ptr -> (ptr._.x ptr._.x) }",
         "{ ptr -> (ptr._.x ptr._.x) }",
         "{*@{&17=Unresolvedfield&17:*@{x=Unresolvedfield&17:{A:Unresolvedfield&20->B:Unresolvedfield&17};...};&20=Unresolvedfield&20:*@{x=A;...};...}->B}",
-        //"{*@{&17 = Unresolved field &17:*@{x={A->B};...}; &20 = Unresolved field &20:*@{x=A;...};...}->B}",
         "[22]{any,3 -> Scalar }",
         "[10]", "[22]");
+        //"[7]", "[22]");
   }
 
   // Field order specified
@@ -1013,6 +1024,7 @@ loop = { name cnt ->
         "{*@{x=*@{&18=Unresolvedfield&18:{A:Unresolvedfield&21->B:Unresolvedfield&18};&21=A;...};...}->B}",
         "[22]{any,3 -> Scalar }",
         "[10]","[22]");
+        //"[7]","[22]");
   }
 
   // Test overload as union of primitives.  Merge of 2 related overloads stalls
@@ -1032,7 +1044,10 @@ loop = { name cnt ->
         "{ A? -> *(int64,int1) }",
         "[31]{any,3 -> *[8](_, int64, xnil) })",
         "[31]{any,3 -> *[8](_, int64, xnil) }",
-        "[4,8]","[4,5,6,31]");
+        "[8]","[31]");
+        //"[30]{any,3 -> *[8](_, int64, xnil) })",
+        //"[30]{any,3 -> *[8](_, int64, xnil) }",
+        //"[8]","[30]");
   }
 
   // Test overload as union of primitives.  Overload resolution before
@@ -1121,9 +1136,11 @@ con2   = (iwrap 2   );
 con2_1 = (fwrap 2.1f);
 (con2_1._*_.1 con2_1)
 """,
-         "A:*@{_*_=*( {*@{i=int64;...}->A}, {B:*@{_*_=*( {*@{i=int64;...}->B}, {*@{f=flt64;...}->B}); f=flt64}->A});f=flt64}",
-         "PA:*[8]@{_; _*_=*[7](_, [26]{any,3 -> PA }, [28]{any,3 -> PA }); f=flt64}",
-         "[4,7,8,10,13]","[26,28]");
+        "A:*@{_*_=*( {*@{i=int64;...}->A}, {B:*@{_*_=*( {*@{i=int64;...}->B}, {*@{f=flt64;...}->B}); f=flt64}->A});f=flt64}",
+        "PA:*[8]@{_; _*_=*[7](_, [26]{any,3 -> PA }, [28]{any,3 -> PA }); f=flt64}",
+        "[7,8,10,13]","[26,28]");
+        //"PA:*[8]@{_; _*_=*[7](_, [25]{any,3 -> PA }, [27]{any,3 -> PA }); f=flt64}",
+        //"[7,8,11,12]","[25,27]");
   }
 
   // Recursive structs.  More like what main AA will do with wrapped primitives.
@@ -1155,7 +1172,7 @@ iwrap = { ii ->
 con2   = (iwrap 2  );
 con2_1 = (fwrap 2.1f);
 mul2 = { x -> (x._*_._ con2)};
-(triple (mul2 con2_1)  (con2._*_._ con2) (con2_1._*_._ con2_1))
+(triple (mul2 con2_1)  (con2._*_.0 con2) (con2_1._*_.1 con2_1))
 """,
         """
 fwrap = { ff ->
@@ -1184,7 +1201,10 @@ mul2 = { x -> (x._*_.0 con2)};
         hm_rez,
         "*[12](_, 0=PA:*[8]@{_; _*_=*[7](_, [26]{any,3 -> PA }, [28]{any,3 -> PA }); f=flt64}, 1=PB:*[11]@{_; _*_=*[9](_, [33]{any,3 -> PB }, [36]{any,3 -> PA }); i=int64}, 2=PA)",
         "*[12](_, 0=PA:*[8]@{_; _*_=*[7](_, [26]{any,3 -> PA }, [28]{any,3 -> PA }); f=flt64}, 1=PB:*[11]@{_; _*_=*[9](_, [33]{any,3 -> PB }, [36]{any,3 -> PA }); i=int64}, 2=PA)",
-        "[4,7,8,9,10,11,12,13,14,15]","[4,5,6,26,28,33,36]");
+         "[7,8,9,10,11,12,13,14,15]", "[26,28,33,36]");
+        //"*[11](_, 0=PA:*[8]@{_; _*_=*[7](_, [25]{any,3 -> PA }, [27]{any,3 -> PA }); f=flt64}, 1=PB:*[10]@{_; _*_=*[9](_, [31]{any,3 -> PB }, [34]{any,3 -> PA }); i=int64}, 2=PA)",
+        //"*[11](_, 0=PA:*[8]@{_; _*_=*[7](_, [25]{any,3 -> PA }, [27]{any,3 -> PA }); f=flt64}, 1=PB:*[10]@{_; _*_=*[9](_, [31]{any,3 -> PB }, [34]{any,3 -> PA }); i=int64}, 2=PA)",
+        //"[4,7,8,9,10,11,12,13,14,15]", "[25,27,31,34]");
   }
 
   // Recursive structs, in a loop.  Test of recursive int wrapper type ("occurs
@@ -1246,16 +1266,16 @@ fact = { n -> (if n.is0 c1 (n.mul.0 (fact n.sub1))) };
 
 (fact c5)
 """,
-         "A:*@{i=int64;is0=int1;mul=*({A->A},{*@{f=flt64;...}->B:*@{f=flt64;mul=*({*@{i=int64;...}->B},{*@{f=flt64;...}->B})}});sub1=A}",
-         "A:*@{i=int64;is0=int1;mul=*({A->A},{*@{f=flt64;...}->B:*@{f=flt64;mul=*({*@{i=int64;...}->B},{*@{f=flt64;...}->B})}});sub1=A}",
-         // bulk test answers
-         "PA:*[11]@{_; i=int64; is0=int1; mul=*[9](_, [34]{any,3 -> PA }, [37]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7](_, [26]{any,3 -> PB }, [28]{any,3 -> PB })} }); sub1=PA}",
-         "PA:*[11]@{_; i=int64; is0=int1; mul=*[9](_, [34]{any,3 -> PA }, [37]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7](_, [26]{any,3 -> PB }, [28]{any,3 -> PB })} }); sub1=PA}",
-         "[7,8,9,10,11,13,14,15]","[26,28,34,37]");
-         // jig answers
-         //"PA:*[10]@{_; i=int64; is0=int1; mul=*[9](_, [29]{any,3 -> PA }, [32]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7](_, [24]{any,3 -> PB }, [26]{any,3 -> PB })} }); sub1=PA}",
-         //"PA:*[8,10]@{_; mul=*[7,9](_, [24,29]{any,3 -> PA }, [26,32]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7](_, [24]{any,3 -> PB }, [26]{any,3 -> PB })} })}",
-         //"[4,7,8,9,10,11,12,13,14]","[4,5,6,24,26,29,32]");
+        "A:*@{i=int64;is0=int1;mul=*({A->A},{*@{f=flt64;...}->B:*@{f=flt64;mul=*({*@{i=int64;...}->B},{*@{f=flt64;...}->B})}});sub1=A}",
+        "A:*@{i=int64;is0=int1;mul=*({A->A},{*@{f=flt64;...}->B:*@{f=flt64;mul=*({*@{i=int64;...}->B},{*@{f=flt64;...}->B})}});sub1=A}",
+        // bulk test answers
+        "PA:*[11]@{_; i=int64; is0=int1; mul=*[9](_, [34]{any,3 -> PA }, [37]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7](_, [26]{any,3 -> PB }, [28]{any,3 -> PB })} }); sub1=PA}",
+        "PA:*[11]@{_; i=int64; is0=int1; mul=*[9](_, [34]{any,3 -> PA }, [37]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7](_, [26]{any,3 -> PB }, [28]{any,3 -> PB })} }); sub1=PA}",
+        "[7,8,9,10,11,13,14,15]","[26,28,34,37]");
+        // jig answers
+        //"PA:*[10]@{_; i=int64; is0=int1; mul=*[9](_, [32]{any,3 -> PA }, [35]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7](_, [25]{any,3 -> PB }, [27]{any,3 -> PB })} }); sub1=PA}",
+        //"PA:*[10]@{_; i=int64; is0=int1; mul=*[9](_, [32]{any,3 -> PA }, [35]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7](_, [25]{any,3 -> PB }, [27]{any,3 -> PB })} }); sub1=PA}",
+        //"[7,8,9,10,11,12,13,14]","[25,27,32,35]");
   }
 
   // Ambiguous overload, {int->int}, cannot select.
@@ -1297,6 +1317,7 @@ fz = (if (rand 2) fx fy);
         "{*@{ &17 = Unresolved field &17: { A:Unresolved field &19 -> B:Unresolved field &17 }; &19 = Unresolvedfield &19: *@{v=A;...};...}->B}",
         "[22]{any,3 ->Scalar }",
         "[10]","[22]");
+        //"[7]","[22]");
   }
 
 

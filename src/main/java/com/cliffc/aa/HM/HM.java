@@ -542,7 +542,7 @@ public class HM {
     // Giant Assert: True if OK; all Syntaxs off worklist do not make progress
     abstract boolean more_work(Work<Syntax> work);
     final boolean more_work_impl(Work<Syntax> work) {
-      if( DO_HM && (!work.on(this) || HM_FREEZE) && hm(null) ) // Anymore HM work?
+      if( (!work.on(this) || HM_FREEZE) && hm(null) ) // Anymore HM work?
         return false;           // Found HM work not on worklist or when frozen
       if( DO_GCP ) {            // Doing GCP AND
         Type t = val(null);
@@ -556,27 +556,31 @@ public class HM {
     @Override final public String toString() { return str(new SB()).toString(); }
     abstract SB str(SB sb);
     // Line-by-line print with more detail
-    public String p() { return p0(new SB(), new VBitSet()).toString(); }
-    final SB p0(SB sb, VBitSet dups) {
-      if( _hmt!=null ) _hmt._get_dups(new VBitSet(),dups);
+    public String p() {
+      VBitSet dups  = new VBitSet();
       VBitSet visit = new VBitSet();
+      visit(syn -> syn._hmt._get_dups(visit,dups),(a,b)->null);
+      return p0(new SB(), new VBitSet(), dups).toString();
+    }
+    final SB p0(SB sb, VBitSet visit, VBitSet dups) {
       p1(sb.i(),dups);
       if( DO_HM  ) _hmt .str(sb.p(", HMT="), visit,dups,true);
       if( DO_GCP ) _flow.str(sb.p(", GCP="), true, false );
       sb.nl();
-      return p2(sb.ii(2),dups).di(2);
+      return p2(sb.ii(2),visit,dups).di(2);
     }
     abstract SB p1(SB sb, VBitSet dups); // Self short print
-    abstract SB p2(SB sb, VBitSet dups); // Recursion print
+    abstract SB p2(SB sb, VBitSet visit, VBitSet dups); // Recursion print
     static void reset() { CNT=1; }
     // Utility to find a specific T2 uid
     T2 find( int uid ) {
       return visit( syn -> syn.debug_find().find(uid),
                     (a,b) -> a==null ? b : a );
     }
-
-    // Walk the program inserting overload-resolving Field loads as needed
-    abstract T2 resolve();
+    Syntax uid( int uid ) {
+      return visit( syn -> syn._uid==uid ? syn : null,
+                    (a,b) -> a==null ? b : a );
+    }
   }
 
   static class Con extends Syntax {
@@ -596,7 +600,7 @@ public class HM {
 
       return _con.str(sb,true,false);
     }
-    @Override SB p2(SB sb, VBitSet dups) { return sb; }
+    @Override SB p2(SB sb, VBitSet visit, VBitSet dups) { return sb; }
     @Override boolean hm(Work<Syntax> work) { return false; }
     @Override Type val(Work<Syntax> work) { return _con; }
     @Override void add_hm_work( @NotNull Work<Syntax> work) { }
@@ -608,7 +612,6 @@ public class HM {
       prep_tree_impl(par, nongen, work, base);
       return 1;
     }
-    @Override T2 resolve() { return null; }
     @Override boolean more_work(Work<Syntax> work) { return more_work_impl(work); }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
   }
@@ -630,7 +633,7 @@ public class HM {
     }
     @Override SB str(SB sb) { return p1(sb,null); }
     @Override SB p1(SB sb, VBitSet dups) { return sb.p(_name); }
-    @Override SB p2(SB sb, VBitSet dups) { return sb; }
+    @Override SB p2(SB sb, VBitSet visit, VBitSet dups) { return sb; }
     T2 idt() {
       T2 idt = _idt.find();
       return idt==_idt ? idt : (_idt=idt);
@@ -690,13 +693,6 @@ public class HM {
       }
       throw new RuntimeException("Parse error, "+_name+" is undefined in "+_par);
     }
-    @Override T2 resolve() {
-      T2 idt = idt(), hmt=find();
-      if( _fresh ) idt.fresh_unify(hmt,_nongen,WORK);
-      else         idt.      unify(hmt        ,WORK);
-      return null;
-    }
-
     @Override boolean more_work(Work<Syntax> work) { return more_work_impl(work); }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
   }
@@ -753,7 +749,7 @@ public class HM {
       }
       return sb.p(" -> ... } ");
     }
-    @Override SB p2(SB sb, VBitSet dups) { return _body.p0(sb,dups); }
+    @Override SB p2(SB sb, VBitSet visit, VBitSet dups) { return _body.p0(sb,visit,dups); }
     @Override public T2 as_fun() { return find(); }
     @Override public int nargs() { return _types.length; }
     public Ident[] refs(int idx) {
@@ -862,17 +858,6 @@ public class HM {
         }
       return -99;
     }
-    @Override T2 resolve() {
-      T2 fun = find();
-      assert fun.is_fun();
-      for( int i=0; i<_targs.length; i++ ) {
-        T2 formal = fun.arg(ARGNAMES[i]);
-        if( formal!=null )      // Can be null if some apply has arg counts wrong
-          formal.unify(targ(i),WORK);
-      }
-      fun.arg(RET).unify(_body.find(),WORK);
-      return null;
-    }
     @Override boolean more_work(Work<Syntax> work) {
       if( !more_work_impl(work) ) return false;
       return _body.more_work(work);
@@ -891,7 +876,7 @@ public class HM {
     Let(String arg0, Syntax def, Syntax body) { _arg0=arg0; _body=body; _def=def; _refs=new Ident[0]; }
     @Override SB str(SB sb) { return _body.str(_def.str(sb.p(_arg0).p(" = ")).p("; ")); }
     @Override SB p1(SB sb, VBitSet dups) { return sb.p(_arg0).p(" = ... ; ..."); }
-    @Override SB p2(SB sb, VBitSet dups) { _def.p0(sb,dups); return _body.p0(sb,dups); }
+    @Override SB p2(SB sb, VBitSet visit, VBitSet dups) { _def.p0(sb,visit,dups); return _body.p0(sb,visit,dups); }
     T2 targ() { return _def.find(); }
     @Override boolean hm(Work<Syntax> work) { return false;  }
     @Override void add_hm_work( @NotNull Work<Syntax> work) { throw unimpl();  }
@@ -922,7 +907,6 @@ public class HM {
       assert prior==_def || prior==_body;
       return prior==_def ? -1 : -2;
     }
-    @Override T2 resolve() { return null; }
     @Override boolean more_work(Work<Syntax> work) {
       if( !more_work_impl(work) ) return false;
       return _body.more_work(work) && _def.more_work(work);
@@ -949,9 +933,9 @@ public class HM {
       return sb.unchar().p(")");
     }
     @Override SB p1(SB sb, VBitSet dups) { return sb.p("(...)"); }
-    @Override SB p2(SB sb, VBitSet dups) {
-      _fun.p0(sb,dups);
-      for( Syntax arg : _args ) arg.p0(sb,dups);
+    @Override SB p2(SB sb, VBitSet visit, VBitSet dups) {
+      _fun.p0(sb,visit,dups);
+      for( Syntax arg : _args ) arg.p0(sb,visit,dups);
       return sb;
     }
 
@@ -1123,23 +1107,6 @@ public class HM {
       return cnt;
     }
 
-    @Override T2 resolve() {
-      T2 fun = _fun.find();
-      if( fun.is_leaf() ) {
-        T2 nfun = make_nfun();
-        fun.unify(nfun,WORK);
-        fun = nfun;
-      }
-      for( int i=0; i<_args.length; i++ ) {
-        T2 actual = _args[i].find();
-        T2 formal = fun.arg(Lambda.ARGNAMES[i]);
-        if( formal!=null )      // Can be null if too many args for fun
-          actual.unify(formal.find(),WORK);
-      }
-      find().unify(fun.find().arg(RET),WORK);
-      return null;
-    }
-
     @Override boolean more_work(Work<Syntax> work) {
       if( !more_work_impl(work) ) return false;
       if( !_fun.more_work(work) ) return false;
@@ -1238,7 +1205,6 @@ public class HM {
       _hmt = _fun.find();
       return cnt;
     }
-    @Override T2 resolve() { return null; }
 
     void add_new_leaf_work(Work<Syntax> work) {
       work.addAll(NEW_LEAF_DEPS);
@@ -1278,7 +1244,7 @@ public class HM {
     static BitsAlias matching_escaped_aliases(T2 t2) {
       BitsAlias aliases = BitsAlias.EMPTY;
       for( int alias : EXT_ALIASES )
-        if( t2.trial_unify_ok(ALIASES.at(alias).t2(),false) )
+        if( t2.trial_unify_ok(ALIASES.at(alias).t2()) )
           aliases = aliases.set(alias); // Compatible escaping alias
       return aliases;
     }
@@ -1296,7 +1262,7 @@ public class HM {
         for( int fidx : EXT_FIDXS ) {
           Func fun = Lambda.FUNS.get(fidx);
           // Dunno (yet), since trial_unify can pass, then filter as HM proceeds
-          if( t2.trial_unify_ok(fun.as_fun(),false) )
+          if( t2.trial_unify_ok(fun.as_fun()) )
             fidxs = fidxs.set(fidx); // Compatible escaping fidx
         }
       return fidxs;
@@ -1456,9 +1422,9 @@ public class HM {
       return sb.p("}");
     }
     @Override SB p1(SB sb, VBitSet dups) { return sb.p("@{").p(_alias).p(" ... } "); }
-    @Override SB p2(SB sb, VBitSet dups) {
+    @Override SB p2(SB sb, VBitSet visit, VBitSet dups) {
       for( int i=0; i<_ids.length; i++ )
-        _flds[i].p0(sb.i().p(_ids[i]).p(" = ").nl(),dups);
+        _flds[i].p0(sb.i().p(_ids[i]).p(" = ").nl(),visit,dups);
       return sb;
     }
     @Override public T2 t2() { return find(); }
@@ -1530,16 +1496,6 @@ public class HM {
       assert  hmt.is_obj();
       return cnt;
     }
-    @Override T2 resolve() {
-      T2 ptr = find();
-      T2 rec = ptr.arg("*");
-      for( int i=0; i<_ids.length; i++ ) {
-        T2 fld = rec.arg(_ids[i]);
-        if( fld != null )
-          fld.unify(_flds[i].find(),WORK);
-      }
-      return null;
-    }
 
     @Override boolean more_work(Work<Syntax> work) {
       if( !more_work_impl(work) ) return false;
@@ -1571,8 +1527,9 @@ public class HM {
     }
     @Override SB str(SB sb) {   return  _ptr.str(sb).p(".").p(is_resolving(_id) ? "_" : _id); }
     @Override SB p1(SB sb, VBitSet dups) { return sb.p(".").p(is_resolving(_id) ? "_" : _id); }
-    @Override SB p2(SB sb, VBitSet dups) { return _ptr.p0(sb,dups); }
+    @Override SB p2(SB sb, VBitSet visit, VBitSet dups) { return _ptr.p0(sb,visit,dups); }
     static boolean is_resolving(String id) { return id.charAt(0)=='&'; }
+    boolean is_resolving() { return is_resolving(_id); }
     @Override boolean hm(Work<Syntax> work) {
       T2 ptr = _ptr.find();
       if( work!=null ) ptr.push_update(this);
@@ -1600,8 +1557,8 @@ public class HM {
 
       // Attempt resolve
       boolean progress=false;
-      if( is_resolving(_id) ) {
-        progress = trial_resolve(rec, work);
+      if( is_resolving() && !rec.is_open() ) {
+        progress = trial_resolve(find(), rec, rec, work);
         if( progress && work==null ) return true;
       }
       
@@ -1612,9 +1569,10 @@ public class HM {
         return (self.unify_errs(ptr._err,work) & fld.unify(self, work)) | progress;
 
       // If field is doing overload resolution, inject even if rec is closed
-      if( is_resolving(_id) ) {
+      if( is_resolving() ) {
         if( work==null ) return true;
         rec._args.put(_id,self);
+        rec.push_update(this);
         rec.merge_deps(self,work);
         return true;
       }
@@ -1642,7 +1600,7 @@ public class HM {
       for( int alias : tmp._aliases ) {
         if( alias==0 ) continue; // May be nil error
         Alloc alloc = ALIASES.at(alias);
-        if( is_resolving(_id) ) { // Field is resolving an overload
+        if( is_resolving() ) {  // Field is resolving an overload
           // Still resolving, use the join of fields.
           afld = HM_AMBI ? alloc.meet() : alloc.join();
         } else {
@@ -1683,95 +1641,62 @@ public class HM {
       prep_tree_impl(par, nongen, work, T2.make_leaf());
       return _ptr.prep_tree(this,nongen,work)+1;
     }
-    @Override T2 resolve() {
-      T2 ptr = _ptr.find();
-      // Get the pointed-at struct.
-      // If not a ptr, make it one (which might trigger an error).
-      T2 rec = ptr.arg("*");
-      if( rec==null ) {
-        if( ptr._args ==null ) ptr._args = new NonBlockingHashMap<>();
-        ptr._args.put("*", rec = T2.make_leaf());
-      }
-
-      // Add struct-ness
-      if( rec.is_leaf() ) {
-        rec._open = true;
-        rec._is_obj = true;
-        assert rec._args==null;
-        rec._args = new NonBlockingHashMap<>();
-      }
-      assert rec.is_obj();
-
-      // Attempt resolve
-      if( is_resolving(_id) )
-        trial_resolve(rec,WORK);
-      // Look up field
-      T2 fld = rec.arg(_id);
-      T2 self = find();
-      if( fld!=null ) {         // Unify against a pre-existing field
-        fld.unify(self, WORK);
-        return null;
-      }
-
-      // If field is doing overload resolution, inject even if rec is closed
-      if( is_resolving(_id) )
-        return rec._args.put(_id,self);
-
-      // If field must be there, and it is not, then it is missing
-      if( !rec.is_open() )
-        self.unify_miss_fld(_id,WORK);
-      
-      // Add the field
-      rec.add_fld(_id,self,WORK);
-      return null;
-    }
-    
     // Attempt to resolve all unresolved labels in a struct
     static boolean trial_resolve_all(T2 obj, Work<Syntax> work) {
       if( obj._args==null || !obj.is_obj() ) return false;
-      if( work==null ) return false;
-      boolean progress=false;
-      for( String key : obj._args.keySet() )
-        if( is_resolving(key) )
-          progress |= trial_resolve(key,obj,work);
+    
+      // If already resolved, just update-in-place
+      boolean progress = false;
+      for( String key : obj._args.keySet() ) {
+        if( !is_resolving(key) ) continue;
+        Field fld = FIELDS.get(key);
+        if( fld.is_resolving() ) {
+          if( !obj.is_open() ) // More fields possible, so trial_resolve cannot be tried
+            progress |= trial_resolve(key,obj.arg(key),obj,obj,work); // Attempt resolve
+        } else {
+          // key is resolving, but Field is already resolved
+          if( work==null ) continue; // Make no changes, but do not declare progress: this is a lazy update
+          T2 old = obj._args.remove(key); // Remove resolving key
+          T2 t2 = obj.arg(fld._id);       // Get resolved label, if any
+          if( t2==null ) obj._args.put(fld._id,old); // Insert resolved-label, even if obj is open, since this is a label replacement
+          else progress |= old.find().unify(t2,work); // Unify into existing (fold labels together)
+        }
+      }
+      
       return progress;
     }
     
-    // Attempts to set a soft-label to a hard-label; if it succeeds unifies them both.
-    static boolean trial_resolve(String key, T2 obj, Work<Syntax> work) { return FIELDS.get(key).trial_resolve(obj,work); }
-    boolean trial_resolve(T2 obj, Work<Syntax> work) {
-      assert obj.is_obj();
-      T2 self = find();
-      // If already resolved, just update-in-p-lace
-      if( !is_resolving(_id) ) {
-        if( work==null ) return true;
-        obj._args.remove("&"+_uid);  // Remove resolved soft-label
-        T2 old = obj._args.get(_id); // Get resolved label T2
-        if( old!=null ) old.unify(self,work); // Merge  resolved-label
-        else obj._args.put(_id,self);         // Insert resolved-label
-        return true;
-      }
+    // Attempts resolve a field; if so updates 'obj' accordingly.
+    static boolean trial_resolve(String key, T2 pat, T2 lhs, T2 rhs, Work<Syntax> work) { return FIELDS.get(key).trial_resolve(pat,lhs, rhs, work); }
+    boolean trial_resolve(T2 pat, T2 lhs, T2 rhs, Work<Syntax> work) {
+      assert lhs.is_obj() && rhs.is_obj() && !rhs.is_open() && is_resolving();
 
       // Not yet resolved.  See if there is exactly 1 choice.
       String lab = null;
-      for( String id : obj._args.keySet() ) {
-        T2 rhs = obj.arg(id);
+      for( String id : rhs._args.keySet() ) {
         if( is_resolving(id) ) continue;
-        if( self.trial_unify_ok(rhs,false) ) {
+        if( pat.trial_unify_ok(rhs.arg(id)) ) {
           if( lab==null ) lab=id;   // No choices yet, so take this one
           else {                    // Ambiguous (yet)
-            self.push_update(this); // Revisit if self changes
+            pat.push_update(this);  // Revisit if changes
+            pat.merge_deps(rhs,work);
             // Either cannot resolve (yet), or too late and will never resolve
             return false;
           }
         }
       }
       if( lab==null ) return false; // No match, so error and never resolves
-      if( work==null ) return true;   // Singleton match
-      T2 old = obj._args.remove(_id); // Get unresolved label
-      if( old!=null ) self.unify(old,work);
+      // Field can be resolved
+      if( work==null ) return true; // Singleton match
+      boolean old = lhs._args.remove(_id)!=null;   // Remove old label
+      T2 prior = lhs.arg(lab);      // Get prior matching lhs label, if any
+      if( prior==null ) {
+        if( !old ) throw unimpl(); // No old unresolved label, no old resolved label
+        lhs._args.put(lab,pat);
+      } else prior.unify(pat,work); // Merge pattern and prior label in LHS
       _id=lab;                  // Change field label
-      return true;
+      work.add(this);           // On worklist, GCP at least can update
+      return true;              // Progress
     }
     
     @Override boolean more_work(Work<Syntax> work) {
@@ -1832,8 +1757,6 @@ public class HM {
       return TypeFunPtr.makex(false,BitsFun.make0(_fidx),_args.length+DSP_IDX,Type.ANY,ret);
     }
 
-    @Override T2 resolve() { return null; }
-
     @Override boolean more_work(Work<Syntax> work) { return more_work_impl(work); }
     @Override SB str(SB sb){ return sb.p(name()); }
 
@@ -1849,7 +1772,7 @@ public class HM {
       return sb.unchar(2).p("} ");
     }
 
-    @Override SB p2(SB sb, VBitSet dups) { return sb; }
+    @Override SB p2(SB sb, VBitSet visit, VBitSet dups) { return sb; }
   }
 
   // Pair
@@ -1961,13 +1884,6 @@ public class HM {
       if( !(pred instanceof TypeNil tn) ) return pred.oob(TypeNil.SCALAR);
       if( tn._nil ) return tn._sub ? TypeNil.XSCALAR : t2; // OR, YES
       else          return tn._sub ? t1              : t1.meet(t2); // NO, AND
-    }
-    // Unify all 3 parts without wrapping an overload.
-    @Override T2 resolve() {
-      T2 rez = find().arg(RET);
-      rez       .unify(targ(1),WORK);
-      rez.find().unify(targ(2),WORK);
-      return null;
     }
   }
 
@@ -2453,7 +2369,7 @@ public class HM {
       n.merge_deps(this,null);
       return this;
     }
-
+    
     private long dbl_uid(T2 t) { return dbl_uid(t._uid); }
     private long dbl_uid(long uid) { return ((long)_uid<<32)|uid; }
 
@@ -2751,8 +2667,8 @@ public class HM {
     // Structural recursion unification.  Always progress.
     static void unify_flds( T2 thsi, T2 that, Work<Syntax> work ) {
       if( thsi._args==that._args ) return;  // Already equal (and probably both nil)
-      Field.trial_resolve_all(thsi,work);
-      Field.trial_resolve_all(that,work);
+      if( Field.trial_resolve_all(thsi,null) ) thsi=thsi.find();
+      assert !Field.trial_resolve_all(that,null); // TODO: need a test case
       
       for( String key : thsi._args.keySet() ) {
         T2 fthis = thsi.arg(key); // Field of this
@@ -2884,28 +2800,31 @@ public class HM {
     private static boolean fresh_unify_flds(T2 thsi, T2 that, VStack nongen, Work<Syntax> work, boolean progress) {
       assert !thsi.unified() && !that.unified();
       // Attempt resolve and unresolved fields
-      progress |= Field.trial_resolve_all(thsi,work);
-      progress |= Field.trial_resolve_all(that,work);
+      while( Field.trial_resolve_all(thsi,work) || Field.trial_resolve_all(that,work) ) {
+        progress=true;
+        thsi = thsi.find();
+        that = that.find();
+      }
       
       boolean missing = thsi.size()!= that.size();
       if( thsi._args != null )
         for( String key : thsi._args.keySet() ) {
           T2 lhs = thsi.arg(key);
           T2 rhs = that.arg(key);
-          if( rhs==null ) {         // No RHS to unify against
-            if( Field.is_resolving(key) ) {
-              if( that.is_open() ) continue;  // Open RHS allows more fields which might add choices
-              Field fld = Field.FIELDS.get(key);
-              if( !fld.trial_resolve(that,work) ) continue;
-              if( work==null ) return true;
-              // Hacking _args mid-iteration to update for the Field resolve
-              thsi._args.remove(key);
-              thsi._args.put(fld._id,lhs);
-              work.add(fld);
-              // Hacked _args mid-iteration, just re-run from the start
-              return fresh_unify_flds(thsi,that.find(),nongen,work,true);
-            }
+          // Attempt a fresh cross-T2 resolve
+          if( rhs==null && Field.is_resolving(key) ) {
+            if( that.is_open() ) continue;  // Open RHS allows more fields which might add choices
+            Field fld = Field.FIELDS.get(key);
+            if( !fld.trial_resolve(lhs,thsi,that,work) ) continue;
+            if( work==null ) return true;
+            progress = true;
+            // Updated LHS args and RHS key
+            key=fld._id;
+            lhs = thsi.arg(key);
+            rhs = that.arg(key);
+          }
 
+          if( rhs==null ) {         // No RHS to unify against
             missing = true;         // Might be missing RHS
             thsi.merge_deps(that,work);
             if( thsi.is_open() || that.is_open() || lhs.is_err() || (thsi.is_fun() && that.is_fun()) ) {
@@ -2929,13 +2848,14 @@ public class HM {
       // just skip the copy).  If the LHS is closed, then the extra RHS fields
       // are removed.
       if( missing && thsi.is_obj() && !thsi.is_open() && that._args!=null )
-        for( String id : that._args.keySet() ) { // For all fields in RHS
-          if( Field.is_resolving(id) ) continue; // No progress until field is resolved
-          if( thsi.arg(id)==null && !that.arg(id).is_err()) {   // Missing in LHS
+        for( String key : that._args.keySet() ) { // For all fields in RHS
+          if( Field.is_resolving(key) ) continue;
+          if( thsi.arg(key)==null && !that.arg(key).is_err()) {   // Missing in LHS
             if( work == null ) return true;    // Will definitely make progress
-            progress |= that.del_fld(id,work);
+            progress |= that.del_fld(key,work);
           }
         }
+      // If LHS is closed, close RHS
       if( thsi.is_obj() && that._open && !thsi._open) { progress = true; that._open = false; }
       if( progress && work!=null ) that.add_deps_work(work);
       return progress;
@@ -2980,7 +2900,6 @@ public class HM {
 
       // Structure is deep-replicated
       T2 t = copy();
-      if( is_leaf() ) t._deps=null;
       VARS.put(this,t);         // Stop cyclic structure looping
       if( _args!=null )
         for( String key : _args.keySet() )
@@ -2992,11 +2911,11 @@ public class HM {
     // Do a trial unification between this and that.  Report back if any error
     // happens.  No change to either side, this is a trial only.
     private static final NonBlockingHashMapLong<T2> TDUPS = new NonBlockingHashMapLong<>();
-    private boolean trial_unify_ok(T2 that, boolean extras) {
+    private boolean trial_unify_ok(T2 that) {
       TDUPS.clear();
-      return _trial_unify_ok(that, extras);
+      return _trial_unify_ok(that);
     }
-    private boolean _trial_unify_ok(T2 that, boolean extras) {
+    private boolean _trial_unify_ok(T2 that) {
       assert !unified() && !that.unified();
       long duid = dbl_uid(that._uid);
       if( TDUPS.putIfAbsent(duid,this)!=null )
@@ -3021,12 +2940,12 @@ public class HM {
           if( Util.eq(id,RET) ) continue; // Do not unify based on return types
           T2 lhs = this.arg(id);
           T2 rhs = that.arg(id);
-          if( rhs!=null && !lhs._trial_unify_ok(rhs, extras) ) return false;
+          if( rhs!=null && !lhs._trial_unify_ok(rhs) ) return false;
         }
 
       // Allow unification with extra fields.  The normal unification path
       // will not declare an error, it will just remove the extra fields.
-      return extras || (this.mismatched_child(that) && that.mismatched_child(this));
+      return this.mismatched_child(that) && that.mismatched_child(this);
     }
 
     // True if 'this' has extra children and 'that' does not allow extras
@@ -3097,9 +3016,6 @@ public class HM {
     // T2MAP allows cycle_equals, not identity equals
     static private final IdentityHashMap<T2,Type> T2MAP = new IdentityHashMap<>();
     static private boolean T2_NEW_LEAF;
-    static private Type T2JOIN_LEAF, T2JOIN_BASE;
-    static private final Ary<T2> T2JOIN_LEAFS = new Ary<>(T2.class);
-    static private final Ary<T2> T2JOIN_BASES = new Ary<>(T2.class);
     static final NonBlockingHashMapLong<Type> WDUPS = new NonBlockingHashMapLong<>();
 
     // Lift the flow of an Apply, according to its inputs.  This is to
@@ -3197,7 +3113,7 @@ public class HM {
         if( is_leaf() ) return TypeNil.XSCALAR; // Will unify with everything
         Type tj = Type.ALL;
         for( T2 t2 : T2.T2MAP.keySet() )
-          if( t2.trial_unify_ok(this,false) ) // true fails b_recursive_err_02/both/rseed=0
+          if( t2.trial_unify_ok(this) ) // true fails b_recursive_err_02/both/rseed=0
             tj = tj.join(T2.T2MAP.get(t2));
         if( !_is_copy )
           tj = tj.widen();
@@ -3298,6 +3214,7 @@ public class HM {
 
     // Merge this._deps into that
     void merge_deps( T2 that, Work<Syntax> work ) {
+      assert !that.unified();
       if( _deps != null ) {
         that.push_update(_deps);
         if( !that._is_copy && _is_copy && work!=null )
@@ -3343,10 +3260,10 @@ public class HM {
       }
 
       // Dup printing for all but bases (which are short, just repeat them)
-      if( debug || !is_base() || is_err() ) {
-        if( dup ) vname(sb,debug);
-        if( visit.tset(_uid) && dup ) return sb;
-        if( dup ) sb.p(':');
+      if( dup && (debug || !is_base() || is_err()) ) {
+        vname(sb,debug);        // Leading V123
+        if( visit.tset(_uid) ) return sb; // V123 and nothing else
+        sb.p(':');              // V123:followed_by_type_descr
       }
 
       // Special printing for errors
@@ -3414,7 +3331,7 @@ public class HM {
           if( Util.eq(fld,RET) ) continue;   // Function return   , happens if unifying fcns and structs
           if( Util.eq(fld,is_clz)) continue; // Clazz marker name, not currently used
           // Skip field names in a tuple
-          str0(is_tup ? sb.p(' ') : sb.p(' ').p(fld).p(" = "),visit,get(fld),dups,debug).p(is_tup ? ',' : ';');
+          str0(is_tup && !Field.is_resolving(fld) ? sb.p(' ') : sb.p(' ').p(fld).p(" = "),visit,get(fld),dups,debug).p(is_tup ? ',' : ';');
           sep=true;
         }
       }
