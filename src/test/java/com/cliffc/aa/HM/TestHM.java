@@ -32,7 +32,7 @@ public class TestHM {
     // x_peano_00, T/T/15
     DO_HMT=true;
     DO_GCP=true;
-    RSEED=15;
+    RSEED=18;
     x_peano_00();
   }
 
@@ -1325,16 +1325,16 @@ fz = (if (rand 2) fx fy);
   @Test public void x_peano_00() {
     run("void = @{};"+              // Same as '()'; all empty structs are alike
         "true = @{"+                // 'true' is a struct with and,or,then
-        "  and= {b -> b};"+
-        "  or = {b -> true};"+
-        "  then = {then else->(then void) }"+
+        "  and= {at -> at};"+
+        "  or = {ot -> true};"+
+        "  then = {then ig_else -> (then void) }"+
         "};"+
         "false = @{"+               // 'false' is a struct with and,or,then
-        "  and= {b -> false};"+
-        "  or = {b -> b};"+
-        "  then = {then else->(else void) }"+
+        "  and= {af -> false};"+
+        "  or = {of -> of};"+
+        "  then = {ig_then else -> (else void) }"+
         "};"+
-        "forceSubtyping ={b ->(if b true false)};"+ // A unified version
+        "forceSubtyping ={pred ->(if pred true false)};"+ // A unified version
         // Trying really hard here to unify 'true' and 'false'
         "bool=@{false=(forceSubtyping 0); true=(forceSubtyping 1); force=forceSubtyping};"+
         // Apply the unified 'false' to two different return contexts
@@ -1346,16 +1346,16 @@ fz = (if (rand 2) fx fy);
 
         "void = @{};"+              // Same as '()'; all empty structs are alike
         "true = @{"+                // 'true' is a struct with and,or,then
-        "  and= {b -> b};"+
-        "  or = {b -> true};"+
-        "  then = {then else->(then void) }"+
+        "  and= {at -> at};"+
+        "  or = {ot -> true};"+
+        "  then = {then ig_else -> (then void) }"+
         "};"+
         "false = @{"+               // 'false' is a struct with and,or,then
-        "  and= {b -> false};"+
-        "  or = {b -> b};"+
-        "  then = {then else->(else void) }"+
+        "  and= {af -> false};"+
+        "  or = {of -> of};"+
+        "  then = {ig_then else -> (else void) }"+
         "};"+
-        "forceSubtyping ={b ->(if b ({_b -> true}(notnil b)) false)};"+ // A unified version
+        "forceSubtyping ={pred ->(if pred ({_pred -> true}(notnil pred)) false)};"+ // A unified version
         // Trying really hard here to unify 'true' and 'false'
         "bool=@{false=(forceSubtyping 0); force=forceSubtyping; true=(forceSubtyping 1)};"+
         // Apply the unified 'false' to two different return contexts
@@ -1365,11 +1365,15 @@ fz = (if (rand 2) fx fy);
         "@{a=testa; b=testb; bool=bool}"+
         "",
 
-         "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
-         "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
-         "*[17]@{_; a=int64; b=*[12,16](_); bool=*[11]@{_; false=PA:*[8,9]@{_; and=[22,26]{any,3 -> Scalar }; or=[23,27]{any,3 -> Scalar }; then=[25,28]{any,4 -> Scalar }}; force=[33]{any,3 -> PA }; true=PA}}",
-         "*[17]@{_; a=Scalar; b=Scalar; bool=*[11]@{_; false=PA:*[8,9]@{_; and=[22,26]{any,3 -> Scalar }; or=[23,27]{any,3 -> Scalar }; then=[25,28]{any,4 -> Scalar }}; force=[33]{any,3 -> PA }; true=PA}}",
-         "[4,7,8,9,11,12,16,17]","[22,23,24,25,26,27,28,32,33]");
+        "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
+        "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
+        "*[17]@{_; a=int64; b=*[12,16](_); bool=*[11]@{_; false=PA:*[8,9]@{_; and=[22,26]{any,3 -> Scalar }; or=[23,27]{any,3 -> Scalar }; then=[25,28]{any,4 -> Scalar }}; force=[33]{any,3 -> PA }; true=PA}}",
+        "*[17]@{_; a=Scalar; b=Scalar; bool=*[11]@{_; false=PA:*[8,9]@{_; and=[22,26]{any,3 -> Scalar }; or=[23,27]{any,3 -> Scalar }; then=[25,28]{any,4 -> Scalar }}; force=[33]{any,3 -> PA }; true=PA}}",
+        "[7,8,9,11,12,16,17]","[22,23,24,25,26,27,28,32,33]");
+        //"*[13]@{_; a=int64 ; b=*[11,12](_); bool=*[10]@{_; false=PA:*[8,9]@{_; and=[22,25]{any,3 -> Scalar }; or=[23,26]{any,3 -> Scalar }; then=[24,27]{any,4 -> Scalar }}; force=[31]{any,3 -> PA }; true=PA}}",
+        //"*[13]@{_; a=Scalar; b=Scalar     ; bool=*[10]@{_; false=PA:*[8,9]@{_; and=[22,25]{any,3 -> Scalar }; or=[23,26]{any,3 -> Scalar }; then=[24,27]{any,4 -> Scalar }}; force=[31]{any,3 -> PA }; true=PA}}",
+        //"[7,8,9,10,11,12,13]","[22,23,24,25,26,27,31,36,37]");
+    
   }
 
 

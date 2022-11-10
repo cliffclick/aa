@@ -207,7 +207,7 @@ public class HM {
     assert prog.more_work(work);
     main_work_loop(prog,work);
 
-    // Pass 3:Unresolved Fields are ambiguous; propagate errors
+    // Pass 3: Unresolved Fields are ambiguous; propagate errors
     HM_AMBI = true;
     prog.add_ambi_work(work);
     assert prog.more_work(work);
@@ -3029,9 +3029,11 @@ public class HM {
     // monotonic because the result is JOINd with GCP types.
     void walk_types_in( Type t ) {
       assert !unified();
-      long duid = dbl_uid(t._uid);
-      if( WDUPS.putIfAbsent(duid,TypeStruct.ISUSED)!=null ) return;
-      T2MAP.merge(this, t, Type::meet);
+      if( !is_obj() ) {
+        long duid = dbl_uid(t._uid);
+        if( WDUPS.putIfAbsent(duid,TypeStruct.ISUSED)!=null ) return;
+        T2MAP.merge(this, t, Type::meet);
+      }
       // TODO: stop lifting on error inputs; then can take early-exit from each choice.
 
       // Free variables keep the input flow type.
@@ -3110,10 +3112,10 @@ public class HM {
       // successful trials, join all results since we might unify with any of
       // them.
       if( !HM_FREEZE ) {
-        if( is_leaf() ) return TypeNil.XSCALAR; // Will unify with everything
+        if( is_leaf() && T2_NEW_LEAF ) return TypeNil.XSCALAR; // Will unify with every new leaf
         Type tj = Type.ALL;
         for( T2 t2 : T2.T2MAP.keySet() )
-          if( t2.trial_unify_ok(this) ) // true fails b_recursive_err_02/both/rseed=0
+          if( t2.trial_unify_ok(this) )
             tj = tj.join(T2.T2MAP.get(t2));
         if( !_is_copy )
           tj = tj.widen();
