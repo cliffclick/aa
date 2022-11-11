@@ -28,11 +28,11 @@ public class TestHM {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    // d_struct_07, T/T/8
-    // x_peano_00, T/T/15
+    // x_peano_00, T/T/9, pass#4 also, picks up a clr_cp in pass#4
+    // x_peano_05, T/T/0
     DO_HMT=true;
     DO_GCP=true;
-    RSEED=18;
+    RSEED=0;
     x_peano_00();
   }
 
@@ -45,8 +45,10 @@ public class TestHM {
     // names are actually inferred (or program is in-error).
     if( rprog==null ) rprog=prog;
     assertEquals(stripIndent("("+rprog+")"),stripIndent(syn.toString()));
-
+    
     // Check expected types for HMT and GCP
+    if( frez_gcp!=null )  if( Type.valueOf(frez_gcp)!=syn.flow_type() ) System.err.println(frez_gcp+" =!= "+syn.flow_type());
+    if(  rez_hm !=null )  if( !stripIndent(rez_hm).equals(stripIndent(syn._hmt.p())) ) System.err.println(rez_hm+" =!= "+syn._hmt.p());
     if( frez_gcp!=null )  assertEquals(Type.valueOf(frez_gcp),syn.flow_type());
     if(  rez_hm !=null )  assertEquals(stripIndent(rez_hm),stripIndent(syn._hmt.p()));
 
@@ -58,6 +60,8 @@ public class TestHM {
       BitsFun   fidxs   = esc_funs==null ? BitsFun  .EMPTY : ((TypeFunPtr)Type.valueOf(esc_funs2)).fidxs() ;
       aliases = aliases.meet(TypeMemPtr.STRPTR._aliases); // Always string alias
       for( HM.EXTLambda elam : Root.EXTS )  if( elam!=null )  fidxs = fidxs.set(elam._fidx); // Always the default escapes
+      if( aliases!=Root.ext_aliases() ) System.err.println("ALIAS "+aliases+" =!= "+Root.ext_aliases());
+      if( fidxs  !=Root.ext_fidxs  () ) System.err.println("FIDX  "+fidxs  +" =!= "+Root.ext_fidxs  ());
       assertEquals(aliases,Root.ext_aliases());
       assertEquals(fidxs  ,Root.ext_fidxs  ());
     }
@@ -98,14 +102,14 @@ public class TestHM {
   @Test public void a_basic_01() {
     run( "{ x -> (pair 3 x) }" ,
          "{ A -> *( 3, A) }",
-         "[23]{any,3 -> *[7](_, 3,Scalar)}",
-         "[7]", "[23]" );
+         "[30]{any,3 -> *[17](_, 3,Scalar)}",
+         "[17]", "[30]" );
   }
   @Test public void a_basic_02() {
     run( "{ z -> (pair (z 0) (z \"abc\")) }" ,
           "{ { *str:(97)? -> A } -> *( A, A) }",
-          "[23]{any,3 ->*[7](_, Scalar, Scalar) }",
-          "[7]", "[23,24]" );
+          "[30]{any,3 ->*[17](_, Scalar, Scalar) }",
+          "[17]", "[30,7]" );
   }
   // Because {y->y} is passed in, all 'y' types must agree.
   // This unifies 3 and 5 which results in 'nint8'
@@ -114,28 +118,28 @@ public class TestHM {
         null,
          "*( nint8, nint8)",   // HMT result type, using both GCP + HMT
          "*( nint8, nint8)",   // HMT result type, HMT alone
-         "*[7](_, 3, 5)",  // GCP result type, using both GCP + HMT
-         "*[7](_, nint8, nint8)", // GCP result type, GCP alone
-          "[7]",null);
+         "*[17](_, 3, 5)",      // GCP result type, using both GCP + HMT
+         "*[17](_, nint8, nint8)", // GCP result type, GCP alone
+          "[17]",null);
   }
   @Test public void a_basic_04() {
     run("id={x->x}; (pair (id 3) (id \"abc\"))",
         null,
-         // HM is sharper here than in test05, because id is generalized per each use site
-         "*( 3, *str:(97))",
-         "*( 3, *str:(97))",
-         // GCP with HM
-         "*[7](_, 3, *[4]str:(97))",
-         // GCP is weaker without HM, reports error tuple
-         "*[7](_, nScalar, nScalar)",
-         "[4,7]", null );
+        // HM is sharper here than in test05, because id is generalized per each use site
+        "*( 3, *str:(97))",
+        "*( 3, *str:(97))",
+        // GCP with HM
+        "*[17](_, 3, *[4]str:(97))",
+        // GCP is weaker without HM, reports error tuple
+        "*[17](_, nScalar, nScalar)",
+        "[17]", null );
   }
   // example that demonstrates generic and non-generic variables:
   @Test public void a_basic_05() {
     run( "{ g -> f = { ignore -> g }; (pair (f 3) (f \"abc\"))}",
           "{ A -> *( A, A) }",
-          "[25]{any,3 ->*[7](_, Scalar, Scalar) }",
-          "[4,7]","[25]");
+          "[31]{any,3 ->*[17](_, Scalar, Scalar) }",
+          "[17]","[31]");
   }
   @Test public void a_basic_06() { run("(i* 2 3)","int64","6");  }
 
@@ -147,8 +151,8 @@ public class TestHM {
   @Test public void b_recursive_00() {
     run( "fact = { n -> (if (eq0 n) 1 (i* n (fact (dec n))))}; fact",
           "{ int64 -> int64 }",
-          "[27]{any,3 -> int64 }",
-          null, "[27]" );
+          "[33]{any,3 -> int64 }",
+          null, "[33]" );
   }
   // recursive unification; normal H-M fails here.
   @Test public void b_recursive_01() {
@@ -156,8 +160,8 @@ public class TestHM {
           // We can argue the pretty-print should print:
           // "  A:{ A -> B }"
           "{ A:{ A -> B } -> B }",
-          "[22]{any,3 ->Scalar }",
-          null, "[22,24]" );
+          "[29]{any,3 ->Scalar }",
+          null, "[29,7]" );
   }
   // Obscure factorial-like
   @Test public void b_recursive_02() {
@@ -189,18 +193,18 @@ public class TestHM {
          null,
          "{{ A -> A } -> A }",
          "{{ A -> A } -> A }",
-         "[25]{any,3 -> ~Scalar }",
-         "[25]{any,3 ->  Scalar }",
-         null, "[24,25]");
+         "[31]{any,3 -> ~Scalar }",
+         "[31]{any,3 ->  Scalar }",
+         null, "[7,31]");
   }
   @Test public void b_recursive_06() {
     run("f0 = { f -> (if (rand 2) 1 (f (f0 f) 2))}; f0",
         null,
         "{ { 1 2 -> 1 } -> 1 }",
         "{ { 1 2 -> 1 } -> 1 }",
-        "[25]{any,3 ->1 }",
-        "[25]{any,3 ->1 }",
-        null,"[24,25]");
+        "[31]{any,3 ->1 }",
+        "[31]{any,3 ->1 }",
+        null,"[7,31]");
   }
   @Test public void b_recursive_07() {
     run("I = {x->x};"+
@@ -210,17 +214,17 @@ public class TestHM {
         "test = (term W);"+
         "test",
         "{ { A:{A->A} -> {A->B} } -> B }",
-        "[27]{any,3 ->Scalar }",
-        null,"[22,23,24,25,27]");
+        "[33]{any,3 ->Scalar }",
+        null,"[29,30,7,31,33]");
   }
 
   // Test incorrect argument count
   @Test public void b_recursive_err_00() {
-    run("({x y -> (pair x y) } 1 2 3)","Bad arg count: *(1,2)","*[7](_, 1, 2)","[4,7]",null);
+    run("({x y -> (pair x y) } 1 2 3)","Bad arg count: *(1,2)","*[17](_, 1, 2)","[17]",null);
   }
   // Test incorrect argument count
   @Test public void b_recursive_err_01() {
-    run("({x y -> (pair x y) } 1 )","Bad arg count: *(1,A)","*[7](_, 1, ~Scalar)","[4,7]",null);
+    run("({x y -> (pair x y) } 1 )","Bad arg count: *(1,A)","*[17](_, 1, ~Scalar)","[17]",null);
   }
   @Test public void b_recursive_err_02() {
     run("I = {x->x};"+
@@ -230,8 +234,8 @@ public class TestHM {
         "test = (term W);"+
         "(test {x -> {y -> (pair (x 3) (((y \"abc\") \"def\") \"red\")) } })",
         "*( A:[Cannot unify {A->A} and 3 and *str:(nint8)], A )",
-        "*[7](_,  Scalar, Scalar)",
-        "[4,7]","[]");
+        "*[17](_,  Scalar, Scalar)",
+        "[17]","[]");
   }
   // Stacked if functions "carry through" precision.
   // Test was buggy, since 'rand' is a known non-zero function pointer constant,
@@ -252,21 +256,21 @@ public class TestHM {
   @Test public void c_composition_01() {
     run( "{ f g -> (f g)}",
           "{ { A -> B } A -> B }",
-          "[22]{any,4 ->Scalar }",
-          null,"[22,24]");
+          "[29]{any,4 ->Scalar }",
+          null,"[29,7]");
   }
   // Function composition
   @Test public void c_composition_02() {
     run( "{ f g -> { arg -> (g (f arg))} }",
           "{ { A -> B } { B -> C } -> { A -> C } }",
-          "[23]{any,4 ->[22]{any,3 ->Scalar } }",
-          null,"[22,23,24,32]");
+          "[30]{any,4 ->[29]{any,3 ->Scalar } }",
+          null,"[29,30,7,8]");
   }
 
   @Test public void c_composition_03() {
     run("x = { y -> (x (y y))}; x",
-         "{ A:{ A -> A } -> B }", "[22]{any,3 ->~Scalar }",
-         null,"[22,24]");
+         "{ A:{ A -> A } -> B }", "[29]{any,3 ->~Scalar }",
+         null,"[29,7]");
   }
 
   // Stacked functions ignoring all function arguments
@@ -275,8 +279,8 @@ public class TestHM {
   // map takes a function and an element (collection?) and applies it (applies to collection?)
   @Test public void c_composition_05() {
     run( "map = { fun -> { x -> (fun x)}}; { p -> 5 }",
-          "{ A -> 5 }",  "[25]{any,3 -> 5 }",
-          null,"[25]");
+          "{ A -> 5 }",  "[31]{any,3 -> 5 }",
+          null,"[31]");
   }
   // Looking at when tvars are duplicated ("fresh" copies made).
   // This is the "map" problem with a scalar instead of a collection.
@@ -287,15 +291,15 @@ public class TestHM {
         null,
         "*( *str:(int8), flt64)",
         "*( *str:(int8), flt64)",
-        "*[7](_, *[4]str:(int8), flt64)",
-        "*[7](_, Scalar, Scalar)",
-        "[4,7]",null);
+        "*[17](_, *[4]str:(int8), flt64)",
+        "*[17](_, Scalar, Scalar)",
+        "[17]",null);
   }
   // map takes a function and an element (collection?) and applies it (applies to collection?)
   @Test public void c_composition_07() { run("map = { fun x -> (fun x)}; (map {a->3} 5)", "3", "3"); }
 
   // map takes a function and an element (collection?) and applies it (applies to collection?)
-  @Test public void c_composition_08() { run("map = { fun x -> (fun x)}; (map { a-> (pair a a)} 5)", "*( 5, 5)", "*[7](_, 5, 5)","[4,7]",null); }
+  @Test public void c_composition_08() { run("map = { fun x -> (fun x)}; (map { a-> (pair a a)} 5)", "*( 5, 5)", "*[17](_, 5, 5)","[17]",null); }
 
   @Test public void c_composition_09() {
     run("""
@@ -303,8 +307,8 @@ fcn = { p -> { a -> (pair a a) }};
 map = { fun x -> (fun x)};
 { q -> (map (fcn q) 5)}
 """,
-         "{ A -> *( 5, 5) }", "[27]{any,3 ->*[7](_, 5, 5) }",
-         "[4,7]","[27]");
+         "{ A -> *( 5, 5) }", "[33]{any,3 ->*[17](_, 5, 5) }",
+         "[17]","[33]");
   }
   @Test public void c_composition_10() {
     run("cons ={x y-> {cadr -> (cadr x y)}};"+
@@ -329,9 +333,9 @@ map ={fun parg -> (fun (cdr parg))};
         null,
         "*( *str:(int8), int1)",
         "*( *str:(int8), int1)",
-        "*[7](_, *[4]str:(int8), int64)",
-        "*[7](_, Scalar, Scalar)",
-        "[4,7]",null );
+        "*[17](_, *[4]str:(int8), int64)",
+        "*[17](_, Scalar, Scalar)",
+        "[17]",null );
   }
   // Toss a function into a pair & pull it back out
   @Test public void c_composition_12() {
@@ -344,8 +348,8 @@ map ={fun parg -> (fun (cdr parg))};
 }
 """,
          "{ { nint8 -> A } -> *( A, A) }",
-         "[29]{any,3 ->*[7](_, Scalar, Scalar) }",
-         "[4,7]","[24,29]" );
+         "[35]{any,3 ->*[17](_, Scalar, Scalar) }",
+         "[17]","[7,35]" );
   }
 
 
@@ -368,9 +372,11 @@ map ={fun parg -> (fun (cdr parg))};
         "map = { fun x -> (fun x)};"+
         "{ q -> (map (fcn q) 5)}",
 
-        "{ A? -> *( B:[Cannot unify 5 and *( 3, B)], B) }",null,
-        "[34]{any,3 -> *[7,8](_, 5, nScalar) }",null,
-        "[4,7,8,9]","[34]" );
+        "{ A? -> *( B:[Cannot unify 5 and *( 3, B)], B) }",
+        "{ A? -> *( B:[Cannot unify 5 and *( 3, B)], B) }",
+        "[39]{any,3 -> *[17,18](_, 5, nScalar) }",
+        "[39]{any,3 -> *[17,18](_, 5, nScalar) }",
+        "[17,18,19]","[39]" );
   }
 
 
@@ -378,14 +384,14 @@ map ={fun parg -> (fun (cdr parg))};
   @Test public void d_struct_00() {
     run("@{x=2; y=3}",
          "*@{ x = 2; y = 3}",
-         "*[7]@{_; x=2; y=3}",
-         "[4,7]",null);
+         "*[17]@{_; x=2; y=3}",
+         "[17]",null);
   }
   @Test public void d_struct_01() {
     run("{ g -> @{x=g; y=g}}",
          "{ A -> *@{ x = A; y = A} }",
-         "[22]{any,3 ->*[7]@{_; x=Scalar; y=Scalar} }",
-         "[4,7]","[22]");
+         "[29]{any,3 ->*[17]@{_; x=Scalar; y=Scalar} }",
+         "[17]","[29]");
   }
   // Basic field test
   @Test public void d_struct_02() { run("@{x =2; y =3}.x", "2", "2"); }
@@ -395,8 +401,8 @@ map ={fun parg -> (fun (cdr parg))};
     run("{ pred -> (if pred @{x=2; y=3} @{x=3; z= \"abc\"}) .x }",
         "{ pred -> (if pred ({_pred -> @{x=2; y=3}} (notnil pred)) @{x=3; z= \"abc\"}) .x }",
         "{ A? -> nint8 }",
-        "[26]{any,3 ->nint8 }",
-        null,"[26]" );
+        "[32]{any,3 ->nint8 }",
+        null,"[32]" );
   }
   @Test public void d_struct_04() {
     run("A=@{x=3; y=3.2f};"+
@@ -410,16 +416,16 @@ map ={fun parg -> (fun (cdr parg))};
         "rez",
 
         "{ A? -> *@{x=nint8} }",
-        "[26]{any,3 ->*[7,8]@{_; x=nint8} }",
-        "[4,7,8]","[26]");
+        "[32]{any,3 ->*[17,18]@{_; x=nint8} }",
+        "[17,18]","[32]");
   }
   // Load some fields from an unknown struct: area of a rectangle.
   // Since no nil-check, correctly types as needing a not-nil input.
   @Test public void d_struct_05() {
     run("{ sq -> (i* sq.x sq.y) }", // { sq -> sq.x * sq.y }
          "{ *@{ x = int64; y = int64; ...} -> int64 }",
-         "[23]{any,3 ->int64 }",
-         "[4,10]","[23]" );
+         "[30]{any,3 ->int64 }",
+         "[5]","[30]" );
   }
   // Regression test.  Was unexpectedly large type result.  Cut down version of
   // test from marco.servetto@gmail.com.  Looks like it needs some kind of
@@ -433,8 +439,8 @@ map ={fun parg -> (fun (cdr parg))};
         "left"+
         "",
         "A:*@{ n1 = *@{ n1 = A; v1 = 7}; v1 = 7}",
-        "PA:*[8]@{_; n1=*[7]@{_; n1=PA; FB:v1=7}; FB}",
-        "[4,7,8]",null);
+        "PA:*[18]@{_; n1=*[17]@{_; n1=PA; FB:v1=7}; FB}",
+        "[17,18]",null);
   }
   // Unexpected restriction on extra fields.
   @Test public void d_struct_07() {
@@ -446,19 +452,19 @@ map ={fun parg -> (fun (cdr parg))};
         "(sx self1)"+
         "",
         "A:*@{ succ=A}",
-        "PA:*[7]@{_; succ=PA}",
-        "[4,7]",null);
+        "PA:*[17]@{_; succ=PA}",
+        "[17]",null);
   }
-  @Test public void d_struct_08() { run( "fun = { ptr -> ptr.x }; fun", "{ *@{x=A; ... } -> A }", "[22]{any,3 -> Scalar}","[4,10]","[22]");  }
-  @Test public void d_struct_09() { run(       "{ ptr -> ptr.x }",      "{ *@{x=A; ... } -> A }", "[22]{any,3 -> Scalar}","[4,10]","[22]");  }
+  @Test public void d_struct_08() { run( "fun = { ptr -> ptr.x }; fun", "{ *@{x=A; ... } -> A }", "[29]{any,3 -> Scalar}","[5]","[29]");  }
+  @Test public void d_struct_09() { run(       "{ ptr -> ptr.x }",      "{ *@{x=A; ... } -> A }", "[29]{any,3 -> Scalar}","[5]","[29]");  }
 
   // Awful flow-type: function can be called from the REPL with any
   // argument type - and the worse case will be an error.
   @Test public void d_struct_10() {
     run("x = { z -> z}; (x { y -> y.u})",
         "{ *@{ u = A; ...} -> A }",
-        "[23]{any,3 ->Scalar }",
-        "[4,10]","[23]");
+        "[30]{any,3 ->Scalar }",
+        "[5]","[30]");
   }
 
 
@@ -474,8 +480,8 @@ map ={fun parg -> (fun (cdr parg))};
     run("{ x -> y = ( x x.v ); 0}",
         // { x:&[ {A->B}; @{v=A;...} ] -> y = ( x.0 x.1.v ); 0}",
         "{ [Cannot unify {A->B} and *@{ v=A;...}] -> C? }",
-        "[22]{any,3 ->xnil }",
-        "[4,10]","[22,24]");
+        "[29]{any,3 ->xnil }",
+        "[5]","[29,7]");
   }
 
   // Example from SimpleSub requiring 'x' to be both:
@@ -486,7 +492,7 @@ map ={fun parg -> (fun (cdr parg))};
     run("x = w = (x x); { z -> z}; (x { y -> y.u})",
         "A:[Cannot unify { A -> A } and *@{ u = A; ... }]",
         "Scalar",
-        "[4,7]","[22,23,24,25]");
+        "[17]","[29,30,7,31]");
   }
 
   // Broken from Marco; function 'f' clearly uses 'p2.a' but example 'res1' does not
@@ -494,8 +500,8 @@ map ={fun parg -> (fun (cdr parg))};
   @Test public void d_struct_err_05() {
     run("f = { p1 p2 -> (if p2.a p1 p2)}; (f @{a=2} @{b=2.3f})",
          "*@{ a= Missing field a: 2 }",
-         "*[7,8](_)",
-         "[4,7,8]",null);
+         "*[17,18](_)",
+         "[17,18]",null);
   }
   // Broken from Marco; function 'f' clearly uses 'p2.a' but example 'res1' does not
   // pass in a field 'a'... and still no error.  Fixed.
@@ -522,9 +528,9 @@ map ={fun parg -> (fun (cdr parg))};
         "    res1 = *@{ a = Missing field a: 2};"+
         "    res2 = *@{ a=nint8; b=nflt32 }"+
         "}",
-        "*[12]@{_; f=[23]{any,4 ->*[7,8,9,10,11,13]SA::(_) }; res1=*[7,8]SA; res2=*[9,11]@{_; a=nint8; b=nflt32}}",
-        "*[12]@{_; f=[23]{any,4 ->PA:*[7,8,9,10,11,13](_) }; res1=PA; res2=PA}",
-        "[4,7,8,9,10,11,12,13]","[23]");
+        "*[21]@{_; f=[30]{any,4 ->*[17,18,19,5,20,6]SA::(_) }; res1=*[17,18]SA; res2=*[19,20]@{_; a=nint8; b=nflt32}}",
+        "*[21]@{_; f=[30]{any,4 ->PA:*[17,18,19,5,20,6](_) }; res1=PA; res2=PA}",
+        "[17,18,19,5,20,21,6]","[30]");
   }
 
 
@@ -533,9 +539,9 @@ map ={fun parg -> (fun (cdr parg))};
   // and writing an infinite output), gcp gets a cyclic approximation.
   @Test public void e_recur_struct_00() {
     run("map = { fcn lst -> @{ n1 = (map fcn lst.n0); v1 = (fcn lst.v0) } }; map",
-         "{ { A -> B } C:*@{ n0 = C; v0 = A; ...} -> D:*@{ n1 = D; v1 = B} }",
-         "[22]{any,4 ->PA:*[7]@{_; n1=PA; v1=Scalar} }",
-         "[4,7,10]","[22,24]");
+        "{ { A -> B } C:*@{ n0 = C; v0 = A; ...} -> D:*@{ n1 = D; v1 = B} }",
+        "[29]{any,4 ->PA:*[17]@{_; n1=PA; v1=Scalar} }",
+        "[17,5]","[29,7]");
   }
 
   // Recursive linked-list discovery, with nil.  Note that the output memory
@@ -545,16 +551,16 @@ map ={fun parg -> (fun (cdr parg))};
     run("map = { fcn lst -> (if lst @{ n1=(map fcn lst.n0); v1=(fcn lst.v0) } 0) }; map",
         "map = { fcn lst -> (if lst ({_lst -> @{ n1=(map fcn _lst.n0); v1=(fcn _lst.v0) }} (notnil lst)) 0) }; map",
         "{ { A -> B } C:*@{ n0 = C; v0 = A; ...}? -> D:*@{ n1 = D; v1 = B}? }",null,
-        "[26]{any,4 ->PA:*[0,7]@{_; n1=PA; v1=Scalar} }",null,
-        "[4,7,10]","[24,26]");
+        "[32]{any,4 ->PA:*[0,17]@{_; n1=PA; v1=Scalar} }",null,
+        "[17,5]","[7,32]");
   }
   // Recursive linked-list discovery, applied
   @Test public void e_recur_struct_02() {
     run("map = { fcn lst -> (if lst @{ n1 = (map fcn lst.n0); v1 = (fcn lst.v0) } 0) }; (map dec @{n0 = 0; v0 = 5})",
         "map = { fcn lst -> (if lst ({_lst -> @{ n1 = (map fcn _lst.n0); v1 = (fcn _lst.v0) }} (notnil lst)) 0) }; (map dec @{n0 = 0; v0 = 5})",
         "A:*@{ n1 = A; v1 = int64}?",
-        "PA:*[0,7]@{_; n1=PA; v1=4}",
-        "[4,7]",null);
+        "PA:*[0,17]@{_; n1=PA; v1=4}",
+        "[17]",null);
   }
   // Need to see if a map call, inlined a few times, 'rolls up'.  Sometimes
   // rolls up, sometimes not; depends on worklist visitation order.
@@ -562,8 +568,8 @@ map ={fun parg -> (fun (cdr parg))};
     run("map = { lst -> (if lst @{ n1= arg= lst.n0; (if arg @{ n1=(map arg.n0); v1=(str arg.v0)} 0); v1=(str lst.v0) } 0) }; map",
         "map = { lst -> (if lst ({_lst -> @{ n1= arg= _lst.n0; (if arg ({_arg -> @{ n1=(map _arg.n0); v1=(str _arg.v0)}} (notnil arg)) 0); v1=(str _lst.v0) }} (notnil lst)) 0) }; map",
         "{ A:*@{ n0 = *@{ n0 = A; v0 = int64; ...}?; v0 = int64; ...}? -> B:*@{ n1 = *@{ n1 = B; v1 = *str:(int8)}?; v1 = *str:(int8)}? }",
-        "[31]{any,3 ->PA:*[8]@{_; n1=*[7]@{_; n1=PA; FB:v1=*[4]str:(_, int8)}?; FB}? }",
-        "[4,7,8,10]","[31]" );
+        "[37]{any,3 ->PA:*[18]@{_; n1=*[17]@{_; n1=PA; FB:v1=*[4]str:(_, int8)}?; FB}? }",
+        "[17,18,5]","[37]" );
   }
   // Checking an AA example
   @Test public void e_recur_struct_04() {
@@ -591,11 +597,11 @@ out_bool= (map in_str { xstr -> (eq xstr "def")});
 (pair out_str out_bool)
 """,
         null,
-         "*( *str:(int8), int1)",
-         "*( *str:(int8), int1)",
-         "*[9](_, *[4]str:(int8), int64)",
-         "*[9](_, Scalar, Scalar)",
-         "[4,9]",null);
+        "*( *str:(int8), int1)",
+        "*( *str:(int8), int1)",
+        "*[19](_, *[4]str:(int8), int64)",
+        "*[19](_, Scalar, Scalar)",
+        "[19]",null);
   }
   @Test public void e_recur_struct_06() {
     run("""
@@ -605,17 +611,17 @@ all = @{
 };
 { x -> (all.is_even all x)}
 """,
-         "{int64 -> int1}", "[31]{any,3 ->int1 }",
-         null,"[31]");
+         "{int64 -> int1}", "[37]{any,3 ->int1 }",
+         null,"[37]");
   }
   @Test public void e_recur_struct_07() {
     run("dsp = @{  id = { dsp n -> n}}; (pair (dsp.id dsp 3) (dsp.id dsp \"abc\"))",
         null,
         "*( 3, *str:(97))",
         "*( 3, *str:(97))",
-        "*[8](_, 3 , *[4]str:(97))",
-        "*[8](_, nScalar, nScalar)",
-        "[4,8]",null);
+        "*[18](_, 3 , *[4]str:(97))",
+        "*[18](_, nScalar, nScalar)",
+        "[18]",null);
   }
   // Test example from AA with expanded ints
   @Test public void e_recur_struct_08() {
@@ -629,8 +635,8 @@ A:*@{
   i=int64
 }
 """,
-         "PA:*[7]@{_; add=[23]{any,4 -> PA }; i=int64}",
-         "[4,7,10,13]","[23]");
+         "PA:*[17]@{_; add=[30]{any,4 -> PA }; i=int64}",
+        "[17,5,6]","[30]");
   }
 
   // Recursive structs.  First: closed structs list available fields;
@@ -639,8 +645,8 @@ A:*@{
     run("{ p -> (if p @{x=3;y=4} @{y=6;z=\"abc\"})}",
         "{ p -> (if p ({_p -> @{x=3;y=4}} (notnil p)) @{y=6;z=\"abc\"})}",
         "{A?->*@{y=nint8}}",
-        "[26]{any,3 ->*[7,8]@{_; y=nint8} }",
-        "[4,7,8]","[26]");
+        "[32]{any,3 ->*[17,18]@{_; y=nint8} }",
+        "[17,18]","[32]");
   }
   // Recursive structs.  Next: open structs list required fields;
   // unification produces the set union.
@@ -648,27 +654,27 @@ A:*@{
     run("{ p rec -> (if p rec.x rec.y)}",
         "{ p rec -> (if p ({_p -> rec.x} (notnil p)) rec.y)}",
         "{ A? *@{x=B;y=B;...} -> B }",
-        "[26]{any,4 ->Scalar }",
-        "[4,10]","[26]");
+        "[32]{any,4 ->Scalar }",
+        "[5]","[32]");
   }
   // Recursive structs.  Next: passing extra fields; they are passed along
   // here.  Required fields are fresh every time.
   @Test public void e_recur_struct_11() {
     run("fun = { rec -> (pair rec rec.x)}; (pair (fun @{x=3;y=4}) (fun @{x=\"abc\";z=2.1f}))",
          "*(*(*@{x=3;y=4},3), *(*@{x=A:*str:(97);z=2.1f},A))",
-         "*[8](_, PA:*[7](_, *[9,11]@{_; x=nScalar}, nScalar), PA)",
-         "[4,7,8,9,11]","[]");
+         "*[18](_, PA:*[17](_, *[19,20]@{_; x=nScalar}, nScalar), PA)",
+        "[17,18,19,20]",null);
   }
   // Recursive structs.  Next: passing extra fields, but the function requires
   // the structures to be the same.  Extra fields dropped.  Unify required fields.
   @Test public void e_recur_struct_12() {
     run("({fun -> "+
-         "   (pair (fun @{x=3; y=4   } )"+    // available {x,y}
-         "         (fun @{x=4; z=2.1f} )  )"+ // available {x,z}
-         "  } { rec -> (pair rec rec.x) } )", // required  {x}
-         "*(A:*(*@{x=nint8},nint8),A)",
-         "*[7](_, PA:*[11](_, *[8,9]@{_; x=nint8}, nint8), PA)",
-         "[4,7,8,9,11]","[]");
+        "   (pair (fun @{x=3; y=4   } )"+    // available {x,y}
+        "         (fun @{x=4; z=2.1f} )  )"+ // available {x,z}
+        "  } { rec -> (pair rec rec.x) } )", // required  {x}
+        "*(A:*(*@{x=nint8},nint8),A)",
+        "*[17](_, PA:*[20](_, *[18,19]@{_; x=nint8}, nint8), PA)",
+        "[17,18,19,20]",null);
   }
   // Recursive structs.
   @Test public void e_recur_struct_13() {
@@ -680,9 +686,9 @@ fun = { ff ->
 };
 (fun 1.2f)
 """,  // required {f} in inner, available {f,mul} in outer
-         "A:*@{f=flt64;mul={*@{f=flt64;...}->A}}", // required {f} in inner, available {f,mul} in outer
-         "PA:*[7]@{_; f=flt64; mul=[23]{any,3 ->PA }}",
-         "[4,7,10]","[23]");
+        "A:*@{f=flt64;mul={*@{f=flt64;...}->A}}", // required {f} in inner, available {f,mul} in outer
+        "PA:*[17]@{_; f=flt64; mul=[30]{any,3 ->PA }}",
+        "[17,5]","[30]");
   }
 
   // Recursive structs, with deeper expressions.  The type expands with
@@ -697,9 +703,9 @@ fun = { ff ->
 con12=(fun 1.2f);
 (con12.mul con12)
 """,                // required {f} in inner, available {f,mul} in outer,middle
-         "A:*@{f=flt64;mul={B:*@{f=flt64;mul={*@{f=flt64;...}->B}}->A}}", // required {f} in inner, available {f,mul} in middle,outer
-         "PA:*[7]@{_; f=flt64; mul=[23]{any,3 ->PA }}",
-         "[4,7,10]","[23]");
+        "A:*@{f=flt64;mul={B:*@{f=flt64;mul={*@{f=flt64;...}->B}}->A}}", // required {f} in inner, available {f,mul} in middle,outer
+        "PA:*[17]@{_; f=flt64; mul=[30]{any,3 ->PA }}",
+        "[17,5]","[30]");
   }
 
   // Recursive structs.  Next: passing extra fields, but the function requires
@@ -710,8 +716,8 @@ con12=(fun 1.2f);
         "         (fun @{x=\"abc\";z=2.1f} )  )"+ // available {x,z}
         "  } { rec -> (pair rec rec.x) } )",      // required  {x}
         "*(A:*(*@{x=B:[Cannot unify 3 and *str:(97)]},B),A)",
-        "*[7](_, PA:*[11](_, *[8,9]@{_; x=nScalar}, nScalar), PA)",
-        "[4,7,8,9,11]","[]");
+        "*[17](_, PA:*[20](_, *[18,19]@{_; x=nScalar}, nScalar), PA)",
+        "[17,18,19,20]","[]");
   }
 
 
@@ -777,7 +783,7 @@ loop = { name cnt ->
   @Test public void f_gcp_hmt_04() {
     run("{ pred -> tmp=(if pred @{x=3} 0); (if tmp tmp.x 4) }",
         "{ pred -> tmp=(if pred ({_pred -> @{x=3}} (notnil pred)) 0); (if tmp ({_tmp -> _tmp.x}(notnil tmp)) 4) }",
-        "{ A? -> nint8 }", "[29]{any,3 ->nint8 }",null,"[29]");
+        "{ A? -> nint8 }", "[35]{any,3 ->nint8 }",null,"[35]");
   }
   // map is parametric in nil-ness
   @Test public void f_gcp_hmt_05() {
@@ -799,23 +805,23 @@ loop = { name cnt ->
 """,
          "{ A? -> *( 3, nint8) }",
          "{ A? -> *( 3, nint8) }",
-         "[34]{any,3 ->*[7](_, nint8, nint8) }",
-         "[34]{any,3 ->*[7](_, nint8, nint8) }",
-         "[4,7]","[34]");
+         "[39]{any,3 ->*[17](_, nint8, nint8) }",
+         "[39]{any,3 ->*[17](_, nint8, nint8) }",
+         "[17]","[39]");
   }
   // Simple nil/default test; takes a nilable but does not return one.
   @Test public void f_gcp_hmt_06() {
     run( "{ x y -> (if x x y) }",
          "{ x y -> (if x ({_x -> _x} (notnil x)) y) }",
-         "{ A? A -> A }", "[26]{any,4 ->Scalar }",
-         null,"[26]");
+         "{ A? A -> A }", "[32]{any,4 ->Scalar }",
+         null,"[32]");
   }
   // Regression test; double nested.  Failed to unify x and y.
   @Test public void f_gcp_hmt_07() {
     run( "{ x y -> (if x (if x x y) y) }",
          "{ x y -> (if x ({_x -> (if _x ({_x -> _x}(notnil _x)) y)}(notnil x)) y) }",
-         "{ A? A -> A }", "[29]{any,4 ->Scalar }",
-         null,"[29]");
+         "{ A? A -> A }", "[35]{any,4 ->Scalar }",
+         null,"[35]");
   }
   @Test public void f_gcp_hmt_08() {
     run("total_size = { a as ->" +  // Total_size takes an 'a' and a list of 'as'
@@ -836,11 +842,11 @@ loop = { name cnt ->
         "};" +                      // End of total_size={...}
         "total_size",               // What is this type?
 
-         "{ A:*@{ size = int64; ...} B:*@{ next = B; val = A; ...}? -> int64 }",
-         "{ A:*@{ size = int64; ...} B:*@{ next = B; val = A; ...}? -> int64 }",
-         "[27]{any,4 ->int64 }",
-         "[27]{any,4 ->int64 }",
-         "[4,10,13]","[27]");
+        "{ A:*@{ size = int64; ...} B:*@{ next = B; val = A; ...}? -> int64 }",
+        "{ A:*@{ size = int64; ...} B:*@{ next = B; val = A; ...}? -> int64 }",
+        "[33]{any,4 ->int64 }",
+        "[33]{any,4 ->int64 }",
+        "[5,6]","[33]");
   }
 
 
@@ -851,8 +857,8 @@ loop = { name cnt ->
   @Test public void f_gcp_hmt_err_01() {
     run("{ pred -> (if pred @{x=3} 0).x}",
         "{ pred -> (if pred ({ _pred -> @{x=3}}(notnil pred)) 0).x}",
-        "{ A? -> May be nil when loading field x: 3 }", "[26]{any,3 ->3 }",
-        null,"[26]"  );
+        "{ A? -> May be nil when loading field x: 3 }", "[32]{any,3 ->3 }",
+        null,"[32]"  );
   }
 
   // map is parametric in nil-ness.  Verify still nil-checking.
@@ -874,8 +880,8 @@ loop = { name cnt ->
 }
 """,
          "{ A? -> *( 3, May be nil when loading field x: 5 ) }",
-         "[30]{any,3 ->*[7](_, nint8, nint8) }",
-         "[4,7]","[30]");
+         "[36]{any,3 ->*[17](_, nint8, nint8) }",
+         "[17]","[36]");
   }
 
 
@@ -886,10 +892,8 @@ loop = { name cnt ->
         "  { x -> (f* x 3.0f) }"+  // Arg is 'flt'
         ")",
         "*( {int64 -> int64}, {flt64 -> flt64} )",
-        "*[7](_, [25]{any,3 -> int64 }, [27]{any,3 -> flt64 })",
-        "[4,7]","[25,27]"
-        //"*[7](_, [24]{any,3 -> int64 }, [26]{any,3 -> flt64 })",
-        //"[4,7]","[24,26]"
+        "*[17](_, [31]{any,3 -> int64 }, [33]{any,3 -> flt64 })",
+        "[17]","[31,33]"
         );
   }
 
@@ -907,8 +911,8 @@ loop = { name cnt ->
         ");"+
         "(pair (f.0 2) (f.1 1.2f))",    // Call with different args
         "*(int64,flt64)", "*(int64,flt64)",
-        "*[8](_, 4,3.6000001f)", "*[8](_, 4, 3.6000001f)",
-        "[4,8]",null);
+        "*[18](_, 4,3.6000001f)", "*[18](_, 4, 3.6000001f)",
+        "[18]",null);
   }
 
   @Test public void g_overload_02() {
@@ -930,12 +934,9 @@ loop = { name cnt ->
 """,
         "{ A? -> *(int64,flt64) }",
         "{ A? -> *(int64,flt64) }",
-        "[35]{any,3 -> *[8](_, nint8, 0.6f) }",
-        "[35]{any,3 -> *[8](_, nint8, 0.6f) }",
-        "[4,8]","[35]");
-        //"[33]{any,3 -> *[8](_, nint8, 0.6f) }",
-        //"[33]{any,3 -> *[8](_, nint8, 0.6f) }",
-        //"[4,8]","[33]");
+        "[40]{any,3 -> *[18](_, nint8, 0.6f) }",
+        "[40]{any,3 -> *[18](_, nint8, 0.6f) }",
+        "[18]","[40]");
   }
 
   // Test overload as union of primitives
@@ -944,9 +945,9 @@ loop = { name cnt ->
         "red = (pair 123 \"red\" ); (pair (dec red.0) (isempty red.1))",
         "*(int64,int1)",
         "*(int64,int1)",
-        "*[8](_, 122, xnil)",
-        "*[8](_, 122, xnil)",
-        "[4,8]",null);
+        "*[18](_, 122, xnil)",
+        "*[18](_, 122, xnil)",
+        "[18]",null);
   }
 
   // Test overload as union of primitives.  Merge of 2 unrelated overloads
@@ -957,12 +958,9 @@ loop = { name cnt ->
         "{ pred -> c =(if pred ({_pred -> (pair 123 \"red\" )}(notnil pred)) (pair 456  \"blue\" )); (pair (dec c.0) (isempty c.1))}",
         "{A? -> *(int64,int1) }",
         "{A? -> *(int64,int1) }",
-        "[31]{any,3 -> *[9](_, int64, xnil) }",
-        "[31]{any,3 -> *[9](_, int64, xnil) }",
-        "[9]","[31]");
-        //"[30]{any,3 -> *[9](_, int64, xnil) }",
-        //"[30]{any,3 -> *[9](_, int64, xnil) }",
-        //"[9]","[30]");
+        "[37]{any,3 -> *[19](_, int64, xnil) }",
+        "[37]{any,3 -> *[19](_, int64, xnil) }",
+        "[19]","[37]");
   }
 
   // Explicit overload argument
@@ -970,9 +968,8 @@ loop = { name cnt ->
     run("{ x -> (x._ x._.v)}",
         "{ x -> (x._ x._.v)}",
         "{*@{&17 = Unresolved field &17: { A:Unresolvedfield&19 -> B:Unresolvedfield&17}; &19 = Unresolvedfield&19:*@{v=A;...};...}->B}",
-        "[22]{any,3 -> Scalar }",
-        "[10]","[22]");
-        //"[7]","[22]");
+        "[29]{any,3 -> Scalar }",
+        "[5]","[29]");
   }
 
   @Test public void g_overload_06() {
@@ -1003,9 +1000,8 @@ loop = { name cnt ->
     run("{ ptr -> (ptr._.x ptr._.x) }",
         "{ ptr -> (ptr._.x ptr._.x) }",
         "{*@{&17=Unresolvedfield&17:*@{x=Unresolvedfield&17:{A:Unresolvedfield&20->B:Unresolvedfield&17};...};&20=Unresolvedfield&20:*@{x=A;...};...}->B}",
-        "[22]{any,3 -> Scalar }",
-        "[10]", "[22]");
-        //"[7]", "[22]");
+        "[29]{any,3 -> Scalar }",
+        "[5]", "[29]");
   }
 
   // Field order specified
@@ -1022,9 +1018,8 @@ loop = { name cnt ->
     run("{ ptr -> (ptr.x._ ptr.x._) }",
         "{ ptr -> (ptr.x._ ptr.x._) }",
         "{*@{x=*@{&18=Unresolvedfield&18:{A:Unresolvedfield&21->B:Unresolvedfield&18};&21=A;...};...}->B}",
-        "[22]{any,3 -> Scalar }",
-        "[10]","[22]");
-        //"[7]","[22]");
+        "[29]{any,3 -> Scalar }",
+        "[5]","[29]");
   }
 
   // Test overload as union of primitives.  Merge of 2 related overloads stalls
@@ -1042,12 +1037,9 @@ loop = { name cnt ->
 
         "{ A? -> *(int64,int1) }",
         "{ A? -> *(int64,int1) }",
-        "[31]{any,3 -> *[8](_, int64, xnil) })",
-        "[31]{any,3 -> *[8](_, int64, xnil) }",
-        "[8]","[31]");
-        //"[30]{any,3 -> *[8](_, int64, xnil) })",
-        //"[30]{any,3 -> *[8](_, int64, xnil) }",
-        //"[8]","[30]");
+        "[37]{any,3 -> *[18](_, int64, xnil) })",
+        "[37]{any,3 -> *[18](_, int64, xnil) }",
+        "[18]","[37]");
   }
 
   // Test overload as union of primitives.  Overload resolution before
@@ -1064,8 +1056,8 @@ loop = { name cnt ->
         ")",
 
         "*(int64,int64)",
-        "*[7](_, int64, int64)",
-        "[4,7]",null);
+        "*[17](_, int64, int64)",
+        "[17]",null);
   }
 
   // 'lite' needs to be told to take an overload with syntax
@@ -1084,9 +1076,9 @@ loop = { name cnt ->
 
         "*( *(int64,int1), *(int64,int1))",
         "*( *(int64,int1), *(int64,int1))",
-        "*[8](_, 0=PA:*[7](_, int64, *[4]str:(nint8)?), 1=PA)",
-        "*[8](_, 0=PA:*[7](_, int64, *[4]str:(nint8)?), 1=PA)",
-        "[7,8]",null);
+        "*[18](_, 0=PA:*[17](_, int64, *[4]str:(nint8)?), 1=PA)",
+        "*[18](_, 0=PA:*[17](_, int64, *[4]str:(nint8)?), 1=PA)",
+        "[17,18]",null);
   }
   // Test case here is trying to get HM to do some overload resolution.
   // Without, many simple int/flt tests in main AA using HM alone fail to find
@@ -1137,10 +1129,8 @@ con2_1 = (fwrap 2.1f);
 (con2_1._*_.1 con2_1)
 """,
         "A:*@{_*_=*( {*@{i=int64;...}->A}, {B:*@{_*_=*( {*@{i=int64;...}->B}, {*@{f=flt64;...}->B}); f=flt64}->A});f=flt64}",
-        "PA:*[8]@{_; _*_=*[7](_, [26]{any,3 -> PA }, [28]{any,3 -> PA }); f=flt64}",
-        "[7,8,10,13]","[26,28]");
-        //"PA:*[8]@{_; _*_=*[7](_, [25]{any,3 -> PA }, [27]{any,3 -> PA }); f=flt64}",
-        //"[7,8,11,12]","[25,27]");
+        "PA:*[18]@{_; _*_=*[17](_, [32]{any,3 -> PA }, [34]{any,3 -> PA }); f=flt64}",
+        "[17,18,5,6]","[32,34]");
   }
 
   // Recursive structs.  More like what main AA will do with wrapped primitives.
@@ -1199,12 +1189,9 @@ mul2 = { x -> (x._*_.0 con2)};
 """,
         hm_rez,
         hm_rez,
-        "*[12](_, 0=PA:*[8]@{_; _*_=*[7](_, [26]{any,3 -> PA }, [28]{any,3 -> PA }); f=flt64}, 1=PB:*[11]@{_; _*_=*[9](_, [33]{any,3 -> PB }, [36]{any,3 -> PA }); i=int64}, 2=PA)",
-        "*[12](_, 0=PA:*[8]@{_; _*_=*[7](_, [26]{any,3 -> PA }, [28]{any,3 -> PA }); f=flt64}, 1=PB:*[11]@{_; _*_=*[9](_, [33]{any,3 -> PB }, [36]{any,3 -> PA }); i=int64}, 2=PA)",
-         "[7,8,9,10,11,12,13,14,15]", "[26,28,33,36]");
-        //"*[11](_, 0=PA:*[8]@{_; _*_=*[7](_, [25]{any,3 -> PA }, [27]{any,3 -> PA }); f=flt64}, 1=PB:*[10]@{_; _*_=*[9](_, [31]{any,3 -> PB }, [34]{any,3 -> PA }); i=int64}, 2=PA)",
-        //"*[11](_, 0=PA:*[8]@{_; _*_=*[7](_, [25]{any,3 -> PA }, [27]{any,3 -> PA }); f=flt64}, 1=PB:*[10]@{_; _*_=*[9](_, [31]{any,3 -> PB }, [34]{any,3 -> PA }); i=int64}, 2=PA)",
-        //"[4,7,8,9,10,11,12,13,14,15]", "[25,27,31,34]");
+        "*[21](_, 0=PA:*[18]@{_; _*_=*[17](_, [32]{any,3 -> PA }, [34]{any,3 -> PA }); f=flt64}, 1=PB:*[20]@{_; _*_=*[19](_, [38]{any,3 -> PB }, [41]{any,3 -> PA }); i=int64}, 2=PA)",
+        "*[21](_, 0=PA:*[18]@{_; _*_=*[17](_, [32]{any,3 -> PA }, [34]{any,3 -> PA }); f=flt64}, 1=PB:*[20]@{_; _*_=*[19](_, [38]{any,3 -> PB }, [41]{any,3 -> PA }); i=int64}, 2=PA)",
+        "[5,6,7,8,17,18,19,20,21]", "[32,34,38,41]");
   }
 
   // Recursive structs, in a loop.  Test of recursive int wrapper type ("occurs
@@ -1269,13 +1256,9 @@ fact = { n -> (if n.is0 c1 (n.mul.0 (fact n.sub1))) };
         "A:*@{i=int64;is0=int1;mul=*({A->A},{*@{f=flt64;...}->B:*@{f=flt64;mul=*({*@{i=int64;...}->B},{*@{f=flt64;...}->B})}});sub1=A}",
         "A:*@{i=int64;is0=int1;mul=*({A->A},{*@{f=flt64;...}->B:*@{f=flt64;mul=*({*@{i=int64;...}->B},{*@{f=flt64;...}->B})}});sub1=A}",
         // bulk test answers
-        "PA:*[11]@{_; i=int64; is0=int1; mul=*[9](_, [34]{any,3 -> PA }, [37]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7](_, [26]{any,3 -> PB }, [28]{any,3 -> PB })} }); sub1=PA}",
-        "PA:*[11]@{_; i=int64; is0=int1; mul=*[9](_, [34]{any,3 -> PA }, [37]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7](_, [26]{any,3 -> PB }, [28]{any,3 -> PB })} }); sub1=PA}",
-        "[7,8,9,10,11,13,14,15]","[26,28,34,37]");
-        // jig answers
-        //"PA:*[10]@{_; i=int64; is0=int1; mul=*[9](_, [32]{any,3 -> PA }, [35]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7](_, [25]{any,3 -> PB }, [27]{any,3 -> PB })} }); sub1=PA}",
-        //"PA:*[10]@{_; i=int64; is0=int1; mul=*[9](_, [32]{any,3 -> PA }, [35]{any,3 -> PB:*[8]@{_; f=flt64; mul=*[7](_, [25]{any,3 -> PB }, [27]{any,3 -> PB })} }); sub1=PA}",
-        //"[7,8,9,10,11,12,13,14]","[25,27,32,35]");
+        "PA:*[20]@{_; i=int64; is0=int1; mul=*[19](_, [39]{any,3 -> PA }, [42]{any,3 -> PB:*[18]@{_; f=flt64; mul=*[17](_, [32]{any,3 -> PB }, [34]{any,3 -> PB })} }); sub1=PA}",
+        "PA:*[20]@{_; i=int64; is0=int1; mul=*[19](_, [39]{any,3 -> PA }, [42]{any,3 -> PB:*[18]@{_; f=flt64; mul=*[17](_, [32]{any,3 -> PB }, [34]{any,3 -> PB })} }); sub1=PA}",
+        "[17,18,19,5,20,6,7,8]","[32,34,39,42]");
   }
 
   // Ambiguous overload, {int->int}, cannot select.
@@ -1315,9 +1298,8 @@ fz = (if (rand 2) fx fy);
     run("{ x -> (x._ x._.v)}",
         "{ x -> (x._ x._.v )}",
         "{*@{ &17 = Unresolved field &17: { A:Unresolved field &19 -> B:Unresolved field &17 }; &19 = Unresolvedfield &19: *@{v=A;...};...}->B}",
-        "[22]{any,3 ->Scalar }",
-        "[10]","[22]");
-        //"[7]","[22]");
+        "[29]{any,3 ->Scalar }",
+        "[5]","[29]");
   }
 
 
@@ -1367,12 +1349,10 @@ fz = (if (rand 2) fx fy);
 
         "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
         "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
-        "*[17]@{_; a=int64; b=*[12,16](_); bool=*[11]@{_; false=PA:*[8,9]@{_; and=[22,26]{any,3 -> Scalar }; or=[23,27]{any,3 -> Scalar }; then=[25,28]{any,4 -> Scalar }}; force=[33]{any,3 -> PA }; true=PA}}",
-        "*[17]@{_; a=Scalar; b=Scalar; bool=*[11]@{_; false=PA:*[8,9]@{_; and=[22,26]{any,3 -> Scalar }; or=[23,27]{any,3 -> Scalar }; then=[25,28]{any,4 -> Scalar }}; force=[33]{any,3 -> PA }; true=PA}}",
-        "[7,8,9,11,12,16,17]","[22,23,24,25,26,27,28,32,33]");
-        //"*[13]@{_; a=int64 ; b=*[11,12](_); bool=*[10]@{_; false=PA:*[8,9]@{_; and=[22,25]{any,3 -> Scalar }; or=[23,26]{any,3 -> Scalar }; then=[24,27]{any,4 -> Scalar }}; force=[31]{any,3 -> PA }; true=PA}}",
-        //"*[13]@{_; a=Scalar; b=Scalar     ; bool=*[10]@{_; false=PA:*[8,9]@{_; and=[22,25]{any,3 -> Scalar }; or=[23,26]{any,3 -> Scalar }; then=[24,27]{any,4 -> Scalar }}; force=[31]{any,3 -> PA }; true=PA}}",
-        //"[7,8,9,10,11,12,13]","[22,23,24,25,26,27,31,36,37]");
+        "*[23]@{_; a=int64; b=*[21,22](_); bool=*[20]@{_; false=PA:*[18,19]@{_; and=[29,32]{any,3 -> Scalar }; or=[30,33]{any,3 -> Scalar }; then=[31,34]{any,4 -> Scalar }}; force=[38]{any,3 -> PA }; true=PA}}",
+        "*[23]@{_; a=Scalar; b=Scalar; bool=*[20]@{_; false=PA:*[18,19]@{_; and=[29,32]{any,3 -> Scalar }; or=[30,33]{any,3 -> Scalar }; then=[31,34]{any,4 -> Scalar }}; force=[38]{any,3 -> PA }; true=PA}}",
+        "[17,18,19,20,21,22,23]","[7,8,29,30,31,32,33,34,38]"
+        );
     
   }
 
@@ -1424,8 +1404,8 @@ boolSub ={b ->(if b ({_b -> true}(notnil b)) false)};
                "then = { { *( ) -> F } { *( ) -> F } -> F }"+
              "}"+
          "}",
-         "*[11]@{_; false=PB:*[8,9]@{_; and=[22,27]{any,3 -> Scalar }; not=[25,29]{any,3 -> PA:*[8]@{_; and=[22]{any,3 -> Scalar }; not=[25]{any,3 -> PA }; or=[23]{any,3 -> PA }; then=[26]{any,4 -> Scalar }} }; or=[23,28]{any,3 -> Scalar }; then=[26,30]{any,4 -> Scalar }}; true=PB}",
-         "[7,8,9,11]","[22,23,24,25,26,27,28,29,30,32]");
+        "*[20]@{_; false=PB:*[18,19]@{_; and=[29,33]{any,3 -> Scalar }; not=[31,35]{any,3 -> PA:*[18]@{_; and=[29]{any,3 -> Scalar }; not=[31]{any,3 -> PA }; or=[30]{any,3 -> PA }; then=[32]{any,4 -> Scalar }} }; or=[30,34]{any,3 -> Scalar }; then=[32,36]{any,4 -> Scalar }}; true=PB}",
+        "[17,18,19,20]","[7,8,29,30,31,32,33,34,35,36]");
   }
 
   @Test public void x_peano_02() {
@@ -1459,35 +1439,35 @@ all
 """,
         "*@{ boolSub = { A? -> *@{ not = { B -> C:*@{ not = { D -> C }; then = { { 7 -> E } { 7 -> E } -> E }} }; then = { { 7 -> F } { 7 -> F } -> F }} }; false = C; true = C}",
         """
-*[9]@{_;
-  boolSub=[30]{any,3 ->
-    PA:*[7,8]@{_; not=[22,25]{any,3 ->PA }; then=[23,26]{any,4 ->Scalar }}
+*[19]@{_;
+  boolSub=[36]{any,3 ->
+    PA:*[17,18]@{_; not=[29,31]{any,3 ->PA }; then=[30,32]{any,4 ->Scalar }}
   };
-  false=PB:*[8]@{_; not=[25]{any,3 ->PC:*[7]@{_; not=[22]{any,3 ->PB }; then=[23]{any,4 ->Scalar }} }; then=[26]{any,4 ->Scalar }};
+  false=PB:*[18]@{_; not=[31]{any,3 ->PC:*[17]@{_; not=[29]{any,3 ->PB }; then=[30]{any,4 ->Scalar }} }; then=[32]{any,4 ->Scalar }};
   true=PC
 }
 """,
-         "[4,7,8,9]","[22,23,24,25,26,30,32]");
+        "[17,18,19]","[7,8,29,30,31,32,36]");
   }
 
   // Full on Peano arithmetic.
   @Test public void x_peano_03() {
     String gcp_rez = """
-*[18]@{_;
-  b=*[11]@{_;
-    false=PA:*[9]@{_; and_=[27]{any,3 -> PA     }; or__=[28]{any,3 -> Scalar }; then=[29]{any,4 -> Scalar }};
-    true =PB:*[8]@{_; and_=[23]{any,3 -> Scalar }; or__=[25]{any,3 -> PB     }; then=[26]{any,4 -> Scalar }}
+*[24]@{_;
+  b=*[20]@{_;
+    false=PA:*[19]@{_; and_=[33]{any,3 -> PA     }; or__=[34]{any,3 -> Scalar }; then=[35]{any,4 -> Scalar }};
+    true =PB:*[18]@{_; and_=[30]{any,3 -> Scalar }; or__=[31]{any,3 -> PB     }; then=[32]{any,4 -> Scalar }}
   };
-  n=*[17]@{_;
-    s=[38]{any,3 ->
-      PC:*[16]@{_;
-        add_=[34]{any,3 -> Scalar };
-        pred=[35]{any,3 -> Scalar };
-        succ=[36]{any,3 -> PC };
-        zero=[37]{any,3 -> PA }
+  n=*[23]@{_;
+    s=[43]{any,3 ->
+      PC:*[22]@{_;
+        add_=[39]{any,3 -> Scalar };
+        pred=[40]{any,3 -> Scalar };
+        succ=[41]{any,3 -> PC };
+        zero=[42]{any,3 -> PA }
       }
     };
-    z=*[12]@{_; add_=[30]{any,3 -> Scalar }; pred=[22]{any,3 -> ~Scalar }; succ=[31]{any,3 -> PC }; zero=[33]{any,3 -> PB }}
+    z=*[21]@{_; add_=[36]{any,3 -> Scalar }; pred=[29]{any,3 -> ~Scalar }; succ=[37]{any,3 -> PC }; zero=[38]{any,3 -> PB }}
   };
   one  =PC;
   three=PC;
@@ -1621,7 +1601,7 @@ three =(n.s two);
         "}"+
         "",
         gcp_rez, gcp_rez,
-        "[4,7,8,9,10,11,12,13,16,17,18]","[4,5,6,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38]");
+       "[17,18,19,5,20,21,6,22,23,24]","[5,6,7,8,29,30,31,32,33,34,35,36,37,32,38,39,40,41,42,43]");
   }
 
   // Regression during the HM/GCP Apply lift.
@@ -1746,36 +1726,36 @@ all
     }
   }
 """,
-         """
-*[16]@{_;
-  false=PC:*[8,9]@{_; and=[23,27]{any,3 -> Scalar }; or=[25,28]{any,3 -> Scalar }; then=[26,29]{any,4 -> Scalar }};
+        """
+*[22]@{_;
+  false=PC:*[18,19]@{_; and=[30,33]{any,3 -> Scalar }; or=[31,34]{any,3 -> Scalar }; then=[32,35]{any,4 -> Scalar }};
   true =PC;
-  s=[45]{any,3 ->
-    PA:*[12]@{_;
-      add_=[44]{any,3 -> PA };
-      pred=[42]{any,3 -> PB:*[10,11,12,13,14]@{_; add_=[4,5,22,23,25,27,28,35,36,37,41,42,43,44,45]{any,3 -> Scalar }; pred=[4,5,22,23,24,25,27,28,32,35,36,37,41,42,43,44,45]{any,3 -> PB }; succ=[4,5,22,23,25,27,28,35,36,37,41,42,43,44,45]{any,3 -> PB }; zero=[4,5,22,23,24,25,27,28,32,35,36,37,41,42,43,44,45]{any,3 -> PC }} };
-      succ=[43]{any,3 -> PA };
-      zero=[41]{any,3 -> PC }
+  s=[50]{any,3 ->
+    PA:*[21]@{_;
+      add_=[49]{any,3 -> PA };
+      pred=[47]{any,3 -> PB:*[5,20,21,6,7]@{_; add_=[4,5,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> Scalar }; pred=[4,5,7,8,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> PB }; succ=[4,5,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> PB }; zero=[4,5,7,8,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> PC }} };
+      succ=[48]{any,3 -> PA };
+      zero=[46]{any,3 -> PC }
     }
   };
-  z=*[11]@{_;
-    add_=[37]{any,3 ->  Scalar };
-    pred=[22]{any,3 -> ~Scalar };
-    succ=[36]{any,3 -> PA };
-    zero=[35]{any,3 -> PC }
+  z=*[20]@{_;
+    add_=[42]{any,3 ->  Scalar };
+    pred=[29]{any,3 -> ~Scalar };
+    succ=[41]{any,3 -> PA };
+    zero=[40]{any,3 -> PC }
   }
 }
 """,
          """
-*[16]@{_;
-  false=PA:*[8,9]@{_; and=[23,27]{any,3 -> Scalar }; or=[25,28]{any,3 -> Scalar }; then=[26,29]{any,4 -> Scalar }};
+*[22]@{_;
+  false=PA:*[18,19]@{_; and=[30,33]{any,3 -> Scalar }; or=[31,34]{any,3 -> Scalar }; then=[32,35]{any,4 -> Scalar }};
   true =PA;
-  s    =[45]{any,3 -> Scalar };
-  z    =*[11]@{_; add_=[37]{any,3 -> Scalar }; pred=[22]{any,3 -> ~Scalar }; succ=[36]{any,3 -> Scalar }; zero=[35]{any,3 -> PA }}
+  s    =[50]{any,3 -> Scalar };
+  z    =*[20]@{_; add_=[42]{any,3 -> Scalar }; pred=[29]{any,3 -> ~Scalar }; succ=[41]{any,3 -> Scalar }; zero=[40]{any,3 -> PA }}
 }
 """,
-         "[4,7,8,9,10,11,12,13,14,16]",
-         "[4,5,6,22,23,24,25,26,27,28,29,32,35,36,37,41,42,43,44,45]"
+        "[17,18,19,5,20,21,6,7,22]",
+        "[5,6,7,8,29,30,31,32,33,34,35,32,40,41,42,46,47,48,49,50]"
          );
   }
 
@@ -1832,9 +1812,9 @@ maybepet = petcage.get;
         (if maybepet ({_maybepet -> _maybepet.name     }(notnil maybepet)) "abc")
 )
 """,
-         "*(nflt32,nflt32,*str:(nint8))",
-         "*[11](_, Scalar, Scalar, *[4]str:(nint8))",
-         "[4,11]",null);
+        "*(nflt32,nflt32,*str:(nint8))",
+        "*[20](_, Scalar, Scalar, *[4]str:(nint8))",
+        "[20]",null);
   }
 
   // Shorter version of perf_01
@@ -1844,9 +1824,9 @@ maybepet = petcage.get;
          "p1 = (triple p0 p0 p0);"+
          "p1",
 
-         rez_hm,
-         "*[8](_, XA:[23]{any,5 ->*[7](_, Scalar, Scalar, Scalar) }, XA, XA)",
-         "[4,7,8]","[23]"  );
+        rez_hm,
+        "*[18](_, XA:[30]{any,5 ->*[17](_, Scalar, Scalar, Scalar) }, XA, XA)",
+        "[17,18]","[30]"  );
   }
 
   // try the worse-case expo blow-up test case from SO
@@ -1857,10 +1837,10 @@ maybepet = petcage.get;
          "p2 = (triple p1 p1 p1);"+
          "p3 = (triple p2 p2 p2);"+
          "p3",
-
-         rez_hm,
-         "*[11](_, PB:*[9](_, PA:*[8](_, XA:[23]{any,5 ->*[7](_, Scalar, Scalar, Scalar) }, XA, XA), PA, PA), PB, PB)",
-         "[4,7,8,9,11]","[23]");
+        
+        rez_hm,
+        "*[20](_, PB:*[19](_, PA:*[18](_, XA:[30]{any,5 ->*[17](_, Scalar, Scalar, Scalar) }, XA, XA), PA, PA), PB, PB)",
+        "[17,18,19,20]","[30]");
   }
 }
 

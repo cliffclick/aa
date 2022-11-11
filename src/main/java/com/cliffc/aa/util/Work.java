@@ -46,4 +46,5 @@ public class Work<E extends IntSupplier> extends BitSetSparse {
   // Get/delete "idx"th elements; error if OOB.
   public E at(int idx) { return (E)_work.at(idx); }
   public void del(int idx) { clr(((E)_work.del(idx)).getAsInt()); }
+  public String print_work() { return _work.toString(); }
 }

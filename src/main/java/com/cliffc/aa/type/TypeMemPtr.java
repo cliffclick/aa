@@ -142,7 +142,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     TypeStruct ts = TypeStruct.make(TypeFld.make_tup(t, AA.ARG_IDX)).set_name("str:");
     return TypeMemPtr.make(aliases.test(0),aliases.clear(0),ts);
   }
-  public boolean is_str() { return Util.eq(_obj._clz,"str:"); }
+  public boolean is_str() { return _obj.is_str(); }
 
   // The display is a self-recursive structure: slot 0 is a ptr to a Display.
   // To break class-init cycle, this is made here, now.

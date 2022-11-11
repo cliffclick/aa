@@ -163,7 +163,14 @@ public class HM {
   // Mapping from alias#s to either Struct, Pair or Triple
   static final Ary<Alloc> ALIASES = new Ary<>(Alloc.class);
 
-  static { BitsAlias.init0(); BitsFun.init0(); }
+  static {
+    BitsAlias.init0();
+    BitsFun.init0();
+    // Pre-cook some EXTX aliases, so they get the same number in every test
+    for( int i=0; i<10; i++ ) BitsAlias.new_alias(BitsAlias.EXTX);
+    // Pre-cook some EXTX fidxs, so they get the same number in every test
+    for( int i=0; i<10; i++ ) BitsFun.new_fidx(BitsFun.EXTX);
+  }
 
   static boolean DO_HM ;        // Do Hindley-Milner typing
   static boolean DO_GCP;        // Do forwards-flow Global Constant Propagation typing
@@ -199,26 +206,26 @@ public class HM {
     HM_NEW_LEAF=false;
     HM_AMBI   = false;
     HM_FREEZE = false;
-    main_work_loop(prog,work);
+    main_work_loop(prog,work,1);
 
     // Pass 2: Potential new Leafs quit lifting GCP in Apply
     HM_NEW_LEAF = true;
     prog.add_new_leaf_work(work);
     assert prog.more_work(work);
-    main_work_loop(prog,work);
+    main_work_loop(prog,work,2);
 
     // Pass 3: Unresolved Fields are ambiguous; propagate errors
     HM_AMBI = true;
     prog.add_ambi_work(work);
     assert prog.more_work(work);
-    main_work_loop(prog,work);
+    main_work_loop(prog,work,3);
     
     // Pass 4: H-M types freeze, escaping function args are assumed called with lowest H-M compatible
     // GCP types continue to run downhill.
     HM_FREEZE = true;
     prog.add_freeze_work(work);
     assert prog.more_work(work);
-    main_work_loop(prog,work);
+    main_work_loop(prog,work,4);
 
     // Error propagation, no types change.
     assert prog.more_work(work);
@@ -227,7 +234,7 @@ public class HM {
     return prog;
   }
 
-  static void main_work_loop( Root prog, Work<Syntax> work) {
+  static void main_work_loop( Root prog, Work<Syntax> work, int pass ) {
 
     int cnt=0;
     while( work.len()>0 ) {     // While work
@@ -1244,7 +1251,7 @@ public class HM {
     static BitsAlias matching_escaped_aliases(T2 t2) {
       BitsAlias aliases = BitsAlias.EMPTY;
       for( int alias : EXT_ALIASES )
-        if( t2.trial_unify_ok(ALIASES.at(alias).t2()) )
+        if( t2.trial_unify_ok(ALIASES.at(alias).t2(),false) )
           aliases = aliases.set(alias); // Compatible escaping alias
       return aliases;
     }
@@ -1256,13 +1263,13 @@ public class HM {
       EXTLambda elam = Root.EXTS.atX(t2.nargs());
       if( elam==null ) throw unimpl();
       fidxs = fidxs.set(elam._fidx);
-      // Cannot ask for trial_unify until HM_FREEZE, because trials can fail
+      // Cannot ask for trial_unify_ok until HM_FREEZE, because trials can fail
       // over time which runs the result backwards in GCP.
       if( HM_FREEZE )
         for( int fidx : EXT_FIDXS ) {
           Func fun = Lambda.FUNS.get(fidx);
-          // Dunno (yet), since trial_unify can pass, then filter as HM proceeds
-          if( t2.trial_unify_ok(fun.as_fun()) )
+          // Dunno (yet), since trial_unify_ok can pass, then filter as HM proceeds
+          if( t2.trial_unify_ok(fun.as_fun(),false) )
             fidxs = fidxs.set(fidx); // Compatible escaping fidx
         }
       return fidxs;
@@ -1675,7 +1682,7 @@ public class HM {
       String lab = null;
       for( String id : rhs._args.keySet() ) {
         if( is_resolving(id) ) continue;
-        if( pat.trial_unify_ok(rhs.arg(id)) ) {
+        if( pat.trial_unify_ok(rhs.arg(id),false) ) {
           if( lab==null ) lab=id;   // No choices yet, so take this one
           else {                    // Ambiguous (yet)
             pat.push_update(this);  // Revisit if changes
@@ -2911,11 +2918,11 @@ public class HM {
     // Do a trial unification between this and that.  Report back if any error
     // happens.  No change to either side, this is a trial only.
     private static final NonBlockingHashMapLong<T2> TDUPS = new NonBlockingHashMapLong<>();
-    private boolean trial_unify_ok(T2 that) {
+    private boolean trial_unify_ok(T2 that, boolean extras) {
       TDUPS.clear();
-      return _trial_unify_ok(that);
+      return _trial_unify_ok(that, extras);
     }
-    private boolean _trial_unify_ok(T2 that) {
+    private boolean _trial_unify_ok(T2 that, boolean extras) {
       assert !unified() && !that.unified();
       long duid = dbl_uid(that._uid);
       if( TDUPS.putIfAbsent(duid,this)!=null )
@@ -2940,12 +2947,13 @@ public class HM {
           if( Util.eq(id,RET) ) continue; // Do not unify based on return types
           T2 lhs = this.arg(id);
           T2 rhs = that.arg(id);
-          if( rhs!=null && !lhs._trial_unify_ok(rhs) ) return false;
+          if( rhs!=null && !lhs._trial_unify_ok(rhs,extras) ) return false;
+          if( id.endsWith(":") && (lhs==null || rhs==null) ) return false; // Class tags are not 'extra fields', must match exactly
         }
 
       // Allow unification with extra fields.  The normal unification path
       // will not declare an error, it will just remove the extra fields.
-      return this.mismatched_child(that) && that.mismatched_child(this);
+      return  (extras || this.mismatched_child(that)) && (that.mismatched_child(this));
     }
 
     // True if 'this' has extra children and 'that' does not allow extras
@@ -3073,7 +3081,7 @@ public class HM {
     }
 
     private static Type at_fld(Type t, String id) { // TODO: FAILURE TO SHARPEN
-      if( !(t instanceof TypeStruct ts) ) return t.oob(TypeNil.SCALAR);
+      if( !(t instanceof TypeStruct ts) || ts.is_str() ) return t.oob(TypeNil.SCALAR);
       TypeFld fld = ts.get(id);
       return fld==null ? ts.oob(TypeNil.SCALAR) : fld._t;
     }
@@ -3108,14 +3116,21 @@ public class HM {
         return TypeNil.XSCALAR;  // Future arg leaf can expand into anything, and lift result
       }
 
-      // Until we freeze, check for "may unify in the future".  For all
-      // successful trials, join all results since we might unify with any of
-      // them.
+      // Until we freeze, check for "may unify in the future".  For all successful      
+      // trials, join all results since we might unify with any of them.
       if( !HM_FREEZE ) {
-        if( is_leaf() && T2_NEW_LEAF ) return TypeNil.XSCALAR; // Will unify with every new leaf
+        if( is_leaf() && T2_NEW_LEAF ) // A leaf and new ones can appear?
+          return TypeNil.XSCALAR;      // Will unify with every new leaf
+        // Join against everything in the arg input map that might unify
         Type tj = Type.ALL;
         for( T2 t2 : T2.T2MAP.keySet() )
-          if( t2.trial_unify_ok(this) )
+          // Test unification.  Specifically allow extra fields, and these can
+          // be removed over time, which will later allow a unification.
+          // E.g. unify @{ a=V123; nope=V456 } and @{ a=V789 } would otherwise
+          // fail because 'nope' is not in RHS and RHS is not open.  But 'nope'
+          // might later be removed (e.g. by normal unifying these two types)
+          // so allow for it now.          
+          if( t2.trial_unify_ok(this,true) )
             tj = tj.join(T2.T2MAP.get(t2));
         if( !_is_copy )
           tj = tj.widen();

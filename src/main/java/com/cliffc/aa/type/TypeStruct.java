@@ -284,6 +284,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   public void remove_dups() { _flds = remove_dups(_def,_flds); }
   public void remove_dups_hashcons() { _flds = TypeFlds.hash_cons(remove_dups(_def,_flds)); }
 
+  public boolean is_str() { return Util.eq(_clz,"str:"); }
+  
   // Possibly allocated.  No fields specified.  All fields are possible and
   // might be ALL (error).  The worst possible result.
   public static final TypeStruct ISUSED = make("",ALL,TypeFlds.EMPTY);
