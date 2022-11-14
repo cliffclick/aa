@@ -6,8 +6,6 @@ import com.cliffc.aa.util.*;
 import java.util.HashMap;
 import java.util.function.BinaryOperator;
 
-import static com.cliffc.aa.AA.unimpl;
-
 // Pointers-to-memory; these can be both the address and the value part of
 // Loads and Stores.  They carry a set of aliased TypeObjs.
 
@@ -124,10 +122,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public TypeMemPtr make_from( BitsAlias aliases ) { return _aliases==aliases ? this : make(aliases.test(0),aliases.clear(0),_obj); }
   public TypeMemPtr make_from_nil( BitsAlias aliases ) {
     if( _aliases==aliases ) return this;
-    //if( _aliases.test(0) != aliases.test(0) )
-    //  aliases = _aliases.test(0) ? aliases.clear(0) : aliases.set(0);
-    //return make(aliases,_obj);
-    throw unimpl();
+    return make(_aliases.test(0),aliases,_obj);
   }
   @Override TypeMemPtr make_from( boolean any, boolean nil, boolean sub ) {
     nil &= sub;

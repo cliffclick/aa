@@ -44,32 +44,11 @@ HM includes polymorphic structures and fields (structural typing not duck
 typing), polymorphic nil-checking, constant bases and an error type-var.  Both
 HM and GCP types fully support recursive/cyclic types.
 
-HM includes ad-hoc polymorphim via overloading.  A set of overloads are
-unambiguously resolved to a single type, or else error-typed as ambiguous.
-This is done by doing *trial-unifications* until only a single overload target
-resolves without an error.  Two overloads from the same Syntax will unify
-choice by choice.  Two unrelated overloads will each have to resolve, and then
-the resolved parts will unify.
-
-Overload resolution happens at some Syntax based on the HM Types.
-
-//  &[ @{ x=1 }; @{ y=2 } ].x // Overload struct resolves to have field 'x'
-//  @{ x=1; y=2 } &[ .x; .z ] // Overload field 'x' resolves but not 'z'
-//  (dec &[ 2 2.3])           // Overload chooses the 'int' argument
-//  (&[ dec isempty] "abc")   // Overload function resolves as 'isempty'
-//  Named overload resolves differently in each context
-//    color = { hex str -> &[ hex str ] };
-//    red   = (color 0x123 "red" );
-//    blue  = (color 0x456 "blue");
-//    (pair red blue)
-//  Same overload can unify to itself
-//         (if rand red           blue   )  // Types as a 'color' overload
-//  Different overloads must resolve first
-//         (if rand red &[ 0x456 "blue" ])  // Error: unrelated overloads did not resolve
-//  Different overloads resolve based on unsafe
-//    (dec (if rand red &[ 0x456 "blue" ])) // Resolves as 'int'; same as "(if rand 0x122 0x455)"
-//  Same overloads resolve the same way
-//    (dec (if rand red           blue   )) // Resolves as 'int'; same as "(if rand 0x122 0x455)"
+HM includes ad-hoc polymorphim via overloading.  An overload is just a normal
+tuple/struct which is loaded via a Field with an unknown label.  The label is
+inferred as being the only field than can unify without error.  This is done by
+doing *trial-unifications* until only a single overload target resolves without
+an error.
 
 HM errors keep all the not-unifiable types, all at once, as a special case of a
 union type.  Further unifications with the error either add a new not-unifiable
@@ -570,7 +549,7 @@ public class HM {
       return p0(new SB(), new VBitSet(), dups).toString();
     }
     final SB p0(SB sb, VBitSet visit, VBitSet dups) {
-      p1(sb.i(),dups);
+      p1(sb.i(),dups).p('#').p(_uid);
       if( DO_HM  ) _hmt .str(sb.p(", HMT="), visit,dups,true);
       if( DO_GCP ) _flow.str(sb.p(", GCP="), true, false );
       sb.nl();
@@ -1068,7 +1047,7 @@ public class HM {
     Type hm_apply_lift(T2 rezt2, TypeFunPtr tfp, boolean test) {
       // Walk the input types, finding all the Leafs.  Repeats of the same Leaf
       // has its flow Types MEETed.
-      T2.T2_NEW_LEAF = false; // Assume new leafs can appear
+      T2.T2_MAY_NEW_LEAF.clear(); // Assume new leafs can appear
       T2.T2MAP.clear();
       for( Syntax arg : _args ) {
         T2.WDUPS.clear(true);
@@ -1165,7 +1144,7 @@ public class HM {
       if( work!=null ) work.add(ROOT);
       return b.set(x);
     }
-    static void add_ext_alias(int alias, Work<Syntax> work) { EXT_ALIASES = add_ext(alias,work,EXT_ALIASES); }
+    static void add_ext_alias(int alias, Work<Syntax> work) { assert alias!=1; EXT_ALIASES = add_ext(alias,work,EXT_ALIASES); }
     static void add_ext_fidx (int fidx , Work<Syntax> work) { EXT_FIDXS   = add_ext(fidx ,work,EXT_FIDXS  ); }
 
     public Root(Syntax body) { super(Type.ANY,body); }
@@ -1222,6 +1201,7 @@ public class HM {
       for( Field fld : Field.FIELDS.values() )
         if( Field.is_resolving(fld._id) ) {
           fld.find().unify_errs("Unresolved field "+fld._id,work);
+          fld.find().clr_cp(work);
           work.add(fld);        // Type changes as well
           work.addAll(fld.find()._deps);
         }
@@ -1360,7 +1340,6 @@ public class HM {
       _t2 = t2;
       _fidx = BitsFun.new_fidx(BitsFun.EXTX);
       Lambda.FUNS.put(_fidx,this);
-      t2.get(RET).clr_cp(work);
       Root.add_ext_fidx(_fidx,work);
     }
     @Override public String toString() { return "ext lambda"; }
@@ -2354,7 +2333,7 @@ public class HM {
       T2 n = arg("?");
       if( n.is_leaf() ) return this;
       _args.remove("?");  // No longer have the "?" key, not a nilable anymore
-      _args.put("??",n);  // For hm_apply_lift, keep around the prior mapping
+      if( n._is_copy ) _args.put("??",n);  // For hm_apply_lift, keep around the prior mapping
       // Nested nilable-and-not-leaf, need to fixup the nilable
       if( n.is_base() ) {
         _may_nil=false;
@@ -2464,12 +2443,11 @@ public class HM {
         return TypeFunPtr.makex(false,fidxs,size()-1+DSP_IDX,Type.ANY,rez);
       }
       if( is_obj() ) {
-        assert HM_FREEZE && deep; // Only for final reporting
         TypeStruct tstr = (TypeStruct)ADUPS.get(_uid);
         if( tstr==null ) {
           // Returning a high version of struct
           Type.RECURSIVE_MEET++;
-          tstr = TypeStruct.malloc("",is_open() ? Type.ANY : Type.ALL,TypeFlds.get(0)).add_fld(TypeFld.NO_DISP);
+          tstr = TypeStruct.malloc("",is_open() ? Type.ANY : Type.ALL,TypeFlds.get(0));
           if( _args!=null ) {
             for( String fld : _args.keySet() )
               if( fld.endsWith(":") ) tstr._clz = fld; // Move a nomative tag into the clz field
@@ -2574,6 +2552,10 @@ public class HM {
         if( cmp2 == 0 ) that._eflow = sf.meet(hf);
         if( cmp2  > 0 ) that._eflow = sf;
         if( cmp2  < 0 ) that._eflow = hf;
+      }
+      if( !that._is_copy ) {    // Widen non-copy bases
+        if( that._tflow!=null ) that._tflow = that._tflow.widen();
+        if( that._eflow!=null ) that._eflow = that._eflow.widen();
       }
       progress |= of!=that._tflow || oe!=that._eflow; // Progress check
       if( work==null && progress ) { that._tflow =of; that._eflow=oe; } // Unwind if just testing
@@ -3004,6 +2986,7 @@ public class HM {
       if( _eflow   !=t._eflow   ) return false;
       if( _may_nil !=t._may_nil ) return false; // Base-cases have to be completely identical
       if( _is_obj  !=t._is_obj  ) return false; // Base-cases have to be completely identical
+      if( _is_copy != t._is_copy) return false; // Base-cases have to be completely identical
       if( _err!=null && !_err.equals(t._err) ) return false; // Base-cases have to be completely identical
       if( is_leaf() ) return false;               // Two leaves must be the same leaf, already checked for above
       if( size() != t.size() ) return false;      // Mismatched sizes
@@ -3023,7 +3006,7 @@ public class HM {
     // -----------------
     // T2MAP allows cycle_equals, not identity equals
     static private final IdentityHashMap<T2,Type> T2MAP = new IdentityHashMap<>();
-    static private boolean T2_NEW_LEAF;
+    static private final Ary<T2> T2_MAY_NEW_LEAF = new Ary<T2>(T2.class);
     static final NonBlockingHashMapLong<Type> WDUPS = new NonBlockingHashMapLong<>();
 
     // Lift the flow of an Apply, according to its inputs.  This is to
@@ -3037,19 +3020,15 @@ public class HM {
     // monotonic because the result is JOINd with GCP types.
     void walk_types_in( Type t ) {
       assert !unified();
-      if( !is_obj() ) {
+      if( is_err() ) return;
+      if( _is_copy && !is_obj() ) {
         long duid = dbl_uid(t._uid);
         if( WDUPS.putIfAbsent(duid,TypeStruct.ISUSED)!=null ) return;
         T2MAP.merge(this, t, Type::meet);
       }
-      // TODO: stop lifting on error inputs; then can take early-exit from each choice.
 
       // Free variables keep the input flow type.
-      if( is_leaf() ) T2_NEW_LEAF = true;   // Might expand to a new leaf later
-
-      // Bases can (sorta) act like a leaf: they can keep their polymorphic
-      // "shape" and induce it on the result
-      //if( is_base() ) /*nothing*/;
+      if( is_leaf() ) T2_MAY_NEW_LEAF.add(this);   // Might expand to a new leaf later
 
       // Pointers recurse on their object
       if( is_ptr() ) {
@@ -3076,7 +3055,7 @@ public class HM {
         for( String id : _args.keySet() )
           if( !id.endsWith(":") ) // No lifting from class args
             arg(id).walk_types_in(at_fld(t, id));
-        if( is_open() ) T2_NEW_LEAF = true; // Can add a new leaf later
+        if( is_open() ) T2_MAY_NEW_LEAF.add(this); // Can add a new leaf later
       }
     }
 
@@ -3090,40 +3069,34 @@ public class HM {
     // stronger flow types from the matching input types.
     Type walk_types_out( Type t, Apply apply, boolean test ) {
       assert !unified();
-
       // Fast-path cutout
       if( t==TypeNil.XSCALAR ) return TypeNil.XSCALAR; // No lift, do not bother
       if( this.is_err() )      return t; // Do not lift errors
 
+      // Check for some future leaf appearing with XSCALAR in the T2MAP.  Means
+      // we saw an input leaf, which might later expand into new leafs (since
+      // no HM_FREEZE) and new leafs can lift (since !HM_NEW_LEAF).
+      if( !HM_NEW_LEAF && !T2.T2_MAY_NEW_LEAF.isEmpty()) {
+        for( T2 t2 : T2.T2_MAY_NEW_LEAF )
+          t2.push_update(apply);
+        Root.NEW_LEAF_DEPS.add(apply);
+        return TypeNil.XSCALAR;  // Future arg leaf can expand into anything, and lift result
+      }
+    
       // Check for a direct hit
       Type tmap = T2MAP.get(this);
       if( tmap!=null ) {
-        Type tw = tmap.widen();       // Check widened bases
-        if( tw == tmap ) return tmap; // Direct hit after widen, always works
-        if( !_is_copy ) return tw;    // Not a copy, so must widen
+        assert _is_copy;
         push_update(apply);   // If is_copy falls, then widen applies and needs a revisit
         return tmap;          // While a copy, can return the direct hit
       }
 
-      // Check for some future leaf appearing with XSCALAR
-      if( !HM_NEW_LEAF && T2_NEW_LEAF ) {
-        // walk T2MAP for leafs or open structs; push Apply.
-        // TODO: can optimize this if becomes expensive, because these are 1-shot transitions
-        for( T2 t2 : T2.T2MAP.keySet() )
-          if( t2.is_leaf() || t2.is_open() )
-            t2.push_update(apply);
-        Root.NEW_LEAF_DEPS.add(apply);
-        return TypeNil.XSCALAR;  // Future arg leaf can expand into anything, and lift result
-      }
-
       // Until we freeze, check for "may unify in the future".  For all successful      
       // trials, join all results since we might unify with any of them.
-      if( !HM_FREEZE ) {
-        if( is_leaf() && T2_NEW_LEAF ) // A leaf and new ones can appear?
-          return TypeNil.XSCALAR;      // Will unify with every new leaf
+      if( !HM_FREEZE && _is_copy ) {
         // Join against everything in the arg input map that might unify
         Type tj = Type.ALL;
-        for( T2 t2 : T2.T2MAP.keySet() )
+        for( T2 t2 : T2.T2MAP.keySet() ) {
           // Test unification.  Specifically allow extra fields, and these can
           // be removed over time, which will later allow a unification.
           // E.g. unify @{ a=V123; nope=V456 } and @{ a=V789 } would otherwise
@@ -3132,29 +3105,30 @@ public class HM {
           // so allow for it now.          
           if( t2.trial_unify_ok(this,true) )
             tj = tj.join(T2.T2MAP.get(t2));
-        if( !_is_copy )
-          tj = tj.widen();
+          t2.push_update(apply); // If t2 loses is_copy, need to recheck here
+        }
         if( tj != Type.ALL ) // Some trial succeeds, use this result "as if" we got a direct hit
-          return tj.join(t);
+          return tj.join(t); // Return join, so the old_lift keeps lifting
         // No trial succeeds, fall into the recursive walk to lift internal parts
       }
 
-      // Lift the internal parts
-      return _walk_types_out(t,apply,test);
-    }
+      
+      if( is_leaf() )
+        return t;
 
-    private Type _walk_types_out( Type t, Apply apply, boolean test ) {
-      if( is_err2() ) return TypeNil.SCALAR; // No lift for mixed ground terms
-
-      if( is_leaf() ) { assert HM_NEW_LEAF; return t; }
-
-      if( is_base() ) return _tflow; // return t;
+      // Recursive breakdown
+      if( is_base() ) return _tflow;
 
       if( is_ptr() ) {
         if( t==TypeNil.NIL || t==TypeNil.XNIL ) return t; // Keep a nil
-        if( !(t instanceof TypeMemPtr tmp) ) return t;
-        return tmp.make_from((TypeStruct)arg("*").walk_types_out(tmp._obj,apply,test));
+        if( !(t instanceof TypeMemPtr tmp) )
+          return t==TypeNil.XNSCALR ? t : t.oob(as_flow(null,true));
+        TypeStruct obj = (TypeStruct)arg("*").walk_types_out(tmp._obj,apply,test);
+        if( tmp._aliases.is_empty() )
+          return tmp.make_from(obj);
+        return TypeMemPtr.make(_may_nil&&tmp.must_nil(),tmp._aliases,obj);
       }
+      if( is_obj() ) return t; // expect ptrs to be simple, so t is ISUSED
 
       if( is_nil() ) // The wrapped leaf gets lifted, then nil is added
         return arg("?").walk_types_out(t.join(TypeNil.NSCALR),apply, test);
@@ -3170,9 +3144,7 @@ public class HM {
           : TypeFunPtr.makex(t.above_center(),(t.above_center() ? BitsFun.EMPTY : BitsFun.NALL),size()-1+DSP_IDX, Type.ANY, trlift);
       }
 
-      if( is_obj() ) return t; // expect ptrs to be simple, so t is ISUSED
-
-      throw unimpl();           // Handled all cases
+      throw unimpl();
     }
 
     // -----------------
@@ -3183,6 +3155,8 @@ public class HM {
     private void _clr_cp( Work<Syntax> work  ) {
       if( !_is_copy || UPDATE_VISIT.tset(_uid) ) return;
       _is_copy = false;
+      if( _tflow!=null ) _tflow = _tflow.widen();
+      if( _eflow!=null ) _eflow = _eflow.widen();
       if( _deps!=null ) {
         T2 ret;
         for( Syntax syn : _deps ) {
@@ -3270,7 +3244,6 @@ public class HM {
     SB str(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
       boolean dup = dups.get(_uid);
       if( !debug && unified() ) return find().str(sb,visit,dups,false);
-      if( debug && !_is_copy ) sb.p('%');
       if( unified() || (is_leaf() && _err==null) ) {
         vname(sb,debug);
         return unified() ? _args.get(">>").str(sb.p(">>"), visit, dups, debug) : sb;
@@ -3282,6 +3255,7 @@ public class HM {
         if( visit.tset(_uid) ) return sb; // V123 and nothing else
         sb.p(':');              // V123:followed_by_type_descr
       }
+      if( !_is_copy ) sb.p('%');
 
       // Special printing for errors
       if( is_err() ) {

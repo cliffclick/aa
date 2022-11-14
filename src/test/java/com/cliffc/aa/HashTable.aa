@@ -2,32 +2,33 @@
 
 // HashTable is a function which returns a new hash table, very similar
 // to calling 'new HashTable()' in Java.
+Hashtable = : K V -> {@{ get = { K -> V? }; put = { K V -> V? } ; ...}};
 HashTable = {@{     // No args, returns a hash table struct
-  tab = [7];        // The table
+  tab = [7];        // The table; fixed size; no resizing in this toy example
 
   // Search the linked list for a key
   // takes a linked list (list) and a key (key) 
   // returns the list or a nil to indicate not found
-  search = { list key ->
-    list ? (
-      list.key.eq(key) ? list : search(list.next,  key)
-    )
+  find = { list key ->
+    list ? (        // if list not-nil, check the key; return on a hit or find again
+      list.key.eq(key) ? list : find(list.next,  key)
+    )               // if list is nil, return a nil
   };
 
   // Takes a key, which has a field 'hash' which has a no-arg function
   // and a field 'eq' which takes an arg.
   get = { key ->
-    bucket = tab[key.hash() % #tab];  // find the bucket
-    entry = search(bucket, key);  // search the bucket for the key
-    entry ? entry.val  // if found return val else nil
+    bucket = tab[key.hash() % #tab]; // the linked list head
+    entry = find(bucket, key);       // search the list for the key
+    entry ? entry.val                // if found return val else nil
   };
   
   // Takes a key, which has a field 'hash' which has a no-arg function
   // and a field 'eq' which takes an arg.  Takes a 'val'.  Returns any
   // oldval
   put = { key val ->
-    idx = key.hash() % #tab;       // Compute hash index
-    entry = search(tab[idx], key); // Get bucket entry
+    idx = key.hash() % #tab;      // Compute hash index
+    entry = find(tab[idx], key);  // Get bucket entry
     // On a hit, set val over the entry.val, and return the oldval.
     entry ? (oldval = entry.val; entry.val := val; ^oldval);
     // On a miss, linked-list insert key, val. Not atomic!?

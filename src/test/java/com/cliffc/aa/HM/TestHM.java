@@ -28,12 +28,10 @@ public class TestHM {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    // x_peano_00, T/T/9, pass#4 also, picks up a clr_cp in pass#4
-    // x_peano_05, T/T/0
     DO_HMT=true;
     DO_GCP=true;
     RSEED=0;
-    x_peano_00();
+    e_recur_struct_03();
   }
 
   private void _run0s( String prog, String rprog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -71,7 +69,7 @@ public class TestHM {
     if( JIG )
       _run0s(prog,rprog,rez_hm,frez_gcp,RSEED,esc_ptrs,esc_funs);
     else
-      for( int rseed=0; rseed<32; rseed++ )
+      for( int rseed=0; rseed<4; rseed++ )
         _run0s(prog,rprog,rez_hm,frez_gcp,rseed,esc_ptrs,esc_funs);
   }
 
@@ -107,7 +105,7 @@ public class TestHM {
   }
   @Test public void a_basic_02() {
     run( "{ z -> (pair (z 0) (z \"abc\")) }" ,
-          "{ { *str:(97)? -> A } -> *( A, A) }",
+          "{ { *str:(97)? -> A } -> *( A, A ) }",
           "[30]{any,3 ->*[17](_, Scalar, Scalar) }",
           "[17]", "[30,7]" );
   }
@@ -125,7 +123,7 @@ public class TestHM {
   @Test public void a_basic_04() {
     run("id={x->x}; (pair (id 3) (id \"abc\"))",
         null,
-        // HM is sharper here than in test05, because id is generalized per each use site
+        // HM is sharper here than in a_basic_03, because id is generalized per each use site
         "*( 3, *str:(97))",
         "*( 3, *str:(97))",
         // GCP with HM
@@ -141,7 +139,7 @@ public class TestHM {
           "[31]{any,3 ->*[17](_, Scalar, Scalar) }",
           "[17]","[31]");
   }
-  @Test public void a_basic_06() { run("(i* 2 3)","int64","6");  }
+  @Test public void a_basic_06() { run("(i* 2 3)","%int64","6");  }
 
 
   @Test(expected = RuntimeException.class)
@@ -150,7 +148,7 @@ public class TestHM {
 
   @Test public void b_recursive_00() {
     run( "fact = { n -> (if (eq0 n) 1 (i* n (fact (dec n))))}; fact",
-          "{ int64 -> int64 }",
+          "{ %int64 -> %int64 }",
           "[33]{any,3 -> int64 }",
           null, "[33]" );
   }
@@ -166,12 +164,12 @@ public class TestHM {
   // Obscure factorial-like
   @Test public void b_recursive_02() {
     run("f0 = { f x -> (if (eq0 x) 1 (f (f0 f (dec x)) 2))}; (f0 i* 99)",
-        "int64","int64");
+        "%int64","int64");
   }
   // Obscure factorial-like
   // let f0 = fn f x => (if (eq0 x) 1 (* (f0 f (dec x)) 2) ) in f0 f0 99
   // let f0 = fn f x => (if (eq0 x) 1 (f (f0 f (dec x)) 2) ) in f0 *  99
-  @Test public void b_recursive_03() { run("f0 = { f x -> (if (eq0 x) 1 (i* (f0 f (dec x)) 2))}; (f0 f0 99)", "int64", "int64"); }
+  @Test public void b_recursive_03() { run("f0 = { f x -> (if (eq0 x) 1 (i* (f0 f (dec x)) 2))}; (f0 f0 99)", "%int64", "int64"); }
 
   // Mutual recursion
   @Test public void b_recursive_04() {
@@ -194,7 +192,7 @@ public class TestHM {
          "{{ A -> A } -> A }",
          "{{ A -> A } -> A }",
          "[31]{any,3 -> ~Scalar }",
-         "[31]{any,3 ->  Scalar }",
+         "[31]{any,3 -> Scalar }",
          null, "[7,31]");
   }
   @Test public void b_recursive_06() {
@@ -289,9 +287,9 @@ public class TestHM {
     run("map = { fun -> { x -> (fun x)}};"+
         "(pair ((map str) 5) ((map factor) 2.3f))",
         null,
-        "*( *str:(int8), flt64)",
-        "*( *str:(int8), flt64)",
-        "*[17](_, *[4]str:(int8), flt64)",
+        "*(%*%str:(%int64),%flt64)",
+        "*(%*%str:(%int64),%flt64)",
+        "*[17](_, *[4]str:(int64), flt64)",
         "*[17](_, Scalar, Scalar)",
         "[17]",null);
   }
@@ -331,9 +329,9 @@ map ={fun parg -> (fun (cdr parg))};
 (pair (map str (cons 0 5)) (map isempty (cons 0 "abc")))
 """,
         null,
-        "*( *str:(int8), int1)",
-        "*( *str:(int8), int1)",
-        "*[17](_, *[4]str:(int8), int64)",
+        "*(%*%str:(%int64),%int64)",
+        "*(%*%str:(%int64),%int64)",
+        "*[17](_, *[4]str:(int64), int64)",
         "*[17](_, Scalar, Scalar)",
         "[17]",null );
   }
@@ -423,7 +421,7 @@ map ={fun parg -> (fun (cdr parg))};
   // Since no nil-check, correctly types as needing a not-nil input.
   @Test public void d_struct_05() {
     run("{ sq -> (i* sq.x sq.y) }", // { sq -> sq.x * sq.y }
-         "{ *@{ x = int64; y = int64; ...} -> int64 }",
+         "{*@{ x=int64; y=int64; ... } -> %int64 }",
          "[30]{any,3 ->int64 }",
          "[5]","[30]" );
   }
@@ -558,8 +556,8 @@ map ={fun parg -> (fun (cdr parg))};
   @Test public void e_recur_struct_02() {
     run("map = { fcn lst -> (if lst @{ n1 = (map fcn lst.n0); v1 = (fcn lst.v0) } 0) }; (map dec @{n0 = 0; v0 = 5})",
         "map = { fcn lst -> (if lst ({_lst -> @{ n1 = (map fcn _lst.n0); v1 = (fcn _lst.v0) }} (notnil lst)) 0) }; (map dec @{n0 = 0; v0 = 5})",
-        "A:*@{ n1 = A; v1 = int64}?",
-        "PA:*[0,17]@{_; n1=PA; v1=4}",
+        "A:*@{ n1 = A; v1 = %int64 }?",
+        "PA:*[17]@{_; n1=PA; v1=4}?",
         "[17]",null);
   }
   // Need to see if a map call, inlined a few times, 'rolls up'.  Sometimes
@@ -567,8 +565,8 @@ map ={fun parg -> (fun (cdr parg))};
   @Test public void e_recur_struct_03() {
     run("map = { lst -> (if lst @{ n1= arg= lst.n0; (if arg @{ n1=(map arg.n0); v1=(str arg.v0)} 0); v1=(str lst.v0) } 0) }; map",
         "map = { lst -> (if lst ({_lst -> @{ n1= arg= _lst.n0; (if arg ({_arg -> @{ n1=(map _arg.n0); v1=(str _arg.v0)}} (notnil arg)) 0); v1=(str _lst.v0) }} (notnil lst)) 0) }; map",
-        "{ A:*@{ n0 = *@{ n0 = A; v0 = int64; ...}?; v0 = int64; ...}? -> B:*@{ n1 = *@{ n1 = B; v1 = *str:(int8)}?; v1 = *str:(int8)}? }",
-        "[37]{any,3 ->PA:*[18]@{_; n1=*[17]@{_; n1=PA; FB:v1=*[4]str:(_, int8)}?; FB}? }",
+        "{ A:*@{ n0 = *@{ n0 = A; v0 = int64; ...}?; v0 = int64; ...}? -> B:*@{ n1 = *@{ n1 = B; v1 = %*%str:(%int64)}?; v1 = %*%str:(%int64)}? }",
+        "[37]{any,3 ->PA:*[18]@{_; n1=*[17]@{_; n1=PA; FB:v1=*[4]str:(int8)}?; FB}? }",
         "[17,18,5]","[37]" );
   }
   // Checking an AA example
@@ -577,7 +575,7 @@ map ={fun parg -> (fun (cdr parg))};
         "(prod @{n= @{n=0; v=3}; v=2})",
         "prod = { x -> (if x ({_x -> (i* (prod _x.n) _x.v)}(notnil x)) 1)};"+
         "(prod @{n= @{n=0; v=3}; v=2})",
-        "int64", "int64",
+        "%int64", "int64",
         null, null);
   }
   // Example from TestParse.test15:
@@ -597,9 +595,9 @@ out_bool= (map in_str { xstr -> (eq xstr "def")});
 (pair out_str out_bool)
 """,
         null,
-        "*( *str:(int8), int1)",
-        "*( *str:(int8), int1)",
-        "*[19](_, *[4]str:(int8), int64)",
+        "*(%*%str:(%int64),%int64)",
+        "*(%*%str:(%int64),%int64)",
+        "*[19](_, *[4]str:(int64), int64)",
         "*[19](_, Scalar, Scalar)",
         "[19]",null);
   }
@@ -629,10 +627,10 @@ all = @{
         """
 A:*@{
   add={
-     B:*@{ add={ *@{i=int64;...} *@{i=int64;...} -> B };i=int64}
-     C:*@{ add={ *@{i=int64;...} *@{i=int64;...} -> C };i=int64}
+     B:*@{ add={ *@{i=int64;...} *@{i=int64;...} -> B };i=%int64}
+     C:*@{ add={ *@{i=int64;...} *@{i=int64;...} -> C };i=%int64}
      -> A};
-  i=int64
+  i=%int64
 }
 """,
          "PA:*[17]@{_; add=[30]{any,4 -> PA }; i=int64}",
@@ -686,7 +684,7 @@ fun = { ff ->
 };
 (fun 1.2f)
 """,  // required {f} in inner, available {f,mul} in outer
-        "A:*@{f=flt64;mul={*@{f=flt64;...}->A}}", // required {f} in inner, available {f,mul} in outer
+        "A:*@{f=%flt64;mul={*@{f=flt64;...}->A}}", // required {f} in inner, available {f,mul} in outer
         "PA:*[17]@{_; f=flt64; mul=[30]{any,3 ->PA }}",
         "[17,5]","[30]");
   }
@@ -703,7 +701,7 @@ fun = { ff ->
 con12=(fun 1.2f);
 (con12.mul con12)
 """,                // required {f} in inner, available {f,mul} in outer,middle
-        "A:*@{f=flt64;mul={B:*@{f=flt64;mul={*@{f=flt64;...}->B}}->A}}", // required {f} in inner, available {f,mul} in middle,outer
+        "A:*@{f=%flt64;mul={B:*@{f=%flt64;mul={*@{f=flt64;...}->B}}->A}}", // required {f} in inner, available {f,mul} in middle,outer
         "PA:*[17]@{_; f=flt64; mul=[30]{any,3 ->PA }}",
         "[17,5]","[30]");
   }
@@ -842,8 +840,8 @@ loop = { name cnt ->
         "};" +                      // End of total_size={...}
         "total_size",               // What is this type?
 
-        "{ A:*@{ size = int64; ...} B:*@{ next = B; val = A; ...}? -> int64 }",
-        "{ A:*@{ size = int64; ...} B:*@{ next = B; val = A; ...}? -> int64 }",
+        "{ A:*@{ size = %int64; ...} B:*@{ next = B; val = A; ...}? -> %int64 }",
+        "{ A:*@{ size = %int64; ...} B:*@{ next = B; val = A; ...}? -> %int64 }",
         "[33]{any,4 ->int64 }",
         "[33]{any,4 ->int64 }",
         "[5,6]","[33]");
@@ -891,7 +889,7 @@ loop = { name cnt ->
         "  { x -> (i* x 2   ) }"+  // Arg is 'int'
         "  { x -> (f* x 3.0f) }"+  // Arg is 'flt'
         ")",
-        "*( {int64 -> int64}, {flt64 -> flt64} )",
+        "*( {int64 -> %int64}, {flt64 -> %flt64} )",
         "*[17](_, [31]{any,3 -> int64 }, [33]{any,3 -> flt64 })",
         "[17]","[31,33]"
         );
@@ -910,7 +908,7 @@ loop = { name cnt ->
         "  { x -> (f* x 3.0f) } "+  // Arg is 'flt'
         ");"+
         "(pair (f.0 2) (f.1 1.2f))",    // Call with different args
-        "*(int64,flt64)", "*(int64,flt64)",
+        "*(%int64,%flt64)", "*(%int64,%flt64)",
         "*[18](_, 4,3.6000001f)", "*[18](_, 4, 3.6000001f)",
         "[18]",null);
   }
@@ -932,8 +930,8 @@ loop = { name cnt ->
   (pair (fx.0 2) (fx.1 1.2f))
 }
 """,
-        "{ A? -> *(int64,flt64) }",
-        "{ A? -> *(int64,flt64) }",
+        "{ A? -> *(%int64,%flt64) }",
+        "{ A? -> *(%int64,%flt64) }",
         "[40]{any,3 -> *[18](_, nint8, 0.6f) }",
         "[40]{any,3 -> *[18](_, nint8, 0.6f) }",
         "[18]","[40]");
@@ -943,8 +941,8 @@ loop = { name cnt ->
   @Test public void g_overload_03() {
     run("red = (pair 123 \"red\" ); (pair (dec red._) (isempty red._))",
         "red = (pair 123 \"red\" ); (pair (dec red.0) (isempty red.1))",
-        "*(int64,int1)",
-        "*(int64,int1)",
+        "*(%int64,%int64)",
+        "*(%int64,%int64)",
         "*[18](_, 122, xnil)",
         "*[18](_, 122, xnil)",
         "[18]",null);
@@ -956,8 +954,8 @@ loop = { name cnt ->
   @Test public void g_overload_04() {
     run("{ pred -> c =(if pred            (pair 123 \"red\" )                (pair 456  \"blue\" )); (pair (dec c._) (isempty c._))}",
         "{ pred -> c =(if pred ({_pred -> (pair 123 \"red\" )}(notnil pred)) (pair 456  \"blue\" )); (pair (dec c.0) (isempty c.1))}",
-        "{A? -> *(int64,int1) }",
-        "{A? -> *(int64,int1) }",
+        "{A? -> *(%int64,%int64) }",
+        "{A? -> *(%int64,%int64) }",
         "[37]{any,3 -> *[19](_, int64, xnil) }",
         "[37]{any,3 -> *[19](_, int64, xnil) }",
         "[19]","[37]");
@@ -967,7 +965,7 @@ loop = { name cnt ->
   @Test public void g_overload_05() {
     run("{ x -> (x._ x._.v)}",
         "{ x -> (x._ x._.v)}",
-        "{*@{&17 = Unresolved field &17: { A:Unresolvedfield&19 -> B:Unresolvedfield&17}; &19 = Unresolvedfield&19:*@{v=A;...};...}->B}",
+        "{*@{&17 = %Unresolved field &17: { A:%Unresolvedfield&19 -> B:%Unresolvedfield&17}; &19 = %Unresolvedfield&19:*%@{v=A;...};...}->B}",
         "[29]{any,3 -> Scalar }",
         "[5]","[29]");
   }
@@ -990,7 +988,7 @@ loop = { name cnt ->
   @Test public void g_overload_08() {
     run("({ ptr -> (ptr._.x ptr._.x) } (pair @{x=3} @{x=str}) )",
         "({ ptr -> (ptr.1.x ptr.0.x) } (pair @{x=3} @{x=str}) )",
-        "*str:(int8)",
+        "%*%str:(%int64)",
         "*[4]str:(51)",
         null,
         null);
@@ -999,7 +997,7 @@ loop = { name cnt ->
   @Test public void g_overload_err_08() {
     run("{ ptr -> (ptr._.x ptr._.x) }",
         "{ ptr -> (ptr._.x ptr._.x) }",
-        "{*@{&17=Unresolvedfield&17:*@{x=Unresolvedfield&17:{A:Unresolvedfield&20->B:Unresolvedfield&17};...};&20=Unresolvedfield&20:*@{x=A;...};...}->B}",
+        "{*@{&17 = %Unresolvedfield &17: *%@{ x = %Unresolvedfield&17: { A:%Unresolvedfield&20 -> B:%Unresolvedfield&17};...};&20 = %Unresolvedfield&20:*%@{x=A;...};...}->B}",
         "[29]{any,3 -> Scalar }",
         "[5]", "[29]");
   }
@@ -1008,7 +1006,7 @@ loop = { name cnt ->
   @Test public void g_overload_09() {
     run("({ ptr -> (ptr.x._ ptr.x._) } @{x=(pair 3 str)})",
         "({ ptr -> (ptr.x.1 ptr.x.0) } @{x=(pair 3 str)})",
-        "*str:(int8)",
+        "%*%str:(%int64)",
         "*[4]str:(51)",
         null,null);
   }
@@ -1017,7 +1015,7 @@ loop = { name cnt ->
   @Test public void g_overload_err_09() {
     run("{ ptr -> (ptr.x._ ptr.x._) }",
         "{ ptr -> (ptr.x._ ptr.x._) }",
-        "{*@{x=*@{&18=Unresolvedfield&18:{A:Unresolvedfield&21->B:Unresolvedfield&18};&21=A;...};...}->B}",
+        "{*@{x=*@{&18=%Unresolvedfield&18:{A:%Unresolvedfield&21->B:%Unresolvedfield&18};&21=A;...};...}->B}",
         "[29]{any,3 -> Scalar }",
         "[5]","[29]");
   }
@@ -1035,8 +1033,8 @@ loop = { name cnt ->
         "blue = (color 456 \"blue\");"+
         "{ pred -> c =(if pred ({_pred -> red}(notnil pred)) blue); (pair (dec c.0) (isempty c.1))}",
 
-        "{ A? -> *(int64,int1) }",
-        "{ A? -> *(int64,int1) }",
+        "{ A? -> *(%int64,%int64) }",
+        "{ A? -> *(%int64,%int64) }",
         "[37]{any,3 -> *[18](_, int64, xnil) })",
         "[37]{any,3 -> *[18](_, int64, xnil) }",
         "[18]","[37]");
@@ -1055,7 +1053,7 @@ loop = { name cnt ->
         "      (fun (triple \"def\" @{x=1} 456 ).2)" + // Correct overload is 0x456
         ")",
 
-        "*(int64,int64)",
+        "*(%int64,%int64)",
         "*[17](_, int64, int64)",
         "[17]",null);
   }
@@ -1074,8 +1072,8 @@ loop = { name cnt ->
         "lite = { c -> (color (dec c.0) (isempty c.1))};"+ // Should be "(color (sub c 0x111) (cat "light" c))"
         "(pair (lite red) (lite blue))",
 
-        "*( *(int64,int1), *(int64,int1))",
-        "*( *(int64,int1), *(int64,int1))",
+        "*( *(%int64,%int64), *(%int64,%int64))",
+        "*( *(%int64,%int64), *(%int64,%int64))",
         "*[18](_, 0=PA:*[17](_, int64, *[4]str:(nint8)?), 1=PA)",
         "*[18](_, 0=PA:*[17](_, int64, *[4]str:(nint8)?), 1=PA)",
         "[17,18]",null);
@@ -1128,20 +1126,20 @@ con2   = (iwrap 2   );
 con2_1 = (fwrap 2.1f);
 (con2_1._*_.1 con2_1)
 """,
-        "A:*@{_*_=*( {*@{i=int64;...}->A}, {B:*@{_*_=*( {*@{i=int64;...}->B}, {*@{f=flt64;...}->B}); f=flt64}->A});f=flt64}",
+        "A:*@{_*_=*( {*@{i=int64;...}->A}, {B:*@{_*_=*( {*@{i=int64;...}->B}, {*@{f=flt64;...}->B}); f=%flt64}->A});f=%flt64}",
         "PA:*[18]@{_; _*_=*[17](_, [32]{any,3 -> PA }, [34]{any,3 -> PA }); f=flt64}",
         "[17,18,5,6]","[32,34]");
   }
 
   // Recursive structs.  More like what main AA will do with wrapped primitives.
   @Test public void g_overload_14() {
-    String hm_rez =  "*("+
-      "A:*@{_*_=*({B:*@{_*_=*({*@{i=int64;...}->B},{*@{f=flt64;...}->C:*@{_*_=*({*@{i=int64;...}->C},{*@{f=flt64;...}->C});f=flt64}});i=int64}->A},{*@{f=flt64;...}->A});f=flt64},"+
-      "D:*@{_*_=*({E:*@{_*_=*({*@{i=int64;...}->E},{*@{f=flt64;...}->F:*@{_*_=*({*@{i=int64;...}->F},{*@{f=flt64;...}->F});f=flt64}});i=int64}->D},{*@{f=flt64;...}->G:*@{_*_=*({*@{i=int64;...}->G},{*@{f=flt64;...}->G});f=flt64}});i=int64},"+
-      "H:*@{_*_=*({*@{i=int64;...}->H},{I:*@{_*_=*({*@{i=int64;...}->I},{*@{f=flt64;...}->I});f=flt64}->H});f=flt64}"+
+    String hm_rez = "*("+
+      "A:*@{_*_=*({B:*@{_*_=*({*@{i=int64;...}->B},{*@{f=flt64;...}->C:*@{_*_=*({*@{i=int64;...}->C},{*@{f=flt64;...}->C});f=%flt64}});i=%int64}->A},{*@{f=flt64;...}->A});f=%flt64},"+
+      "D:*@{_*_=*({E:*@{_*_=*({*@{i=int64;...}->E},{*@{f=flt64;...}->F:*@{_*_=*({*@{i=int64;...}->F},{*@{f=flt64;...}->F});f=%flt64}});i=%int64}->D},{*@{f=flt64;...}->G:*@{_*_=*({*@{i=int64;...}->G},{*@{f=flt64;...}->G});f=%flt64}});i=%int64},"+
+      "H:*@{_*_=*({*@{i=int64;...}->H},{I:*@{_*_=*({*@{i=int64;...}->I},{*@{f=flt64;...}->I});f=%flt64}->H});f=%flt64}"+
       ")";
 
-    run("""
+            run("""
 fwrap = { ff ->
   @{ _*_ = (pair
        { y -> (fwrap (f* ff (i2f y.i))) }
@@ -1253,9 +1251,8 @@ fact = { n -> (if n.is0 c1 (n.mul.0 (fact n.sub1))) };
 
 (fact c5)
 """,
-        "A:*@{i=int64;is0=int1;mul=*({A->A},{*@{f=flt64;...}->B:*@{f=flt64;mul=*({*@{i=int64;...}->B},{*@{f=flt64;...}->B})}});sub1=A}",
-        "A:*@{i=int64;is0=int1;mul=*({A->A},{*@{f=flt64;...}->B:*@{f=flt64;mul=*({*@{i=int64;...}->B},{*@{f=flt64;...}->B})}});sub1=A}",
-        // bulk test answers
+        "A:*@{i=%int64;is0=%int64;mul=*({A->A},{*@{f=flt64;...}->B:*@{f=%flt64;mul=*({*@{i=int64;...}->B},{*@{f=flt64;...}->B})}});sub1=A}",
+        "A:*@{i=%int64;is0=%int64;mul=*({A->A},{*@{f=flt64;...}->B:*@{f=%flt64;mul=*({*@{i=int64;...}->B},{*@{f=flt64;...}->B})}});sub1=A}",
         "PA:*[20]@{_; i=int64; is0=int1; mul=*[19](_, [39]{any,3 -> PA }, [42]{any,3 -> PB:*[18]@{_; f=flt64; mul=*[17](_, [32]{any,3 -> PB }, [34]{any,3 -> PB })} }); sub1=PA}",
         "PA:*[20]@{_; i=int64; is0=int1; mul=*[19](_, [39]{any,3 -> PA }, [42]{any,3 -> PB:*[18]@{_; f=flt64; mul=*[17](_, [32]{any,3 -> PB }, [34]{any,3 -> PB })} }); sub1=PA}",
         "[17,18,19,5,20,6,7,8]","[32,34,39,42]");
@@ -1269,7 +1266,7 @@ fact = { n -> (if n.is0 c1 (n.mul.0 (fact n.sub1))) };
         "   { x -> (i* x 3) }"+  // Arg is 'int'
         "  )._ 4)",              // Error, ambiguous
         "((pair { x -> (i* x 2 ) } { x -> (i* x 3 ) } )._ 4)",
-        "Unresolved field &28",
+        "%Unresolved field &28",
         "nint8",
         null,null
       );
@@ -1277,7 +1274,7 @@ fact = { n -> (if n.is0 c1 (n.mul.0 (fact n.sub1))) };
   // Wrong args for all overloads
   @Test public void g_overload_err_01() {
     run("((pair { x y -> (i* x y) } { x y z -> (i* y z) })._ 4)",
-        "Unresolved field &28",
+        "%Unresolved field &28",
         "~int64");
   }
   // Mixing unrelated overloads
@@ -1288,7 +1285,7 @@ fy = (pair { z -> "def" } { a -> 4     });
 fz = (if (rand 2) fx fy);
 (isempty (fz._ 1.2f))
 """,
-         "Unresolved field &37: int1",
+         "%Unresolved field &37: int64",
          "int1",
          null,null);
   }
@@ -1297,11 +1294,10 @@ fz = (if (rand 2) fx fy);
   @Test public void g_overload_err_03() {
     run("{ x -> (x._ x._.v)}",
         "{ x -> (x._ x._.v )}",
-        "{*@{ &17 = Unresolved field &17: { A:Unresolved field &19 -> B:Unresolved field &17 }; &19 = Unresolvedfield &19: *@{v=A;...};...}->B}",
+        "{*@{ &17 = %Unresolved field &17: { A:%Unresolved field &19 -> B:%Unresolved field &17 }; &19 = %Unresolvedfield &19: *%@{v=A;...};...}->B}",
         "[29]{any,3 ->Scalar }",
         "[5]","[29]");
   }
-
 
   // Create a boolean-like structure, and unify.
   @Test public void x_peano_00() {
@@ -1349,13 +1345,11 @@ fz = (if (rand 2) fx fy);
 
         "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
         "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
-        "*[23]@{_; a=int64; b=*[21,22](_); bool=*[20]@{_; false=PA:*[18,19]@{_; and=[29,32]{any,3 -> Scalar }; or=[30,33]{any,3 -> Scalar }; then=[31,34]{any,4 -> Scalar }}; force=[38]{any,3 -> PA }; true=PA}}",
-        "*[23]@{_; a=Scalar; b=Scalar; bool=*[20]@{_; false=PA:*[18,19]@{_; and=[29,32]{any,3 -> Scalar }; or=[30,33]{any,3 -> Scalar }; then=[31,34]{any,4 -> Scalar }}; force=[38]{any,3 -> PA }; true=PA}}",
+        "*[23]@{_; a=nint8 ; b=*[21,22](_); bool=*[20]@{_; false=PA:*[18,19]@{_; and=[29,32]{any,3 -> Scalar }; or=[30,33]{any,3 -> Scalar }; then=[31,34]{any,4 -> Scalar }}; force=[38]{any,3 -> PA }; true=PA}}",
+        "*[23]@{_; a=Scalar; b=Scalar     ; bool=*[20]@{_; false=PA:*[18,19]@{_; and=[29,32]{any,3 -> Scalar }; or=[30,33]{any,3 -> Scalar }; then=[31,34]{any,4 -> Scalar }}; force=[38]{any,3 -> PA }; true=PA}}",
         "[17,18,19,20,21,22,23]","[7,8,29,30,31,32,33,34,38]"
-        );
-    
+        );    
   }
-
 
   // Regression test; was NPE.  Was testMyBoolsNullPException from marco.servetto@gmail.com.
   @Test public void x_peano_01() {
@@ -1733,7 +1727,7 @@ all
   s=[50]{any,3 ->
     PA:*[21]@{_;
       add_=[49]{any,3 -> PA };
-      pred=[47]{any,3 -> PB:*[5,20,21,6,7]@{_; add_=[4,5,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> Scalar }; pred=[4,5,7,8,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> PB }; succ=[4,5,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> PB }; zero=[4,5,7,8,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> PC }} };
+      pred=[47]{any,3 -> PB:*[5,20,21,6,7]@{add_=[4,5,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> Scalar }; pred=[4,5,7,8,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> PB }; succ=[4,5,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> PB }; zero=[4,5,7,8,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> PC }} };
       succ=[48]{any,3 -> PA };
       zero=[46]{any,3 -> PC }
     }
