@@ -43,7 +43,7 @@ public class RootNode extends Node {
                                         _def_mem,
                                         TypeRPC.ALL_CALL,
                                         TypeFunPtr.make(EXT_FIDXS,1),
-                                        TypeMemPtr.make(false,EXT_ALIASES,TypeStruct.ISUSED)));
+                                        TypeMemPtr.make(false,false,EXT_ALIASES,TypeStruct.ISUSED)));
   }
 
   public void kill_alias( int alias ) {

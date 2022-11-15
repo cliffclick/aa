@@ -906,7 +906,7 @@ public class Parse implements Comparable<Parse> {
     // First stmt is parsed already
     Parse bad = errMsg(first_arg_start);
     while( s!= null ) {         // More args
-      TypeFld fld = TypeFld.make((""+(nn.len())).intern(),TypeNil.SCALAR,Access.Final);
+      TypeFld fld = TypeFld.make((""+nn.len()).intern(),TypeNil.SCALAR,Access.Final);
       nn.add_fld(fld,s,bad);
       if( !peek(',') ) break;   // Final comma is optional
       skipWS();                 // Skip to arg start before recording arg start

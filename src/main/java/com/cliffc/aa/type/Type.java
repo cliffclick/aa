@@ -742,43 +742,66 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   static class Parse {
     final String _str;
     int _x;
-    final NonBlockingHashMap<String,Type> _dups=new NonBlockingHashMap<>();
+    final NonBlockingHashMap<String,Type> _dups = new NonBlockingHashMap<>();
     Parse(String str) { _str = str; }
-    Type type() { return type(null,false,-1); }
-    Type type(String cid, boolean any, int fld_num) {
-      if( fld_num>0 ) {         // Normal type parse (no field name), then wrap in a numbered field
-        // Can also have the label as a number: "0=DUP:type"  vs "DUP:type"  vs "label=type", etc
+    Type type() { return type(null,false,-2); }
+    
+    // dup: the parsed type has a dup label, and as soon as possible needs to
+    //      be installed in the dups table.  Due to cycles the sub-type parser
+    //      generally needs to make a partially-initialized object to install.
+    // any: some earlier syntax inverts this type
+    // fld_num: -2 , never a field
+    //          -1 , always a field and a label must be found
+    //           0+, always a field; label is optional and is the stringified value    
+    Type type(String dup, boolean any, int fld_num) {
+      // Field parse:
+      // [ DUP: ] [label] [Access.SHORTS] type
+      //         7     // 0 =7
+      //      7 =7     // 7 =7
+      //   FA:x =7     // x =7 and DUP FA
+      //   FA:x:=7;    // x:=7 and DUP FA
+      //       :=7     // 0:=7
+      //   FA: :=7     // 0:=7 and DUP FA
+      if( fld_num!= -2 ) { //
         int oldx = _x;
-        String id = id();
-        if( Util.eq(id,TypeFld.TUPS[fld_num]) ) { // Either "0=DUP:type" or simple "123"
+        String lab = id_num();  // Might be a label, or a DUP or a DUP: or a type-prefix after field assignment
+        if( lab!=null ) {
           int oldxx = _x;
-          if( TypeFld.valueOfEq(this) != -1  ) { // Yes 0=DUP:type
-            _x = oldxx;
-            return TypeFld.valueOf(this,cid,any,id,0);
+          if( TypeFld.valueOfEq(this) != -1  ) { // Yes, found lab = type
+            _x = oldxx;                          // Reset parse
+            return TypeFld.valueOf(this,dup,any,lab); // Delegate to field parse
           }
+          // lab is a type-prefix or a 'DUP:'
+          assert dup==null;
+          if( peek(':') ) return type(lab,any,fld_num);
+          Type t = _dups.get(lab);
+          if( t!=null ) { assert t instanceof TypeFld; return t; }
         }
-        _x = oldx;
-        return TypeFld.make(TypeFld.TUPS[fld_num],type(null,any,-1));
+        assert dup==null;
+        // lab is a type-prefix
+        _x = oldx;              // Reset type parse
+        return TypeFld.make((""+fld_num).intern(),type(lab,any,-2));
       }
 
       return switch( skipWS() ) {
       case '0','1','2','3','4','5','6','7','8','9','-' -> num();
       case '"'  -> throw unimpl(); // parse string
-      case '~' -> type(cid,-1 < _x++,fld_num);
-      case ':' -> type(cid,_x++ < -1,-1); // DUP::@{} dup struct with no clz, skip the extra ':' and normal struct parse
-      case '#' ->     TypeRPC   .valueOf(this,cid,any) ;
-      case '{' ->     TypeTuple .valueOf(this,cid,any) ;
-      case '*' -> cyc(TypeMemPtr.valueOf(this,cid,any));
-      case '(' -> cyc(TypeStruct.valueOf(this,cid,any,true ));
-      case '@' -> cyc(TypeStruct.valueOf(this,cid,any,false));
+      case '~' -> type(dup,-1 < _x++,fld_num);
+      case ':' -> type(dup,_x++ < -1,-2); // DUP::@{} dup struct with no clz, skip the extra ':' and normal struct parse
+      case '#' ->     TypeRPC   .valueOf(this,dup,any) ;
+      case '{' ->     TypeTuple .valueOf(this,dup,any) ;
+      case '*' -> cyc(TypeMemPtr.valueOf(this,dup,any));
+      case '(' -> cyc(TypeStruct.valueOf(this,dup,any,true ));
+      case '@' -> cyc(TypeStruct.valueOf(this,dup,any,false));
       case '[' -> peek("[[")
-        ? TypeMem.valueOf(this,cid,any)
-        : cyc(TypeFunPtr.valueOf(this,cid,any));
+        ? TypeMem.valueOf(this,dup,any)
+        : cyc(TypeFunPtr.valueOf(this,dup,any));
       default -> {
         // These strings all start with an id.
         // DUP:type     // defining a repeated type
         // DUP          // using    a repeated type
         // CLZ:@{}  or CLZ:()  // Struct clazz
+        // int:1 or flt:3.14   // Shortcut for int/flt
         // DUP:CLZ:@{}  // Both are possible
         // FLD=type     // A field label
         // NIL          // Any one of several constant types
@@ -789,8 +812,13 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         Type t = _dups.get(id);
         if( t!=null ) yield t;
         
-        // Leading type repeat name
-        if( fld_num<0 && peek(':') ) {
+        // Leading id, then ':'.  Can be
+        // DUP:non_struct_type or
+        // CLZ:struct_type or
+        // DUP:CLZ:struct_type or
+        // int:1 or
+        // flt:3.14
+        if( peek(':') ) {
           int oldx2 = _x;
           // To resolve ambiguity with TypeStruct parse, look for a 2nd clz id and ':'.
           // "str:(97)"    - struct clz "str" with leading char 'a'
@@ -800,11 +828,14 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
           id();                // Skip clz parse
           if( !peek(':') ) {   // Distinguish "CLZ:@{}" from "DUP:int64" or "DUP:fld_name=int64"
             char c = at(_x);   // Single "clz:" then tuple or struct
-            if( c=='(' ) { _x=oldx; yield cyc(TypeStruct.valueOf(this,cid,any,true )); }
-            if( c=='@' ) { _x=oldx; yield cyc(TypeStruct.valueOf(this,cid,any,false)); }
-            // DUP "id" with some other type
+            // Check for DUP:CLZ:struct_type
+            if( c=='(' ) { _x=oldx; yield cyc(TypeStruct.valueOf(this,dup,any,true )); }
+            if( c=='@' ) { _x=oldx; yield cyc(TypeStruct.valueOf(this,dup,any,false)); }
+            // DUP "id": with some other type
           }
           _x=oldx2;             // Unwind back to after "DUP:"
+          if( Util.eq(id,"int") ) yield TypeStruct.make_int(TypeInt.con((long)_num()));
+          if( Util.eq(id,"flt") ) yield TypeStruct.make_flt(TypeFlt.con(      _num()));
           
           RECURSIVE_MEET++;     // Ok, really start a recursive type
           t = type(id,any,fld_num);
@@ -813,12 +844,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
           yield t;
         }
 
-        // Check for field id
-        if( fld_num == 0 )
-          yield cyc(skipWS() >0 && at(_x+1)!='=' && peek(':') // Named field: FA:v1=123, and not r/w field FA:=123
-                    ? type(id,any,0) 
-                    : TypeFld.valueOf(this,cid,any,id,0)); // Unnamed field: v1=123
-        
         // Lookup various constant type names
         t = simple_type(id);
         if( t!=null )
@@ -883,10 +908,21 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       return dd*neg;                  // A double
     }
     // Skip whitespace and parse an identifier.
+    // Disallows numbers
     String id() {
       skipWS();
       int oldx=_x;
-      if( !eos() && isId0(at(_x)) ) _x++;
+      if( eos() || !isId0(at(_x)) ) return null;
+      _x++;                     // First char is ok
+      while( !eos() && isId1(at(_x)) ) _x++;
+      return oldx==_x ? null : _str.substring(oldx,_x).intern();
+    }
+    // Skip whitespace and parse a field label.
+    // Specifically allows numbers.
+    String id_num() {
+      skipWS();
+      int oldx=_x;  char c;
+      if( eos() || !(isId0(c=at(_x)) || ('0' <= c && c <= '9')) ) return null;
       while( !eos() && isId1(at(_x)) ) _x++;
       return oldx==_x ? null : _str.substring(oldx,_x).intern();
     }

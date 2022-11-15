@@ -88,9 +88,8 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
 
   // Parse "=type" and all variants of "=" in SHORTS, or return null.
   // Passed in any "DUP:" string as cid.  Passed in the field name and number.
-  static TypeFld valueOf(Parse P, String cid, boolean any, String fld, int fld_num) {
+  static TypeFld valueOf(Parse P, String cid, boolean any, String fld) {
     assert !any;                // Discovered via SHORTS
-    assert fld_num>=0;          // Only called in a field context
     int i = valueOfEq(P);
     if( i == -1  ) return null;                     // Not a assignment flavor
     TypeFld tf = malloc(fld,null,Access.values[i]); // Make TypeFld without type yet

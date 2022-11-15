@@ -627,7 +627,12 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     //       clz:()  -- parses as a no-dup    clz tuple
     //   dup:   :()  -- parses as a    dup no-clz tuple
     //   dup:clz:()  -- parses as a    dup    clz tuple
-    if( _clz.isEmpty() && dups.get(_uid)!=null )  sb.p(':'); 
+    //       int:1234
+    //       flt:3.14
+    if( _clz.isEmpty() && dups.get(_uid)!=null )  sb.p(':');
+    // Shortcut print for 'int:1234" and 'flt:3.14'
+    if( Util.eq("int:",_clz) && _flds.length==0 && _def.is_con() ) return _def._str(visit,dups,sb,debug,indent);
+    if( Util.eq("flt:",_clz) && _flds.length==0 && _def.is_con() ) return _def._str(visit,dups,sb,debug,indent);
     boolean is_tup = is_tup();
     sb.p(is_tup ? "(" : "@{");
     // Set the indent flag once for the entire struct.  Indent if any field is complex.
@@ -657,11 +662,11 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return true; }
 
-  // e.g. (), (^=any), (^=any,"abc"), (3.14), (3.14,"abc")
-  // @{}, @{x=3.14; y="abc"}
-  static TypeStruct valueOf(Parse P, String cid, boolean any, boolean is_tup ) {
+  // e.g. (), (^=any), (^=any,"abc"), (3.14), (3.14,"abc",:=123)
+  // @{}, @{x=3.14; y="abc"; z:=123}
+  static TypeStruct valueOf(Parse P, String dup, boolean any, boolean is_tup ) {
     TypeStruct ts = malloc(any ? "~" : "",any ? ANY : ALL,TypeFlds.get(0));
-    if( cid!=null ) P._dups.put(cid,ts);
+    if( dup!=null ) P._dups.put(dup,ts);
     String clz = P.id();
     if( clz!=null ) {
       P.require(':');
@@ -671,15 +676,21 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     char close = is_tup ? ')' : '}';
     if( P.peek(close) ) return ts;
 
-    int fld_num = ARG_IDX;
+    int fld_num = 0; 
     while(true) {
       if( P.peek("...") ) { assert any; break; }
       if( P.peek('$') )
-        { ts._def = P.type(null,false,-1); break; }
+        { ts._def = P.type(null,false,-2); break; }
       TypeFld fld = ts.len()==0 && P.peek('_')
         ? TypeFld.ANY_DSP
-        : (TypeFld)P.type(null,false,is_tup && P.skipWS()!='^' ? fld_num++ : 0);
-      ts.add_fld(fld);        
+        // Request a parse of:
+        //   label:=type (yielding a TypeFld); label can be a number; or
+        //   type (yielding a "fld_num=" type TypeFld) or
+        // Handling of leading DUP: handled by general parser:
+        //   DUP:label:=type (yielding a TypeFld) or 
+        //   DUP:type (yielding a "fld_num=" type TypeFld) or
+        : (TypeFld)P.type(null,false,is_tup && P.skipWS()!='^' ? fld_num++ : -1/*must find a label*/);
+      ts.add_fld(fld);
       if( !P.peek(is_tup ? ',' : ';') ) break;
     }
 

@@ -62,7 +62,7 @@ public class TypeTuple extends Type<TypeTuple> {
     Type[] ts = Types.get(10);
     int i=0;
     while(true) {
-      ts[i++] = P.type(null,false,-1);
+      ts[i++] = P.type(null,false,-2);
       if( !P.peek(',') ) break;
     }
     Type[] ts0 = Types.get(i);

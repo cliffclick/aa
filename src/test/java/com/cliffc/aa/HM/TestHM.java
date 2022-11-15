@@ -107,7 +107,7 @@ public class TestHM {
     run( "{ z -> (pair (z 0) (z \"abc\")) }" ,
           "{ { *str:(97)? -> A } -> *( A, A ) }",
           "[30]{any,3 ->*[17](_, Scalar, Scalar) }",
-          "[17]", "[30,7]" );
+          "[17]", "[7,30]" );
   }
   // Because {y->y} is passed in, all 'y' types must agree.
   // This unifies 3 and 5 which results in 'nint8'
@@ -159,7 +159,7 @@ public class TestHM {
           // "  A:{ A -> B }"
           "{ A:{ A -> B } -> B }",
           "[29]{any,3 ->Scalar }",
-          null, "[29,7]" );
+          null, "[7,29]" );
   }
   // Obscure factorial-like
   @Test public void b_recursive_02() {
@@ -213,7 +213,7 @@ public class TestHM {
         "test",
         "{ { A:{A->A} -> {A->B} } -> B }",
         "[33]{any,3 ->Scalar }",
-        null,"[29,30,7,31,33]");
+        null,"[7,29,30,31,33]");
   }
 
   // Test incorrect argument count
@@ -255,20 +255,20 @@ public class TestHM {
     run( "{ f g -> (f g)}",
           "{ { A -> B } A -> B }",
           "[29]{any,4 ->Scalar }",
-          null,"[29,7]");
+          null,"[7,29]");
   }
   // Function composition
   @Test public void c_composition_02() {
     run( "{ f g -> { arg -> (g (f arg))} }",
           "{ { A -> B } { B -> C } -> { A -> C } }",
           "[30]{any,4 ->[29]{any,3 ->Scalar } }",
-          null,"[29,30,7,8]");
+          null,"[7,8,29,30]");
   }
 
   @Test public void c_composition_03() {
     run("x = { y -> (x (y y))}; x",
          "{ A:{ A -> A } -> B }", "[29]{any,3 ->~Scalar }",
-         null,"[29,7]");
+         null,"[7,29]");
   }
 
   // Stacked functions ignoring all function arguments
@@ -526,9 +526,9 @@ map ={fun parg -> (fun (cdr parg))};
         "    res1 = *@{ a = Missing field a: 2};"+
         "    res2 = *@{ a=nint8; b=nflt32 }"+
         "}",
-        "*[21]@{_; f=[30]{any,4 ->*[17,18,19,5,20,6]SA::(_) }; res1=*[17,18]SA; res2=*[19,20]@{_; a=nint8; b=nflt32}}",
-        "*[21]@{_; f=[30]{any,4 ->PA:*[17,18,19,5,20,6](_) }; res1=PA; res2=PA}",
-        "[17,18,19,5,20,21,6]","[30]");
+        "*[21]@{_; f=[30]{any,4 ->*[5,6,17,18,19,20]SA::(_) }; res1=*[17,18]SA; res2=*[19,20]@{_; a=nint8; b=nflt32}}",
+        "*[21]@{_; f=[30]{any,4 ->PA:*[5,6,17,18,19,20](_) }; res1=PA; res2=PA}",
+        "[5,6,17,18,19,20,21]","[30]");
   }
 
 
@@ -539,7 +539,7 @@ map ={fun parg -> (fun (cdr parg))};
     run("map = { fcn lst -> @{ n1 = (map fcn lst.n0); v1 = (fcn lst.v0) } }; map",
         "{ { A -> B } C:*@{ n0 = C; v0 = A; ...} -> D:*@{ n1 = D; v1 = B} }",
         "[29]{any,4 ->PA:*[17]@{_; n1=PA; v1=Scalar} }",
-        "[17,5]","[29,7]");
+        "[5,17]","[7,29]");
   }
 
   // Recursive linked-list discovery, with nil.  Note that the output memory
@@ -549,8 +549,8 @@ map ={fun parg -> (fun (cdr parg))};
     run("map = { fcn lst -> (if lst @{ n1=(map fcn lst.n0); v1=(fcn lst.v0) } 0) }; map",
         "map = { fcn lst -> (if lst ({_lst -> @{ n1=(map fcn _lst.n0); v1=(fcn _lst.v0) }} (notnil lst)) 0) }; map",
         "{ { A -> B } C:*@{ n0 = C; v0 = A; ...}? -> D:*@{ n1 = D; v1 = B}? }",null,
-        "[32]{any,4 ->PA:*[0,17]@{_; n1=PA; v1=Scalar} }",null,
-        "[17,5]","[7,32]");
+        "[32]{any,4 ->PA:*[17]@{_; n1=PA; v1=Scalar}? }",null,
+        "[5,17]","[7,32]");
   }
   // Recursive linked-list discovery, applied
   @Test public void e_recur_struct_02() {
@@ -567,7 +567,7 @@ map ={fun parg -> (fun (cdr parg))};
         "map = { lst -> (if lst ({_lst -> @{ n1= arg= _lst.n0; (if arg ({_arg -> @{ n1=(map _arg.n0); v1=(str _arg.v0)}} (notnil arg)) 0); v1=(str _lst.v0) }} (notnil lst)) 0) }; map",
         "{ A:*@{ n0 = *@{ n0 = A; v0 = int64; ...}?; v0 = int64; ...}? -> B:*@{ n1 = *@{ n1 = B; v1 = %*%str:(%int64)}?; v1 = %*%str:(%int64)}? }",
         "[37]{any,3 ->PA:*[18]@{_; n1=*[17]@{_; n1=PA; FB:v1=*[4]str:(int8)}?; FB}? }",
-        "[17,18,5]","[37]" );
+        "[5,17,18]","[37]" );
   }
   // Checking an AA example
   @Test public void e_recur_struct_04() {
@@ -634,7 +634,7 @@ A:*@{
 }
 """,
          "PA:*[17]@{_; add=[30]{any,4 -> PA }; i=int64}",
-        "[17,5,6]","[30]");
+        "[5,6,17]","[30]");
   }
 
   // Recursive structs.  First: closed structs list available fields;
@@ -660,7 +660,7 @@ A:*@{
   @Test public void e_recur_struct_11() {
     run("fun = { rec -> (pair rec rec.x)}; (pair (fun @{x=3;y=4}) (fun @{x=\"abc\";z=2.1f}))",
          "*(*(*@{x=3;y=4},3), *(*@{x=A:*str:(97);z=2.1f},A))",
-         "*[18](_, PA:*[17](_, *[19,20]@{_; x=nScalar}, nScalar), PA)",
+         "*[18](_, 0=PA:*[17](_, *[19,20]@{_; x=nScalar}, nScalar), 1=PA)",
         "[17,18,19,20]",null);
   }
   // Recursive structs.  Next: passing extra fields, but the function requires
@@ -671,7 +671,7 @@ A:*@{
         "         (fun @{x=4; z=2.1f} )  )"+ // available {x,z}
         "  } { rec -> (pair rec rec.x) } )", // required  {x}
         "*(A:*(*@{x=nint8},nint8),A)",
-        "*[17](_, PA:*[20](_, *[18,19]@{_; x=nint8}, nint8), PA)",
+        "*[17](_, 0=PA:*[20](_, *[18,19]@{_; x=nint8}, nint8), 1=PA)",
         "[17,18,19,20]",null);
   }
   // Recursive structs.
@@ -686,7 +686,7 @@ fun = { ff ->
 """,  // required {f} in inner, available {f,mul} in outer
         "A:*@{f=%flt64;mul={*@{f=flt64;...}->A}}", // required {f} in inner, available {f,mul} in outer
         "PA:*[17]@{_; f=flt64; mul=[30]{any,3 ->PA }}",
-        "[17,5]","[30]");
+        "[5,17]","[30]");
   }
 
   // Recursive structs, with deeper expressions.  The type expands with
@@ -703,7 +703,7 @@ con12=(fun 1.2f);
 """,                // required {f} in inner, available {f,mul} in outer,middle
         "A:*@{f=%flt64;mul={B:*@{f=%flt64;mul={*@{f=flt64;...}->B}}->A}}", // required {f} in inner, available {f,mul} in middle,outer
         "PA:*[17]@{_; f=flt64; mul=[30]{any,3 ->PA }}",
-        "[17,5]","[30]");
+        "[5,17]","[30]");
   }
 
   // Recursive structs.  Next: passing extra fields, but the function requires
@@ -714,7 +714,7 @@ con12=(fun 1.2f);
         "         (fun @{x=\"abc\";z=2.1f} )  )"+ // available {x,z}
         "  } { rec -> (pair rec rec.x) } )",      // required  {x}
         "*(A:*(*@{x=B:[Cannot unify 3 and *str:(97)]},B),A)",
-        "*[17](_, PA:*[20](_, *[18,19]@{_; x=nScalar}, nScalar), PA)",
+        "*[17](_, 0=PA:*[20](_, *[18,19]@{_; x=nScalar}, nScalar), 1=PA)",
         "[17,18,19,20]","[]");
   }
 
@@ -1035,7 +1035,7 @@ loop = { name cnt ->
 
         "{ A? -> *(%int64,%int64) }",
         "{ A? -> *(%int64,%int64) }",
-        "[37]{any,3 -> *[18](_, int64, xnil) })",
+        "[37]{any,3 -> *[18](_, int64, xnil) }",
         "[37]{any,3 -> *[18](_, int64, xnil) }",
         "[18]","[37]");
   }
@@ -1128,7 +1128,7 @@ con2_1 = (fwrap 2.1f);
 """,
         "A:*@{_*_=*( {*@{i=int64;...}->A}, {B:*@{_*_=*( {*@{i=int64;...}->B}, {*@{f=flt64;...}->B}); f=%flt64}->A});f=%flt64}",
         "PA:*[18]@{_; _*_=*[17](_, [32]{any,3 -> PA }, [34]{any,3 -> PA }); f=flt64}",
-        "[17,18,5,6]","[32,34]");
+        "[5,6,17,18]","[32,34]");
   }
 
   // Recursive structs.  More like what main AA will do with wrapped primitives.
@@ -1255,7 +1255,7 @@ fact = { n -> (if n.is0 c1 (n.mul.0 (fact n.sub1))) };
         "A:*@{i=%int64;is0=%int64;mul=*({A->A},{*@{f=flt64;...}->B:*@{f=%flt64;mul=*({*@{i=int64;...}->B},{*@{f=flt64;...}->B})}});sub1=A}",
         "PA:*[20]@{_; i=int64; is0=int1; mul=*[19](_, [39]{any,3 -> PA }, [42]{any,3 -> PB:*[18]@{_; f=flt64; mul=*[17](_, [32]{any,3 -> PB }, [34]{any,3 -> PB })} }); sub1=PA}",
         "PA:*[20]@{_; i=int64; is0=int1; mul=*[19](_, [39]{any,3 -> PA }, [42]{any,3 -> PB:*[18]@{_; f=flt64; mul=*[17](_, [32]{any,3 -> PB }, [34]{any,3 -> PB })} }); sub1=PA}",
-        "[17,18,19,5,20,6,7,8]","[32,34,39,42]");
+        "[5,6,7,8,17,18,19,20]","[32,34,39,42]");
   }
 
   // Ambiguous overload, {int->int}, cannot select.
@@ -1595,7 +1595,7 @@ three =(n.s two);
         "}"+
         "",
         gcp_rez, gcp_rez,
-       "[17,18,19,5,20,21,6,22,23,24]","[5,6,7,8,29,30,31,32,33,34,35,36,37,32,38,39,40,41,42,43]");
+       "[5,6,17,18,19,20,21,22,23,24]","[5,6,7,8,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43]");
   }
 
   // Regression during the HM/GCP Apply lift.
@@ -1723,15 +1723,15 @@ all
         """
 *[22]@{_;
   false=PC:*[18,19]@{_; and=[30,33]{any,3 -> Scalar }; or=[31,34]{any,3 -> Scalar }; then=[32,35]{any,4 -> Scalar }};
-  true =PC;
   s=[50]{any,3 ->
     PA:*[21]@{_;
       add_=[49]{any,3 -> PA };
-      pred=[47]{any,3 -> PB:*[5,20,21,6,7]@{add_=[4,5,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> Scalar }; pred=[4,5,7,8,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> PB }; succ=[4,5,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> PB }; zero=[4,5,7,8,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> PC }} };
+      pred=[47]{any,3 -> PB:*[5,6,7,20,21]@{add_=[4,5,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> Scalar }; pred=[4,5,7,8,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> PB }; succ=[4,5,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> PB }; zero=[4,5,7,8,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> PC }} };
       succ=[48]{any,3 -> PA };
       zero=[46]{any,3 -> PC }
     }
   };
+  true =PC;
   z=*[20]@{_;
     add_=[42]{any,3 ->  Scalar };
     pred=[29]{any,3 -> ~Scalar };
@@ -1743,13 +1743,13 @@ all
          """
 *[22]@{_;
   false=PA:*[18,19]@{_; and=[30,33]{any,3 -> Scalar }; or=[31,34]{any,3 -> Scalar }; then=[32,35]{any,4 -> Scalar }};
-  true =PA;
   s    =[50]{any,3 -> Scalar };
+  true =PA;
   z    =*[20]@{_; add_=[42]{any,3 -> Scalar }; pred=[29]{any,3 -> ~Scalar }; succ=[41]{any,3 -> Scalar }; zero=[40]{any,3 -> PA }}
 }
 """,
-        "[17,18,19,5,20,21,6,7,22]",
-        "[5,6,7,8,29,30,31,32,33,34,35,32,40,41,42,46,47,48,49,50]"
+        "[5,6,7,17,18,19,20,21,22]",
+        "[5,6,7,8,29,30,31,32,33,34,35,40,41,42,46,47,48,49,50]"
          );
   }
 
@@ -1819,7 +1819,7 @@ maybepet = petcage.get;
          "p1",
 
         rez_hm,
-        "*[18](_, XA:[30]{any,5 ->*[17](_, Scalar, Scalar, Scalar) }, XA, XA)",
+        "*[18](_, 0=XA:[30]{any,5 ->*[17](_, Scalar, Scalar, Scalar) }, 1=XA, 2=XA)",
         "[17,18]","[30]"  );
   }
 
@@ -1833,7 +1833,7 @@ maybepet = petcage.get;
          "p3",
         
         rez_hm,
-        "*[20](_, PB:*[19](_, PA:*[18](_, XA:[30]{any,5 ->*[17](_, Scalar, Scalar, Scalar) }, XA, XA), PA, PA), PB, PB)",
+        "*[20](_, 0=PB:*[19](_, 0=PA:*[18](_, 0=XA:[30]{any,5 ->*[17](_, Scalar, Scalar, Scalar) }, 1=XA, 2=XA), 1=PA, 2=PA), 1=PB, 2=PB)",
         "[17,18,19,20]","[30]");
   }
 }
