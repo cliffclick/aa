@@ -39,15 +39,16 @@ public class TypeInt extends TypeNil<TypeInt> {
     return _strn(sb).p("int").p(_z);
   }
 
-  static Type valueOfInt(String cid) {
+  static TypeInt valueOfInt(String cid) {
+    if( cid==null ) return null;
     return switch(cid) {
-    case   "int64" ->  INT64;
-    case  "nint64" -> NINT64;
-    case   "int8"  ->  INT8 ;
-    case  "int16"  ->  INT16;
     case   "int1"  ->  BOOL ;
+    case   "int8"  ->  INT8 ;
+    case   "int16" ->  INT16;
     case   "int32" ->  INT32;
+    case   "int64" ->  INT64;
     case  "nint8"  -> NINT8 ;
+    case  "nint64" -> NINT64;
     default       -> null;
     };
   }

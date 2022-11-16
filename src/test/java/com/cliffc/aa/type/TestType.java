@@ -51,9 +51,6 @@ public class TestType {
   // Test for a collection of Strings, that toString and valueOf are a bijection
   @Test public void testValueOf() {
     String[] ss = new String[] {
-      "3",                      // Simple primitive int
-      "int:1",                  // Class integer
-      "flt:3.14",               // Class Float
       "Scalar",                 // The Scalars and Nils
       "nScalar",
       "nil",
@@ -62,12 +59,21 @@ public class TestType {
       "~nScalar",
       "xnil",
       "~_0Scalar",
+      "3",                      // Simple primitive int
+      "int64",                  // Simple primitive range
+      "int:123",                // Class integer
+      "int:nint8",              // Class integer range
+      "3.14",                   // Simple primitive flt
+      "flt32",                  // Simple primitive range
+      "flt:3.14",               // Class Float
+      "flt:flt64",              // Class Float range
       "*[17](_, 1, ~Scalar)",   // Bare ~type as a field
       "[23]{any,3 -> *[7](3, Scalar) }", // Function returning a struct
       "*[9](_, 0=PA:*[7]@{_; _*_=*[nALL]over35:(); f=flt64}, *[](), 2=PA)", // Struct with self-references
       "PA:*[7]@{_; add=[23]{any,4 -> PA }; i=int64}", // Struct with function return self-reference
       "PA:*[18]@{_; n1=*[17]@{_; n1=PA; FB:v1=7}; FB}", // DUP Field
       "*[18](_, 0=PA:*[17](_, *[4,5]@{_; x=nScalar}, nScalar), 1=PA)",
+      "{Ctrl,[[_all_]],SB:int:int64,SB}", // Label on a wrapped int
     };
     for( String s : ss ) {
       Type t0 = Type.valueOf(s);

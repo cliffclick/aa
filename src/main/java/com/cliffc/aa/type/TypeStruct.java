@@ -631,8 +631,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     //       flt:3.14
     if( _clz.isEmpty() && dups.get(_uid)!=null )  sb.p(':');
     // Shortcut print for 'int:1234" and 'flt:3.14'
-    if( Util.eq("int:",_clz) && _flds.length==0 && _def.is_con() ) return _def._str(visit,dups,sb,debug,indent);
-    if( Util.eq("flt:",_clz) && _flds.length==0 && _def.is_con() ) return _def._str(visit,dups,sb,debug,indent);
+    if( Util.eq("int:",_clz) && _flds.length==0 && _def instanceof TypeInt ) return _def._str(visit,dups,sb,debug,indent);
+    if( Util.eq("flt:",_clz) && _flds.length==0 && _def instanceof TypeFlt ) return _def._str(visit,dups,sb,debug,indent);
     boolean is_tup = is_tup();
     sb.p(is_tup ? "(" : "@{");
     // Set the indent flag once for the entire struct.  Indent if any field is complex.
@@ -662,6 +662,12 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return true; }
 
+  boolean is_top_clz () { return Util.eq(     "",_clz) && _flds.length>1 && Util.eq("flt",_flds[1]._fld); }
+  boolean is_int_clz () { return Util.eq( "int:",_clz) && _flds.length>0 && Util.eq("!_" ,_flds[0]._fld); }
+  boolean is_flt_clz () { return Util.eq( "flt:",_clz) && _flds.length>0 && Util.eq("-_" ,_flds[0]._fld); }
+  boolean is_math_clz() { return Util.eq(     "",_clz) && _flds.length>0 && Util.eq("pi" ,_flds[0]._fld); }
+
+  
   // e.g. (), (^=any), (^=any,"abc"), (3.14), (3.14,"abc",:=123)
   // @{}, @{x=3.14; y="abc"; z:=123}
   static TypeStruct valueOf(Parse P, String dup, boolean any, boolean is_tup ) {

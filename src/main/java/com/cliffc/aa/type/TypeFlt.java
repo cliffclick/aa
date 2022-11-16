@@ -38,7 +38,8 @@ public class TypeFlt extends TypeNil<TypeFlt> {
     return _strn(sb).p("flt").p(_z);
   }
 
-  static Type valueOfFlt(String cid) {
+  static TypeFlt valueOfFlt(String cid) {
+    if( cid==null ) return null;
     return switch(cid) {
     case "flt64"  -> FLT64;
     case "flt32"  -> FLT32;

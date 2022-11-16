@@ -238,6 +238,15 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // Internal tick of tick-tock printing
   final SB _str( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     if( _hash==0 ) sb.p("!!!");
+    
+    // Some early cutouts for common bulky cases
+    if( this==TypeStruct.ISUSED ) return sb.p("()"); // Shortcut for common case
+    if( this instanceof TypeStruct ts && ts.is_top_clz() ) return sb.p("$TOP");
+    if( this instanceof TypeStruct ts && ts.is_int_clz() ) return sb.p("$INT");
+    if( this instanceof TypeStruct ts && ts.is_flt_clz() ) return sb.p("$FLT");
+    if( this instanceof TypeStruct ts && ts.is_math_clz() ) return sb.p("$MATH");
+    
+    // Print a dups label, and optionally the type
     String s = dups.get(_uid);
     if( s!=null ) {
       sb.p(s);                  // Pretty name
@@ -817,7 +826,9 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         // CLZ:struct_type or
         // DUP:CLZ:struct_type or
         // int:1 or
-        // flt:3.14
+        // DUP:int:1 or
+        // flt:3.14 or
+        // DUP:flt:3.14
         if( peek(':') ) {
           int oldx2 = _x;
           // To resolve ambiguity with TypeStruct parse, look for a 2nd clz id and ':'.
@@ -826,7 +837,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
           // "SA:str:(97)" - struct clz "str" with DUP "SA:"
           // "SA:int64"    - DUP "SA:" with some other type
           id();                // Skip clz parse
-          if( !peek(':') ) {   // Distinguish "CLZ:@{}" from "DUP:int64" or "DUP:fld_name=int64"
+          if( !peek(':') && !eos() ) {   // Distinguish "CLZ:@{}" from "DUP:int64" or "DUP:fld_name=int64"
             char c = at(_x);   // Single "clz:" then tuple or struct
             // Check for DUP:CLZ:struct_type
             if( c=='(' ) { _x=oldx; yield cyc(TypeStruct.valueOf(this,dup,any,true )); }
@@ -834,10 +845,19 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
             // DUP "id": with some other type
           }
           _x=oldx2;             // Unwind back to after "DUP:"
-          if( Util.eq(id,"int") ) yield TypeStruct.make_int(TypeInt.con((long)_num()));
-          if( Util.eq(id,"flt") ) yield TypeStruct.make_flt(TypeFlt.con(      _num()));
-          
-          RECURSIVE_MEET++;     // Ok, really start a recursive type
+
+          // Shortcut for ints/flts.  Check for "int:int_type" or "flt:flt_type"
+          if( Util.eq(id,"int") ) {
+            TypeInt tint = TypeInt.valueOfInt(id_num());
+            yield maybe_dup(dup,TypeStruct.make_int(tint==null ? TypeInt.con((long)back_num(oldx2)) : tint));
+          }
+          if( Util.eq(id,"flt") ) {
+            TypeFlt tflt = TypeFlt.valueOfFlt(id_num());
+            yield maybe_dup(dup,TypeStruct.make_flt(tflt==null ? TypeFlt.con(      back_num(oldx2)) : tflt));
+          }
+
+          // Ok, really start a recursive type
+          RECURSIVE_MEET++;
           t = type(id,any,fld_num);
           if( --RECURSIVE_MEET == 0)
             t = Cyclic.install(t,_dups);
@@ -854,6 +874,9 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       }
     };
     }
+    // Helper for int/flt parse
+    private double back_num(int oldx2) { _x=oldx2; return _num(); }
+    private Type maybe_dup(String dup, Type t) { if( dup!=null ) _dups.put(dup,t);  return t;  }
 
     // Something like { int64, any, ~Scalar, nil } or null
     private Type simple_type(String id) {
