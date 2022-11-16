@@ -13,6 +13,7 @@ public class CProjNode extends ProjNode {
       return _idx==0 ? "False" : "True";
     return "CProj"+_idx;
   }
+  @Override boolean is_CFG() { return in(0).is_CFG(); }
   @Override public Type value() {
     if( in(0)._op==OP_ROOT ) return Type.CTRL; // Program Start
     // Normal projection, except pinch to CTRL.

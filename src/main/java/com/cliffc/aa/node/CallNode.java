@@ -102,6 +102,7 @@ public class CallNode extends Node {
 
   @Override public String xstr() { return (_is_copy ? "CopyCall" : (is_dead() ? "Xall" : "Call"))+(_not_resolved_by_gcp?"_UNRESOLVED":""); } // Self short name
   String  str() { return xstr(); }       // Inline short name
+  @Override boolean is_CFG() { return !_is_copy; }
   @Override public boolean is_mem() {    // Some calls are known to not write memory
     CallEpiNode cepi = cepi();
     return cepi!=null && ProjNode.proj(cepi,MEM_IDX)!=null;

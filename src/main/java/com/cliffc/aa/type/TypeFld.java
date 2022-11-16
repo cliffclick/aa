@@ -70,7 +70,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     return _t.cycle_equals(((TypeFld)o)._t);
   }
 
-  @Override void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
+  @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
     if( visit.tset(_uid) ) {
       if( !dups.containsKey(_uid) )
         dups.put(_uid,"F"+(char)('A'+ucnt._fld++));

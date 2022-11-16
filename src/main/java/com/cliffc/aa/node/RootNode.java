@@ -20,6 +20,8 @@ public class RootNode extends Node {
   private Type _cache_key;
   private TypeTuple _cache_val;
 
+  @Override boolean is_CFG() { return true; }
+
   // Output value is:
   // [Ctrl,All_Mem_Minus_Dead,TypeRPC.ALL_CALL,escaped_fidxs, escaped_aliases,]
   @Override public TypeTuple value() {

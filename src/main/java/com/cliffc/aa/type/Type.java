@@ -220,20 +220,23 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // aliases and raw fidxs.  Non-debug dumps are used in ErrMsg.  Many debug
   // dumps use this version, and intersperse types with other printouts in the
   // same SB.  This is the 'base' printer, as changing this changes behavior.
-  public final SB str( SB sb, boolean debug, boolean indent ) {
-    NonBlockingHashMapLong<String> dups = new NonBlockingHashMapLong<>();
-    VBitSet bs = new VBitSet();
-    _str_dups(bs, dups, new UCnt());
-    return _str(bs.clr(), dups, sb, debug, indent );
+  public final SB str( SB sb, boolean debug, boolean indent ) { return str(sb,null,null,debug,indent); }
+  public final SB str( SB sb, VBitSet typebs, NonBlockingHashMapLong<String> dups, boolean debug, boolean indent ) {
+    if( dups==null ) {
+      assert typebs==null;
+      _str_dups(typebs = new VBitSet(), dups = new NonBlockingHashMapLong<>(), new UCnt());
+      typebs.clr();
+    }
+    return _str(typebs, dups, sb, debug, indent );
   }
-  static class UCnt { int _fld, _tmp, _tfp, _ts; }
+  public static class UCnt { int _fld, _tmp, _tfp, _ts; }
 
   // The debug printer must have good handling of dups and cycles - on
   // partially-built types.  It can depend on the UID but not on, e.g., all
   // fields being filled, or the types being interned or having their hash.
   // Walk the entire reachable set of types and gather the dups, and come up
   // with a nice name for each dup.
-  void _str_dups(VBitSet visit, NonBlockingHashMapLong<String> ignore, UCnt ucnt) { visit.tset(_uid); }
+  public void _str_dups(VBitSet visit, NonBlockingHashMapLong<String> ignore, UCnt ucnt) { visit.tset(_uid); }
 
   // Internal tick of tick-tock printing
   final SB _str( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
@@ -241,10 +244,10 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     
     // Some early cutouts for common bulky cases
     if( this==TypeStruct.ISUSED ) return sb.p("()"); // Shortcut for common case
-    if( this instanceof TypeStruct ts && ts.is_top_clz() ) return sb.p("$TOP");
-    if( this instanceof TypeStruct ts && ts.is_int_clz() ) return sb.p("$INT");
-    if( this instanceof TypeStruct ts && ts.is_flt_clz() ) return sb.p("$FLT");
-    if( this instanceof TypeStruct ts && ts.is_math_clz() ) return sb.p("$MATH");
+    //if( this instanceof TypeStruct ts && ts.is_top_clz() ) return sb.p("$TOP");
+    //if( this instanceof TypeStruct ts && ts.is_int_clz() ) return sb.p("$INT");
+    //if( this instanceof TypeStruct ts && ts.is_flt_clz() ) return sb.p("$FLT");
+    //if( this instanceof TypeStruct ts && ts.is_math_clz() ) return sb.p("$MATH");
     
     // Print a dups label, and optionally the type
     String s = dups.get(_uid);

@@ -11,6 +11,7 @@ import static com.cliffc.aa.AA.DSP_IDX;
 public class RegionNode extends Node {
   public RegionNode( Node... ctrls) { super(OP_REGION,ctrls); }
   RegionNode( byte op ) { super(op,(Node)null); } // For FunNodes
+  @Override boolean is_CFG() { return is_copy(0)==null; }
   @Override void walk_reset0() {
     while( len()>1 && !in(len()-1).is_prim() )
       pop(); // Kill wired primitive inputs

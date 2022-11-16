@@ -35,7 +35,7 @@ public class TypeTuple extends Type<TypeTuple> {
   // Never part of a cycle so the normal equals works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
 
-  @Override void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
+  @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
     for( Type t : _ts )
       if( t!=null )
         t._str_dups(visit,dups,ucnt);

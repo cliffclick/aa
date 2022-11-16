@@ -3,9 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashSet;
@@ -280,13 +278,13 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Short string name
   public String xstr() { return STRS[_op]; } // Self short name
   String  str() { return xstr(); }    // Inline longer name
-  @Override public String toString() { return dump(0,new SB(),false,false).toString(); }
+  @Override public String toString() { return dump(0,new SB(),null, null, false,false).toString(); }
   // Dump
   public String dump( int max ) { return dump(max,is_prim(),false,false); }
   // Dump including primitives
-  public String dump( int max, boolean prims, boolean plive, boolean ptvar ) { return dump(0, new SB(),max,new VBitSet(),prims,plive,ptvar).toString();  }
+  public String dump( int max, boolean prims, boolean plive, boolean ptvar ) { return dump(0, new SB(),null, null, max,new VBitSet(),prims,plive,ptvar).toString();  }
   // Dump one node, no recursion
-  private SB dump( int d, SB sb, boolean plive, boolean ptvar ) {
+  private SB dump( int d, SB sb, VBitSet typebs, NonBlockingHashMapLong dups, boolean plive, boolean ptvar ) {
     String xs = String.format("%s%4d: %-7.7s ",plive ? _live : "",_uid,xstr());
     sb.i(d).p(xs);
     if( is_dead() ) return sb.p("DEAD");
@@ -296,7 +294,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     sb.p("]]  ");
     sb.p(str()).s();
     if( _val==null ) sb.p("----");
-    else _val.str(sb, true, false);
+    else _val.str(sb, typebs, dups, true, false); // Print a type using the shared dups printer
     if( ptvar && _tvar!=null ) _tvar.str(sb.p(" - "));
 
     return sb;
@@ -304,16 +302,16 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Dump one node IF not already dumped, no recursion
   private void dump(int d, SB sb, VBitSet bs, boolean plive, boolean ptvar) {
     if( bs.tset(_uid) ) return;
-    dump(d,sb,plive,ptvar).nl();
+    dump(d,sb,new VBitSet(),null,plive,ptvar).nl();
   }
   // Recursively print, up to depth
-  private SB dump( int d, SB sb, int max, VBitSet bs, boolean prims, boolean plive, boolean ptvar ) {
+  private SB dump( int d, SB sb, VBitSet typebs, NonBlockingHashMapLong<String> dups, int max, VBitSet bs, boolean prims, boolean plive, boolean ptvar ) {
     if( bs.tset(_uid) ) return sb;
     if( d < max ) {    // Limit at depth
       // Print parser scopes first (deepest)
-      for( Node n : _defs ) if( n instanceof ScopeNode ) n.dump(d+1,sb,max,bs,prims,plive,ptvar);
+      for( Node n : _defs ) if( n instanceof ScopeNode ) n.dump(d+1,sb,typebs,dups,max,bs,prims,plive,ptvar);
       // Print constants early
-      for( Node n : _defs ) if( n instanceof ConNode ) n.dump(d+1,sb,max,bs,prims,plive,ptvar);
+      for( Node n : _defs ) if( n instanceof ConNode ) n.dump(d+1,sb,typebs,dups,max,bs,prims,plive,ptvar);
       // Do not recursively print root Scope, nor Unresolved of primitives.
       // These are too common, and uninteresting.
       for( Node n : _defs ) if( n != null && (!prims && n.is_prim() && n._defs._len > 3) ) bs.set(n._uid);
@@ -322,14 +320,14 @@ public abstract class Node implements Cloneable, IntSupplier {
       for( Node n : _defs )
         if( n != null && !n.is_multi_head() && !n.is_multi_tail() &&
             !(n instanceof UnresolvedNode) && !(n instanceof FunPtrNode) )
-          n.dump(d+1,sb,max,bs,prims,plive,ptvar);
+          n.dump(d+1,sb,typebs,dups,max,bs,prims,plive,ptvar);
       // Print Unresolved and FunPtrs, which typically catch whole functions.
       for( Node n : _defs )
         if( (n instanceof UnresolvedNode) || (n instanceof FunPtrNode) )
-          n.dump(d+1,sb,max,bs,prims,plive,ptvar);
+          n.dump(d+1,sb,typebs,dups,max,bs,prims,plive,ptvar);
       // Print anything not yet printed, including multi-node combos
-      for( Node n : _defs ) if( n != null && !n.is_multi_head() ) n.dump(d+1,sb,max,bs,prims,plive,ptvar);
-      for( Node n : _defs ) if( n != null ) n.dump(d+1,sb,max,bs,prims,plive,ptvar);
+      for( Node n : _defs ) if( n != null && !n.is_multi_head() ) n.dump(d+1,sb,typebs,dups,max,bs,prims,plive,ptvar);
+      for( Node n : _defs ) if( n != null ) n.dump(d+1,sb,typebs,dups,max,bs,prims,plive,ptvar);
     }
     // Print multi-node combos all-at-once, including all tails even if they
     // exceed the depth limit by 1.
@@ -340,7 +338,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       for( Node n : x._uses )
         if( n.is_multi_tail() )
           for( Node m : n._defs )
-            if( dx<max) m.dump(dx+1,sb,max,bs,prims,plive,ptvar);
+            if( dx<max) m.dump(dx+1,sb,typebs,dups,max,bs,prims,plive,ptvar);
       if( x==this ) bs.clear(_uid); // Reset for self, so prints right now
       x.dump(dx,sb,bs,plive,ptvar); // Conditionally print head of combo
       // Print all combo tails, if not already printed
@@ -348,16 +346,27 @@ public abstract class Node implements Cloneable, IntSupplier {
       for( Node n : x._uses ) if( n.is_multi_tail() ) n.dump(dx-1,sb,bs,plive,ptvar);
       return sb;
     } else { // Neither combo head nor tail, just print
-      return dump(d,sb,plive,ptvar).nl();
+      return dump(d,sb,typebs,dups,plive,ptvar).nl();
     }
   }
   public boolean is_multi_head() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_IF || _op==OP_NEW || _op==OP_REGION || _op==OP_SPLIT || _op==OP_ROOT; }
   private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI || _op==OP_PROJ || _op==OP_CPROJ; }
-  boolean is_CFG() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_RET || _op==OP_IF || _op==OP_REGION || _op==OP_ROOT || _op==OP_CPROJ || _op==OP_SCOPE; }
+  boolean is_CFG() { return _op==OP_FUN || _op==OP_RET || _op==OP_IF || _op==OP_REGION || _op==OP_ROOT || _op==OP_CPROJ || _op==OP_SCOPE; }
 
   public String dumprpo( boolean prims, boolean plive, boolean ptvar ) {
     Ary<Node> nodes = new Ary<>(new Node[1],0);
     postorder(nodes,new VBitSet());
+    // Walk the node list and count Type duplicates.  This means the same types
+    // use the same Dup name on every node in the entire print.
+    NonBlockingHashMapLong<String> dups = new NonBlockingHashMapLong<>();
+    VBitSet typebs = new VBitSet();
+    Type.UCnt ucnt = new Type.UCnt();
+    for( Node n : nodes ) {
+      n._val ._str_dups(typebs, dups, ucnt);
+      n._live._str_dups(typebs, dups, ucnt);
+    }
+    typebs.clr();
+    
     // Dump in reverse post order
     SB sb = new SB();
     Node prior = null;
@@ -371,7 +380,7 @@ public abstract class Node implements Cloneable, IntSupplier {
           n.is_multi_head() )
         sb.nl();
       if( n._op==OP_FUN ) _header((FunNode)n,sb);
-      n.dump(0,sb,plive,ptvar).nl();
+      n.dump(0,sb,typebs,dups,plive,ptvar).nl();
       if( n._op==OP_RET && n.in(4) instanceof FunNode ) _header((FunNode)n.in(4),sb);
       prior = n;
     }
@@ -384,7 +393,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( bs.tset(_uid) ) return;
     // If CFG, walk the CFG first.  Do not walk thru Returns (into Calls) as
     // this breaks up the whole- functions-at-once.
-    if( is_CFG() && _op!=OP_RET ) {
+    if( is_CFG() && _op!=OP_RET && is_copy(0)==null ) {
       // Walk any CProj first.
       for( Node use : _uses )
         if( use._op == OP_CPROJ )
@@ -403,11 +412,11 @@ public abstract class Node implements Cloneable, IntSupplier {
     // into a Fun's Parms.  We want the Fun to walk its own Parms, in order so
     // ignore these edges.  Since the Parms are all reachable from the Fun they
     // get walked eventually.
-    if( _op != OP_CALL && _op!=OP_RET ) {
-      if( _op!=OP_SPLIT || _uses._len!=2 )
+    if( (_op != OP_CALL || is_copy(0)!=null ) && _op!=OP_RET ) {
+      if( _op!=OP_SPLIT || _uses._len!=2 ) {
         for( Node use : _uses )
           use.postorder(nodes,bs);
-      else {                    // For MemSplit, walk the "busy" side first
+      }  else {                 // For MemSplit, walk the "busy" side first
         Node p0 = _uses.at(0), p1 = _uses.at(1);
         if( ((ProjNode)p0)._idx==1 ) { p0=p1; p1=_uses.at(0); } // Swap
         p1.postorder(nodes,bs);
@@ -830,7 +839,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   private int _report_bug(String msg) {
     FLOW_VISIT.clear(_uid); // Pop-frame & re-run in debugger
     System.err.println(msg);
-    System.err.println(dump(0,new SB(),true,false)); // Rolling backwards not allowed
+    System.err.println(dump(0,new SB(),null,null,true,false)); // Rolling backwards not allowed
     return 1;
   }
 

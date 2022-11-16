@@ -11,6 +11,8 @@ import static com.cliffc.aa.AA.unimpl;
 // Split control
 public class IfNode extends Node {
   public IfNode( Node ctrl, Node pred ) { super(OP_IF,ctrl,pred); }
+  
+  @Override boolean is_CFG() { return is_copy(0)==null; }
 
   @Override public Node ideal_reduce() {
     Node ctl = in(0);

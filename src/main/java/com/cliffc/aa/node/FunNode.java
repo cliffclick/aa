@@ -168,6 +168,7 @@ public class FunNode extends RegionNode {
 
   // Never inline with a nested function
   @Override @NotNull public FunNode copy( boolean copy_edges) { throw unimpl(); }
+  @Override boolean is_CFG() { return is_copy(0)==null; }
 
   public int nargs() { return _nargs; }
 

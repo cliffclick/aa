@@ -66,7 +66,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     return _obj == t2._obj || _obj.cycle_equals(t2._obj);
   }
 
-  @Override void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
+  @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
     if( visit.tset(_uid) ) {
       if( !dups.containsKey(_uid) )
         dups.put(_uid,"P"+(char)('A'+ucnt._tmp++));

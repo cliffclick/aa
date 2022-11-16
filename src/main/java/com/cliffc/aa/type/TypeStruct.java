@@ -609,7 +609,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     return get("0")!=null;
   }
 
-  @Override void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
+  @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
     if( visit.tset(_uid) ) {
       if( !dups.containsKey(_uid) )
         dups.put(_uid,"S"+(char)('A'+ucnt._ts++));

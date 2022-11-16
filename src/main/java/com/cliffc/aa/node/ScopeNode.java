@@ -34,6 +34,7 @@ public class ScopeNode extends Node {
     _types = types;
     _closure = false;
   }
+  @Override boolean is_CFG() { return true; }
 
   public       Node ctrl() { return in(CTL_IDX); }
   public       Node mem () { return in(MEM_IDX); }

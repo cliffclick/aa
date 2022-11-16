@@ -32,6 +32,7 @@ public final class CallEpiNode extends Node {
     if( is_dead() ) return "XallEpi";
     return "CallEpi";
   }
+  @Override boolean is_CFG() { return !_is_copy; }
   public CallNode call() { return (CallNode)in(0); }
   @Override public boolean is_mem() { return true; }
   public int nwired() { return _defs._len-1; }

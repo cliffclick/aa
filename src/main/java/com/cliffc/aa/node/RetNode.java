@@ -27,6 +27,7 @@ public final class RetNode extends Node {
     FunNode fun = fun();
     return "Ret"+(is_copy() ? "!copy!" : (fun==null ? "["+_fidx+"]" : fun.name()));
   }
+  @Override boolean is_CFG() { return !is_copy(); }
   public Node ctl() { return in(0); }
   public Node mem() { return in(1); }
   public Node rez() { return in(2); }
