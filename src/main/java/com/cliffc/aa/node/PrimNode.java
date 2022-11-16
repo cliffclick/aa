@@ -142,14 +142,9 @@ public abstract class PrimNode extends Node {
   // Fun Parm_dsp [Parm_y] prim Ret
   // No memory, no RPC.  Display is first arg.
   private void as_fun( StructNode rec, boolean is_oper ) {
-    String op = is_oper ? (switch( _tfp.nargs() ) {
-      case ARG_IDX+1 -> "_";
-      case ARG_IDX   -> "";
-      default -> throw unimpl();
-      }+_name+"_").intern() : _name;
-    if( is_oper ) Oper.make(op,_is_lazy);
+    if( is_oper ) Oper.make(_name,_is_lazy);
 
-    FunNode fun = new FunNode(this,is_oper ? op : _name);
+    FunNode fun = new FunNode(this,_name);
     fun.add_def(new CRProjNode(fun._fidx).init()); // Need FIDX to make the default control
     fun.init();                 // Now register with parser
     if( _is_lazy ) add_def(fun); // Ctrl in slot 0
@@ -175,8 +170,8 @@ public abstract class PrimNode extends Node {
     // Return the result
     RetNode ret = new RetNode(zctrl,zmem,zrez,rpc,fun).init();
     // FunPtr is UNBOUND here, will be bound when loaded thru a named struct to the Clazz.
-    FunPtrNode fptr = new FunPtrNode(op,ret,Env.ALL).init();
-    rec.add_fun(op,Access.Final,fptr,null);
+    FunPtrNode fptr = new FunPtrNode(_name,ret,Env.ALL).init();
+    rec.add_fun(_name,Access.Final,fptr,null);
   }
 
   // Build and install match package
@@ -213,7 +208,7 @@ public abstract class PrimNode extends Node {
   // str:{int     -> str }  ==>>  str:int
   // str:{flt     -> str }  ==>>  str:flt
   // == :{ptr ptr -> int1}  ==>>  == :ptr
-  @Override public String xstr() { return _name+":"+_formals.at(DSP_IDX); }
+  @Override public String xstr() { return _name; }
   private static final Type[] TS = new Type[ARG_IDX+1];
   @Override public Type value() {
     if( is_keep() ) return _val;
@@ -279,7 +274,7 @@ public abstract class PrimNode extends Node {
     abstract double op( double d );
   }
 
-  static class MinusF64 extends Prim1OpF64 { MinusF64() { super("-"); } double op( double d ) { return -d; } }
+  static class MinusF64 extends Prim1OpF64 { MinusF64() { super("-_"); } double op( double d ) { return -d; } }
 
   // 1Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim1OpI64 extends PrimNode {
@@ -288,10 +283,10 @@ public abstract class PrimNode extends Node {
     abstract long op( long d );
   }
 
-  static class MinusI64 extends Prim1OpI64 { MinusI64() { super("-"); } long op( long x ) { return -x; } }
+  static class MinusI64 extends Prim1OpI64 { MinusI64() { super("-_"); } long op( long x ) { return -x; } }
   static class NotI64 extends PrimNode {
     // Rare function which takes a Scalar (works for both ints and ptrs).
-    public NotI64() { super("!",TypeTuple.INT64,TypeStruct.BOOL); }
+    public NotI64() { super("!_",TypeTuple.INT64,TypeStruct.BOOL); }
     @Override public Type value() {
       Type t0 = val(0);
       if( t0==Type.ANY ) return TypeStruct.BOOL.dual();
@@ -316,10 +311,10 @@ public abstract class PrimNode extends Node {
     abstract double op( double x, double y );
   }
 
-  static class AddF64 extends Prim2OpF64 { AddF64() { super("+"); } double op( double l, double r ) { return l+r; } }
-  static class SubF64 extends Prim2OpF64 { SubF64() { super("-"); } double op( double l, double r ) { return l-r; } }
-  static class MulF64 extends Prim2OpF64 { MulF64() { super("*"); } double op( double l, double r ) { return l*r; } }
-  static class DivF64 extends Prim2OpF64 { DivF64() { super("/"); } double op( double l, double r ) { return l/r; } }
+  static class AddF64 extends Prim2OpF64 { AddF64() { super("_+_"); } double op( double l, double r ) { return l+r; } }
+  static class SubF64 extends Prim2OpF64 { SubF64() { super("_-_"); } double op( double l, double r ) { return l-r; } }
+  static class MulF64 extends Prim2OpF64 { MulF64() { super("_*_"); } double op( double l, double r ) { return l*r; } }
+  static class DivF64 extends Prim2OpF64 { DivF64() { super("_/_"); } double op( double l, double r ) { return l/r; } }
 
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpF64 extends PrimNode {
@@ -328,12 +323,12 @@ public abstract class PrimNode extends Node {
     abstract boolean op( double x, double y );
   }
 
-  public static class LT_F64 extends Prim2RelOpF64 { public LT_F64() { super("<" ); } boolean op( double l, double r ) { return l< r; } }
-  public static class LE_F64 extends Prim2RelOpF64 { public LE_F64() { super("<="); } boolean op( double l, double r ) { return l<=r; } }
-  public static class GT_F64 extends Prim2RelOpF64 { public GT_F64() { super(">" ); } boolean op( double l, double r ) { return l> r; } }
-  public static class GE_F64 extends Prim2RelOpF64 { public GE_F64() { super(">="); } boolean op( double l, double r ) { return l>=r; } }
-  public static class EQ_F64 extends Prim2RelOpF64 { public EQ_F64() { super("=="); } boolean op( double l, double r ) { return l==r; } }
-  public static class NE_F64 extends Prim2RelOpF64 { public NE_F64() { super("!="); } boolean op( double l, double r ) { return l!=r; } }
+  public static class LT_F64 extends Prim2RelOpF64 { public LT_F64() { super("_<_" ); } boolean op( double l, double r ) { return l< r; } }
+  public static class LE_F64 extends Prim2RelOpF64 { public LE_F64() { super("_<=_"); } boolean op( double l, double r ) { return l<=r; } }
+  public static class GT_F64 extends Prim2RelOpF64 { public GT_F64() { super("_>_" ); } boolean op( double l, double r ) { return l> r; } }
+  public static class GE_F64 extends Prim2RelOpF64 { public GE_F64() { super("_>=_"); } boolean op( double l, double r ) { return l>=r; } }
+  public static class EQ_F64 extends Prim2RelOpF64 { public EQ_F64() { super("_==_"); } boolean op( double l, double r ) { return l==r; } }
+  public static class NE_F64 extends Prim2RelOpF64 { public NE_F64() { super("_!=_"); } boolean op( double l, double r ) { return l!=r; } }
 
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpFI64 extends PrimNode {
@@ -342,12 +337,12 @@ public abstract class PrimNode extends Node {
     abstract boolean op( double x, long y );
   }
 
-  public static class LT_FI64 extends Prim2RelOpFI64 { public LT_FI64() { super("<" ); } boolean op( double l, long r ) { return l< r; } }
-  public static class LE_FI64 extends Prim2RelOpFI64 { public LE_FI64() { super("<="); } boolean op( double l, long r ) { return l<=r; } }
-  public static class GT_FI64 extends Prim2RelOpFI64 { public GT_FI64() { super(">" ); } boolean op( double l, long r ) { return l> r; } }
-  public static class GE_FI64 extends Prim2RelOpFI64 { public GE_FI64() { super(">="); } boolean op( double l, long r ) { return l>=r; } }
-  public static class EQ_FI64 extends Prim2RelOpFI64 { public EQ_FI64() { super("=="); } boolean op( double l, long r ) { return l==r; } }
-  public static class NE_FI64 extends Prim2RelOpFI64 { public NE_FI64() { super("!="); } boolean op( double l, long r ) { return l!=r; } }
+  public static class LT_FI64 extends Prim2RelOpFI64 { public LT_FI64() { super("_<_" ); } boolean op( double l, long r ) { return l< r; } }
+  public static class LE_FI64 extends Prim2RelOpFI64 { public LE_FI64() { super("_<=_"); } boolean op( double l, long r ) { return l<=r; } }
+  public static class GT_FI64 extends Prim2RelOpFI64 { public GT_FI64() { super("_>_" ); } boolean op( double l, long r ) { return l> r; } }
+  public static class GE_FI64 extends Prim2RelOpFI64 { public GE_FI64() { super("_>=_"); } boolean op( double l, long r ) { return l>=r; } }
+  public static class EQ_FI64 extends Prim2RelOpFI64 { public EQ_FI64() { super("_==_"); } boolean op( double l, long r ) { return l==r; } }
+  public static class NE_FI64 extends Prim2RelOpFI64 { public NE_FI64() { super("_!=_"); } boolean op( double l, long r ) { return l!=r; } }
 
 
   // 2Ops have uniform input/output types, so take a shortcut on name printing
@@ -357,34 +352,34 @@ public abstract class PrimNode extends Node {
     abstract long op( long x, long y );
   }
 
-  static class AddI64 extends Prim2OpI64 { AddI64() { super("+"); } long op( long l, long r ) { return l+r; } }
-  static class SubI64 extends Prim2OpI64 { SubI64() { super("-"); } long op( long l, long r ) { return l-r; } }
-  static class MulI64 extends Prim2OpI64 { MulI64() { super("*"); } long op( long l, long r ) { return l*r; } }
-  static class DivI64 extends Prim2OpI64 { DivI64() { super("/"); } long op( long l, long r ) { return r==0 ? 0 : l/r; } } // Long division
-  static class ModI64 extends Prim2OpI64 { ModI64() { super("%"); } long op( long l, long r ) { return r==0 ? 0 : l%r; } }
+  static class AddI64 extends Prim2OpI64 { AddI64() { super("_+_"); } long op( long l, long r ) { return l+r; } }
+  static class SubI64 extends Prim2OpI64 { SubI64() { super("_-_"); } long op( long l, long r ) { return l-r; } }
+  static class MulI64 extends Prim2OpI64 { MulI64() { super("_*_"); } long op( long l, long r ) { return l*r; } }
+  static class DivI64 extends Prim2OpI64 { DivI64() { super("_/_"); } long op( long l, long r ) { return r==0 ? 0 : l/r; } } // Long division
+  static class ModI64 extends Prim2OpI64 { ModI64() { super("_%_"); } long op( long l, long r ) { return r==0 ? 0 : l%r; } }
 
   abstract static class Prim2OpIF64 extends PrimNode {
     Prim2OpIF64( String name ) { super(name,TypeTuple.INT64_FLT64,TypeStruct.FLT); }
     @Override public Type apply( Type[] args ) { return make_flt(op(unwrap_ii(args[0]),unwrap_ff(args[1]))); }
     abstract double op( long x, double y );
   }
-  static class AddIF64 extends Prim2OpIF64 { AddIF64() { super("+"); } double op( long l, double r ) { return l+r; } }
-  static class SubIF64 extends Prim2OpIF64 { SubIF64() { super("-"); } double op( long l, double r ) { return l-r; } }
-  static class MulIF64 extends Prim2OpIF64 { MulIF64() { super("*"); } double op( long l, double r ) { return l*r; } }
-  static class DivIF64 extends Prim2OpIF64 { DivIF64() { super("/"); } double op( long l, double r ) { return l/r; } } // Float division, by 0 gives infinity
+  static class AddIF64 extends Prim2OpIF64 { AddIF64() { super("_+_"); } double op( long l, double r ) { return l+r; } }
+  static class SubIF64 extends Prim2OpIF64 { SubIF64() { super("_-_"); } double op( long l, double r ) { return l-r; } }
+  static class MulIF64 extends Prim2OpIF64 { MulIF64() { super("_*_"); } double op( long l, double r ) { return l*r; } }
+  static class DivIF64 extends Prim2OpIF64 { DivIF64() { super("_/_"); } double op( long l, double r ) { return l/r; } } // Float division, by 0 gives infinity
 
   abstract static class Prim2OpFI64 extends PrimNode {
     Prim2OpFI64( String name ) { super(name,TypeTuple.FLT64_INT64,TypeStruct.FLT); }
     @Override public Type apply( Type[] args ) { return make_flt(op(unwrap_ff(args[0]),unwrap_ii(args[1]))); }
     abstract double op( double x, long y );
   }
-  static class AddFI64 extends Prim2OpFI64 { AddFI64() { super("+"); } double op( double l, long r ) { return l+r; } }
-  static class SubFI64 extends Prim2OpFI64 { SubFI64() { super("-"); } double op( double l, long r ) { return l-r; } }
-  static class MulFI64 extends Prim2OpFI64 { MulFI64() { super("*"); } double op( double l, long r ) { return l*r; } }
-  static class DivFI64 extends Prim2OpFI64 { DivFI64() { super("/"); } double op( double l, long r ) { return l/r; } } // Float division, by 0 gives infinity
+  static class AddFI64 extends Prim2OpFI64 { AddFI64() { super("_+_"); } double op( double l, long r ) { return l+r; } }
+  static class SubFI64 extends Prim2OpFI64 { SubFI64() { super("_-_"); } double op( double l, long r ) { return l-r; } }
+  static class MulFI64 extends Prim2OpFI64 { MulFI64() { super("_*_"); } double op( double l, long r ) { return l*r; } }
+  static class DivFI64 extends Prim2OpFI64 { DivFI64() { super("_/_"); } double op( double l, long r ) { return l/r; } } // Float division, by 0 gives infinity
 
   public static class AndI64 extends Prim2OpI64 {
-    public AndI64() { super("&"); }
+    public AndI64() { super("_&_"); }
     // And can preserve bit-width
     @Override public Type value() {
       Type t0 = val(0), t1 = val(1);
@@ -414,7 +409,7 @@ public abstract class PrimNode extends Node {
   }
 
   public static class OrI64 extends Prim2OpI64 {
-    public OrI64() { super("|"); }
+    public OrI64() { super("_|_"); }
     // And can preserve bit-width
     @Override public Type value() {
       if( is_keep() ) return _val;
@@ -452,12 +447,12 @@ public abstract class PrimNode extends Node {
     abstract boolean op( long x, long y );
   }
 
-  public static class LT_I64 extends Prim2RelOpI64 { public LT_I64() { super("<" ); } boolean op( long l, long r ) { return l< r; } }
-  public static class LE_I64 extends Prim2RelOpI64 { public LE_I64() { super("<="); } boolean op( long l, long r ) { return l<=r; } }
-  public static class GT_I64 extends Prim2RelOpI64 { public GT_I64() { super(">" ); } boolean op( long l, long r ) { return l> r; } }
-  public static class GE_I64 extends Prim2RelOpI64 { public GE_I64() { super(">="); } boolean op( long l, long r ) { return l>=r; } }
-  public static class EQ_I64 extends Prim2RelOpI64 { public EQ_I64() { super("=="); } boolean op( long l, long r ) { return l==r; } }
-  public static class NE_I64 extends Prim2RelOpI64 { public NE_I64() { super("!="); } boolean op( long l, long r ) { return l!=r; } }
+  public static class LT_I64 extends Prim2RelOpI64 { public LT_I64() { super("_<_" ); } boolean op( long l, long r ) { return l< r; } }
+  public static class LE_I64 extends Prim2RelOpI64 { public LE_I64() { super("_<=_"); } boolean op( long l, long r ) { return l<=r; } }
+  public static class GT_I64 extends Prim2RelOpI64 { public GT_I64() { super("_>_" ); } boolean op( long l, long r ) { return l> r; } }
+  public static class GE_I64 extends Prim2RelOpI64 { public GE_I64() { super("_>=_"); } boolean op( long l, long r ) { return l>=r; } }
+  public static class EQ_I64 extends Prim2RelOpI64 { public EQ_I64() { super("_==_"); } boolean op( long l, long r ) { return l==r; } }
+  public static class NE_I64 extends Prim2RelOpI64 { public NE_I64() { super("_!=_"); } boolean op( long l, long r ) { return l!=r; } }
 
   abstract static class Prim2RelOpIF64 extends PrimNode {
     Prim2RelOpIF64( String name ) { super(name,TypeTuple.INT64_FLT64,TypeStruct.BOOL); }
@@ -465,16 +460,16 @@ public abstract class PrimNode extends Node {
     abstract boolean op( long x, double y );
   }
 
-  public static class LT_IF64 extends Prim2RelOpIF64 { public LT_IF64() { super("<" ); } boolean op( long l, double r ) { return l< r; } }
-  public static class LE_IF64 extends Prim2RelOpIF64 { public LE_IF64() { super("<="); } boolean op( long l, double r ) { return l<=r; } }
-  public static class GT_IF64 extends Prim2RelOpIF64 { public GT_IF64() { super(">" ); } boolean op( long l, double r ) { return l> r; } }
-  public static class GE_IF64 extends Prim2RelOpIF64 { public GE_IF64() { super(">="); } boolean op( long l, double r ) { return l>=r; } }
-  public static class EQ_IF64 extends Prim2RelOpIF64 { public EQ_IF64() { super("=="); } boolean op( long l, double r ) { return l==r; } }
-  public static class NE_IF64 extends Prim2RelOpIF64 { public NE_IF64() { super("!="); } boolean op( long l, double r ) { return l!=r; } }
+  public static class LT_IF64 extends Prim2RelOpIF64 { public LT_IF64() { super("_<_" ); } boolean op( long l, double r ) { return l< r; } }
+  public static class LE_IF64 extends Prim2RelOpIF64 { public LE_IF64() { super("_<=_"); } boolean op( long l, double r ) { return l<=r; } }
+  public static class GT_IF64 extends Prim2RelOpIF64 { public GT_IF64() { super("_>_" ); } boolean op( long l, double r ) { return l> r; } }
+  public static class GE_IF64 extends Prim2RelOpIF64 { public GE_IF64() { super("_>=_"); } boolean op( long l, double r ) { return l>=r; } }
+  public static class EQ_IF64 extends Prim2RelOpIF64 { public EQ_IF64() { super("_==_"); } boolean op( long l, double r ) { return l==r; } }
+  public static class NE_IF64 extends Prim2RelOpIF64 { public NE_IF64() { super("_!=_"); } boolean op( long l, double r ) { return l!=r; } }
 
 
   public static class EQ_OOP extends PrimNode {
-    public EQ_OOP() { super("==",TypeTuple.OOP_OOP,TypeInt.BOOL); }
+    public EQ_OOP() { super("_==_",TypeTuple.OOP_OOP,TypeInt.BOOL); }
     @Override public Type value() {
       if( is_keep() ) return _val;
       //// Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
@@ -509,7 +504,7 @@ public abstract class PrimNode extends Node {
   }
 
   public static class NE_OOP extends PrimNode {
-    public NE_OOP() { super("!=",TypeTuple.OOP_OOP,TypeInt.BOOL); }
+    public NE_OOP() { super("_!=_",TypeTuple.OOP_OOP,TypeInt.BOOL); }
     @Override public Type value() {
       if( is_keep() ) return _val;
       //// Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
@@ -558,7 +553,7 @@ public abstract class PrimNode extends Node {
   public static class AndThen extends PrimNode {
     private static final TypeTuple ANDTHEN = TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, Type.ALL, TypeFunPtr.THUNK); // {val tfp -> val }
     // Takes a value on the LHS, and a THUNK on the RHS.
-    public AndThen() { super("&&",true/*lazy*/,ANDTHEN,TypeNil.SCALAR); }
+    public AndThen() { super("_&&_",true/*lazy*/,ANDTHEN,TypeNil.SCALAR); }
     @Override public Type apply(Type[] ts) { throw unimpl(); }
     @Override public Type value() { return TypeTuple.RET; }
     // Expect this to inline everytime
@@ -611,7 +606,7 @@ public abstract class PrimNode extends Node {
   public static class OrElse extends PrimNode {
     private static final TypeTuple ORELSE = TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, Type.ALL, TypeFunPtr.THUNK); // {val tfp -> val }
     // Takes a value on the LHS, and a THUNK on the RHS.
-    public OrElse() { super("||",true/*lazy*/,ORELSE,TypeNil.SCALAR); }
+    public OrElse() { super("_||_",true/*lazy*/,ORELSE,TypeNil.SCALAR); }
     @Override public Type apply(Type[] ts) { throw unimpl(); }
     @Override public Type value() { return TypeTuple.RET; }
     // Expect this to inline everytime
