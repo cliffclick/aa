@@ -350,7 +350,8 @@ public final class CallEpiNode extends Node {
     //  if( trez_lift instanceof TypeMemPtr )
     //    tmem3 = tmem3.lift_at((TypeMemPtr)trez_lift);  // Upgrade memory result
     //  trez = trez_lift_dull.join(trez);                // Upgrade scalar result
-      throw unimpl();
+    // Turned off for now
+    throw unimpl();
   }
 
 

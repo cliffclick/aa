@@ -19,7 +19,6 @@ public abstract class AA {
   public static boolean DO_GCP, DO_HMT; // Global type-precision controllers
 
 
-
   private static final AbstractBuildVersion ABV;
   static {
     AbstractBuildVersion abv = null;

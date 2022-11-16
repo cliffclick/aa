@@ -34,7 +34,6 @@ public class TestParse {
   }
 
   @Test public void testParse00() {
-    test("!1", "xnil", "A?");
     test("1", "int:1", "int:1");
     // Unary operator
     test("-1", "int:-1", "int:-1");

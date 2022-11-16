@@ -1,4 +1,14 @@
 =======================================
+11/16/2022
+
+Overloads solved (H-M resolves unknown field, but user syntax for unknown field).
+- TODO: now do this in main.
+
+Pending: redo the deps tracking ala Bobby E's suggestion
+
+Pending: TVar moved to a hard class heirarchy instead of a soft class with string edges
+
+=======================================
 9/24/2022
 
 Solving the mis-mashed Overloads

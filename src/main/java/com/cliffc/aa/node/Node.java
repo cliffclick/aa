@@ -615,7 +615,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       }
       Env.GVN.add_reduce(nnn);  // Rerun the replacement
       // Any new nodes made post-Combo-HM need a TVar
-      if( AA.DO_HMT && Combo.HM_FREEZE && nnn.has_tvar() && nnn._tvar==null ) { 
+      if( Combo.HM_FREEZE && nnn.has_tvar() && nnn._tvar==null ) { 
         nnn.set_tvar();
         assert Env.GVN.on_flow(nnn);
       }
@@ -746,7 +746,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     } else {                    // Not doing optimistic GCP...
       assert _val==value() && _live==live();
     }
-    if( AA.DO_HMT && has_tvar() )
+    if( has_tvar() )
       set_tvar();
     // Walk reachable graph
     for( Node def : _defs ) if( def != null ) def.walk_initype();

@@ -1,10 +1,8 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.node.*;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.node.Node;
+import com.cliffc.aa.node.StructNode;
 import com.cliffc.aa.util.VBitSet;
-
-import static com.cliffc.aa.AA.unimpl;
 
 /** Combined Global Constant Propagation and Hindly-Milner with extensions.
 
@@ -123,42 +121,55 @@ their inputs, and so their inputs are treated as dead.
 
  */
 public abstract class Combo {
-  static public boolean HM_FREEZE;
+  static public boolean HM_NEW_LEAF;   // After 1st pass, potential HM new leafs will no longer lift Apply results
+  static public boolean HM_AMBI;       // After 2nd pass, unresolved Fields are ambiguous
+  static public boolean HM_FREEZE;     // After 3rd pass, HM types are frozen but GCP types continue to fall
 
   public static void opto() {
     Env.GVN.flow_clear();       // Will be used as a worklist
 
     // Set all values to ANY and lives to DEAD, their most optimistic types.
     // Set all type-vars to Leafs.
-    if( AA.DO_HMT )
-      for( StructNode n : Env.PROTOS.values() )
-        n.set_tvar();           // Set prototypes early, so instances can find
+    for( StructNode n : Env.PROTOS.values() )
+      n.set_tvar();           // Set prototypes early, so instances can find
     Env.ROOT.walk_initype();
 
     // Make the non-gen set in a pre-pass
     assert Env.ROOT.more_work(false)==0; // Initial conditions are correct
 
     // Init
-    HM_FREEZE = false;
+    HM_NEW_LEAF = false;
+    HM_AMBI     = false;
+    HM_FREEZE   = false;
     int work_cnt=0;
 
     // Pass 1: Everything starts high/top/leaf and falls; escaping function args are assumed high
-    work_cnt += main_work_loop();
-    //assert Env.ROOT.more_work(false)==0;
+    work_cnt += main_work_loop(1);
 
-    // H-M types freeze, escaping function args are assumed called with lowest H-M compatible
-    HM_FREEZE = true;
-    Env.GVN.add_flow(Env.ROOT);
-    //assert Env.ROOT.more_work(false)==0;
-
-    // Pass 2: GCP types continue to run downhill.
-    work_cnt += main_work_loop();
+    // Pass 2: Potential new Leafs quit lifting GCP in Apply
+    HM_NEW_LEAF = true;
+    add_new_leaf_work();
     assert Env.ROOT.more_work(false)==0;
+    work_cnt += main_work_loop(2);
 
+    // Pass 3: Unresolved Fields are ambiguous; propagate errors
+    HM_AMBI = true;
+    add_ambi_work();
+    assert Env.ROOT.more_work(false)==0;
+    work_cnt += main_work_loop(3);
+    
+    // Pass 4: H-M types freeze, escaping function args are assumed called with lowest H-M compatible
+    // GCP types continue to run downhill.
+    HM_FREEZE = true;
+    add_freeze_work();
+    assert Env.ROOT.more_work(false)==0;
+    work_cnt += main_work_loop(4);
+
+    // Take advantage of results
     Env.ROOT.walk_opt(new VBitSet());
   }
 
-  static int main_work_loop( ) {
+  static int main_work_loop( int pass ) {
 
     int cnt=0;                  // Debug counter
 
@@ -174,68 +185,70 @@ public abstract class Combo {
 
         // Backwards flow
         n.combo_backwards();
-
       }
 
       // H-M unification
-      if( AA.DO_HMT )
-        n.combo_unify();
+      n.combo_unify();
 
       // Very expensive assert: everything that can make progress is on worklist
-      //assert Env.ROOT.more_work(false)==0;
+      assert Env.ROOT.more_work(false)==0;
     }
     return cnt;
   }
 
-  // Walk any escaping root functions, and claim they are called by the most
-  // conservative callers.
-  private static final VBitSet RVISIT = new VBitSet();
-  private static void update_root_args(ScopeNode scope) {
-    // If an argument changes type, adjust the lambda arg types
-    Type flow = scope.rez()._val;
-    if( AA.DO_GCP && !flow.above_center() ) {
-      ADD_SIG.clear();
-      Type sflow = add_sig((TypeMem)scope.mem()._val,flow); // Sharpen
-      RVISIT.clear();
-      _walk_root_funs(sflow);
-    }
-  }
-  static private void _walk_root_funs(Type flow) {
-    if( RVISIT.tset(flow._uid) ) return;
-    // Find any functions
-    if( flow instanceof TypeFunPtr tfp && !tfp.is_full() ) {
-      // Walk all functions; these might be called by external callers
-      for( int fidx : tfp.fidxs() ) {
-        RetNode ret = RetNode.get(fidx);
-        Node[] parms = ret.fun().parms();
-        for( int i=AA.ARG_IDX; i<parms.length; i++ ) {
-          ConNode defalt = (ConNode)parms[i].in(1);
-          Type aflow = AA.DO_HMT ? parms[i].tvar().as_flow() : TypeNil.SCALAR;
-          Type bflow = aflow.meet(defalt._val);
-          if( bflow != defalt._val )
-            throw unimpl();            // fun.arg_meet(i,aflow,work);
-          if( AA.DO_HMT ) throw unimpl(); // targ.clr_cp()
-        }
-      }
-    }
+  //// Walk any escaping root functions, and claim they are called by the most
+  //// conservative callers.
+  //private static final VBitSet RVISIT = new VBitSet();
+  //private static void update_root_args(ScopeNode scope) {
+  //  // If an argument changes type, adjust the lambda arg types
+  //  Type flow = scope.rez()._val;
+  //  if( AA.DO_GCP && !flow.above_center() ) {
+  //    ADD_SIG.clear();
+  //    Type sflow = add_sig((TypeMem)scope.mem()._val,flow); // Sharpen
+  //    RVISIT.clear();
+  //    _walk_root_funs(sflow);
+  //  }
+  //}
+  //static private void _walk_root_funs(Type flow) {
+  //  if( RVISIT.tset(flow._uid) ) return;
+  //  // Find any functions
+  //  if( flow instanceof TypeFunPtr tfp && !tfp.is_full() ) {
+  //    // Walk all functions; these might be called by external callers
+  //    for( int fidx : tfp.fidxs() ) {
+  //      RetNode ret = RetNode.get(fidx);
+  //      Node[] parms = ret.fun().parms();
+  //      for( int i=AA.ARG_IDX; i<parms.length; i++ ) {
+  //        ConNode defalt = (ConNode)parms[i].in(1);
+  //        Type aflow = AA.DO_HMT ? parms[i].tvar().as_flow() : TypeNil.SCALAR;
+  //        Type bflow = aflow.meet(defalt._val);
+  //        if( bflow != defalt._val )
+  //          throw unimpl();            // fun.arg_meet(i,aflow,work);
+  //        if( AA.DO_HMT ) throw unimpl(); // targ.clr_cp()
+  //      }
+  //    }
+  //  }
+  //
+  //  // recursively walk structures for nested functions
+  //  if( flow instanceof TypeMemPtr tmp )
+  //    for( TypeFld fld : tmp._obj )
+  //      _walk_root_funs(fld._t);
+  //
+  //}
 
-    // recursively walk structures for nested functions
-    if( flow instanceof TypeMemPtr tmp )
-      for( TypeFld fld : tmp._obj )
-        _walk_root_funs(fld._t);
+  //// Expand functions to full signatures, recursively.
+  //private static final VBitSet ADD_SIG = new VBitSet();
+  //private static Type add_sig(TypeMem mem, Type t) {
+  //  if( ADD_SIG.tset(t._uid) ) return t;
+  //  if( t instanceof TypeFunPtr fun )
+  //    return fun.make_from(fun.dsp(),add_sig(mem,fun._ret));
+  //  if( t instanceof TypeMemPtr tmp )
+  //    return mem.sharpen(tmp);
+  //  return t;
+  //}
 
-  }
-
-  // Expand functions to full signatures, recursively.
-  private static final VBitSet ADD_SIG = new VBitSet();
-  private static Type add_sig(TypeMem mem, Type t) {
-    if( ADD_SIG.tset(t._uid) ) return t;
-    if( t instanceof TypeFunPtr fun )
-      return fun.make_from(fun.dsp(),add_sig(mem,fun._ret));
-    if( t instanceof TypeMemPtr tmp )
-      return mem.sharpen(tmp);
-    return t;
-  }
-
-  static void reset() { HM_FREEZE=false; }
+  private static void add_new_leaf_work() { }
+  private static void add_ambi_work()     { }
+  private static void add_freeze_work()   { }
+  
+  static void reset() { HM_NEW_LEAF = HM_AMBI = HM_FREEZE=false; }
 }
