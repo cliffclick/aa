@@ -1,9 +1,11 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMemPtr;
+
+import static com.cliffc.aa.AA.unimpl;
 
 // "fresh" the incoming TVar: make a fresh instance before unifying
 public class FreshNode extends Node {
@@ -15,7 +17,7 @@ public class FreshNode extends Node {
   }
   public Node id() { return in(1); } // The HM identifier
   public static Node peek(Node f) { return f instanceof FreshNode fsh ? fsh.id() : f; }
-  TV2[] nongen() { return fun()==null ? null : fun()._nongen; }
+  TV3[] nongen() { return fun()==null ? null : fun()._nongen; }
 
   @Override public Type value() { return id()._val; }
   @Override public void add_flow_extra(Type old) {
@@ -37,21 +39,23 @@ public class FreshNode extends Node {
   @Override public boolean has_tvar() { return true; }
   
   @Override public void set_tvar() {
-    _tvar = new_tvar();
-    if( id()._tvar==null ) id().walk_initype();
-    id().tvar().push_dep(this);
+    //_tvar = new_tvar();
+    //if( id()._tvar==null ) id().walk_initype();
+    //id().tvar().push_dep(this);
+    throw unimpl();
   }
 
   @Override public boolean unify( boolean test ) {
-    TV2[] nongen = nongen();
+    TV3[] nongen = nongen();
     return id().tvar().fresh_unify(tvar(),nongen,test);
   }
   @Override public void add_work_hm() {
     super.add_work_hm();
     Env.GVN.add_flow(id());
-    TV2 t = id().tvar();
-    if( t.nongen_in(nongen()) )
-      t.add_deps_flow(); // recursive work.add(_deps)
+    TV3 t = id().tvar();
+    //if( t.nongen_in(nongen()) )
+    //  t.add_deps_flow(); // recursive work.add(_deps)
+    throw unimpl();
   }
 
   @Override public Node ideal_reduce() {
@@ -60,7 +64,7 @@ public class FreshNode extends Node {
     if( no_tvar_structure(_val) )
       return id();
     // Remove if TVar has already unified with the input.
-    if( _tvar!=null && tvar()==id().tvar() )
+    if( has_tvar() && tvar()==id().tvar() )
      return id();
 
     return null;
@@ -68,7 +72,7 @@ public class FreshNode extends Node {
 
   // Two FreshNodes are only equal, if they have compatible TVars
   @Override public boolean equals(Object o) {
-    if( _tvar==null ) return this==o;
+    if( !has_tvar() ) return this==o;
     if( !(o instanceof FreshNode frsh) ) return false;
     return tvar()==frsh.tvar();
   }

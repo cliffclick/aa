@@ -1,6 +1,6 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 import org.junit.BeforeClass;
@@ -890,7 +890,7 @@ HashTable = {@{
     // Check HMT result
     if( hmt != null && err==null ) {
       assertNull(te._errs);
-      TV2 actual = te._hmt;
+      TV3 actual = te._hmt;
       String actual_str = actual.p();
       assertEquals(stripIndent(hmt),stripIndent(actual_str));
     }

@@ -3335,7 +3335,6 @@ public class HM {
 
     // Pick a nice tvar name.  Generally: "A" or "B" or "V123" for leafs,
     // "X123" for unified but not collapsed tvars.
-
     private void vname( SB sb, boolean debug) {
       final boolean vuid = debug && (unified()||is_leaf());
       sb.p(VNAMES.computeIfAbsent((long) _uid,

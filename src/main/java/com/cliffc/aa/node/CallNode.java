@@ -3,7 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
@@ -443,17 +443,18 @@ public class CallNode extends Node {
 
   // Unify ProjNodes with the Call arguments directly.
   @Override public boolean unify_proj( ProjNode proj, boolean test ) {
-    TV2 tvp = proj.tvar();     // Projection tvar
-    TV2 tv2 = tvar(proj._idx); // Input tvar matching projection
+    TV3 tvp = proj.tvar();     // Projection tvar
+    TV3 tv3 = tvar(proj._idx); // Input tvar matching projection
     if( proj._idx!=DSP_IDX )
-      return tvp.unify(tv2,test); // Unify with Call arguments
-    // Specifically for the function/display, only unify on the display part.
-    if( tv2.is_fun() ) {        // Expecting the call input to be a function
-      TV2 tdsp = tv2.arg("2");  // Unify against the function display
-      return tdsp != null && tvp.unify(tdsp,test);
-    }
-    tv2.push_dep(proj);         // Proj will unify once tv2 becomes a fun
-    return false;
+      return tvp.unify(tv3,test); // Unify with Call arguments
+    //// Specifically for the function/display, only unify on the display part.
+    //if( tv3.is_fun() ) {        // Expecting the call input to be a function
+    //  TV3 tdsp = tv3.arg("2");  // Unify against the function display
+    //  return tdsp != null && tvp.unify(tdsp,test);
+    //}
+    //tv3.push_dep(proj);         // Proj will unify once tv3 becomes a fun
+    //return false;
+    throw unimpl();
   }
 
   @Override public ErrMsg err( boolean fast ) {

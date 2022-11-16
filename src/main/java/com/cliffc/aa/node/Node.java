@@ -1,7 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
-import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
@@ -80,18 +80,18 @@ public abstract class Node implements Cloneable, IntSupplier {
   public Type _val;     // Value; starts at ALL and lifts towards ANY.
   public Type _live;    // Liveness; assumed live in gvn.iter(), assumed dead in gvn.gcp().
   // Hindley-Milner inspired typing, or CNC Thesis based congruence-class
-  // typing.  This is a Type Variable which can unify with other TV2s forcing
+  // typing.  This is a Type Variable which can unify with other TV3s forcing
   // Type-equivalence (JOIN of unified Types), and includes gross structure
   // (functions, structs, pointers, or simple Types).
-  TV2 _tvar;
+  TV3 _tvar;
   // H-M Type-Variables
-  public TV2 tvar() {
-    TV2 tv = _tvar.find();     // Do U-F step
+  public TV3 tvar() {
+    TV3 tv = _tvar.find();                  // Do U-F step
     return tv == _tvar ? tv : (_tvar = tv); // Update U-F style in-place.
   }
   abstract public boolean has_tvar();
-  public TV2 tvar(int x) { return in(x).tvar(); } // nth TV2
-  TV2 new_tvar() { return TV2.make_leaf("new_tvar"); }
+  public TV3 tvar(int x) { return in(x).tvar(); } // nth TV2
+  public void set_tvar() { assert has_tvar(); if( _tvar==null ) _tvar = new TVLeaf(); }
 
   // Hash is function+inputs, or opcode+input_uids, and is invariant over edge
   // order (so we can swap edges without rehashing)
@@ -278,13 +278,13 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Short string name
   public String xstr() { return STRS[_op]; } // Self short name
   String  str() { return xstr(); }    // Inline longer name
-  @Override public String toString() { return dump(0,new SB(),null, null, false,false).toString(); }
+  @Override public String toString() { return dump(0,new SB(),null, null, null, null, false,false).toString(); }
   // Dump
   public String dump( int max ) { return dump(max,is_prim(),false,false); }
   // Dump including primitives
-  public String dump( int max, boolean prims, boolean plive, boolean ptvar ) { return dump(0, new SB(),null, null, max,new VBitSet(),prims,plive,ptvar).toString();  }
+  public String dump( int max, boolean prims, boolean plive, boolean ptvar ) { return dump(0,max,new VBitSet(), new SB(),null, null, null, null,prims,plive,ptvar).toString();  }
   // Dump one node, no recursion
-  private SB dump( int d, SB sb, VBitSet typebs, NonBlockingHashMapLong dups, boolean plive, boolean ptvar ) {
+  private SB dump( int d, SB sb, VBitSet typebs, NonBlockingHashMapLong dups, VBitSet hmt_bs, VBitSet hmt_dups, boolean plive, boolean ptvar ) {
     String xs = String.format("%s%4d: %-7.7s ",plive ? _live : "",_uid,xstr());
     sb.i(d).p(xs);
     if( is_dead() ) return sb.p("DEAD");
@@ -295,23 +295,23 @@ public abstract class Node implements Cloneable, IntSupplier {
     sb.p(str()).s();
     if( _val==null ) sb.p("----");
     else _val.str(sb, typebs, dups, true, false); // Print a type using the shared dups printer
-    if( ptvar && _tvar!=null ) _tvar.str(sb.p(" - "));
+    if( ptvar && _tvar!=null ) _tvar.str(sb.p(" - "), hmt_bs, hmt_dups, false);
 
     return sb;
   }
   // Dump one node IF not already dumped, no recursion
-  private void dump(int d, SB sb, VBitSet bs, boolean plive, boolean ptvar) {
+  private void dump(int d, VBitSet bs, SB sb, VBitSet typebs, NonBlockingHashMapLong dups, VBitSet hmt_bs, VBitSet hmt_dups, boolean plive, boolean ptvar ) {
     if( bs.tset(_uid) ) return;
-    dump(d,sb,new VBitSet(),null,plive,ptvar).nl();
+    dump(d,sb,typebs,dups,hmt_bs,hmt_dups,plive,ptvar).nl();
   }
   // Recursively print, up to depth
-  private SB dump( int d, SB sb, VBitSet typebs, NonBlockingHashMapLong<String> dups, int max, VBitSet bs, boolean prims, boolean plive, boolean ptvar ) {
+  private SB dump( int d, int max, VBitSet bs, SB sb, VBitSet typebs, NonBlockingHashMapLong<String> dups, VBitSet hmt_bs, VBitSet hmt_dups, boolean prims, boolean plive, boolean ptvar ) {
     if( bs.tset(_uid) ) return sb;
     if( d < max ) {    // Limit at depth
       // Print parser scopes first (deepest)
-      for( Node n : _defs ) if( n instanceof ScopeNode ) n.dump(d+1,sb,typebs,dups,max,bs,prims,plive,ptvar);
+      for( Node n : _defs ) if( n instanceof ScopeNode ) n.dump(d+1,max,bs,sb,typebs,dups,hmt_bs,hmt_dups,prims,plive,ptvar);
       // Print constants early
-      for( Node n : _defs ) if( n instanceof ConNode ) n.dump(d+1,sb,typebs,dups,max,bs,prims,plive,ptvar);
+      for( Node n : _defs ) if( n instanceof ConNode ) n.dump(d+1,max,bs,sb,typebs,dups,hmt_bs,hmt_dups,prims,plive,ptvar);
       // Do not recursively print root Scope, nor Unresolved of primitives.
       // These are too common, and uninteresting.
       for( Node n : _defs ) if( n != null && (!prims && n.is_prim() && n._defs._len > 3) ) bs.set(n._uid);
@@ -320,14 +320,14 @@ public abstract class Node implements Cloneable, IntSupplier {
       for( Node n : _defs )
         if( n != null && !n.is_multi_head() && !n.is_multi_tail() &&
             !(n instanceof UnresolvedNode) && !(n instanceof FunPtrNode) )
-          n.dump(d+1,sb,typebs,dups,max,bs,prims,plive,ptvar);
+          n.dump(d+1,max,bs,sb,typebs,dups,hmt_bs,hmt_dups,prims,plive,ptvar);
       // Print Unresolved and FunPtrs, which typically catch whole functions.
       for( Node n : _defs )
         if( (n instanceof UnresolvedNode) || (n instanceof FunPtrNode) )
-          n.dump(d+1,sb,typebs,dups,max,bs,prims,plive,ptvar);
+          n.dump(d+1,max,bs,sb,typebs,dups,hmt_bs,hmt_dups,prims,plive,ptvar);
       // Print anything not yet printed, including multi-node combos
-      for( Node n : _defs ) if( n != null && !n.is_multi_head() ) n.dump(d+1,sb,typebs,dups,max,bs,prims,plive,ptvar);
-      for( Node n : _defs ) if( n != null ) n.dump(d+1,sb,typebs,dups,max,bs,prims,plive,ptvar);
+      for( Node n : _defs ) if( n != null && !n.is_multi_head() ) n.dump(d+1,max,bs,sb,typebs,dups,hmt_bs,hmt_dups,prims,plive,ptvar);
+      for( Node n : _defs ) if( n != null ) n.dump(d+1,max,bs,sb,typebs,dups,hmt_bs,hmt_dups,prims,plive,ptvar);
     }
     // Print multi-node combos all-at-once, including all tails even if they
     // exceed the depth limit by 1.
@@ -338,15 +338,15 @@ public abstract class Node implements Cloneable, IntSupplier {
       for( Node n : x._uses )
         if( n.is_multi_tail() )
           for( Node m : n._defs )
-            if( dx<max) m.dump(dx+1,sb,typebs,dups,max,bs,prims,plive,ptvar);
+            if( dx<max) m.dump(dx+1,max,bs,sb,typebs,dups,hmt_bs,hmt_dups,prims,plive,ptvar);
       if( x==this ) bs.clear(_uid); // Reset for self, so prints right now
-      x.dump(dx,sb,bs,plive,ptvar); // Conditionally print head of combo
+      x.dump(dx,bs,sb,typebs,dups,hmt_bs,hmt_dups,plive,ptvar); // Conditionally print head of combo
       // Print all combo tails, if not already printed
       if( x!=this ) bs.clear(_uid); // Reset for self, so prints in the mix below
-      for( Node n : x._uses ) if( n.is_multi_tail() ) n.dump(dx-1,sb,bs,plive,ptvar);
+      for( Node n : x._uses ) if( n.is_multi_tail() ) n.dump(dx-1,bs,sb,typebs,dups,hmt_bs,hmt_dups,plive,ptvar);
       return sb;
     } else { // Neither combo head nor tail, just print
-      return dump(d,sb,typebs,dups,plive,ptvar).nl();
+      return dump(d,sb,typebs,dups,hmt_bs,hmt_dups,plive,ptvar).nl();
     }
   }
   public boolean is_multi_head() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_IF || _op==OP_NEW || _op==OP_REGION || _op==OP_SPLIT || _op==OP_ROOT; }
@@ -361,11 +361,15 @@ public abstract class Node implements Cloneable, IntSupplier {
     NonBlockingHashMapLong<String> dups = new NonBlockingHashMapLong<>();
     VBitSet typebs = new VBitSet();
     Type.UCnt ucnt = new Type.UCnt();
+    VBitSet hmt_bs   = new VBitSet();
+    VBitSet hmt_dups = new VBitSet();
     for( Node n : nodes ) {
       n._val ._str_dups(typebs, dups, ucnt);
       n._live._str_dups(typebs, dups, ucnt);
+      if( n._tvar!=null ) n._tvar._get_dups(hmt_bs,hmt_dups);
     }
     typebs.clr();
+    hmt_bs.clr();
     
     // Dump in reverse post order
     SB sb = new SB();
@@ -380,7 +384,7 @@ public abstract class Node implements Cloneable, IntSupplier {
           n.is_multi_head() )
         sb.nl();
       if( n._op==OP_FUN ) _header((FunNode)n,sb);
-      n.dump(0,sb,typebs,dups,plive,ptvar).nl();
+      n.dump(0,sb,typebs,dups,hmt_bs,hmt_dups,plive,ptvar).nl();
       if( n._op==OP_RET && n.in(4) instanceof FunNode ) _header((FunNode)n.in(4),sb);
       prior = n;
     }
@@ -583,7 +587,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   public void combo_unify() {
     if( _live== Type.ANY ) return; // No HM progress on dead code
     if( _val == Type.ANY ) return; // No HM progress on untyped code
-    TV2 old = _tvar==null ? null : tvar();
+    TV3 old = _tvar==null ? null : tvar();
     if( old!=null && old.is_err() ) return;  // No unifications with error
     if( unify(false) ) {
       assert old==null || !_tvar.debug_find().unify(old.debug_find(),true);// monotonic: unifying with the result is no-progress
@@ -752,7 +756,6 @@ public abstract class Node implements Cloneable, IntSupplier {
     for( Node def : _defs ) if( def != null ) def.walk_initype();
     for( Node use : _uses )                   use.walk_initype();
   }
-  public void set_tvar() { if( _tvar==null ) _tvar = new_tvar(); }
   
   // Reset
   public final void walk_reset( ) {
@@ -839,7 +842,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   private int _report_bug(String msg) {
     FLOW_VISIT.clear(_uid); // Pop-frame & re-run in debugger
     System.err.println(msg);
-    System.err.println(dump(0,new SB(),null,null,true,false)); // Rolling backwards not allowed
+    System.err.println(dump(0,new SB(),null,null,null,null,true,false)); // Rolling backwards not allowed
     return 1;
   }
 

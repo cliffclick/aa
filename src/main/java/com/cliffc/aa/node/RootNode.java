@@ -1,7 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.VBitSet;
 
@@ -87,10 +87,11 @@ public class RootNode extends Node {
         RetNode ret = RetNode.FUNS.at(fidx);
         if( ret!=null && !EXT_FIDXS.test(fidx) ) {
           FunPtrNode fptr = ret.funptr();
-          if( fptr !=null && fptr._tvar!=null ) {
-            TV2 tfun = ret.funptr().tvar();
-            //  tfun.add_deps_work(work);
-            tfun.arg(" ret").clr_cp();
+          if( fptr !=null && fptr.has_tvar() ) {
+            TV3 tfun = ret.funptr().tvar();
+            tfun.add_deps_work();
+            //tfun.arg(" ret").clr_cp();
+            throw unimpl();
           }
         }
         EXT_FIDXS = EXT_FIDXS.set(fidx);

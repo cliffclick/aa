@@ -3,7 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.*;
@@ -120,7 +120,7 @@ public class UnresolvedNode extends Node {
   @Override public boolean unify( boolean test ) {
     // Giant assert that all inputs are all Fun or Val constructors, ignoring errors.
     for( int i=1; i<len(); i++ ) {
-      TV2 tv = tvar(i);
+      TV3 tv = tvar(i);
       assert tv.is_err() || tv.is_fun() || tv.is_leaf() || tv.is_obj();
     }
     return false;

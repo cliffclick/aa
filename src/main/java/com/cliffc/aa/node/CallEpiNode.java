@@ -2,7 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
-import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.*;
@@ -330,19 +330,19 @@ public final class CallEpiNode extends Node {
     return TypeTuple.make(Type.CTRL,tmem,trez);
   }
 
-  Type hm_apply_lift(TV2 rezt2, Type ret) {
-    // Walk the inputs, building a mapping
-    TV2.T2MAP.clear();
-    // Walk the display first, skipping through the function pointer to the display
-    TV2.WDUPS.clear();
-    TV2 tfun = call().fdx().tvar();
+  Type hm_apply_lift(TV3 rezt2, Type ret) {
+    //// Walk the inputs, building a mapping
+    //TV3.T2MAP.clear();
+    //// Walk the display first, skipping through the function pointer to the display
+    //TV3.WDUPS.clear();
+    //TV3 tfun = call().fdx().tvar();
     //  if( tfun.is_fun() ) {
-    //    TV2 dsp = tfun.get("2");
+    //    TV3 dsp = tfun.get("2");
     //    if( dsp!=null )  dsp.walk_types_in(caller_mem,tfptr._dsp);
     //  }
     //  // Walk the args
     //  for( int i=ARG_IDX; i<call._defs._len-1; i++ )
-    //    { TV2.WDUPS.clear(); call.tvar(i).walk_types_in(caller_mem,call.val(i)); }
+    //    { TV3.WDUPS.clear(); call.tvar(i).walk_types_in(caller_mem,call.val(i)); }
     //  // Walk the outputs, building an improved result
     //  Type trez_sharp = tmem3.sharptr(trez);
     //  Type trez_lift = tvar().walk_types_out(trez_sharp,this);
@@ -501,63 +501,64 @@ public final class CallEpiNode extends Node {
     CallNode call = call();
     int nargs = call.nargs();
     Node fdx = call.fdx();
-    TV2 tfun = fdx.tvar();
-    if( !tfun.is_fun() ) {
-      if( test ) return true;
-      TV2[] targs = new TV2[nargs+1];
-      targs[DSP_IDX] = TV2.make_leaf("CallEpi_unify");
-      for( int i=ARG_IDX; i<nargs; i++ ) targs[i] = call.tvar(i);
-      targs[nargs] = tvar();    // Return
-      TV2 nfun = TV2.make_fun("CallEpi_unify", false, targs);
-      progress = tfun.unify(nfun,test);
-    } else {
-
-      // Check for progress amongst args
-      int miss=0;
-      for( int i=ARG_IDX; i<nargs; i++ ) {
-        TV2 formal = tfun.arg(TV2.argname(i));
-        if( formal == null && tfun.is_open() ) {
-          if( test ) return true;
-          tfun._args.put(TV2.argname(i),formal=TV2.make_leaf("CallEpi_unify_open"));
-        }
-        if( formal == null ) {      // No matching formal (too many args pass)
-          miss++;
-          progress |= bad_arg_cnt(test);
-        } else {
-          TV2 actual = call.tvar(i);
-          progress |= actual.unify(formal, test);
-          if( progress && test ) return true; // Early exit
-          tfun = tfun.find();
-        }
-      }
-      // Too few args passed, some formals missed
-      if( (tfun.size()-1)-(nargs-miss) > 0 && !tfun.is_err() )
-        progress |= bad_arg_cnt(test);
-      // Check for progress on the return
-      progress |= tvar().unify(tfun.arg(" ret"),test);
-    }
-
-    // Flag HMT result as widening, if GCP falls to a TFP which widens in HMT.
-    TV2 tret = tfun.find().arg(" ret");
-    if( tret.is_copy() && fdx._val instanceof TypeFunPtr tfp && tfp.fidxs()!=BitsFun.NALL ) {
-      for( int fidx : tfp.fidxs() ) {
-        if( fidx==0 ) continue;
-        RetNode ret = RetNode.FUNS.at(fidx);
-        FunPtrNode fptr = ret.funptr();
-        TV2 tfun2 = fptr.tvar();
-        if( !tfun2.is_fun() ) tfun2.push_dep(this); // Come back around when this becomes a function
-        else if( tfun2.arg(" ret").is_copy() ) {
-          if( !test ) tret.clr_cp();
-          return true;
-        }
-      }
-    }
-
-    return progress;
+    TV3 tfun = fdx.tvar();
+    //if( !tfun.is_fun() ) {
+    //  if( test ) return true;
+    //  TV3[] targs = new TV3[nargs+1];
+    //  targs[DSP_IDX] = new TVLeaf();
+    //  for( int i=ARG_IDX; i<nargs; i++ ) targs[i] = call.tvar(i);
+    //  targs[nargs] = tvar();    // Return
+    //  TV3 nfun = TV3.make_fun("CallEpi_unify", false, targs);
+    //  progress = tfun.unify(nfun,test);
+    //} else {
+    //
+    //  // Check for progress amongst args
+    //  int miss=0;
+    //  for( int i=ARG_IDX; i<nargs; i++ ) {
+    //    TV3 formal = tfun.arg(TV3.argname(i));
+    //    if( formal == null && tfun.is_open() ) {
+    //      if( test ) return true;
+    //      tfun._args.put(TV3.argname(i),formal=TV3.make_leaf("CallEpi_unify_open"));
+    //    }
+    //    if( formal == null ) {      // No matching formal (too many args pass)
+    //      miss++;
+    //      progress |= bad_arg_cnt(test);
+    //    } else {
+    //      TV3 actual = call.tvar(i);
+    //      progress |= actual.unify(formal, test);
+    //      if( progress && test ) return true; // Early exit
+    //      tfun = tfun.find();
+    //    }
+    //  }
+    //  // Too few args passed, some formals missed
+    //  if( (tfun.size()-1)-(nargs-miss) > 0 && !tfun.is_err() )
+    //    progress |= bad_arg_cnt(test);
+    //  // Check for progress on the return
+    //  progress |= tvar().unify(tfun.arg(" ret"),test);
+    //}
+    //
+    //// Flag HMT result as widening, if GCP falls to a TFP which widens in HMT.
+    //TV3 tret = tfun.find().arg(" ret");
+    //if( tret.is_copy() && fdx._val instanceof TypeFunPtr tfp && tfp.fidxs()!=BitsFun.NALL ) {
+    //  for( int fidx : tfp.fidxs() ) {
+    //    if( fidx==0 ) continue;
+    //    RetNode ret = RetNode.FUNS.at(fidx);
+    //    FunPtrNode fptr = ret.funptr();
+    //    TV3 tfun2 = fptr.tvar();
+    //    if( !tfun2.is_fun() ) tfun2.push_dep(this); // Come back around when this becomes a function
+    //    else if( tfun2.arg(" ret").is_copy() ) {
+    //      if( !test ) tret.clr_cp();
+    //      return true;
+    //    }
+    //  }
+    //}
+    //
+    //return progress;
+    throw unimpl();
   }
 
   private boolean bad_arg_cnt(boolean test) {
-    TV2 self = tvar();
+    TV3 self = tvar();
     if( self.is_err() ) return false;
     if( !test ) {
       //self._err = "Bad argument count";

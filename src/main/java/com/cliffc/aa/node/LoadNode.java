@@ -2,7 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.*;
@@ -62,15 +62,16 @@ public class LoadNode extends Node {
 
   // Standard memory unification; the Load unifies with the loaded field.
   @Override public boolean unify( boolean test ) {
-    TV2 self = tvar();
-    TV2 ptr = adr().tvar();
-    assert !ptr.is_obj() && !self.is_nil() && self.arg("*")==null;
-    if( ptr.is_nil() )
-      throw unimpl();
-    TV2 rec = ptr.arg("*");
-    if( rec==null )
-      ptr.add_fld("*",rec = TV2.make_leaf("Load_unify"));
-    return self.unify(rec,test);
+    TV3 self = tvar();
+    TV3 ptr = adr().tvar();
+    //assert !ptr.is_obj() && !self.is_nil() && self.arg("*")==null;
+    //if( ptr.is_nil() )
+    //  throw unimpl();
+    //TV3 rec = ptr.arg("*");
+    //if( rec==null )
+    //  ptr.add_fld("*",rec = TV3.make_leaf("Load_unify"));
+    //return self.unify(rec,test);
+    throw unimpl();
   }
   public void add_work_hm() {
     super.add_work_hm();

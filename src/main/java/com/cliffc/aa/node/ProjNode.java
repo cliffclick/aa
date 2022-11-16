@@ -37,7 +37,7 @@ public class ProjNode extends Node {
 
   // Unify with the parent TVar sub-part
   @Override public boolean unify( boolean test ) {
-    return _tvar!=null && in(0).unify_proj(this,test);
+    return has_tvar() && in(0).unify_proj(this,test);
   }
 
   public static ProjNode proj( Node head, int idx ) {

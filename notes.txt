@@ -8,6 +8,104 @@ Pending: redo the deps tracking ala Bobby E's suggestion
 
 Pending: TVar moved to a hard class heirarchy instead of a soft class with string edges
 
+
+
+
+Leaning towards wrappers being ptrs-to-struct
+*[6]int:{$17}
+TMP -> OBJ with clz "int:" and def TypeInt:17 and no fields.
+
+1 + 2 turns into:
+*[6]int:{$1}
+  Load [6] to get an instanceof 'int:'
+int:{$1}  
+  Field ._+_  ; this peeks the empty struct; fails; looks again at 'int:' PROTOS for _+_, succeeds; loads an Overload
+&[ {17 ^=int:int64 int:int64 -> int:int64}
+   {18 ^=int:int64 flt:flt64 -> flt:flt64} ]
+  Field from PROTOS also specializes the 'this':
+&[ {17 ^=int:1 int:int64 -> int:int64}
+   {18 ^=int:1 flt:flt64 -> flt:flt64} ]
+  Field ._ ; requires overload resolution
+  Field .0 ; specialization complete
+{ int:1 int:int64 -> int:int64}
+  Adds the remaining argument and function call
+({17 ^=int:1 int:int64 -> int:int64}  int:2)
+
+Pre-optimization Nodes:
+  int:1          // A ConNode with type 'int:1' which is a TMP -> OBJ with clz "int:" and def TypeInt:1 and no fields.
+  Load           // Converts TMP to a int:TS
+  Field ._+_     // Class load vs int:TS; adds disp
+  fun = Field .0 // Overload resolution
+  int:2          // Arg2
+  Call(fun,int:2)
+
+Post-optimization
+  fun=FunPtr(17,int:1)
+  Call(fun,int:2)
+
+After inlining:
+  int:1
+  int:2
+  $17$add_ii(int:1,int:2)
+
+After prim folds:
+  int:3
+
+--------------
+
+xnil behavior:
+0 + 2
+
+*[8]nil:{$1}
+  Load [6] to get an instanceof 'nil:'
+nil:{$nil}  
+  Field ._+_  ; this peeks the empty struct; fails; looks again at 'nil:' PROTOS for _+_, succeeds; loads an Overload
+&[ {15 ^=nil int:int64 -> int:int64}
+   {16 ^=nil flt:flt64 -> flt:flt64} ]
+  Field from PROTOS also specializes the 'this'; no change for nil
+&[ {15 ^=nil int:int64 -> int:int64}
+   {16 ^=nil flt:flt64 -> flt:flt64} ]
+  Field ._ ; requires overload resolution
+  Field .0 ; specialization complete
+{ nil int:int64 -> int:int64}
+  Adds the remaining argument and function call
+({ ^=nil int:int64 -> int:int64}  int:2)
+
+Post-optimization
+  fun=FunPtr(15,nil)
+  Call(fun,int:2)
+
+After inlining:
+  nil
+  int:2
+  $15$add_0i(nil,int:2)
+
+After prim folds:
+  int:2
+
+
+-------------------------------------
+
+What happens if loading from xnil, then nil falls to e.g. TypeInt or TypeStr ?
+
+xnil   -> Load ->    // Loads from the default class struct, which int,flt, etc all load from.  
+:@{_+_ = &[{xnil x:A -> x:A}] } -> Field._+_ ->   // int/flt class add same field with *more* overloads.  Needs to resolve combined overloads.
+&[ {0 x:A -> x:A } ] -> Field.0 ->
+{ 0 x:A -> x:A } -> Call int.2 ->
+int.2
+
+
+A:@{
+  label = &[ fun1 fun2 ]
+}
+
+B:A:@{
+  label = &[ fun3 fun4 ]
+}
+
+Here B-isa-A.  Requires matching fields have a isa-relationship in their contents.
+
+
 =======================================
 9/24/2022
 

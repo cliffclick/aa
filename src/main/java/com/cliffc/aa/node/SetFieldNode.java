@@ -2,7 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFld;
 import com.cliffc.aa.type.TypeStruct;
@@ -53,46 +53,47 @@ public class SetFieldNode extends Node {
 
   @Override public boolean has_tvar() { return true; }
 
-  // Unify the named field against a TV2.is_obj same named field.
+  // Unify the named field against a TV3.is_obj same named field.
   // Other fields are just passed through.
   @Override public boolean unify( boolean test ) {
-    TV2 self = tvar();
-    TV2 rec = tvar(0);
-    TV2 tvf = tvar(1);
-    assert rec.arg("*")==null && !rec.is_nil() && self.arg("*")==null && !self.is_nil();
-
-    // Unify all other fields common to both
-    boolean progress = false;
-    if( self.is_obj() )
-      if( rec.is_obj() ) {
-        for( String fld : self._args.keySet() )
-          if( !Util.eq(fld,_fld) ) { // All fields except the replaced one
-            TV2 rfld = rec.arg(fld);
-            progress |= rfld!=null && self.arg(fld).unify(rfld,test);
-            if( test && progress ) return true;
-          }
-      } else
-        rec.push_dep(this);    // When this becomes a obj, need to unify here
-
-    // Lookup field in self
-    TV2 fld = self.arg(_fld);
-    if( fld!=null )
-      return fld.unify(tvf,test) | progress;
-
-    // Add struct-ness if possible
-    if( !self.is_obj() ) {
-      if( test ) return true;
-      self.make_struct_from();
-    }
-
-    // Add the field
-    if( self.is_obj() && self.is_open() ) {
-      if( !test ) self.add_fld(_fld,tvf);
-      return true;
-    }
-
-    // Closed/non-record, field is missing
-    return self.set_err(("Missing field "+_fld).intern(),test);
+    TV3 self = tvar();
+    TV3 rec = tvar(0);
+    TV3 tvf = tvar(1);
+    //assert rec.arg("*")==null && !rec.is_nil() && self.arg("*")==null && !self.is_nil();
+    //
+    //// Unify all other fields common to both
+    //boolean progress = false;
+    //if( self.is_obj() )
+    //  if( rec.is_obj() ) {
+    //    for( String fld : self._args.keySet() )
+    //      if( !Util.eq(fld,_fld) ) { // All fields except the replaced one
+    //        TV3 rfld = rec.arg(fld);
+    //        progress |= rfld!=null && self.arg(fld).unify(rfld,test);
+    //        if( test && progress ) return true;
+    //      }
+    //  } else
+    //    rec.push_dep(this);    // When this becomes a obj, need to unify here
+    //
+    //// Lookup field in self
+    //TV3 fld = self.arg(_fld);
+    //if( fld!=null )
+    //  return fld.unify(tvf,test) | progress;
+    //
+    //// Add struct-ness if possible
+    //if( !self.is_obj() ) {
+    //  if( test ) return true;
+    //  self.make_struct_from();
+    //}
+    //
+    //// Add the field
+    //if( self.is_obj() && self.is_open() ) {
+    //  if( !test ) self.add_fld(_fld,tvf);
+    //  return true;
+    //}
+    //
+    //// Closed/non-record, field is missing
+    //return self.set_err(("Missing field "+_fld).intern(),test);
+    throw unimpl();
   }
 
   @Override public ErrMsg err( boolean fast ) {

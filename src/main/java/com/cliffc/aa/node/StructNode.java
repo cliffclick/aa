@@ -2,10 +2,9 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.type.TypeFld.Access;
@@ -228,33 +227,36 @@ public class StructNode extends Node {
 
   @Override public boolean unify( boolean test ) {
     // Force result to be a struct with at least these fields.
-    // Do not allocate a TV2 unless we need to pick up fields.
+    // Do not allocate a TV3 unless we need to pick up fields.
     boolean progress = false;
-    TV2 rec = tvar();
+    TV3 rec = tvar();
     if( !rec.is_obj() ) {
       if( test ) return true;
-      progress = rec.unify(rec=TV2.make_struct(this,"init_struct"),test);
+    //  progress = rec.unify(rec=TV3.make_struct(this,"init_struct"),test);
+      throw unimpl();
     }
 
-    assert check_fields(rec);
-    rec.push_dep(this);
-
-    // Unify existing fields.  Ignore extras on either side.
-    for( int i=0; i<_ts.len(); i++ ) {
-      TV2 fld = rec.arg(_ts.get(i)._fld);
-      if( fld!=null ) progress |= fld.unify(tvar(i),test);
-      if( test && progress ) return true;
-    }
-
-    return progress;
+    //assert check_fields(rec);
+    //rec.push_dep(this);
+    //
+    //// Unify existing fields.  Ignore extras on either side.
+    //for( int i=0; i<_ts.len(); i++ ) {
+    //  TV3 fld = rec.arg(_ts.get(i)._fld);
+    //  if( fld!=null ) progress |= fld.unify(tvar(i),test);
+    //  if( test && progress ) return true;
+    //}
+    //
+    //return progress;
+    throw unimpl();
   }
   // Extra fields are unified with ERR since they are not created here:
   // error to load from a non-existing field
-  private boolean check_fields(TV2 rec) {
-    if( rec._args != null )
-      for( String id : rec._args.keySet() )
-        if( !Util.eq(id," def") && _ts.find(id)==-1 && !rec.arg(id).is_err() )
-          return false;
-    return true;
+  private boolean check_fields(TV3 rec) {
+    //if( rec._args != null )
+    //  for( String id : rec._args.keySet() )
+    //    if( !Util.eq(id," def") && _ts.find(id)==-1 && !rec.arg(id).is_err() )
+    //      return false;
+    //return true;
+    throw unimpl();
   }
 }

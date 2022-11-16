@@ -1,7 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
-import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.Util;
@@ -233,13 +233,14 @@ public abstract class PrimNode extends Node {
   // internal Lambda.  Here there is already a wrapper Lambda, and the
   // primitive computes a result.
   @Override public boolean unify( boolean test ) {
-    TV2 self = tvar();
-    if( !self.is_copy() && self.is_obj() && self.arg(" def")._tflow==((TypeStruct)_tfp._ret)._def )
-      return false;             // Already unified
-    if( !self.is_copy() && self.is_leaf() && _tfp._ret==TypeNil.SCALAR )
-      return false;             // Already a leaf
-    // TODO: unify input args to formals
-    return test || self.unify(TV2.make(_tfp._ret,"PrimNode_create").clr_cp(),test);
+    TV3 self = tvar();
+    //if( !self.is_copy() && self.is_obj() && self.arg(" def")._tflow==((TypeStruct)_tfp._ret)._def )
+    //  return false;             // Already unified
+    //if( !self.is_copy() && self.is_leaf() && _tfp._ret==TypeNil.SCALAR )
+    //  return false;             // Already a leaf
+    //// TODO: unify input args to formals
+    //return test || self.unify(TV3.make(_tfp._ret,"PrimNode_create").clr_cp(),test);
+    throw unimpl();
   }
 
   @Override public ErrMsg err( boolean fast ) {

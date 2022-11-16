@@ -221,7 +221,8 @@ public class TV2 {
       args.put(" def",make_base(ts._def,alloc_site));
     for( int i=0; i<rec._defs._len; i++ )
       if( rec.in(i).has_tvar() )
-        args.put(ts.get(i)._fld,rec.tvar(i));
+        //args.put(ts.get(i)._fld,rec.tvar(i));
+        throw unimpl();
     return make_struct(args,ts.clz(),alloc_site);
   }
   private static TV2 make_struct( TypeStruct ts, String alloc_site ) {
@@ -418,30 +419,31 @@ public class TV2 {
     if( _clz==null || _clz.isEmpty() ) return null;
     // Clazz must exist, but might not be unified/structured yet.
     StructNode sclz = Env.PROTOS.get(_clz);
-    TV2 clz = sclz.tvar();
-    // If not yet a clazz, make it one
-    if( !clz.is_obj() ) {
-      clz._clz = "";            // Clazzes do not have a clazz.
-      if( clz._args==null ) clz._args = new NonBlockingHashMap<>();
-    }
-    // Find the field, making if needed.
-    TV2 fld = clz.arg(key);
-    // At least a leaf field in the clazz
-    if( fld==null )
-      clz._args.put(key,fld = make_leaf("clz_arg"));
-    // At least the leaf is a function, taking a display and allowing more arguments
-    if( !fld.is_fun() ) {
-      if( fld._args==null ) fld._args = new NonBlockingHashMap<String,TV2>();
-      fld._args.put(argname(DSP_IDX),make_leaf("clz_arg dsp"));
-      fld._args.put(" ret",make_leaf("clz_arg ret"));
-      fld._is_fun=true;
-      fld._open=true;
-    }
-    // Put a fresh copy in the local instance
-    _args.put(key,fld=fld._fresh(null));
-    TV2 dsp = fld.arg(argname(DSP_IDX));
-    dsp._unify(this,false);
-    return fld;
+    //TV2 clz = sclz.tvar();
+    //// If not yet a clazz, make it one
+    //if( !clz.is_obj() ) {
+    //  clz._clz = "";            // Clazzes do not have a clazz.
+    //  if( clz._args==null ) clz._args = new NonBlockingHashMap<>();
+    //}
+    //// Find the field, making if needed.
+    //TV2 fld = clz.arg(key);
+    //// At least a leaf field in the clazz
+    //if( fld==null )
+    //  clz._args.put(key,fld = make_leaf("clz_arg"));
+    //// At least the leaf is a function, taking a display and allowing more arguments
+    //if( !fld.is_fun() ) {
+    //  if( fld._args==null ) fld._args = new NonBlockingHashMap<String,TV2>();
+    //  fld._args.put(argname(DSP_IDX),make_leaf("clz_arg dsp"));
+    //  fld._args.put(" ret",make_leaf("clz_arg ret"));
+    //  fld._is_fun=true;
+    //  fld._open=true;
+    //}
+    //// Put a fresh copy in the local instance
+    //_args.put(key,fld=fld._fresh(null));
+    //TV2 dsp = fld.arg(argname(DSP_IDX));
+    //dsp._unify(this,false);
+    //return fld;
+    throw unimpl();
   }
   
   
@@ -1173,7 +1175,7 @@ public class TV2 {
     if( _deps!=null ) {
       add_deps_flow();
       for( Node n : _deps.values() )
-        if( n instanceof FunPtrNode fptr && fptr.tvar().arg("ret")==this )
+      //  if( n instanceof FunPtrNode fptr && fptr.tvar().arg("ret")==this )
       //    for( Apply apply : lam._applys )
       //      if( (ret=apply._fun.find().arg("ret"))!=null )
       //        ret._clr_cp();

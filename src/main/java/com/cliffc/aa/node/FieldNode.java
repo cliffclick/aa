@@ -2,9 +2,11 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
+
+import static com.cliffc.aa.AA.unimpl;
 
 // Takes a static field name, a TypeStruct and returns the field value.
 // Basically a ProjNode except it does lookups by field name in TypeStruct
@@ -100,28 +102,29 @@ public class FieldNode extends Node {
   @Override public boolean has_tvar() { return true; }
 
   @Override public boolean unify( boolean test ) {
-    TV2 self = tvar();
-    TV2 rec = tvar(0);
-    if( !test ) rec.push_dep(this);
-    assert rec.arg("*")==null;  // No ptrs here, just structs
-
-    // Look up field
-    TV2 fld = rec.arg(_fld);
-    if( fld!=null )           // Unify against a pre-existing field
-      return fld.unify(self, test);
-
-    // Add struct-ness if possible
-    if( !rec.is_obj() ) {
-      if( test ) return true;
-      rec.make_struct_from();
-    }
-    // Add the field
-    if( rec.is_obj() && rec.is_open() ) {
-      if( !test ) rec.add_fld(_fld,self);
-      return true;
-    }
-    // Closed/non-record, field is missing
-    return self.set_err(("Missing field "+_fld).intern(),test);
+    TV3 self = tvar();
+    TV3 rec = tvar(0);
+    //if( !test ) rec.push_dep(this);
+    //assert rec.arg("*")==null;  // No ptrs here, just structs
+    //
+    //// Look up field
+    //TV3 fld = rec.arg(_fld);
+    //if( fld!=null )           // Unify against a pre-existing field
+    //  return fld.unify(self, test);
+    //
+    //// Add struct-ness if possible
+    //if( !rec.is_obj() ) {
+    //  if( test ) return true;
+    //  rec.make_struct_from();
+    //}
+    //// Add the field
+    //if( rec.is_obj() && rec.is_open() ) {
+    //  if( !test ) rec.add_fld(_fld,self);
+    //  return true;
+    //}
+    //// Closed/non-record, field is missing
+    //return self.set_err(("Missing field "+_fld).intern(),test);
+    throw unimpl();
   }
 
   @Override public int hashCode() { return super.hashCode()+_fld.hashCode(); }

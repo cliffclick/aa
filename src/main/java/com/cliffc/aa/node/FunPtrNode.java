@@ -1,7 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
-import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.*;
@@ -147,40 +147,43 @@ public final class FunPtrNode extends Node {
     if( ret.is_copy() ) return false; // GENSYM
     FunNode fun = ret.fun();
     ParmNode[] parms = fun.parms();
-    TV2 self = tvar();
+    TV3 self = tvar();
 
     if( !self.is_fun() ) {      // Force a function if not already
       if( test ) return true;
-      TV2[] tv2s = new TV2[parms.length+1];
+      TV3[] tv3s = new TV3[parms.length+1];
       for( int i=DSP_IDX; i<parms.length; i++ ) {
         ParmNode parm = parms[i];
         assert parm==null || (parm._idx==i && parm.has_tvar());
-        tv2s[i] = parm!=null ? parm.tvar() : TV2.make_leaf("FunPtr_unify");
+        tv3s[i] = parm!=null ? parm.tvar() : new TVLeaf();
       }
       
-      tv2s[parms.length] = ret.rez().tvar(); // Return last slot
-      self.unify(TV2.make_fun("FunPtr_unify",false,tv2s),test);
-      self = self.find();
-      assert self.is_fun();
-      progress = true;
+      tv3s[parms.length] = ret.rez().tvar(); // Return last slot
+      //self.unify(TV3.make_fun("FunPtr_unify",false,tv3s),test);
+      //self = self.find();
+      //assert self.is_fun();
+      //progress = true;
+      throw unimpl();
     }
 
     // Each normal argument from the parms directly
     for( int i=ARG_IDX; i<parms.length; i++ )
       if( parms[i]!=null ) {
-        if( self.arg(TV2.argname(i)).unify(parms[i].tvar(), test) ) {
-          if( test ) return true;
-          progress = true;
-          assert !self.is_unified(); // Probably need a FIND here
-        }
+        //if( self.arg(TV2.argname(i)).unify(parms[i].tvar(), test) ) {
+        //  if( test ) return true;
+        //  progress = true;
+        //  assert !self.is_unified(); // Probably need a FIND here
+        //}
+        throw unimpl();
       }
-    progress |= self.arg(" ret").unify(ret.rez().tvar(),test);
-
-    // FunPtr also does Apply unification, for JUST the display argument.
-    if( display().has_tvar() )
-      progress |= self.arg(TV2.argname(DSP_IDX)).unify(display().tvar(),test);
-
-    return progress;
+    //progress |= self.arg(" ret").unify(ret.rez().tvar(),test);
+    //
+    //// FunPtr also does Apply unification, for JUST the display argument.
+    //if( display().has_tvar() )
+    //  progress |= self.arg(TV2.argname(DSP_IDX)).unify(display().tvar(),test);
+    //
+    //return progress;
+    throw unimpl();
   }
 
   // HM changes; push related neighbors

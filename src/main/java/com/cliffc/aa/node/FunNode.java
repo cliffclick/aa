@@ -2,7 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.VBitSet;
@@ -64,7 +64,7 @@ public class FunNode extends RegionNode {
   public int _nargs;        // Number of arguments
 
   // H-M non-generative set, only active during Combo.
-  public TV2[] _nongen;
+  public TV3[] _nongen;
 
   private byte _cnt_size_inlines; // Count of size-based inlines; prevents infinite unrolling via inlining
   public static int _must_inline; // Used for asserts
@@ -790,14 +790,14 @@ public class FunNode extends RegionNode {
 
   // Nongenerative set for Hindly-Milner
   public void prep_nongen() {
-    // Gather TV2s from parents
-    Ary<TV2> tv2s = new Ary<>(TV2.class);
+    // Gather TV3s from parents
+    Ary<TV3> tv3s = new Ary<>(TV3.class);
 
     // Gather the rest from my parms
     for( Node use : _uses )
-      if( use instanceof ParmNode && use._tvar!=null )
-        tv2s.push(use._tvar);
-    _nongen = tv2s.asAry();
+      if( use instanceof ParmNode && use.has_tvar() )
+        tv3s.push(use.tvar());
+    _nongen = tv3s.asAry();
   }
 
   // True if this is a forward_ref

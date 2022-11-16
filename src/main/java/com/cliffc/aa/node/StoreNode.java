@@ -3,7 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.unimpl;
@@ -200,15 +200,16 @@ public class StoreNode extends Node {
   @Override public boolean has_tvar() { return false; }
 
   @Override public boolean unify( boolean test ) {
-    TV2 ptr = adr().tvar();     // Should be leaf, nilable, or ptr
-    TV2 rez = rez().tvar();     // Should be leaf, or struct
-    assert !ptr.is_obj() && !rez.is_nil() && rez.arg("*")==null;
-    if( ptr.is_nil() ) throw unimpl();
-    TV2 obj = ptr.arg("*");
-    if( obj!=null )
-      return obj.unify(rez,test);
-    ptr.add_fld("*",rez);
-    return true;
+    TV3 ptr = adr().tvar();     // Should be leaf, nilable, or ptr
+    TV3 rez = rez().tvar();     // Should be leaf, or struct
+    //assert !ptr.is_obj() && !rez.is_nil() && rez.arg("*")==null;
+    //if( ptr.is_nil() ) throw unimpl();
+    //TV3 obj = ptr.arg("*");
+    //if( obj!=null )
+    //  return obj.unify(rez,test);
+    //ptr.add_fld("*",rez);
+    //return true;
+    throw unimpl();
   }
 
   @Override public void add_work_hm() {

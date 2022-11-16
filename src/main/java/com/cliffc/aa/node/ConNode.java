@@ -1,15 +1,15 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.*;
 
 import java.util.function.Predicate;
 
 import static com.cliffc.aa.AA.unimpl;
 
 // Constant value nodes; no computation needed.  Hashconsed for unique
-// constants, except for XNIL.  XNIL allows for a TV2 typevar Nilable-Leaf with
+// constants, except for XNIL.  XNIL allows for a TV3 typevar Nilable-Leaf with
 // each Leaf unifying on its own.
 public class ConNode<T extends Type> extends Node {
   T _t;                         // Not final for testing
@@ -34,10 +34,11 @@ public class ConNode<T extends Type> extends Node {
     return false;
   }
 
-  @Override TV2 new_tvar() {
-    return _t==TypeNil.XNIL
-      ? TV2.make_nil(TV2.make_leaf("ConNode_notnil"),"ConNode_nilable")
-      : TV2.make(_t, "ConNode_base");
+  @Override public void set_tvar() {
+    assert _tvar==null;
+    _tvar = _t==TypeNil.XNIL
+      ? new TVNil( new TVLeaf() ) // xnil gets a HM nilable instead of a base
+      : new TVBase(_t);
   }
   
   @Override public boolean unify( boolean test ) {
@@ -47,14 +48,14 @@ public class ConNode<T extends Type> extends Node {
   @Override public String toString() { return str(); }
   @Override public int hashCode() {
     // In theory also slot 0, but slot 0 is always Start.
-    // Two XNILs are typically different because their TV2s are different
+    // Two XNILs are typically different because their TV3s are different
     return _t.hashCode();
   }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !(o instanceof ConNode con) ) return false;
     if( _t==TypeNil.NIL && con._t==TypeNil.NIL )
-      return false;             // Different versions of TV2 NotNil
+      return false;             // Different versions of TV3 NotNil
     return _t==con._t;
   }
   @Override Node walk_dom_last( Predicate<Node> P) { return null; }

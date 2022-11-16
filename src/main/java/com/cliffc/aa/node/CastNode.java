@@ -1,7 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.*;
 import org.jetbrains.annotations.NotNull;
 
@@ -67,47 +67,48 @@ public class CastNode extends Node {
 
   // Unifies the input to '(Nil ?:self)'
   @Override public boolean unify( boolean test ) {
-    TV2 maynil = tvar(1); // arg in HM
-    TV2 notnil = tvar();  // ret in HM
+    TV3 maynil = tvar(1); // arg in HM
+    TV3 notnil = tvar();  // ret in HM
     // If the maynil is already nil-checked, can be a nilable of a nilable.
     // If the cast is already satisfied, then no change
     if( maynil==notnil ) return false;
 
 
-    // If this is a type-cast, and not a not-nil cast
-    // just do a normal base unification.
-    if( TypeNil.XNIL.isa(_t) ) {
-      boolean progress = notnil.unify(maynil,test);
-      TV2 tv2 = notnil.find();
-      if( tv2.is_base() && tv2._tflow ==_t )
-        return progress;
-      return test || tv2.unify(TV2.make(_t,"Cast_unify"),test);
-    }
-
-
-    // Already an expanded nilable
-    if( maynil.is_nil() && maynil.arg("?") == notnil ) return false;
-
-    // Expand nilable to either base
-    if( maynil.is_base() && notnil.is_base() )
-      //assert !arg.is_open() && !ret.is_open();
-      //assert arg._flow == ret._flow.meet(Type.NIL);
-      //return false;
-      throw unimpl(); //
-
-    // Already an expanded nilable with ptr
-    if( maynil.is_ptr() && notnil.is_ptr() )
-      return maynil.arg("*").unify(notnil.arg("*"),test);
-
-    // All other paths may progress
-    if( test ) return true;
-
-    // Can be nilable of nilable; fold the layer
-    if( maynil.is_nil() && notnil.is_nil() )
-      throw unimpl(); // return maynil.unify(notnil,work);
-
-    // Unify the maynil with a nilable version of notnil
-    return TV2.make_nil(notnil,"Cast_unify").find().unify(maynil,test);
+    //// If this is a type-cast, and not a not-nil cast
+    //// just do a normal base unification.
+    //if( TypeNil.XNIL.isa(_t) ) {
+    //  boolean progress = notnil.unify(maynil,test);
+    //  TV3 tv3 = notnil.find();
+    //  if( tv3.is_base() && tv3._tflow ==_t )
+    //    return progress;
+    //  return test || tv3.unify(TV3.make(_t,"Cast_unify"),test);
+    //}
+    //
+    //
+    //// Already an expanded nilable
+    //if( maynil.is_nil() && maynil.arg("?") == notnil ) return false;
+    //
+    //// Expand nilable to either base
+    //if( maynil.is_base() && notnil.is_base() ) {
+    //  assert !arg.is_open() && !ret.is_open();
+    //  assert arg._flow == ret._flow.meet(Type.NIL);
+    //  return false;
+    //}
+    //
+    //// Already an expanded nilable with ptr
+    //if( maynil.is_ptr() && notnil.is_ptr() )
+    //  return maynil.arg("*").unify(notnil.arg("*"),test);
+    //
+    //// All other paths may progress
+    //if( test ) return true;
+    //
+    //// Can be nilable of nilable; fold the layer
+    //if( maynil.is_nil() && notnil.is_nil() )
+    //  throw unimpl(); // return maynil.unify(notnil,work);
+    //
+    //// Unify the maynil with a nilable version of notnil
+    //return TV3.make_nil(notnil,"Cast_unify").find().unify(maynil,test);
+    throw unimpl();
   }
 
   @Override public void add_work_hm() {

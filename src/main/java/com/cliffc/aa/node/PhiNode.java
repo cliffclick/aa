@@ -14,7 +14,6 @@ public class PhiNode extends Node {
     super(op,vals);
     _t = t;
     _badgc = badgc;
-    if( t instanceof TypeMem || t instanceof TypeRPC ) _tvar=null;  // No HM for memory
   }
   public PhiNode( Type t, Parse badgc, Node... vals ) { this(OP_PHI,t,badgc,vals); }
   @Override public boolean is_mem() { return _t==TypeMem.ALLMEM; }
@@ -71,7 +70,7 @@ public class PhiNode extends Node {
   // All inputs unify
   @Override public boolean unify( boolean test ) {
     if( !(in(0) instanceof RegionNode r) ) return false; // Dying
-    if( _tvar==null ) return false; // Memory not part of HM
+    if( !has_tvar() ) return false; // Memory not part of HM
     boolean progress = false;
     for( int i=1; i<_defs._len; i++ ) {
       if( r.val(i)!=Type.XCTRL && r.val(i)!=Type.ANY ) { // Only unify alive paths
