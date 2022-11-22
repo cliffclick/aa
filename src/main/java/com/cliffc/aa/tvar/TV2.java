@@ -216,14 +216,13 @@ public class TV2 {
   // field is included.
   public static TV2 make_struct( StructNode rec, String alloc_site ) {
     NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
-    TypeStruct ts = rec.ts();
-    if( !ts._clz.isEmpty() )
-      args.put(" def",make_base(ts._def,alloc_site));
+    if( !rec._clz.isEmpty() )
+      args.put(" def",make_base(rec._def,alloc_site));
     for( int i=0; i<rec._defs._len; i++ )
       if( rec.in(i).has_tvar() )
         //args.put(ts.get(i)._fld,rec.tvar(i));
         throw unimpl();
-    return make_struct(args,ts.clz(),alloc_site);
+    return make_struct(args,rec._clz,alloc_site);
   }
   private static TV2 make_struct( TypeStruct ts, String alloc_site ) {
     NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();

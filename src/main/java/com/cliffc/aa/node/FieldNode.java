@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV3;
@@ -12,63 +13,81 @@ import static com.cliffc.aa.AA.unimpl;
 // Basically a ProjNode except it does lookups by field name in TypeStruct
 // instead of by index in TypeTuple.
 public class FieldNode extends Node {
-  public final String _fld;
+  
+  // Field being loaded from a TypeStruct.  If null, the field name is inferred
+  // from amongst the field choices.  If not-null and not present, then an error.
+  public       String _fld;
   public final Parse _bad;
 
   public FieldNode(Node struct, String fld, Parse bad) {
     super(OP_FIELD,struct);
-    _fld=fld;
+    _fld = fld==null ? ("&"+_uid).intern() : fld;
     _bad = bad;
   }
 
-  @Override public String xstr() { return "."+_fld; }   // Self short name
+  @Override public String xstr() { return "."+(is_resolving() ? "_" : _fld); }   // Self short name
   String  str() { return xstr(); } // Inline short name
+  static boolean is_resolving(String fld) { return fld.charAt(0)=='&'; }
+  boolean is_resolving() { return is_resolving(_fld); }
 
   @Override public Type value() {
     Type t = val(0);
     String sclz;
+    // TODO: proper semantics?  For now, mimic int
     if( t==TypeNil.XNIL ) {
-      // TODO: proper semantics?  For now, mimic int
-      sclz="int:";
+      sclz = "int:";
     } else {
+      // Input is not a struct, so error return
       if( !(t instanceof TypeStruct ts) )
-        return t.oob();           // Input is not a Struct
+        return t.oob();
+      // Mid-resolve?  No field name yet.
+      if( is_resolving() )
+        // Still resolving, use the join of all fields.
+        return Combo.HM_AMBI ? meet(ts) : join(ts);
+      // Normal field lookup
       TypeFld fld = ts.get(_fld);
+      // Hit with field name
       if( fld!=null ) return fld._t;
-      // For named prototypes, if the field load fails, try again in the
-      // prototype.  Only valid for final fields.
+      // Missed, but has a clazz?  Try the prototype lookup
       sclz = ts.clz();
+      if( sclz.isEmpty() )
+        return missing_field();
     }
-    StructNode clz = proto(sclz);
-    if( clz==null ) return t.oob();
-    TypeFld pfld = ((TypeStruct) clz._val).get(_fld);
-    if( pfld == null ) return t.oob(TypeNil.SCALAR);
+    // Prototype lookup
+    StructNode proto = Env.PROTOS.get(sclz);    
+    TypeFld pfld = ((TypeStruct) proto._val).get(_fld);
+    if( pfld==null ) return missing_field();
     assert pfld._access == TypeFld.Access.Final;
-    // If this is a function, act as-if it was pre-bound to 'this' argument
-    if( !(pfld._t instanceof TypeFunPtr tfp) || tfp.has_dsp() )
-      return pfld._t;           // Clazz field type
-    return tfp.make_from(t);
+    return pfld._t;
   }
 
-  private static StructNode proto(String clz) {
-    if( clz.isEmpty() ) return null;
-    return Env.PROTOS.get(clz);
+  private static Type meet(TypeStruct ts) { Type t = TypeNil.XSCALAR; for( TypeFld t2 : ts )  t = t.meet(t2._t); return t; }
+  private static Type join(TypeStruct ts) { Type t = TypeNil. SCALAR; for( TypeFld t2 : ts )  t = t.join(t2._t); return t; }
+
+  // Checks is_err from HMT from StructNode.
+  // Gets the T2 from the base StructNode.
+  // Gets the StructNode from the aliases - needs the actual struct layout
+  private Type missing_field() {
+    throw unimpl();
   }
 
+  
   @Override public Node ideal_reduce() {
     if( in(0) instanceof StructNode clz )
-      return clz.in_bind(_fld,in(0),_bad);
+      //return clz.in_bind(_fld,in(0),_bad);
+      throw unimpl();
     // For named prototypes, if the field load fails, try again in the
     // prototype.  Only valid for final fields.
-    String sclz=null;
-    Type t = val(0);
-    if( t == TypeNil.XNIL ) sclz = "int:";
-    else if( t instanceof TypeStruct ts ) sclz = ts.clz();
-    if( sclz!=null ) {
-      StructNode clz = proto(sclz);
-      if( clz!=null )
-        return clz.in_bind(_fld,in(0),_bad);
-    }
+    //String sclz=null;
+    //Type t = val(0);
+    //if( t == TypeNil.XNIL ) sclz = "int:";
+    //else if( t instanceof TypeStruct ts ) sclz = ts.clz();
+    //if( sclz!=null ) {
+    //  StructNode clz = proto(sclz);
+    //  if( clz!=null )
+    //    //return clz.in_bind(_fld,in(0),_bad);
+    //    throw unimpl();
+    //}
 
     // Back-to-back SetField/Field
     if( in(0) instanceof SetFieldNode sfn && sfn.err(true)==null )

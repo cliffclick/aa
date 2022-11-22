@@ -448,8 +448,7 @@ public class Parse implements Comparable<Parse> {
     if( create ) {              // Token not already bound at any scope
       scope = scope();          // Create in the current scope
       StructNode stk = scope.stk();
-      TypeFld fld = TypeFld.make(tok,t,Access.RW);
-      stk.add_fld(fld, Env.XNIL,badf); // Create at top of scope as undefined
+      stk.add_fld(tok, mutable, Env.XNIL,badf); // Create at top of scope as undefined
       scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
     }
     Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
@@ -618,35 +617,38 @@ public class Parse implements Comparable<Parse> {
       // But here, in a function, the display is actually passed in as a hidden
       // extra argument and replaces the default.
       StructNode stk = e._scope.stk();
-      stk.set_fld("^",Access.Final,Node.pop(clo_idx),true);
-      // Parse body
-      Node rez = _expr_higher_require(op);
-      // Normal exit (no early-exit?)
-      stk.close();
-      assert e._scope.is_closure();
-      // Standard return; function control, memory, result, RPC.  Plus a hook
-      // to the function for faster access.
-      Node xrpc = Node.pop(rpc_idx);
-      Node xfun = Node.pop(fun_idx); assert xfun == fun;
-      RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,xrpc,fun));
-
-      _e = e._par;            // Pop nested environment
-      // The FunPtr builds a real display; any up-scope references are passed in now.
-      Node fptr = gvn(new FunPtrNode(ret,_e._scope.ptr()));
-      fptr_idx = fptr.push(); // Return function; close-out and DCE 'e'
-
-      // Extra variables in the short-circuit are not available afterwards.
-      // Set them to Err.
-      for( int i=1; i<stk._defs._len; i++ ) {
-        String fname = stk.get(i)._fld;
-        String msg = "'"+fname+"' not defined prior to the short-circuit";
-        Parse bad = errMsg(rhsx);
-        Node err = gvn(new ErrNode(ctrl(),bad,msg));
-        do_store(null,err,Access.Final,fname,bad,TypeNil.SCALAR,bad);
-      }
+      // TODO: Make a new StructNode for the local display.
+      // TODO: Fold more together with "func()".
+      //stk.set_fld("^",Access.Final,Node.pop(clo_idx),true);
+      //// Parse body
+      //Node rez = _expr_higher_require(op);
+      //// Normal exit (no early-exit?)
+      //stk.close();
+      //assert e._scope.is_closure();
+      //// Standard return; function control, memory, result, RPC.  Plus a hook
+      //// to the function for faster access.
+      //Node xrpc = Node.pop(rpc_idx);
+      //Node xfun = Node.pop(fun_idx); assert xfun == fun;
+      //RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,xrpc,fun));
+      //
+      //_e = e._par;            // Pop nested environment
+      //// The FunPtr builds a real display; any up-scope references are passed in now.
+      //Node fptr = gvn(new FunPtrNode(ret,_e._scope.ptr()));
+      //fptr_idx = fptr.push(); // Return function; close-out and DCE 'e'
+      //
+      //// Extra variables in the short-circuit are not available afterwards.
+      //// Set them to Err.
+      //for( int i=1; i<stk._defs._len; i++ ) {
+      //  String fname = stk.get(i)._fld;
+      //  String msg = "'"+fname+"' not defined prior to the short-circuit";
+      //  Parse bad = errMsg(rhsx);
+      //  Node err = gvn(new ErrNode(ctrl(),bad,msg));
+      //  do_store(null,err,Access.Final,fname,bad,TypeNil.SCALAR,bad);
+      //}
+      throw unimpl();
 
     }
-    return Node.pop(fptr_idx);
+    //return Node.pop(fptr_idx);
   }
 
   /** Any number field-lookups or function applications, then an optional assignment
@@ -679,9 +681,16 @@ public class Parse implements Comparable<Parse> {
       if( e0 == null ) { return err_ctrl2("Missing term after operator '"+op+"'"); } // Parsed a valid leading op but missing trailing expr
       if( op.is_open() ) throw unimpl(); // Parse the close
       if( op._nargs!=1 ) throw unimpl(); // No binary/trinary allowed here
-      // Load field e0.op2_ as TFP, and instance call.
-      Node fun = gvn(new FieldNode(e0,op._name,errMsg(oldx)));
-      n = do_call(errMsgs(oldx,oldx),args(fun));
+      int e0idx = e0.push();
+      // Load field e0.op2_ as an overload, load again to resolve to a TFP,
+      // bind, and instance call.  Returns an overload from the clazz, typed as
+      // a TypeStruct tuple where the fields hold the function choices.
+      Node over = gvn(new FieldNode(e0,op._name,errMsg(oldx)));
+      // Selects the correct function from the TypeStruct tuple.
+      Node unbound_fun = gvn(new FieldNode(over,null,errMsg(oldx)));
+      // Binds the function
+      Node bound_fun = gvn(new BindFPNode(unbound_fun,Node.pop(e0idx)));
+      n = do_call(errMsgs(oldx,oldx),args(bound_fun));
     } else {
       // Normal leading term
       _x=oldx;
@@ -902,12 +911,11 @@ public class Parse implements Comparable<Parse> {
    *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
    */
   private StructNode tuple(int oldx, Node s, int first_arg_start) {
-    StructNode nn = new StructNode(false,false,errMsg(oldx), TypeStruct.ISUSED).init();
+    StructNode nn = new StructNode(false,false,errMsg(oldx), "", Type.ALL).init();
     // First stmt is parsed already
     Parse bad = errMsg(first_arg_start);
     while( s!= null ) {         // More args
-      TypeFld fld = TypeFld.make((""+nn.len()).intern(),TypeNil.SCALAR,Access.Final);
-      nn.add_fld(fld,s,bad);
+      nn.add_fld((""+nn.len()).intern(),Access.Final,s,bad);
       if( !peek(',') ) break;   // Final comma is optional
       skipWS();                 // Skip to arg start before recording arg start
       bad = errMsg();           // Record arg start
@@ -1013,39 +1021,40 @@ public class Parse implements Comparable<Parse> {
       // But here, in a function, the display is actually passed in as a hidden
       // extra argument and replaces the default.
       StructNode stk = e._scope.stk();
-      stk.set_fld("^",Access.Final,Node.pop(clo_idx),true);
-
-      // Parms for all arguments
-      Parse errmsg = errMsg();  // Lazy error message
-      assert fun==_e._fun && fun==_e._scope.ctrl();
-      for( int i=ARG_IDX; i<formals.len(); i++ ) { // User parms start
-        Node parm = gvn(new ParmNode(i,fun,errmsg,Type.ALL,Env.ALL));
-        if( formals.at(i)!=TypeNil.SCALAR )
-          parm = gvn(new CastNode(fun,parm,formals.at(i)));
-        scope().stk().add_fld(TypeFld.make(ids.at(i),formals.at(i),args_are_mutable),parm,bads.at(i-ARG_IDX));
-      }
-
-      // Parse function body
-      Node rez = stmts();       // Parse function body
-      if( rez == null ) rez = err_ctrl2("Missing function body");
-      require('}',oldx-1);      // Matched with opening {}
-      stk.close();
-
-      // Merge normal exit into all early-exit paths
-      assert e._scope.is_closure();
-      rez = merge_exits(rez);
-      // Standard return; function control, memory, result, RPC.  Plus a hook
-      // to the function for faster access.
-      Node xrpc = Node.pop(rpc_idx);
-      Node xfun = Node.pop(fun_idx); assert xfun == fun;
-      RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,xrpc,fun));
-
-      _e = e._par;            // Pop nested environment; pops nongen also
-      // The FunPtr builds a real display; any up-scope references are passed in now.
-      Node fptr = gvn(new FunPtrNode(ret,_e._scope.ptr()));
-      fptr_idx = fptr.push();   // Return function; close-out and DCE 'e'
+      // TODO: Make a new StructNode for the local display.
+      // TODO: Fold more together with 'lazy_expr'
+      //// Parms for all arguments
+      //Parse errmsg = errMsg();  // Lazy error message
+      //assert fun==_e._fun && fun==_e._scope.ctrl();
+      //for( int i=ARG_IDX; i<formals.len(); i++ ) { // User parms start
+      //  Node parm = gvn(new ParmNode(i,fun,errmsg,Type.ALL,Env.ALL));
+      //  if( formals.at(i)!=TypeNil.SCALAR )
+      //    parm = gvn(new CastNode(fun,parm,formals.at(i)));
+      //  scope().stk().add_fld(TypeFld.make(ids.at(i),formals.at(i),args_are_mutable),parm,bads.at(i-ARG_IDX));
+      //}
+      //
+      //// Parse function body
+      //Node rez = stmts();       // Parse function body
+      //if( rez == null ) rez = err_ctrl2("Missing function body");
+      //require('}',oldx-1);      // Matched with opening {}
+      //stk.close();
+      //
+      //// Merge normal exit into all early-exit paths
+      //assert e._scope.is_closure();
+      //rez = merge_exits(rez);
+      //// Standard return; function control, memory, result, RPC.  Plus a hook
+      //// to the function for faster access.
+      //Node xrpc = Node.pop(rpc_idx);
+      //Node xfun = Node.pop(fun_idx); assert xfun == fun;
+      //RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,xrpc,fun));
+      //
+      //_e = e._par;            // Pop nested environment; pops nongen also
+      //// The FunPtr builds a real display; any up-scope references are passed in now.
+      //Node fptr = gvn(new FunPtrNode(ret,_e._scope.ptr()));
+      //fptr_idx = fptr.push();   // Return function; close-out and DCE 'e'
     }
-    return Node.pop(fptr_idx);
+    //return Node.pop(fptr_idx);
+    throw unimpl();
   }
 
   private Node merge_exits(Node rez) {
@@ -1235,10 +1244,7 @@ public class Parse implements Comparable<Parse> {
         val = con(t);
       }
       // Insert the field into the structure.
-      // FunPtrs are allowed to stack, if the signatures do not overlap.
-      TypeFld tfld = TypeFld.make(tok.intern(),t,access);
-      if( val instanceof FunPtrNode fptr ) proto.add_fun(tok ,access,fptr,null);
-      else                                 proto.add_fld(tfld       , val,null);
+      proto.add_fld(tok.intern(),access, val,null);
       if(  peek('}') ) break;          // End of struct,  no trailing semicolon?
       if( !peek(';') ) throw unimpl(); // Not a type
       if(  peek('}') ) break;          // End of struct, yes trailing semicolon?
@@ -1267,7 +1273,16 @@ public class Parse implements Comparable<Parse> {
   }
 
 
-  // Type-id or type-var parse
+  // Type-id or type-var parse.
+  // TODO: type-vars done as function syntax?
+  // Example: List = : @{ next:List?; val:A }  // 'A' is free.  Problem: when to Shadow and when not.
+  // Example: List A = : @{ next:List?; val:A }  // 'A' is declared.  Problem: Deeply nested types STILL need wrappers to avoid ambiguity
+  // Example: List = : A => @{ next:List?; val:A } // New BNF: toks* => t0 with toks as free t-vars; does not support nested "toks*=>tN" exprs
+  // Example: List = : { A => @{ next:List?; val:A } } // New BNF: { toks* => t0 } with toks as free t-vars
+  // Less parens
+  // Example: MyType = :   A => @{ table:A[]; map:  B => { MyType {A->B} -> MyType(B) }  ; ... }
+  // More parens
+  // Example: MyType = : { A => @{ table:A[]; map:{ B => { MyType {A->B} -> MyType(B) } }; ... } }  
   private Type tid(boolean allow_fref) {
     String tok = token();
     if( tok==null ) return null;
@@ -1282,7 +1297,8 @@ public class Parse implements Comparable<Parse> {
       clz = type_fref(tname,false); // None, so create
     }
     // Clazzes have a canonical worse-case instance
-    return clz.ts().make_canonical();
+    //return clz.ts().make_canonical();
+    throw unimpl();
   }
 
   // Create a value forward-reference.  Must turn into a function call later.
@@ -1294,8 +1310,7 @@ public class Parse implements Comparable<Parse> {
     UnresolvedNode fref = init(UnresolvedNode.forward_ref(tok,bad));
     // Place in nearest enclosing closure scope, this will keep promoting until we find the actual scope
     StructNode stk = scope().stk();
-    TypeFld fld = TypeFld.make(tok,TypeNil.SCALAR,Access.Final);
-    stk.add_fld(fld,fref,null);
+    stk.add_fld(tok,Access.Final,fref,null);
     return fref;
   }
   // Create a type forward-reference.  Must be type-defined later.  Called when

@@ -70,7 +70,7 @@ public class ScopeNode extends Node {
   @Override public boolean is_mem() { return true; }
 
   public Node get(String name) { return stk().in(name); }
-  public boolean is_mutable(String name) { return stk().get(name)._access==Access.RW; }
+  public boolean is_mutable(String name) { return stk().access(name)==Access.RW; }
 
   public RegionNode early_ctrl() { return (RegionNode)in(4); }
   public    PhiNode early_mem () { return (   PhiNode)in(5); }

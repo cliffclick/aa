@@ -117,7 +117,7 @@ public class SetFieldNode extends Node {
     // SetField directly against a Struct; just use the Struct.
     if( in0 instanceof StructNode st ) {
       int idx = st.find(_fld);
-      if( in(1) == st.in(idx) && st.get(idx)._access == _fin )
+      if( in(1) == st.in(idx) && st._accesses.at(idx) == _fin )
         return st; // Storing same over same, no change
 
       // TODO: When profitable to replicate a StructNode ?

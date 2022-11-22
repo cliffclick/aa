@@ -1511,8 +1511,8 @@ public class HM {
       if( id==null ) FIELDS.put(id=("&"+_uid).intern(),this);
       _id=id; 
     }
-    @Override SB str(SB sb) {   return  _ptr.str(sb).p(".").p(is_resolving(_id) ? "_" : _id); }
-    @Override SB p1(SB sb, VBitSet dups) { return sb.p(".").p(is_resolving(_id) ? "_" : _id); }
+    @Override SB str(SB sb) {   return  _ptr.str(sb).p(".").p(is_resolving() ? "_" : _id); }
+    @Override SB p1(SB sb, VBitSet dups) { return sb.p(".").p(is_resolving() ? "_" : _id); }
     @Override SB p2(SB sb, VBitSet visit, VBitSet dups) { return _ptr.p0(sb,visit,dups); }
     static boolean is_resolving(String id) { return id.charAt(0)=='&'; }
     boolean is_resolving() { return is_resolving(_id); }
@@ -1607,9 +1607,6 @@ public class HM {
     // Handler for missing field
     private Type missing_field(Alloc alloc) {
       T2 t2rec = alloc.t2().get("*");
-      // Not a ptr-to-record on the base alloc
-      if( t2rec == null )
-        return TypeNil.SCALAR;
       T2 t2fld = t2rec.arg(_id);
       // Field from wrong alias (ignore/XSCALAR should not affect GCP field type),
       if( t2fld==null ) {
@@ -1617,9 +1614,8 @@ public class HM {
         return TypeNil.SCALAR.oob(!HM_FREEZE);
       }
       // HMT tells us the field is missing
-      if( t2fld.is_err() )
-        return TypeNil.SCALAR;
-      return t2fld.as_flow(this,false);
+      assert t2fld.is_err();
+      return TypeNil.SCALAR;
     }
 
     @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) { work.add(this); }

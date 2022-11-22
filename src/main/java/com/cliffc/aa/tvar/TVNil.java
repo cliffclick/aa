@@ -1,5 +1,7 @@
 package com.cliffc.aa.tvar;
 
+import com.cliffc.aa.util.*;
+
 import static com.cliffc.aa.AA.unimpl;
 
 /** Polymorphic nil.
@@ -12,8 +14,19 @@ import static com.cliffc.aa.AA.unimpl;
  */
 public class TVNil extends TV3 {
   
-  public TVNil( TV3 tv3 ) {
-    _args = new TV3[]{tv3};
-  }
+  public TVNil( TV3 tv3 ) { super(true,tv3); }
   TV3 find_nil() { throw unimpl(); }
+  
+  // -------------------------------------------------------------
+  @Override void _union_impl(TV3 that) {
+    if( !(that instanceof TVBase base) ) throw unimpl();
+    throw unimpl();
+  }
+
+  @Override boolean _unify_impl(TV3 that, boolean test ) {
+    throw unimpl();
+  }
+  @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
+    return _args[0]._str(sb,visit,dups,debug).p('?');
+  }  
 }

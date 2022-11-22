@@ -15,40 +15,41 @@ import static com.cliffc.aa.AA.unimpl;
 
 // Sea-of-Nodes
 public abstract class Node implements Cloneable, IntSupplier {
-  static final byte OP_CALL   = 1;
-  static final byte OP_CALLEPI= 2;
-  static final byte OP_CAST   = 3;
-  static final byte OP_CON    = 4;
-  static final byte OP_CONTYPE= 5;
-  static final byte OP_CPROJ  = 6;
-  static final byte OP_ERR    = 7;
-  static final byte OP_FIELD  = 8;
-  static final byte OP_FRESH  = 9;
-  static final byte OP_FUN    =10;
-  static final byte OP_FUNPTR =11;
-  static final byte OP_IF     =12;
-  static final byte OP_JOIN   =13;
-  static final byte OP_KEEP   =14;
-  static final byte OP_LOAD   =15;
-  static final byte OP_NEW    =16; // Allocate a new struct
-  static final byte OP_PARM   =17;
-  static final byte OP_PHI    =18;
-  static final byte OP_PRIM   =19;
-  static final byte OP_PROJ   =20;
-  static final byte OP_REGION =21;
-  static final byte OP_RET    =22;
-  static final byte OP_ROOT   =23;
-  static final byte OP_SCOPE  =24;
-  static final byte OP_SETFLD =25;
-  static final byte OP_SPLIT  =26;
-  static final byte OP_STORE  =27;
-  static final byte OP_STRUCT =28;
-  static final byte OP_TYPE   =29;
-  static final byte OP_UNR    =30;
-  static final byte OP_VAL    =31;
-  static final byte OP_MAX    =32;
+  static final byte OP_BINDFP = 1;
+  static final byte OP_CALL   = 2;
+  static final byte OP_CALLEPI= 3;
+  static final byte OP_CAST   = 4;
+  static final byte OP_CON    = 5;
+  static final byte OP_CONTYPE= 6;
+  static final byte OP_CPROJ  = 7;
+  static final byte OP_ERR    = 8;
+  static final byte OP_FIELD  = 9;
+  static final byte OP_FRESH  =10;
+  static final byte OP_FUN    =11;
+  static final byte OP_FUNPTR =12;
+  static final byte OP_IF     =13;
+  static final byte OP_JOIN   =14;
+  static final byte OP_KEEP   =15;
+  static final byte OP_LOAD   =16;
+  static final byte OP_NEW    =17; // Allocate a new struct
+  static final byte OP_PARM   =18;
+  static final byte OP_PHI    =19;
+  static final byte OP_PRIM   =20;
+  static final byte OP_PROJ   =21;
+  static final byte OP_REGION =22;
+  static final byte OP_RET    =23;
+  static final byte OP_ROOT   =24;
+  static final byte OP_SCOPE  =25;
+  static final byte OP_SETFLD =26;
+  static final byte OP_SPLIT  =27;
+  static final byte OP_STORE  =28;
+  static final byte OP_STRUCT =29;
+  static final byte OP_TYPE   =30;
+  static final byte OP_UNR    =31;
+  static final byte OP_VAL    =32;
+  static final byte OP_MAX    =33;
 
-  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "ConType", "CProj", "Err", "Field", "Fresh", "Fun", "FunPtr", "If", "Join", "Keep", "Load", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Root", "Scope","SetFld","Split", "Store", "Struct", "Type", "Unresolved", "Val" };
+  private static final String[] STRS = new String[] { null, "BindFP", "Call", "CallEpi", "Cast", "Con", "ConType", "CProj", "Err", "Field", "Fresh", "Fun", "FunPtr", "If", "Join", "Keep", "Load", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Root", "Scope","SetFld","Split", "Store", "Struct", "Type", "Unresolved", "Val" };
   static { assert STRS.length==OP_MAX; }
 
   // Unique dense node-numbering
@@ -537,9 +538,10 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // HM changes; push related neighbors
   public void add_work_hm() {
-    tvar().add_deps_flow();
-    for( Node def : _defs ) if( def!=null && def.has_tvar() ) Env.GVN.add_flow(def);
-    for( Node use : _uses ) if( use!=null && use.has_tvar() ) Env.GVN.add_flow(use);
+    // TODO: rethink how deps work in SSA
+    //tvar().add_deps_flow();
+    //for( Node def : _defs ) if( def!=null && def.has_tvar() ) Env.GVN.add_flow(def);
+    //for( Node use : _uses ) if( use!=null && use.has_tvar() ) Env.GVN.add_flow(use);
   }
 
   // Do One Step of forwards-dataflow analysis.  Assert monotonic progress.
@@ -588,7 +590,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( _live== Type.ANY ) return; // No HM progress on dead code
     if( _val == Type.ANY ) return; // No HM progress on untyped code
     TV3 old = _tvar==null ? null : tvar();
-    if( old!=null && old.is_err() ) return;  // No unifications with error
+    if( old instanceof TVErr ) return;  // No unifications with error
     if( unify(false) ) {
       assert old==null || !_tvar.debug_find().unify(old.debug_find(),true);// monotonic: unifying with the result is no-progress
       add_work_hm();            // Neighbors on worklist

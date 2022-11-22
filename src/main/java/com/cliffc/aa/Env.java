@@ -1,7 +1,7 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
-import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.VBitSet;
 
@@ -121,8 +121,8 @@ public class Env implements AutoCloseable {
   Env( Env par, FunNode fun, boolean is_closure, Node ctrl, Node mem, Node dsp_ptr, StructNode fref ) {
     _par = par;
     _fun = fun;
-    StructNode dsp = fref==null ? new StructNode(is_closure,false,null, TypeStruct.ISUSED).init() : fref;
-    dsp.add_fld(TypeFld.make_dsp(dsp_ptr._val),dsp_ptr,null);
+    StructNode dsp = fref==null ? new StructNode(is_closure,false,null, "", Type.ALL).init() : fref;
+    dsp.add_fld("^",TypeFld.Access.Final,dsp_ptr,null);
     NewNode nnn = new NewNode(mem,dsp).init();
     mem = new MProjNode(nnn).init();
     Node ptr = new ProjNode(nnn,REZ_IDX).init();
@@ -227,7 +227,7 @@ public class Env implements AutoCloseable {
     unhook_last(CTL_0);
     unhook_last(MEM_0);
     GVN.iter_dead();
-    TV2.reset_to_init0();
+    TV3.reset_to_init0();
     Node.VALS.clear();          // Clean out hashtable
     GVN.flow_clear();
     ROOT.walk_reset();          // Clean out any wired prim calls

@@ -6,6 +6,8 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.util.Util;
+import static com.cliffc.aa.type.TypeFld.Access;
+
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -232,9 +234,9 @@ public class TestNode {
     //test1monotonic_intrinsic(new NewStrNode.ConvertF64Str());
     //test1monotonic_intrinsic(new NewStrNode.AddStrStr());
     test1monotonic(new   LoadNode(_ins[1],_ins[2],null));
-    StructNode nnn1 = new StructNode(false,false,null,TypeStruct.ISUSED);
-    set_type(1,TypeNil.SCALAR);  nnn1.add_fld(TypeFld.make("x"),_ins[1],null);
-    set_type(2,TypeNil.SCALAR);  nnn1.add_fld(TypeFld.make("y"),_ins[2],null);
+    StructNode nnn1 = new StructNode(false,false,null,"",Type.ALL);
+    set_type(1,TypeNil.SCALAR);  nnn1.add_fld("x",Access.Final,_ins[1],null);
+    set_type(2,TypeNil.SCALAR);  nnn1.add_fld("y",Access.Final,_ins[2],null);
     test1monotonic(nnn1);
     ((ConNode<Type>)_ins[1])._t = TypeNil.SCALAR; // ParmNode reads this for _alltype
     test1monotonic(new   ParmNode( 1,(FunNode)_ins[0],null,null,(ConNode)_ins[1]).add_def(_ins[2]));

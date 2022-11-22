@@ -121,7 +121,8 @@ public class UnresolvedNode extends Node {
     // Giant assert that all inputs are all Fun or Val constructors, ignoring errors.
     for( int i=1; i<len(); i++ ) {
       TV3 tv = tvar(i);
-      assert tv.is_err() || tv.is_fun() || tv.is_leaf() || tv.is_obj();
+      //assert tv.is_err() || tv.is_fun() || tv.is_leaf() || tv.is_obj();
+      throw unimpl();
     }
     return false;
   }

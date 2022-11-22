@@ -27,10 +27,10 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_HMT=true;
-    DO_GCP=false;
+    DO_GCP=true;
+    DO_HMT=false;
     RSEED=0;
-    test("x=3; mul2={x -> x*2}; mul2(2.1)", "flt:4.2","flt:4.2"); // must inline to resolve overload {*}:Flt with I->F conversion
+    test("!1", "xnil", "A?");
   }
 
   @Test public void testParse00() {

@@ -42,9 +42,9 @@ public class TestLive {
     ConNode fdy = new ConNode(TypeInt.con(9)).init();
 
     // New object, fields x,y holding ints
-    StructNode obj = new StructNode(false,false,null,TypeStruct.ISUSED);
-    obj.add_fld(TypeFld.make("x"),fdx,null);
-    obj.add_fld(TypeFld.make("y"),fdy,null);
+    StructNode obj = new StructNode(false,false,null,"",Type.ALL);
+    obj.add_fld("x",TypeFld.Access.Final,fdx,null);
+    obj.add_fld("y",TypeFld.Access.Final,fdy,null);
     obj.close().init();
 
     NewNode nnn = new NewNode(mmm,obj).init();

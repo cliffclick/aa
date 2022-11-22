@@ -2,7 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
-import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.*;
@@ -559,7 +559,7 @@ public final class CallEpiNode extends Node {
 
   private boolean bad_arg_cnt(boolean test) {
     TV3 self = tvar();
-    if( self.is_err() ) return false;
+    if( self instanceof TVErr ) return false;
     if( !test ) {
       //self._err = "Bad argument count";
       //self.add_deps_work(work); // Error removes apply_lift

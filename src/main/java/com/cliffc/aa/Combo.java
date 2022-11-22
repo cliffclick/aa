@@ -1,7 +1,6 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.Node;
-import com.cliffc.aa.node.StructNode;
 import com.cliffc.aa.util.VBitSet;
 
 /** Combined Global Constant Propagation and Hindly-Milner with extensions.
@@ -130,8 +129,6 @@ public abstract class Combo {
 
     // Set all values to ANY and lives to DEAD, their most optimistic types.
     // Set all type-vars to Leafs.
-    for( StructNode n : Env.PROTOS.values() )
-      n.set_tvar();           // Set prototypes early, so instances can find
     Env.ROOT.walk_initype();
 
     // Make the non-gen set in a pre-pass

@@ -28,10 +28,11 @@ public class TestHM {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_HMT=true;
+    // F/T/0 d_struct_err_07
+    DO_HMT=false;
     DO_GCP=true;
     RSEED=0;
-    e_recur_struct_03();
+    d_struct_err_05();
   }
 
   private void _run0s( String prog, String rprog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {

@@ -547,7 +547,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   public Type at( String name ) { return get(name)._t; }
 
   // Field by index, null after end
-  public TypeFld get( int idx ) { return idx < _flds.length ? _flds[idx] : null; }
+  public TypeFld fld( int idx ) { return idx < _flds.length ? _flds[idx] : null; }
+  public TypeFld get( int idx ) { return fld(idx); }
   // Field type by index, AIOOBE if field not found
   public Type at( int idx ) { return _flds[idx]._t; }
 

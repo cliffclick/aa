@@ -1,7 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
-import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.Util;
@@ -56,26 +56,34 @@ public abstract class PrimNode extends Node {
     if( PRIMS!=null ) return PRIMS;
 
     // int opers
-    PrimNode[] INTS = new PrimNode[]{
-      new MinusI64(), new NotI64(),
-      new MulI64 (), new DivI64 (), new MulIF64(), new DivIF64(), new ModI64(),
-      new AddI64 (), new SubI64 (), new AddIF64(), new SubIF64(),
-      new LT_I64 (), new LE_I64 (), new GT_I64 (), new GE_I64 (),
-      new LT_IF64(), new LE_IF64(), new GT_IF64(), new GE_IF64(),
-      new EQ_I64 (), new NE_I64 (),
-      new EQ_IF64(), new NE_IF64(),
-      new AndI64 (), new AndThen(),
-      new OrI64  (), new OrElse(),
+    PrimNode[][] INTS = new PrimNode[][]{
+      { new AddI64(), new AddIF64() },
+      { new SubI64(), new SubIF64() },
+      { new MulI64(), new MulIF64() },
+      { new DivI64(), new DivIF64() },
+      { new LT_I64(), new LT_IF64() },
+      { new LE_I64(), new LE_IF64() },
+      { new GT_I64(), new GT_IF64() },
+      { new GE_I64(), new GE_IF64() },
+      { new EQ_I64(), new EQ_IF64() },
+      { new NE_I64(), new NE_IF64() },
+      { new MinusI64() }, { new NotI64() }, { new ModI64() },
+      { new AndI64() }, { new OrI64  () },
+      { new AndThen() }, { new OrElse() },
     };
 
-    PrimNode[] FLTS = new PrimNode[]{
-      new MinusF64(),
-      new MulF64 (), new DivF64 (), new MulFI64(), new DivFI64(),
-      new AddF64 (), new SubF64 (), new AddFI64(), new SubFI64(),
-      new LT_F64 (), new LE_F64 (), new GT_F64 (), new GE_F64 (),
-      new LT_FI64(), new LE_FI64(), new GT_FI64(), new GE_FI64(),
-      new EQ_F64 (), new NE_F64 (),
-      new EQ_FI64(), new NE_FI64()
+    PrimNode[][] FLTS = new PrimNode[][]{
+      { new AddF64(), new AddFI64() },
+      { new SubF64(), new SubFI64() },
+      { new MulF64(), new MulFI64() },
+      { new DivF64(), new DivFI64() },
+      { new LT_F64(), new LT_FI64() },
+      { new GE_F64(), new GE_FI64() },
+      { new LE_F64(), new LE_FI64() },
+      { new GT_F64(), new GT_FI64() },
+      { new EQ_F64(), new EQ_FI64() },
+      { new NE_F64(), new NE_FI64() },
+      { new MinusF64() },
     };
     // Other primitives, not binary operators
     PrimNode rand = new RandI64();
@@ -97,16 +105,16 @@ public abstract class PrimNode extends Node {
     // Gather
     Ary<PrimNode> allprims = new Ary<>(others);
     for( PrimNode prim : others ) allprims.push(prim);
-    for( PrimNode prim : INTS   ) allprims.push(prim);
-    for( PrimNode prim : FLTS   ) allprims.push(prim);
+    for( PrimNode prims[] : INTS   ) for( PrimNode prim : prims ) allprims.push(prim);
+    for( PrimNode prims[] : FLTS   ) for( PrimNode prim : prims ) allprims.push(prim);
     PRIMS = allprims.asAry();
 
     // Build the int and float types and prototypes
-    install("int",INTS,TypeStruct.INT);
-    install("flt",FLTS,TypeStruct.FLT);
+    Env.STK_0.add_fld("flt",Access.Final,make_prim("flt",FLTS,TypeStruct.FLT),null);
+    Env.STK_0.add_fld("int",Access.Final,make_prim("int",INTS,TypeStruct.INT),null);
 
     // Math package
-    install_math(rand);
+    Env.STK_0.add_fld("math",Access.Final,make_math(rand),null);
 
     return PRIMS;
   }
@@ -122,26 +130,10 @@ public abstract class PrimNode extends Node {
   public static long   unwrap_ii(Type t) { return t==TypeNil.XNIL ? 0 : unwrap_i(t).getl(); }
   public static double unwrap_ff(Type t) { return unwrap_f(t).getd(); }
 
-  // Make and install a primitive Clazz.
-  private static void install( String s, PrimNode[] prims, TypeStruct canonical_prim ) {
-    String tname = (s+":").intern();
-    StructNode rec = new StructNode(false,false,null, TypeStruct.make(tname,canonical_prim._def));
-    for( PrimNode prim : prims ) prim.as_fun(rec,true);
-    for( Node n : rec._defs )
-      if( n instanceof UnresolvedNode unr )
-        Env.GVN.add_work_new(unr.define()); // Flag all overloaded prims as being known
-    rec.init();
-    rec.close();
-    Env.PROTOS.put(tname,rec);     // clazz String -> clazz Struct mapping, for values
-    Env.SCP_0.add_type(tname,rec); // type  String -> clazz Struct mapping, for types
-    // Inject the primitive class into scope above top-level display
-    alloc_inject(rec,s);
-  }
-
   // Primitive wrapped as a simple function.
   // Fun Parm_dsp [Parm_y] prim Ret
   // No memory, no RPC.  Display is first arg.
-  private void as_fun( StructNode rec, boolean is_oper ) {
+  private FunPtrNode as_fun( boolean is_oper ) {
     if( is_oper ) Oper.make(_name,_is_lazy);
 
     FunNode fun = new FunNode(this,_name);
@@ -170,32 +162,37 @@ public abstract class PrimNode extends Node {
     // Return the result
     RetNode ret = new RetNode(zctrl,zmem,zrez,rpc,fun).init();
     // FunPtr is UNBOUND here, will be bound when loaded thru a named struct to the Clazz.
-    FunPtrNode fptr = new FunPtrNode(_name,ret,Env.ALL).init();
-    rec.add_fun(_name,Access.Final,fptr,null);
+    return new FunPtrNode(_name,ret,Env.ALL).init();
+  }
+
+  // Make and install a primitive Clazz.
+  private static StructNode make_prim( String s, PrimNode[][] primss, TypeStruct canonical_prim ) {
+    String tname = (s+":").intern();
+    StructNode rec = new StructNode(false,false,null, canonical_prim._clz, canonical_prim._def);
+    for( PrimNode[] prims : primss ) {
+      StructNode over = new StructNode(false,false,null,"",Type.ALL);
+      int cnt=0;
+      for( PrimNode prim : prims )
+        over.add_fld((""+cnt++).intern(),Access.Final,prim.as_fun(true),null);
+      over.init();
+      over.close();
+      rec.add_fld(prims[0]._name,Access.Final,over,null);
+    }
+    rec.init();
+    rec.close();
+    Env.PROTOS.put(tname,rec);     // clazz String -> clazz Struct mapping, for values
+    Env.SCP_0.add_type(tname,rec); // type  String -> clazz Struct mapping, for types
+    return rec;
   }
 
   // Build and install match package
-  private static void install_math(PrimNode rand) {
-    StructNode rec = new StructNode(false,false,null,TypeStruct.ISUSED);
-    rand.as_fun(rec,false);
-    Type pi = make_wrap(TypeFlt.PI);
-    rec.add_fld(TypeFld.make("pi",pi),Node.con(pi),null);
+  private static StructNode make_math(PrimNode rand) {
+    StructNode rec = new StructNode(false,false,null,"",Type.ALL);
+    rec.add_fld("pi",Access.Final,Node.con(make_wrap(TypeFlt.PI)),null);
+    rec.add_fld(rand._name,Access.Final,rand.as_fun(false),null);
+    rec.init();
     rec.close();
-    Env.GVN.init(rec);
-    alloc_inject(rec,"math");
-  }
-
-  // Allocate and inject above top display
-  private static void alloc_inject(StructNode rec, String name) {
-    // Inject the primitive class above top-level display
-    Node mem = Env.SCP_0.mem();
-    NewNode dsp = (NewNode)mem.in(0);
-    NewNode nnn = new NewNode(dsp.mem(),rec).init(); // Allocate primitive clazz; they have memory
-    dsp.set_def(MEM_IDX,new MProjNode(nnn).init());
-    Node ptr = new ProjNode(nnn,REZ_IDX).init();
-    Env.STK_0.add_fld(TypeFld.make(name,ptr._val),ptr,null);
-    dsp.xval();
-    mem.xval();
+    return rec;
   }
 
 
@@ -229,19 +226,24 @@ public abstract class PrimNode extends Node {
 
   @Override public boolean has_tvar() { return true; }
 
-  // In the test HM, All primitives are effectively H-M Applies with a hidden
-  // internal Lambda.  Here there is already a wrapper Lambda, and the
-  // primitive computes a result.
-  @Override public boolean unify( boolean test ) {
-    TV3 self = tvar();
-    //if( !self.is_copy() && self.is_obj() && self.arg(" def")._tflow==((TypeStruct)_tfp._ret)._def )
-    //  return false;             // Already unified
-    //if( !self.is_copy() && self.is_leaf() && _tfp._ret==TypeNil.SCALAR )
-    //  return false;             // Already a leaf
-    //// TODO: unify input args to formals
-    //return test || self.unify(TV3.make(_tfp._ret,"PrimNode_create").clr_cp(),test);
-    throw unimpl();
+  // In the test HM, all primitives are a Lambda without a body.  Here they are
+  // effectively Applies/Calls and the primitive computes a result.
+  @Override public void set_tvar() {
+    if( _tvar==null ) {
+      // Return is some primitive, and is typically never a copy
+      _tvar = new TVBase(false,_ret); 
+      // All arguments are pre-unified the dual-formal (so very high Bases).
+      // They will probably fall, but as long as they stay above the formals
+      // they are ok.
+      for( int i=DSP_IDX; i<_formals.len(); i++ ) {
+        in(i-DSP_IDX).set_tvar();
+        tvar(i-DSP_IDX).unify(new TVBase(true,_formals.at(i).dual()),false);
+      }
+    }
   }
+  
+  // All work done in set_tvar, no need to unify
+  @Override public boolean unify( boolean test ) { return false; }
 
   @Override public ErrMsg err( boolean fast ) {
     for( int i=DSP_IDX; i<_formals.len(); i++ ) {
@@ -592,6 +594,25 @@ public abstract class PrimNode extends Node {
       }
     }
 
+    // Pre-cook type: { A? { -> B } -> B? }
+    // Bind display to A?
+    // Bind arg3 to { -> B } and return to B?
+    @Override public void set_tvar() {
+      if( _tvar!=null ) return;
+      TVLeaf b = new TVLeaf();
+      _tvar = new TVNil(b);     // Result is B?
+      // Unify display to A?
+      in(DSP_IDX).set_tvar();
+      tvar(DSP_IDX).unify(new TVNil(new TVLeaf()),false);
+      // Unify arg3 to { -> B }
+      in(ARG_IDX).set_tvar();
+      TVLambda lam = new TVLambda(0); // No args
+      lam.set_ret(b);                 // { -> B }
+      tvar(ARG_IDX).unify(lam,false);
+    }
+    // All work done in set_tvar, no need to unify
+    @Override public boolean unify( boolean test ) { return false; }
+    
     // Unify trailing result ProjNode with the AndThen directly.
     @Override public boolean unify_proj( ProjNode proj, boolean test ) {
       assert proj._idx==REZ_IDX;
@@ -644,7 +665,27 @@ public abstract class PrimNode extends Node {
         return this;
       }
     }
-    // Unify trailing result ProjNode with the OrElse directly.
+    
+    // Pre-cook type: { A { -> A } -> A }
+    // Bind display to A
+    // Bind arg3 to { -> A } and return to A
+    @Override public void set_tvar() {
+      if( _tvar!=null ) return;
+      TVLeaf a = new TVLeaf();
+      _tvar = a;
+      // Unify display to A
+      in(DSP_IDX).set_tvar();
+      tvar(DSP_IDX).unify(a,false);
+      // Unify arg3 to { -> A }
+      in(ARG_IDX).set_tvar();
+      TVLambda lam = new TVLambda(0); // No args
+      lam.set_ret(a);                 // { -> a }
+      tvar(ARG_IDX).unify(lam,false);
+    }
+    // All work done in set_tvar, no need to unify
+    @Override public boolean unify( boolean test ) { return false; }
+    
+    // Unify trailing result ProjNode with the AndThen directly.
     @Override public boolean unify_proj( ProjNode proj, boolean test ) {
       assert proj._idx==REZ_IDX;
       return tvar().unify(proj.tvar(),test);

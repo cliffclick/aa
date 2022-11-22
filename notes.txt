@@ -1,4 +1,18 @@
 =======================================
+11/18/2022
+
+Main code base:
+probably need to drop Unresolved.
+Use 'Field' with unresolved label for forward-refs.
+Upon seeing a f-ref, add var in scope, pointing to empty tuple.
+When using the f-ref, insert unresolved Field in the code, reading from the tuple.
+When finally def'ing, insert function in the tuple.
+
+Of course, loading from unresolved is not used in normal code.
+So the tuple has to be flagged as a fref tuple?
+
+
+=======================================
 11/16/2022
 
 Overloads solved (H-M resolves unknown field, but user syntax for unknown field).

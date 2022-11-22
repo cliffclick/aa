@@ -493,7 +493,7 @@ public class TestNodeSmall {
     // The file-scope display closing the graph-cycle.  Needs the FunPtr, not
     // yet built.
     ConNode dsp_prims = new ConNode<>(TypeMemPtr.DISP_SIMPLE).init();
-    StructNode dsp_file = new StructNode(true,false,null,TypeStruct.ISUSED).add_fld(TypeMemPtr.DISP_FLD,dsp_prims,null).init();
+    StructNode dsp_file = new StructNode(true,false,null,"",Type.ALL).add_fld("^",Access.Final,dsp_prims,null).init();
     NewNode dsp_file_new = new NewNode(mem,dsp_file).init();
     ProjNode dsp_file_mem = new MProjNode(dsp_file_new).init();
     ProjNode dsp_file_ptr = new ProjNode(REZ_IDX,dsp_file_new).init();
@@ -508,7 +508,7 @@ public class TestNodeSmall {
     FunPtrNode fptr = new FunPtrNode(ret,dsp_file_ptr).init();
     fptr._name = "fact";
     // Close the cycle
-    dsp_file.add_fld(TypeFld.make("fact",fptr._val),fptr,null);
+    dsp_file.add_fld("fact",Access.Final,fptr,null);
     dsp_file.close();
     // Return the fptr to keep all alive
     ScopeNode env = new ScopeNode(true);

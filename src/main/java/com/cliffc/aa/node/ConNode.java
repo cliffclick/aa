@@ -35,10 +35,10 @@ public class ConNode<T extends Type> extends Node {
   }
 
   @Override public void set_tvar() {
-    assert _tvar==null;
-    _tvar = _t==TypeNil.XNIL
-      ? new TVNil( new TVLeaf() ) // xnil gets a HM nilable instead of a base
-      : new TVBase(_t);
+    if( _tvar == null )
+      _tvar = _t==TypeNil.XNIL
+        ? new TVNil( new TVLeaf() ) // xnil gets a HM nilable instead of a base
+        : new TVBase(true,_t);
   }
   
   @Override public boolean unify( boolean test ) {

@@ -24,6 +24,18 @@ import static com.cliffc.aa.AA.unimpl;
  * See HM.java for a simplified complete implementation.  The HM T2 class uses
  * a "soft class" implementation notion: Strings are used to denote java-like
  * classes.  This implementation uses concrete Java classes.
+ *
+ * BNF for the "core AA" pretty-printed types:
+ *    T = Vnnn               | // Leaf number nnn
+ *        Xnnn>>T            | // Unified; lazily collapsed with 'find()' calls
+ *        base               | // any lattice element, all are nilable
+ *        T0?T1              | // T1 is a not-nil T0; stacked not-nils collapse
+ *        { T* -> Tret }     | // Lambda, arg count is significant
+ *        *T0                | // Ptr-to-struct; T0 is either a leaf, or unified, or a struct
+ *        @{ (label = T;)* } | // ';' is a field-separator not a field-end
+ *        @{ (_nnn = T;)* }  | // Some field labels are inferred; nnn is the Field uid, and will be inferred to the actual label
+ *        [Error base* T0*]  | // A union of base and not-nil, lambda, ptr, struct
+ *
  */
 
 abstract public class TV3 {
@@ -36,21 +48,18 @@ abstract public class TV3 {
   private TV3 _uf=null;
 
   // Outgoing edges for structural recursion.
-  TV3[] _args = null;
+  final TV3[] _args;
+
+  // All uses of this type-var are value-equivalent to the def.
+  // Makes a one-shot transition from true to false.
+  boolean _is_copy = true;
+  
+  //
+  TV3() { _args=null; }
+  TV3( boolean is_copy, TV3... args ) { _is_copy = is_copy; _args=args; }
   
   // True if this a set member not leader.  Asserted for in many places.
   public boolean unified() { return _uf!=null; }
-  // True if this is a normal Leaf Type Variable
-  public boolean is_leaf() { return false; }
-  // True if this is a ground term from GCP, e.g. int, flt, string
-  public boolean is_base() { return false; }
-  // True if this is a function
-  public boolean is_fun() { return false; }
-  // True if this is a struct
-  public boolean is_obj() { return false; }
-  // True if this term contains type errors
-  public boolean is_err () { return false; }
-  
   
   // Find the leader, without rollup.  Used during printing.
   public TV3 debug_find() {
@@ -65,7 +74,7 @@ abstract public class TV3 {
   public TV3 find() {
     if( _uf    ==null ) return this;// Shortcut, no rollup
     if( _uf._uf==null ) return _uf; // Unrolled once shortcut, no rollup
-    TV3 leader = _find();           // No shortcut\
+    TV3 leader = _find();           // No shortcut
     // Additional read-barrier for TVNil to collapse nil-of-something
     return leader instanceof TVNil tnil ? tnil.find_nil() : leader;
   }
@@ -77,18 +86,64 @@ abstract public class TV3 {
     return leader;
   }
 
+  // Fetch a specific arg index, with rollups
+  TV3 _find( int i ) {
+    TV3 arg = _args[i], u = arg.find();
+    return u==arg ? u : (_args[i]=u);
+  }
+
   // -----------------
+  // U-F union; this becomes that; returns 'that'.
+  // No change if only testing, and reports progress.
+  boolean union(TV3 that, boolean test) {
+    assert !unified() && !that.unified(); // Cannot union twice
+    if( this==that ) return false;
+    if( test ) return true;     // Report progress without changing
+    _uf = that;                 // U-F union
+    that._is_copy &= _is_copy;  // Both must be is_copy to keep is_copy
+    _union_impl(that);          // Merge subclass specific bits
+    return true;
+  }
+
+  // Merge subclass specific bits
+  abstract void _union_impl(TV3 that);
+  
+  // -------------------------------------------------------------
   // Classic Hindley-Milner structural unification.
   // Returns false if no-change, true for change.
   // If test, does not actually change anything, just reports progress.
   // If test and change, unifies 'this' into 'that' (changing both), and
   // updates the worklist.
+
+  // Supports iso-recursive types, nilable, overload field resolution, and the
+  // normal HM structural recursion.
+  static private final NonBlockingHashMapLong<TV3> DUPS = new NonBlockingHashMapLong<>();
   public boolean unify( TV3 that, boolean test ) {
-    throw unimpl();
+    if( this==that ) return false;
+    assert DUPS.isEmpty();
+    boolean progress = _unify(that,test);
+    DUPS.clear();
+    return progress;
   }
   
+  // Structural unification, 'this' into 'that'.  No change if just testing and
+  // returns a progress flag.  If updating, both 'this' and 'that' are the same
+  // afterwards.
+  private boolean _unify(TV3 that, boolean test) {
+    assert !unified() && !that.unified();
+    if( this==that ) return false;    
+    // Any leaf immediately unifies with any non-leaf; triangulate
+    if( that instanceof TVLeaf )
+      return that._unify_impl(this,test);
+    // Ask subclass unification
+    return _unify_impl(that,test);
+  }
 
+  abstract boolean _unify_impl(TV3 that, boolean test);
+  
+  // -------------------------------------------------------------
   public boolean fresh_unify( TV3 that, TV3[] nongen, boolean test ) {
+    if( this==that ) return false;
     throw unimpl();
   }
 
@@ -113,7 +168,8 @@ abstract public class TV3 {
     } else {
       if( _args != null )
         for( TV3 tv3 : _args )  // Edge lookup does NOT 'find()'
-          tv3._get_dups(visit,dups);
+          if( tv3!=null )
+            tv3._get_dups(visit,dups);
     }
     return dups;
   }
@@ -137,26 +193,37 @@ abstract public class TV3 {
   SB _str(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     boolean dup = dups.get(_uid);
     if( !debug && unified() ) return find().str(sb,visit,dups,false);
-    if( unified() || is_leaf() ) {
-      vname(sb,debug);
+    if( unified() || this instanceof TVLeaf ) {
+      vname(sb,debug,true);
       return unified() ? _uf.str(sb.p(">>"), visit, dups, debug) : sb;
     }
 
     // Dup printing for all but bases (which are short, just repeat them)
-    if( dup && (debug || !is_base() || is_err()) ) {
-      vname(sb,debug);        // Leading V123
+    if( dup && (debug || !(this instanceof TVBase) || this instanceof TVErr) ) {
+      vname(sb,debug,false);            // Leading V123
       if( visit.tset(_uid) ) return sb; // V123 and nothing else
-      sb.p(':');              // V123:followed_by_type_descr
+      sb.p(':');                        // V123:followed_by_type_descr
     }
-    throw unimpl();
+    if( !_is_copy ) sb.p('%');
+
+    return _str_impl(sb,visit,dups,debug);    
+  }
+
+  // Generic structural TV3
+  SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
+    sb.p(getClass().getSimpleName()).p("( ");
+    if( _args!=null )
+      for( TV3 tv3 : _args )
+        tv3._str(sb,visit,dups,debug).p(" ");
+    return sb.unchar().p(")");    
   }
   
   // Pick a nice tvar name.  Generally: "A" or "B" or "V123" for leafs,
   // "X123" for unified but not collapsed tvars.
-  private void vname( SB sb, boolean debug) {
-    final boolean vuid = debug && (unified()||is_leaf());
+  private void vname( SB sb, boolean debug, boolean uni_or_leaf) {
+    final boolean vuid = debug && uni_or_leaf;
     sb.p(VNAMES.computeIfAbsent((long) _uid,
-                                (k -> (vuid ? ((is_leaf() ? "V" : "X") + k) : ((++VCNT) - 1 + 'A' < 'V' ? ("" + (char) ('A' + VCNT - 1)) : ("V" + VCNT))))));
+                                (k -> (vuid ? ((unified() ? "X" : "V") + k) : ((++VCNT) - 1 + 'A' < 'V' ? ("" + (char) ('A' + VCNT - 1)) : ("V" + VCNT))))));
   }
   
   // Debugging tool
@@ -171,5 +238,6 @@ abstract public class TV3 {
     //return null;
     throw unimpl();
   }
-  static void reset() { CNT=0; }
+  
+  public static void reset_to_init0() { CNT=0; }
 }

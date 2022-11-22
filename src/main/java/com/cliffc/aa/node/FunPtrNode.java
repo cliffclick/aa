@@ -52,7 +52,7 @@ public final class FunPtrNode extends Node {
   // Explicitly, no display
   public  FunPtrNode( String name, RetNode ret ) { this(name,ret, Env.ANY ); }
   // Display (already fresh-loaded) but no name.
-  public  FunPtrNode( RetNode ret, Node display ) { this(ret.fun()._name,ret,display); }
+  public  FunPtrNode( Node ret, Node display ) { this(((RetNode)ret).fun()._name,((RetNode)ret),display); }
   public RetNode ret() { return in(0)==null ? null : (RetNode)in(0); }
   public Node display(){ return in(1); }
   public FunNode fun() { return ret().fun(); }
@@ -140,50 +140,34 @@ public final class FunPtrNode extends Node {
 
   @Override public boolean has_tvar() { return true; }
 
+  @Override public void set_tvar() {
+    if( _tvar!=null ) return;
+    // Display is included in the argument count
+    TVLambda lam = new TVLambda(nargs()-AA.DSP_IDX); _tvar = lam;
+    Node rez = ret().rez();
+    rez.set_tvar();
+    lam.set_ret(rez.tvar());
+  }
+
   // Implements class HM.Lambda unification.
   @Override public boolean unify( boolean test ) {
-    boolean progress = false;
     RetNode ret = ret();
     if( ret.is_copy() ) return false; // GENSYM
     FunNode fun = ret.fun();
     ParmNode[] parms = fun.parms();
-    TV3 self = tvar();
-
-    if( !self.is_fun() ) {      // Force a function if not already
-      if( test ) return true;
-      TV3[] tv3s = new TV3[parms.length+1];
-      for( int i=DSP_IDX; i<parms.length; i++ ) {
-        ParmNode parm = parms[i];
-        assert parm==null || (parm._idx==i && parm.has_tvar());
-        tv3s[i] = parm!=null ? parm.tvar() : new TVLeaf();
-      }
-      
-      tv3s[parms.length] = ret.rez().tvar(); // Return last slot
-      //self.unify(TV3.make_fun("FunPtr_unify",false,tv3s),test);
-      //self = self.find();
-      //assert self.is_fun();
-      //progress = true;
-      throw unimpl();
-    }
+    TVLambda lam = (TVLambda)tvar();
 
     // Each normal argument from the parms directly
-    for( int i=ARG_IDX; i<parms.length; i++ )
+    boolean progress = false;
+    for( int i=DSP_IDX; i<parms.length; i++ )
+      // Parms can be missing (and display might not support a TVar)
       if( parms[i]!=null ) {
-        //if( self.arg(TV2.argname(i)).unify(parms[i].tvar(), test) ) {
-        //  if( test ) return true;
-        //  progress = true;
-        //  assert !self.is_unified(); // Probably need a FIND here
-        //}
-        throw unimpl();
+        progress |= lam.arg(i-DSP_IDX).unify(parms[i].tvar(),test);
+        if( test && progress ) return true;
       }
-    //progress |= self.arg(" ret").unify(ret.rez().tvar(),test);
-    //
-    //// FunPtr also does Apply unification, for JUST the display argument.
-    //if( display().has_tvar() )
-    //  progress |= self.arg(TV2.argname(DSP_IDX)).unify(display().tvar(),test);
-    //
-    //return progress;
-    throw unimpl();
+    progress |= lam.ret().unify(ret.rez().tvar(),test);
+
+    return progress;
   }
 
   // HM changes; push related neighbors
