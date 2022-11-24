@@ -147,7 +147,9 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     return _str_nil(sb.p('}'));
   }
 
-  @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return _ret._str_complex(visit,dups); }
+  @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) {
+    return this!=_ret && _ret._str_complex(visit,dups);
+  }
 
   static TypeFunPtr valueOf(Parse P, String cid, boolean any) {
     BitsFun pos = P.bits(BitsFun.EMPTY);
@@ -281,15 +283,17 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     TypeFunPtr tfp = malloc(any,nil,sub,pos,nargs,dsp,null);
     tfp._ret = tfp;             // Make a self-cycle of length 1
     assert dsp._hash!=0;        // Can be 'compute_hash'
+    tfp._cyc_hash = tfp.static_hash(); // Cycle hash is the XOR of all static hashes
     tfp._hash = tfp.compute_hash();
     TypeFunPtr old = (TypeFunPtr)tfp.intern_get(); // Intern check
     if( old!=null )                                // Return prior hit
       return POOLS[TFUNPTR].free(tfp,old);         // Return prior
-    tfp._dual = tfp.xdual();                       // Install dual in a self-cycle
-    tfp._dual._dual = tfp;
-    tfp._dual._ret = tfp._dual;
-    tfp._dual._hash = tfp._dual.compute_hash();
-    return tfp.retern()._dual.retern().dual();     // Install self-cycle
+    TypeFunPtr tfpd = tfp._dual = tfp.xdual(); // Install dual in a self-cycle
+    tfpd._dual = tfp;
+    tfpd._ret = tfpd;
+    tfpd._cyc_hash = tfpd.static_hash(); // Cycle hash is the XOR of all static hashes
+    tfpd._hash = tfpd.compute_hash();
+    return tfp.retern()._dual.retern().dual(); // Install self-cycle
   }
 
   // Allocate and init

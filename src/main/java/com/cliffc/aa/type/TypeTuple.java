@@ -1,7 +1,9 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.*;
-import static com.cliffc.aa.AA.*;
+import com.cliffc.aa.util.NonBlockingHashMapLong;
+import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.Util;
+import com.cliffc.aa.util.VBitSet;
 
 // Internal fixed-length non-recursive tuples.  Used for function arguments,
 // and multi-arg results like IfNode and CallNode.  This is not the same as a
@@ -19,9 +21,9 @@ public class TypeTuple extends Type<TypeTuple> {
 
   // If visit is null, children have had their hash already computed.
   // If visit is not null, children need to be recursively visited.
-  @Override public long static_hash( ) { throw unimpl(); }
+  @Override public long static_hash( ) { return (_any?0:2047) ^ ((long) _ts.length <<2); }
   @Override long compute_hash() {
-    Util.add_hash(super.static_hash() ^ (_any?0:2047) ^ ((long) _ts.length <<2));
+    Util.add_hash(super.static_hash() ^ static_hash());
     for( Type t : _ts )
       Util.add_hash(t._hash);
     return Util.get_hash();
@@ -62,7 +64,7 @@ public class TypeTuple extends Type<TypeTuple> {
     Type[] ts = Types.get(10);
     int i=0;
     while(true) {
-      ts[i++] = P.type(null,false,-2);
+      ts[i++] = Cyclic.install(P.type(null,false,-2),P._dups);
       if( !P.peek(',') ) break;
     }
     Type[] ts0 = Types.get(i);

@@ -644,7 +644,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     if( ind ) sb.ii(1);
     boolean sep=false;
     for( TypeFld fld : _flds ) {
-      if( fld==TypeFld.ANY_DSP ) sb.p('_'); // Short cut the ever-present display
+      if( fld==TypeFld.ANY_DSP ) sb.p('_'); // Short-cut the ever-present display
       else {
         if( ind ) sb.nl().i();
         fld._str(visit,dups, sb, debug, indent ); // Field name, access mod, type
@@ -696,7 +696,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
         // Handling of leading DUP: handled by general parser:
         //   DUP:label:=type (yielding a TypeFld) or 
         //   DUP:type (yielding a "fld_num=" type TypeFld) or
-        : (TypeFld)P.type(null,false,is_tup && P.skipWS()!='^' ? fld_num++ : -1/*must find a label*/);
+        : (TypeFld)P.type(null,false,is_tup ? fld_num : -1/*must find a label*/);
+      if( is_tup && fld._fld.equals(""+fld_num) ) fld_num++; // Used up a field num
       ts.add_fld(fld);
       if( !P.peek(is_tup ? ',' : ';') ) break;
     }

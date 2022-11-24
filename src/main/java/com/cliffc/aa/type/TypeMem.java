@@ -92,7 +92,7 @@ public class TypeMem extends Type<TypeMem> {
           }
     return true;
   }
-  @Override public long static_hash( ) { throw unimpl(); }
+  @Override public long static_hash( ) { return _pubs.length; }
 
   // ----------
   @Override long compute_hash() {

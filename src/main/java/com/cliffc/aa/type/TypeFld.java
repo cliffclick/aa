@@ -80,7 +80,8 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   }
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    if( !TypeStruct.isDigit(_fld.charAt(0)) || // Do not print number-named fields for tuples, unless dups are involved
+    if( !TypeStruct.isDigit(_fld.charAt(0)) || // Do not print number-named final fields for tuples, unless dups are involved
+        _access!=Access.Final ||  // Odd access permissions
         dups.get(_uid)!=null || _t==null || dups.get(_t._uid)!=null ) // DUP:_t is ambiguous with DUP:0=_t and 0=DUP:_t; so print field name
       _access.str(sb.p(_fld));                                        // Print "field="
     return _t==null ? sb.p('!') : (_t._str(visit, dups, sb, debug, indent));

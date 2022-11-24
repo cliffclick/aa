@@ -437,6 +437,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       return t;                 // Set breakpoints here to find a uid
     }
     <T extends Type> T free(T t1, T t2) {
+      assert _frees.isEmpty() || _frees.last()!= t1;
       t1._dual = null;   // Too easy to make mistakes, so zap now
       t1._hash = t1._cyc_hash = 0;      // Too easy to make mistakes, so zap now
       _frees.push(t1);   // On the free list
@@ -622,6 +623,14 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     concat(ts,TypeMem   .TYPES);
     concat(ts,TypeStruct.TYPES);
     concat(ts,TypeTuple .TYPES);
+    // Some more complex exciting types
+    for( String s : new String[]{
+        "*[3](_, 1, ~Scalar)",
+        "*[3](_, 0=PA:*[6]@{_; _*_=*[nALL]over35:(); f=flt64}, *[](), 2=PA)",
+        "PA:*[3]@{_; add=[4]{any,4 -> PA }; i=int64}",
+      })
+      _push(ts,Type.valueOf(s));
+
     // Partial order Sort, makes for easier tests later.  Arrays.sort requires
     // a total order (i.e., the obvious Comparator breaks the sort contract),
     // so we hand-roll a simple bubble sort.
@@ -630,12 +639,11 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         if( ts._es[j].isa(ts._es[i]) ) { Type tmp = ts._es[i]; ts._es[i] = ts._es[j]; ts._es[j] = tmp; }
     return (ALL_TYPES = ts); // Preserve for tests
   }
-  static void concat( Ary<Type> ts, Type[] ts1 ) {
-    for( Type t1 : ts1 ) {
-      assert !t1.above_center(); // Always below-center or equal, because we will dual anyways
-      ts.push(t1);
-      if( t1!=t1.dual() ) ts.push(t1.dual());
-    }
+  private static void concat( Ary<Type> ts, Type[] ts1 ) { for( Type t1 : ts1 ) _push(ts,t1); }
+  private static void _push( Ary<Type> ts, Type t ) {
+    assert !t.above_center(); // Always below-center or equal, because we will dual anyways
+    ts.push(t);
+    if( t!=t.dual() ) ts.push(t.dual());
   }
 
   static boolean check_startup() {
@@ -748,8 +756,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     return s.length()==2 && Character.isUpperCase(s.charAt(0)) && Character.isUpperCase(s.charAt(1));
   }
 
-  // Parse an indented string to get a Type back.  Handles cyclic types (and
-  // very inefficiently calls Cyclic.install many many times).
+  // Parse an indented string to get a Type back.  Handles cyclic types.
   // Example: "[0,ALL]{all,1 ->PA:*[0,5]@{^=any; n1=PA; v1=Scalar} }"
   static class Parse {
     final String _str;
@@ -792,7 +799,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         assert dup==null;
         // lab is a type-prefix
         _x = oldx;              // Reset type parse
-        return TypeFld.make((""+fld_num).intern(),type(lab,any,-2));
+        return TypeFld.malloc((""+fld_num).intern(),type(lab,any,-2), TypeFld.Access.Final);
       }
 
       return switch( skipWS() ) {
@@ -802,12 +809,12 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       case ':' -> type(dup,_x++ < -1,-2); // DUP::@{} dup struct with no clz, skip the extra ':' and normal struct parse
       case '#' ->     TypeRPC   .valueOf(this,dup,any) ;
       case '{' ->     TypeTuple .valueOf(this,dup,any) ;
-      case '*' -> cyc(TypeMemPtr.valueOf(this,dup,any));
-      case '(' -> cyc(TypeStruct.valueOf(this,dup,any,true ));
-      case '@' -> cyc(TypeStruct.valueOf(this,dup,any,false));
+      case '*' ->     TypeMemPtr.valueOf(this,dup,any);
+      case '(' ->     TypeStruct.valueOf(this,dup,any,true );
+      case '@' ->     TypeStruct.valueOf(this,dup,any,false);
       case '[' -> peek("[[")
         ? TypeMem.valueOf(this,dup,any)
-        : cyc(TypeFunPtr.valueOf(this,dup,any));
+        : TypeFunPtr.valueOf(this,dup,any);
       default -> {
         // These strings all start with an id.
         // DUP:type     // defining a repeated type
@@ -843,8 +850,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
           if( !peek(':') && !eos() ) {   // Distinguish "CLZ:@{}" from "DUP:int64" or "DUP:fld_name=int64"
             char c = at(_x);   // Single "clz:" then tuple or struct
             // Check for DUP:CLZ:struct_type
-            if( c=='(' ) { _x=oldx; yield cyc(TypeStruct.valueOf(this,dup,any,true )); }
-            if( c=='@' ) { _x=oldx; yield cyc(TypeStruct.valueOf(this,dup,any,false)); }
+            if( c=='(' ) { _x=oldx; yield TypeStruct.valueOf(this,dup,any,true ); }
+            if( c=='@' ) { _x=oldx; yield TypeStruct.valueOf(this,dup,any,false); }
             // DUP "id": with some other type
           }
           _x=oldx2;             // Unwind back to after "DUP:"
@@ -860,11 +867,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
           }
 
           // Ok, really start a recursive type
-          RECURSIVE_MEET++;
-          t = type(id,any,fld_num);
-          if( --RECURSIVE_MEET == 0)
-            t = Cyclic.install(t,_dups);
-          yield t;
+          yield type(id,any,fld_num);
         }
 
         // Lookup various constant type names
@@ -895,7 +898,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       // Succeed or return null
       return TypeFlt.valueOfFlt(id);
     }
-    <T extends Type> T cyc(T t) { return RECURSIVE_MEET==0 ? Cyclic.install(t,_dups) : t; }
     char at(int x) { return _str.charAt(x); }
     char skipWS() { // Advance to 1st not-WS char and return it, or -1 for end-of-string
       while( !eos() && at(_x) <= ' ' ) _x++;
@@ -988,7 +990,14 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     }
     @Override public String toString() { return _str.substring(_x); }
   }
-  public static Type _valueOf( String str ) { return new Parse(str).type(); }
+  public static Type _valueOf( String str ) {
+    Parse P = new Parse(str);
+    Type t1 = P.type();
+    Type t2 = t1 instanceof TypeTuple || t1 instanceof TypeMem
+      ? t1                       // Since never recursive, these call Cyclic.install internally
+      : Cyclic.install(t1,null); // No need for map arg now
+    return t2;
+  }
   public static Type valueOf( String str ) {
     if( str==null ) return null;
     Type t = _valueOf(str);

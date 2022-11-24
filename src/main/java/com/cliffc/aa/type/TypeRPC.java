@@ -32,9 +32,9 @@ public class TypeRPC extends TypeNil<TypeRPC> {
     P.require('#');
     var rpcs = P.bits(BitsRPC.EMPTY);
     assert any==rpcs.above_center() || rpcs.is_empty();
-    TypeRPC rpc = malloc(any, rpcs.test(0),true, rpcs.clear(0));
+    TypeRPC rpc = malloc(any, rpcs.test(0),true, rpcs.clear(0)).val_nil(P).hashcons_free();
     if( cid!=null ) P._dups.put(cid,rpc);
-    return rpc.val_nil(P);
+    return rpc;
   }
 
   static { new Pool(TRPC,new TypeRPC()); }

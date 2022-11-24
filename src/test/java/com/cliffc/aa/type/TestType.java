@@ -6,36 +6,29 @@ import com.cliffc.aa.util.SB;
 import org.junit.Test;
 
 import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 
 public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
-    int a0 = BitsFun.new_fidx();
-    int a1 = BitsFun.new_fidx();
-    int a2 = BitsFun.new_fidx();
-    Type t0 = tfp(a0,TypeNil.XSCALAR);
-    Type t1 = tfp(a1,t0);
-    //Type t2 = t0.join(t1);
-    Type t2x = tfp(BitsFun.EMPTY,TypeNil.XSCALAR);
-    //assertEquals(t2x,t2);
+    Type mtx = Type.valueOf(" @{add =  XA: [ 4]{all, 4 -> XA }     }");
+    Type mtd = Type.valueOf("~@{add!=! XA:~[-4]{any,-4 -> XA }; ...}");
+    //Type mtx = Type.valueOf(" XA: [ 4]{all, 4 -> XA }");
+    //Type mtd = Type.valueOf(" XA:~[-4]{any,-4 -> XA }");
+    assertEquals(mtd,mtx._dual);
+    assertSame  (mtd,mtx._dual);
 
-    Type t3 = tfp(a2,t1);
-    Type t4 = TypeFunPtr.make_cycle(false,false,true,BitsFun.make0(a0),3,Type.ANY);
-    Type t5 = tfp(BitsFun.make0(a0,a1),t4);
 
-    Type t3d = t3.dual();
-    Type t5d = t5.dual();
     
-    Type t6d = t5d.meet(t3d);
-    assertEquals(t2x.dual(),t6d);
-    
-    
+    //Type t0 = Type.valueOf("PA:*[3]@{_; add=[4]{any,4 -> PA }; i=int64}");
+    //Type t1 = t0._dual;
+    //Type mt = t0.meet(t1);
+    //Type t0d = Type.valueOf("PA:~*[-3]~@{^!=!all; add!=!~[-4]{all,-4 -> PA }; i!=!~int64; ...}");
+    //// check symmetry
+    //Type t0x = mtd.meet(t0._dual);
+    //assertSame(t0._dual,t0x);
   }
-  private static TypeFunPtr tfp(int fidx   ,Type ret) { return TypeFunPtr.make(      fidx,3,Type.ANY,ret); }
-  private static TypeFunPtr tfp(BitsFun pos,Type ret) { return TypeFunPtr.make(false,pos ,3,Type.ANY,ret); }
 
   // Test for a collection of Types, that toString and valueOf are a bijection
   @Test public void testToString() {
@@ -69,7 +62,7 @@ public class TestType {
       "flt:flt64",              // Class Float range
       "*[17](_, 1, ~Scalar)",   // Bare ~type as a field
       "[23]{any,3 -> *[7](3, Scalar) }", // Function returning a struct
-      "*[9](_, 0=PA:*[7]@{_; _*_=*[nALL]over35:(); f=flt64}, *[](), 2=PA)", // Struct with self-references
+      "*[3](_, 0=PA:*[3]@{_; _*_=*[nALL]over35:(); f=flt64}, *[](), 2=PA)", // Struct with self-references
       "PA:*[7]@{_; add=[23]{any,4 -> PA }; i=int64}", // Struct with function return self-reference
       "PA:*[18]@{_; n1=*[17]@{_; n1=PA; FB:v1=7}; FB}", // DUP Field
       "*[18](_, 0=PA:*[17](_, *[4,5]@{_; x=nScalar}, nScalar), 1=PA)",

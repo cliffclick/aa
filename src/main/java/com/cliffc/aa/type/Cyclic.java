@@ -128,11 +128,18 @@ public interface Cyclic {
       } else {
         // Keep the entire cycle.  xdual/rdual/hash/retern
         Type.RECURSIVE_MEET++; // Stop xdual interning TypeFlds
-        long dcyc_hash = Util.rot(cyc_hash,32); // Crappy dual-cyc_hash
-        for( Type c : ts ) { Type d = c._dual = c.xdual(); d._dual = c; d._cyc_hash = dcyc_hash; }
+        // Build the dual cycle, with dual leader
+        for( Type c : ts ) { Type d = c._dual = c.xdual(); d._dual = c; }
         Type dleader = leader.dual();
         dleader.set_cyclic(dleader); // Dual cycle-leader, head of the dual cycle
-        for( Type c : ts ) { c.rdual(); c._dual.set_cyclic(dleader); c._dual._hash = c._dual.compute_hash(); }
+        for( Type c : ts ) { c.rdual(); c._dual.set_cyclic(dleader); }
+        // Compute the dual hash
+        long dcyc_hash = 0;
+        for( Type c : ts ) dcyc_hash ^= c._dual.static_hash();
+        if( dcyc_hash==0 ) dcyc_hash = 0xcafebabe; // Disallow zero hash
+        for( Type c : ts ) { c._dual._cyc_hash = dcyc_hash; }
+        for( Type c : ts ) { c._dual._hash = c._dual.compute_hash(); }
+        
         for( Type c : ts ) c.retern()._dual.retern();
         Type.RECURSIVE_MEET--; // Allow xdual to intern TypeFlds
         for( Type c : ts )     // Now that all fields are interned, we can intern the TypeFld[]
