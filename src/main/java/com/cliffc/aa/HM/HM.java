@@ -2955,6 +2955,7 @@ public class HM {
       return false;
     }
 
+    // Does 'this' occur anywhere inside the nested 'x' ?
     boolean _occurs_in_type(T2 x) {
       assert !unified() && !x.unified();
       if( x==this ) return true;

@@ -1837,5 +1837,51 @@ maybepet = petcage.get;
         "*[20](_, 0=PB:*[19](_, 0=PA:*[18](_, 0=XA:[30]{any,5 ->*[17](_, Scalar, Scalar, Scalar) }, 1=XA, 2=XA), 1=PA, 2=PA), 1=PB, 2=PB)",
         "[17,18,19,20]","[30]");
   }
+
+  // A more substantial test to check the running time of a worst-case H-M result.
+  // This program is a core-AA clone of the equivalent Haskell program:
+  //    let dup x = (x,x)
+  //    in    dup . dup . dup . ... . dup   // Where "." is a Haskell composition operator
+  @Ignore @Test public void x_perf_02() {
+    String dup = "dup = { x -> (pair x x) }; ";
+    String fog = "fog = { f g -> { x -> (f (g x)) } }; "; // Core AA does not have a composition operator
+    String base = "(fog dup dup)";
+    // Running time and the result program type are both linear in the program size.
+    // Be sure to turn off asserts when running, or the cubic asserts will blow out the runtime!    
+    for( int i=0; i<100; i++ ) {
+      String core = "(fog dup "+base+" )";
+      String prog = dup+fog+core;
+      long t0 = System.currentTimeMillis();
+      Root syntax = HM.hm(prog, 0, true, false ); // HM, no GCP
+      String rez = syntax._hmt.p();
+      long t1 = System.currentTimeMillis();
+      System.out.println("Program size: "+prog.length()+", type size: "+rez.length()+", runtime: "+(t1-t0)+"ms" );
+      base = core;
+    }
+  }
+
+  // A more substantial test to check the running time of a worst-case H-M result.
+  // This program is a core-AA clone of the Example 1.1 in 1990 ACM paper
+  // "Deciding ML Typability is Complete for Deterministic Exponential Time" by
+  // HARRY G. MAIRSON
+  @Ignore @Test public void x_perf_03() {
+    String xn = "x0";
+    String base = "x0 = { z -> z}; ";
+    // Running time and the result program type are both *exponential* in the program size.
+    // Be sure to turn off asserts when running, or the cubic asserts will blow out the runtime!    
+    for( int i=0; i<10; i++ ) {
+      String xn1 = "x"+(i+1);
+      base = base + xn1 + "= (pair "+xn+" "+xn+"); ";
+      xn = xn1;
+      String prog = base + xn1;
+      long t0 = System.currentTimeMillis();
+      Root syntax = HM.hm(prog, 0, true, false ); // HM, no GCP
+      String rez = syntax._hmt.p();
+      long t1 = System.currentTimeMillis();
+      System.out.println("Program size: "+prog.length()+", type size: "+rez.length()+", runtime: "+(t1-t0)+"ms" );
+    }
+  }
+
+
 }
 

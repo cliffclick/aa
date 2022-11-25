@@ -178,10 +178,9 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     boolean sub = _sub & tn._sub;
     return make(any,nil,sub);
   }
-  TypeNil as_nil() { return make(false,_nil,_sub); }
 
   // Type must support a nil
-  public boolean must_nil() { return !_sub; }
+  @Override public boolean must_nil() { return !_sub; }
 
   @Override public boolean above_center() { return _any; }
 

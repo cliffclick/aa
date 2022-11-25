@@ -716,6 +716,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     assert is_simple();
     return false;
   }
+  // Type must support a nil
+  public boolean must_nil() { return this==ALL; }
 
   // Return a long   from a TypeInt constant; assert otherwise.
   public long   getl() { throw typerr(null); }
