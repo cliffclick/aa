@@ -2,11 +2,11 @@ package com.cliffc.aa.HM;
 
 import com.cliffc.aa.HM.HM.Root;
 import com.cliffc.aa.type.*;
-import org.junit.BeforeClass;
-import org.junit.FixMethodOrder;
-import org.junit.Ignore;
-import org.junit.Test;
+
+import org.junit.*;
 import org.junit.runners.MethodSorters;
+
+import java.io.*;
 
 import static org.junit.Assert.assertEquals;
 
@@ -28,17 +28,16 @@ public class TestHM {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    // F/T/0 d_struct_err_07
-    DO_HMT=false;
+    DO_HMT=true;
     DO_GCP=true;
     RSEED=0;
-    d_struct_err_05();
+    f_gcp_hmt_03();
   }
 
-  private void _run0s( String prog, String rprog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
+  private void _run0s( String prog, String rprog, String rez_hm, Type gcp, int rseed, String esc_ptrs, String esc_funs  ) {
     // Type the program
     HM.reset();
-    Root syn = HM.hm(prog, rseed, rez_hm!=null, frez_gcp!=null );
+    Root syn = HM.hm(prog, rseed, rez_hm!=null, gcp!=null );
     // Check the expected syntactic rewriting.  'if id e0 e1' expressions are
     // rewritten so that 'id' is known not-nul in 'e0'.  Also inferred field
     // names are actually inferred (or program is in-error).
@@ -46,13 +45,13 @@ public class TestHM {
     assertEquals(stripIndent("("+rprog+")"),stripIndent(syn.toString()));
     
     // Check expected types for HMT and GCP
-    if( frez_gcp!=null )  if( Type.valueOf(frez_gcp)!=syn.flow_type() ) System.err.println(frez_gcp+" =!= "+syn.flow_type());
-    if(  rez_hm !=null )  if( !stripIndent(rez_hm).equals(stripIndent(syn._hmt.p())) ) System.err.println(rez_hm+" =!= "+syn._hmt.p());
-    if( frez_gcp!=null )  assertEquals(Type.valueOf(frez_gcp),syn.flow_type());
-    if(  rez_hm !=null )  assertEquals(stripIndent(rez_hm),stripIndent(syn._hmt.p()));
+    if( gcp    !=null )  if( gcp != syn.flow_type() ) System.err.println(gcp + " =!= " + syn.flow_type());
+    if( rez_hm !=null )  if( !stripIndent(rez_hm).equals(stripIndent(syn._hmt.p())) ) System.err.println(rez_hm+" =!= "+syn._hmt.p());
+    if( gcp    !=null )  assertEquals(gcp,syn.flow_type());
+    if( rez_hm !=null )  assertEquals(stripIndent(rez_hm),stripIndent(syn._hmt.p()));
 
     // Track expected Root escapes
-    if( rez_hm!=null && frez_gcp!=null && !rez_hm.contains("Cannot") ) {
+    if( rez_hm!=null && gcp!=null && !rez_hm.contains("Cannot") ) {
       String esc_ptrs2 = "*"+esc_ptrs+"()";
       String esc_funs2 =     esc_funs+"{any,3->Scalar}";
       BitsAlias aliases = esc_ptrs==null ? BitsAlias.EMPTY : ((TypeMemPtr)Type.valueOf(esc_ptrs2))._aliases;
@@ -66,26 +65,29 @@ public class TestHM {
     }
   }
 
-  private void _run1s( String prog, String rprog, String rez_hm, String frez_gcp, String esc_ptrs, String esc_funs ) {
+  private void _run1s( String prog, String rprog, String rez_hm, Type gcp, String esc_ptrs, String esc_funs ) {
     if( JIG )
-      _run0s(prog,rprog,rez_hm,frez_gcp,RSEED,esc_ptrs,esc_funs);
+      _run0s(prog,rprog,rez_hm,gcp,RSEED,esc_ptrs,esc_funs);
     else
-      for( int rseed=0; rseed<4; rseed++ )
-        _run0s(prog,rprog,rez_hm,frez_gcp,rseed,esc_ptrs,esc_funs);
+      for( int rseed=0; rseed<32; rseed++ )
+        _run0s(prog,rprog,rez_hm,gcp,rseed,esc_ptrs,esc_funs);
   }
 
   // Run same program in all 3 combinations, but answers vary across combos
   private void run( String prog, String rprog, String rez_hm_gcp, String rez_hm_alone, String frez_gcp_hm, String frez_gcp_alone, String esc_ptrs, String esc_funs ) {
     if(   rez_hm_alone == null )   rez_hm_alone = rez_hm_gcp;
     if( frez_gcp_alone == null ) frez_gcp_alone = frez_gcp_hm;
+    Type gcp_alone = Type.valueOf(frez_gcp_alone);
+    Type gcp_hm    = Type.valueOf(frez_gcp_hm   );
+    assert gcp_hm.isa(gcp_alone); // Broken test, expected GCP only improves with more information
     if( JIG ) {
       _run1s(prog, rprog,
              DO_HMT ? (DO_GCP ?  rez_hm_gcp :  rez_hm_alone ) : null,
-             DO_GCP ? (DO_HMT ? frez_gcp_hm : frez_gcp_alone) : null, esc_ptrs, esc_funs);
+             DO_GCP ? (DO_HMT ?      gcp_hm :     gcp_alone ) : null, esc_ptrs, esc_funs);
     } else {
-      _run1s(prog, rprog, null        ,frez_gcp_alone, esc_ptrs, esc_funs);
-      _run1s(prog, rprog, rez_hm_alone,null          , esc_ptrs, esc_funs);
-      _run1s(prog, rprog, rez_hm_gcp  ,frez_gcp_hm   , esc_ptrs, esc_funs);
+      _run1s(prog, rprog, null        ,gcp_alone, esc_ptrs, esc_funs);
+      _run1s(prog, rprog, rez_hm_alone,null     , esc_ptrs, esc_funs);
+      _run1s(prog, rprog, rez_hm_gcp  ,gcp_hm   , esc_ptrs, esc_funs);
     }
   }
   // Same thing with a bunch of default arguments
@@ -146,6 +148,12 @@ public class TestHM {
   @Test(expected = RuntimeException.class)
   public void a_basic_err_00() { run( "fred","","all"); }
 
+  @Test public void a_basic_err_01() {
+    run("(+ \"abc\" 0)",
+        "%[Cannot unify int64 and *str:(97)?]",
+        "nScalar");
+  }
+
 
   @Test public void b_recursive_00() {
     run( "fact = { n -> (if (eq0 n) 1 (i* n (fact (dec n))))}; fact",
@@ -178,7 +186,10 @@ public class TestHM {
         "  is_odd = { n -> (if (eq0 n) 0 (is_even (dec n)))}; "+
         "     { n -> (if (eq0 n) 1 (is_odd (dec n)))};"+
         "(is_even 3)" ,
-        "int1", "int1");
+        null,
+        "%int64", "%int64",
+        "int1", "int1",
+        null, null);
   }
 
   // Y-combinator
@@ -199,10 +210,10 @@ public class TestHM {
   @Test public void b_recursive_06() {
     run("f0 = { f -> (if (rand 2) 1 (f (f0 f) 2))}; f0",
         null,
-        "{ { 1 2 -> 1 } -> 1 }",
-        "{ { 1 2 -> 1 } -> 1 }",
-        "[31]{any,3 ->1 }",
-        "[31]{any,3 ->1 }",
+        "{ { %int64 2 -> %int64 } -> %int64 }",
+        "{ { %int64 2 -> %int64 } -> %int64 }",
+        "[31]{any,3 ->int64 }",
+        "[31]{any,3 ->int64 }",
         null,"[7,31]");
   }
   @Test public void b_recursive_07() {
@@ -236,9 +247,10 @@ public class TestHM {
         "*[17](_,  Scalar, Scalar)",
         "[17]","[]");
   }
+
   // Stacked if functions "carry through" precision.
   // Test was buggy, since 'rand' is a known non-zero function pointer constant,
-  // GCP folds the 'if' to the true arm.  Instead call: '(rand 2)'
+  // GCP folds the 'if' to the true arm.  Instead, call: '(rand 2)'
   @Test public void b_recursive_err_03() {
     run("i = {x -> x}; "+
         "k = {x -> (i x)}; "+
@@ -246,7 +258,7 @@ public class TestHM {
         "m = {x -> (l x)}; "+
         "n = {x -> (m x)}; "+
         "(if (rand 2) (n 1) (n \"abc\"))",
-        "[Cannot unify 1 and *str:(97)]", "nScalar" );
+        "%[Cannot unify int64 and *str:(97)?]", "nScalar" );
   }
 
 
@@ -288,9 +300,9 @@ public class TestHM {
     run("map = { fun -> { x -> (fun x)}};"+
         "(pair ((map str) 5) ((map factor) 2.3f))",
         null,
-        "*(%*%str:(%int64),%flt64)",
-        "*(%*%str:(%int64),%flt64)",
-        "*[17](_, *[4]str:(int64), flt64)",
+        "*(%*str:(int8),%flt64)",
+        "*(%*str:(int8),%flt64)",
+        "*[17](_, *[4]str:(int8), flt64)",
         "*[17](_, Scalar, Scalar)",
         "[17]",null);
   }
@@ -330,9 +342,9 @@ map ={fun parg -> (fun (cdr parg))};
 (pair (map str (cons 0 5)) (map isempty (cons 0 "abc")))
 """,
         null,
-        "*(%*%str:(%int64),%int64)",
-        "*(%*%str:(%int64),%int64)",
-        "*[17](_, *[4]str:(int64), int64)",
+        "*(%*str:(int8),%int64)",
+        "*(%*str:(int8),%int64)",
+        "*[17](_, *[4]str:(int8), int64)",
         "*[17](_, Scalar, Scalar)",
         "[17]",null );
   }
@@ -371,8 +383,8 @@ map ={fun parg -> (fun (cdr parg))};
         "map = { fun x -> (fun x)};"+
         "{ q -> (map (fcn q) 5)}",
 
-        "{ A? -> *( B:[Cannot unify 5 and *( 3, B)], B) }",
-        "{ A? -> *( B:[Cannot unify 5 and *( 3, B)], B) }",
+        "{ A? -> *( B:[Cannot unify 5 and *(3, B)], B) }",
+        "{ A? -> *( B:[Cannot unify 5 and *(3, B)], B) }",
         "[39]{any,3 -> *[17,18](_, 5, nScalar) }",
         "[39]{any,3 -> *[17,18](_, 5, nScalar) }",
         "[17,18,19]","[39]" );
@@ -414,8 +426,8 @@ map ={fun parg -> (fun (cdr parg))};
         "rez = { pred -> (if pred ({_pred -> A}(notnil pred)) B)};"+
         "rez",
 
-        "{ A? -> *@{x=nint8} }",
-        "[32]{any,3 ->*[17,18]@{_; x=nint8} }",
+        "    { A?  -> %*       @{   x= nint8} }",
+        "[32]{any,3 -> *[17,18]@{_; x= nint8} }",
         "[17,18]","[32]");
   }
   // Load some fields from an unknown struct: area of a rectangle.
@@ -478,7 +490,7 @@ map ={fun parg -> (fun (cdr parg))};
   @Test public void d_struct_err_02() {
     run("{ x -> y = ( x x.v ); 0}",
         // { x:&[ {A->B}; @{v=A;...} ] -> y = ( x.0 x.1.v ); 0}",
-        "{ [Cannot unify {A->B} and *@{ v=A;...}] -> C? }",
+        "{ A:[Cannot unify {B->A} and *@{ v=B;...}] -> C? }",
         "[29]{any,3 ->xnil }",
         "[5]","[29,7]");
   }
@@ -498,7 +510,7 @@ map ={fun parg -> (fun (cdr parg))};
   // pass in a field 'a'... and still no error.  Fixed.
   @Test public void d_struct_err_05() {
     run("f = { p1 p2 -> (if p2.a p1 p2)}; (f @{a=2} @{b=2.3f})",
-         "*@{ a= Missing field a: 2 }",
+         "%*@{ a= Missing field a: 2 }",
          "*[17,18](_)",
          "[17,18]",null);
   }
@@ -517,18 +529,12 @@ map ={fun parg -> (fun (cdr parg))};
         "res1 = (f @{a=2;       c=\"def\"} @{    b=2.3f;d=\"abc\"});"+
         "res2 = (f @{a=2;b=1.2f;c=\"def\"} @{a=3;b=2.3f;d=\"abc\"});"+
         "@{f=f;res1=res1;res2=res2}",
-        null,
 
-        "*@{ f    =  { A:*@{ a=B;... } A -> A };"+
-        "    res1 = *@{ a = Missing field a: 2};"+
-        "    res2 = *@{ a=nint8; b=nflt32 }"+
+        "*@{ f    =  { A:%*@{ a=B;... } A -> A };"+
+        "    res1 = %*@{ a = Missing field a: 2};"+
+        "    res2 = %*@{ a=nint8; b=nflt32 }"+
         "}",
-        "*@{ f    =  { A:*@{ a=B;... } A -> A };"+
-        "    res1 = *@{ a = Missing field a: 2};"+
-        "    res2 = *@{ a=nint8; b=nflt32 }"+
-        "}",
-        "*[21]@{_; f=[30]{any,4 ->*[5,6,17,18,19,20]SA::(_) }; res1=*[17,18]SA; res2=*[19,20]@{_; a=nint8; b=nflt32}}",
-        "*[21]@{_; f=[30]{any,4 ->PA:*[5,6,17,18,19,20](_) }; res1=PA; res2=PA}",
+        "*[21]@{_; f=[30]{any,4 -> PA:*[5,6,17,18,19,20](_) }; res1=PA; res2=PA}",
         "[5,6,17,18,19,20,21]","[30]");
   }
 
@@ -549,7 +555,7 @@ map ={fun parg -> (fun (cdr parg))};
   @Test public void e_recur_struct_01() {
     run("map = { fcn lst -> (if lst @{ n1=(map fcn lst.n0); v1=(fcn lst.v0) } 0) }; map",
         "map = { fcn lst -> (if lst ({_lst -> @{ n1=(map fcn _lst.n0); v1=(fcn _lst.v0) }} (notnil lst)) 0) }; map",
-        "{ { A -> B } C:*@{ n0 = C; v0 = A; ...}? -> D:*@{ n1 = D; v1 = B}? }",null,
+        "{ { A -> B } C:*@{ n0 = C; v0 = A; ...}? -> D:%*@{ n1 = D; v1 = B}? }",null,
         "[32]{any,4 ->PA:*[17]@{_; n1=PA; v1=Scalar}? }",null,
         "[5,17]","[7,32]");
   }
@@ -557,7 +563,7 @@ map ={fun parg -> (fun (cdr parg))};
   @Test public void e_recur_struct_02() {
     run("map = { fcn lst -> (if lst @{ n1 = (map fcn lst.n0); v1 = (fcn lst.v0) } 0) }; (map dec @{n0 = 0; v0 = 5})",
         "map = { fcn lst -> (if lst ({_lst -> @{ n1 = (map fcn _lst.n0); v1 = (fcn _lst.v0) }} (notnil lst)) 0) }; (map dec @{n0 = 0; v0 = 5})",
-        "A:*@{ n1 = A; v1 = %int64 }?",
+        "A:%*@{ n1 = A; v1 = %int64 }?",
         "PA:*[17]@{_; n1=PA; v1=4}?",
         "[17]",null);
   }
@@ -566,7 +572,7 @@ map ={fun parg -> (fun (cdr parg))};
   @Test public void e_recur_struct_03() {
     run("map = { lst -> (if lst @{ n1= arg= lst.n0; (if arg @{ n1=(map arg.n0); v1=(str arg.v0)} 0); v1=(str lst.v0) } 0) }; map",
         "map = { lst -> (if lst ({_lst -> @{ n1= arg= _lst.n0; (if arg ({_arg -> @{ n1=(map _arg.n0); v1=(str _arg.v0)}} (notnil arg)) 0); v1=(str _lst.v0) }} (notnil lst)) 0) }; map",
-        "{ A:*@{ n0 = *@{ n0 = A; v0 = int64; ...}?; v0 = int64; ...}? -> B:*@{ n1 = *@{ n1 = B; v1 = %*%str:(%int64)}?; v1 = %*%str:(%int64)}? }",
+        "{ A:*@{ n0 = *@{ n0 = A; v0 = int64; ...}?; v0 = int64; ...}? -> B:%*@{ n1 = %*@{ n1 = B; v1 = %*str:(int8)}?; v1 = %*str:(int8)}? }",
         "[37]{any,3 ->PA:*[18]@{_; n1=*[17]@{_; n1=PA; FB:v1=*[4]str:(int8)}?; FB}? }",
         "[5,17,18]","[37]" );
   }
@@ -596,9 +602,9 @@ out_bool= (map in_str { xstr -> (eq xstr "def")});
 (pair out_str out_bool)
 """,
         null,
-        "*(%*%str:(%int64),%int64)",
-        "*(%*%str:(%int64),%int64)",
-        "*[19](_, *[4]str:(int64), int64)",
+        "*(%*str:(int8),%int64)",
+        "*(%*str:(int8),%int64)",
+        "*[19](_, *[4]str:(int8), int64)",
         "*[19](_, Scalar, Scalar)",
         "[19]",null);
   }
@@ -610,7 +616,7 @@ all = @{
 };
 { x -> (all.is_even all x)}
 """,
-         "{int64 -> int1}", "[37]{any,3 ->int1 }",
+         "{int64 -> %int64}", "[37]{any,3 ->int1 }",
          null,"[37]");
   }
   @Test public void e_recur_struct_07() {
@@ -643,7 +649,7 @@ A:*@{
   @Test public void e_recur_struct_09() {
     run("{ p -> (if p @{x=3;y=4} @{y=6;z=\"abc\"})}",
         "{ p -> (if p ({_p -> @{x=3;y=4}} (notnil p)) @{y=6;z=\"abc\"})}",
-        "{A?->*@{y=nint8}}",
+        "{A? -> %*@{ y = nint8 } }",
         "[32]{any,3 ->*[17,18]@{_; y=nint8} }",
         "[17,18]","[32]");
   }
@@ -724,7 +730,7 @@ con12=(fun 1.2f);
   @Test public void f_gcp_hmt_00() {
     run("pred = 0; s1 = @{ x=\"abc\" }; s2 = @{ y=3.4f }; (if pred s1 s2).y",
         "pred = 0; s1 = @{ x=\"abc\" }; s2 = @{ y=3.4f }; (if pred ({_pred -> s1}(notnil pred)) s2).y",
-        "3.4f", "Missing field y in *(): 3.4f",
+        "3.4f", "Missing field y in %*(): 3.4f",
         "3.4f", "3.4f",
         null,null);
   }
@@ -772,9 +778,9 @@ loop = { name cnt ->
 };
 (loop "def" (id 2))
 """,
-        "*str:(nint8)?",      // Both HM and GCP
-        "[Cannot unify int8 and *str:(nint8)?]", // HM alone cannot do this one
-        "*[4]str:(100)",      // Both HM and GCP
+        "%*str:(nint8)?",     // Both HM and GCP
+        "%[Cannot unify int64 and *str:(nint8)?]", // HM alone cannot do this one
+        "*[4]str:(nint8)",    // Both HM and GCP
         "nScalar",            // GCP alone gets a very weak answer
         null,null);
   }
@@ -782,7 +788,7 @@ loop = { name cnt ->
   @Test public void f_gcp_hmt_04() {
     run("{ pred -> tmp=(if pred @{x=3} 0); (if tmp tmp.x 4) }",
         "{ pred -> tmp=(if pred ({_pred -> @{x=3}} (notnil pred)) 0); (if tmp ({_tmp -> _tmp.x}(notnil tmp)) 4) }",
-        "{ A? -> nint8 }", "[35]{any,3 ->nint8 }",null,"[35]");
+        "{ A? -> %int64 }", "[35]{any,3 ->nint8 }",null,"[35]");
   }
   // map is parametric in nil-ness
   @Test public void f_gcp_hmt_05() {
@@ -802,8 +808,8 @@ loop = { name cnt ->
   )
 }
 """,
-         "{ A? -> *( 3, nint8) }",
-         "{ A? -> *( 3, nint8) }",
+         "{ A? -> *( 3, %int64) }",
+         "{ A? -> *( 3, %int64) }",
          "[39]{any,3 ->*[17](_, nint8, nint8) }",
          "[39]{any,3 ->*[17](_, nint8, nint8) }",
          "[17]","[39]");
@@ -966,7 +972,7 @@ loop = { name cnt ->
   @Test public void g_overload_05() {
     run("{ x -> (x._ x._.v)}",
         "{ x -> (x._ x._.v)}",
-        "{*@{&17 = %Unresolved field &17: { A:%Unresolvedfield&19 -> B:%Unresolvedfield&17}; &19 = %Unresolvedfield&19:*%@{v=A;...};...}->B}",
+        "{*@{&17 = %Unresolved field &17: { A:Unresolvedfield&19 -> B:Unresolvedfield&17}; &19 = %Unresolvedfield&19:*@{v=A;...};...}->B}",
         "[29]{any,3 -> Scalar }",
         "[5]","[29]");
   }
@@ -982,14 +988,15 @@ loop = { name cnt ->
   @Test public void g_overload_07() {
     run("{ ptr -> (ptr.x ptr.x) }",
         "{ *@{x= A:{ A-> B}; ...} -> B }",
-        null);
+        "[29]{any,3 -> Scalar }",
+        "[5]","[29]");
   }
 
   // Field order specified
   @Test public void g_overload_08() {
     run("({ ptr -> (ptr._.x ptr._.x) } (pair @{x=3} @{x=str}) )",
         "({ ptr -> (ptr.1.x ptr.0.x) } (pair @{x=3} @{x=str}) )",
-        "%*%str:(%int64)",
+        "%*str:(int8)",
         "*[4]str:(51)",
         null,
         null);
@@ -998,16 +1005,16 @@ loop = { name cnt ->
   @Test public void g_overload_err_08() {
     run("{ ptr -> (ptr._.x ptr._.x) }",
         "{ ptr -> (ptr._.x ptr._.x) }",
-        "{*@{&17 = %Unresolvedfield &17: *%@{ x = %Unresolvedfield&17: { A:%Unresolvedfield&20 -> B:%Unresolvedfield&17};...};&20 = %Unresolvedfield&20:*%@{x=A;...};...}->B}",
+        "{*@{&17 = %Unresolvedfield &17: *@{ x = Unresolvedfield&17: { A:Unresolvedfield&20 -> B:Unresolvedfield&17};...};&20 = %Unresolvedfield&20:*@{x=A;...};...}->B}",
         "[29]{any,3 -> Scalar }",
         "[5]", "[29]");
   }
 
   // Field order specified
   @Test public void g_overload_09() {
-    run("({ ptr -> (ptr.x._ ptr.x._) } @{x=(pair 3 str)})",
-        "({ ptr -> (ptr.x.1 ptr.x.0) } @{x=(pair 3 str)})",
-        "%*%str:(%int64)",
+    run("({ ptr -> (ptr.x.1 3) } @{x=(pair 3 str)})",
+        "({ ptr -> (ptr.x.1 3) } @{x=(pair 3 str)})",
+        "%*str:(int8)",
         "*[4]str:(51)",
         null,null);
   }
@@ -1016,7 +1023,7 @@ loop = { name cnt ->
   @Test public void g_overload_err_09() {
     run("{ ptr -> (ptr.x._ ptr.x._) }",
         "{ ptr -> (ptr.x._ ptr.x._) }",
-        "{*@{x=*@{&18=%Unresolvedfield&18:{A:%Unresolvedfield&21->B:%Unresolvedfield&18};&21=A;...};...}->B}",
+        "{*@{x=*@{&18=%Unresolvedfield&18:{A:%Unresolvedfield&21->B:Unresolvedfield&18};&21=A;...};...}->B}",
         "[29]{any,3 -> Scalar }",
         "[5]","[29]");
   }
@@ -1252,8 +1259,8 @@ fact = { n -> (if n.is0 c1 (n.mul.0 (fact n.sub1))) };
 
 (fact c5)
 """,
-        "A:*@{i=%int64;is0=%int64;mul=*({A->A},{*@{f=flt64;...}->B:*@{f=%flt64;mul=*({*@{i=int64;...}->B},{*@{f=flt64;...}->B})}});sub1=A}",
-        "A:*@{i=%int64;is0=%int64;mul=*({A->A},{*@{f=flt64;...}->B:*@{f=%flt64;mul=*({*@{i=int64;...}->B},{*@{f=flt64;...}->B})}});sub1=A}",
+        "A:%*@{i=%int64;is0=%int64;mul=*({A->A},{*@{f=flt64;...}->B:*@{f=%flt64;mul=*({*@{i=int64;...}->B},{*@{f=flt64;...}->B})}});sub1=A}",
+        "A:%*@{i=%int64;is0=%int64;mul=*({A->A},{*@{f=flt64;...}->B:*@{f=%flt64;mul=*({*@{i=int64;...}->B},{*@{f=flt64;...}->B})}});sub1=A}",
         "PA:*[20]@{_; i=int64; is0=int1; mul=*[19](_, [39]{any,3 -> PA }, [42]{any,3 -> PB:*[18]@{_; f=flt64; mul=*[17](_, [32]{any,3 -> PB }, [34]{any,3 -> PB })} }); sub1=PA}",
         "PA:*[20]@{_; i=int64; is0=int1; mul=*[19](_, [39]{any,3 -> PA }, [42]{any,3 -> PB:*[18]@{_; f=flt64; mul=*[17](_, [32]{any,3 -> PB }, [34]{any,3 -> PB })} }); sub1=PA}",
         "[5,6,7,8,17,18,19,20]","[32,34,39,42]");
@@ -1267,7 +1274,7 @@ fact = { n -> (if n.is0 c1 (n.mul.0 (fact n.sub1))) };
         "   { x -> (i* x 3) }"+  // Arg is 'int'
         "  )._ 4)",              // Error, ambiguous
         "((pair { x -> (i* x 2 ) } { x -> (i* x 3 ) } )._ 4)",
-        "%Unresolved field &28",
+        "Unresolved field &28",
         "nint8",
         null,null
       );
@@ -1275,7 +1282,7 @@ fact = { n -> (if n.is0 c1 (n.mul.0 (fact n.sub1))) };
   // Wrong args for all overloads
   @Test public void g_overload_err_01() {
     run("((pair { x y -> (i* x y) } { x y z -> (i* y z) })._ 4)",
-        "%Unresolved field &28",
+        "Unresolved field &28",
         "~int64");
   }
   // Mixing unrelated overloads
@@ -1286,7 +1293,7 @@ fy = (pair { z -> "def" } { a -> 4     });
 fz = (if (rand 2) fx fy);
 (isempty (fz._ 1.2f))
 """,
-         "%Unresolved field &37: int64",
+         "%Unresolved field &37 [Cannot unify int64 and *str:(int8)? ]",
          "int1",
          null,null);
   }
@@ -1295,10 +1302,157 @@ fz = (if (rand 2) fx fy);
   @Test public void g_overload_err_03() {
     run("{ x -> (x._ x._.v)}",
         "{ x -> (x._ x._.v )}",
-        "{*@{ &17 = %Unresolved field &17: { A:%Unresolved field &19 -> B:%Unresolved field &17 }; &19 = %Unresolvedfield &19: *%@{v=A;...};...}->B}",
+        "{*@{ &17 = %Unresolved field &17: { A:Unresolved field &19 -> B:Unresolved field &17 }; &19 = %Unresolvedfield &19: *@{v=A;...};...}->B}",
         "[29]{any,3 ->Scalar }",
         "[5]","[29]");
   }
+
+
+  // A List, effectively a List<Object> that only has ints in it
+  @Test public void h_variance_00() {
+    String prog = """
+List = { lst val -> @{
+    nxt=lst;
+    val=val
+}};
+list_int0 = (List 0 17);
+list_int1 = (List list_int0 19);
+list_int1
+""";
+    // Note that the H-M type is completely unrolled, same as the code
+    run(prog,
+        "*@{nxt=*@{nxt=A?;val=17};val=19}",
+        "PA:*[17]@{_; nxt=PA; val=nint8}",
+        "[17]",null);
+  }
+
+  // A List of Ints, forced by use as an Int by "(dec val)'.
+  @Test public void h_variance_01() {
+    String prog = """
+ListInt = { lst val ->
+    dummy = (dec val);
+    @{
+        nxt=lst;
+        val=val
+    }
+};
+list_int0 = (ListInt 0 17);
+list_int1 = (ListInt list_int0 "abc");
+list_int1
+""";
+    // Note that the H-M type is completely unrolled, same as the code
+    run(prog,
+        prog,
+        "*@{nxt=*@{nxt=A?;val=int64};val=[Cannot unify int64 and *str:(97)]}",
+        "*@{nxt=*@{nxt=A?;val=int64};val=[Cannot unify int64 and *str:(97)]}",
+        "PA:*[17]@{_; nxt=PA; val=nScalar}",
+        "PA:*[17]@{_; nxt=PA; val=nScalar}",
+        "[17]",null);
+  }
+
+
+  // A generic List, which is given a way to force the values to be a specific
+  // type.
+  @Test public void h_variance_02() {
+    String prog = """
+List = { generic ->
+  { lst val ->
+    dummy = (generic val);
+    @{  nxt=lst;  val=val }
+  }
+};
+
+ListInt = (List {val -> (dec     val)});
+ListStr = (List {val -> (isempty val)});
+
+list_int0 = (ListInt 0 17);
+list_int1 = (ListInt list_int0 19);
+
+list_str0 = (ListStr 0 "red");
+list_str1 = (ListStr list_str0 "blue");
+
+(pair list_int1 list_str1)
+""";
+    // Note that the H-M type is completely unrolled, same as the code
+    run(prog,
+        prog,
+        "*( *@{nxt=*@{nxt = A?; val = int64      }; val = int64      } ," +
+        "   *@{nxt=*@{nxt = B?; val = *str:(int8)}; val = *str:(int8)} )",
+        "*[18](_, 0=PA:*[17]@{_; nxt=PA; val=nScalar}, 1=PA)",
+        "[17,18]",null);
+  }
+
+  // A generic List, which is given a way to force the values to be a specific
+  // type.  Errors if created with the wrong type.
+  @Test public void h_variance_03() {
+    String prog = """
+List = { generic ->
+  { lst val ->
+    dummy = (generic val);
+    @{  nxt=lst;  val=val }
+  }
+};
+
+ListInt = (List {val -> (dec     val)});
+ListStr = (List {val -> (isempty val)});
+
+list_int0 = (ListInt 0 "red");
+list_str0 = (ListStr 0 17);
+(pair list_int0 list_str0)
+""";
+    run(prog,
+        prog,
+        "*( *@{nxt = A?; val = [Cannot unify int64 and *str:(114 )]} ," +
+        "   *@{nxt = B?; val = [Cannot unify 17    and *str:(int8)]} )",
+        "*[18](_, 0=PA:*[17]@{_; nxt=xnil; val=nScalar}, 1=PA)",
+        "[17,18]",null);
+  }
+
+  // Disallow mixing list types.  Fails to catch, e.g.
+  //   (ListCat (ListPet (ListPet someDog) someCat) otherCat)
+  // where the List head claims "all cats" but the List tail is a mix of Pets
+  @Test public void h_variance_04() {
+    String prog = """
+List = { generic ->
+  { lst val ->
+    dummy0 = (generic val);
+    dummy1 = (if lst (lst.generic val) 0);
+    @{  nxt=lst;  val=val;  generic=generic }
+  }
+};
+
+ListInt = (List {val -> (dec     val)});
+ListStr = (List {val -> (isempty val)});
+
+list_int0 = (ListInt 0 17);
+list_str1 = (ListStr list_int0 "red");
+list_str1
+""";
+    String rprog = """
+List = { generic ->
+  { lst val ->
+    dummy0 = (generic val);
+    dummy1 = (if lst ({_lst -> (_lst.generic val)} (notnil lst)) 0);
+    @{ generic=generic;  nxt=lst;  val=val }
+  }
+};
+
+ListInt = (List {val -> (dec     val)});
+ListStr = (List {val -> (isempty val)});
+
+list_int0 = (ListInt 0 17);
+list_str1 = (ListStr list_int0 "red");
+list_str1
+""";
+    run(prog, rprog,
+        "*@{ generic = { A:[Cannot unify int64 and *str:(int8)] -> %int64}; " +
+        "    nxt = *@{ generic={A->%int64}; nxt = *@{ generic = {A -> %B?};...}?; val=A}?;" +
+        "    val = A" +
+        "  }",
+        "PA:*[17]@{_; generic=[35,37]{any,3 -> int64 }; nxt=PA; val=nScalar}",
+        "[17,18]",null);
+  }
+
 
   // Create a boolean-like structure, and unify.
   @Test public void x_peano_00() {
@@ -1344,8 +1498,8 @@ fz = (if (rand 2) fx fy);
         "@{a=testa; b=testb; bool=bool}"+
         "",
 
-        "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
-        "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
+        "*@{ a = nint8; b = *( ); bool = *@{ false = A:%*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:%*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:%*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
+        "*@{ a = nint8; b = *( ); bool = *@{ false = A:%*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:%*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:%*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
         "*[23]@{_; a=nint8 ; b=*[21,22](_); bool=*[20]@{_; false=PA:*[18,19]@{_; and=[29,32]{any,3 -> Scalar }; or=[30,33]{any,3 -> Scalar }; then=[31,34]{any,4 -> Scalar }}; force=[38]{any,3 -> PA }; true=PA}}",
         "*[23]@{_; a=Scalar; b=Scalar     ; bool=*[20]@{_; false=PA:*[18,19]@{_; and=[29,32]{any,3 -> Scalar }; or=[30,33]{any,3 -> Scalar }; then=[31,34]{any,4 -> Scalar }}; force=[38]{any,3 -> PA }; true=PA}}",
         "[17,18,19,20,21,22,23]","[7,8,29,30,31,32,33,34,38]"
@@ -1388,12 +1542,12 @@ false = @{
 boolSub ={b ->(if b ({_b -> true}(notnil b)) false)};
 @{false=(boolSub 0); true=(boolSub 1)}
 """,
-         "*@{ false = A:*@{ and = { A -> A }; "+
+         "*@{ false = A:%*@{ and = { A -> A }; "+
                "not = { B -> A }; "+
                "or = { A -> A }; "+
                "then = { { *( ) -> C } { *( ) -> C } -> C }"+
              "}; "+
-             "true = D:*@{ and = { D -> D }; "+
+             "true = D:%*@{ and = { D -> D }; "+
                "not = { E -> D }; "+
                "or = { D -> D }; "+
                "then = { { *( ) -> F } { *( ) -> F } -> F }"+
@@ -1432,7 +1586,7 @@ boolSub ={b ->(if b ({_b -> true}(notnil b)) false)};
 @{boolSub=boolSub; false=false; true=true };
 all
 """,
-        "*@{ boolSub = { A? -> *@{ not = { B -> C:*@{ not = { D -> C }; then = { { 7 -> E } { 7 -> E } -> E }} }; then = { { 7 -> F } { 7 -> F } -> F }} }; false = C; true = C}",
+        "*@{ boolSub = { A? -> %*@{ not = { B -> C:*@{ not = { D -> C }; then = { { 7 -> E } { 7 -> E } -> E }} }; then = { { 7 -> F } { 7 -> F } -> F }} }; false = C; true = C}",
         """
 *[19]@{_;
   boolSub=[36]{any,3 ->
@@ -1673,7 +1827,7 @@ all
 """,
          """
 *@{
-  false=A:*@{
+  false=A:%*@{
     and={A->A};
     or={A->A};
     then={{*()->B}{*()->B}->B}
@@ -1698,7 +1852,7 @@ all
 """,
          """
 *@{
-  false=A:*@{
+  false=A:%*@{
     and={A->A};
     or={A->A};
     then={{*()->B}{*()->B}->B}
@@ -1807,7 +1961,9 @@ maybepet = petcage.get;
         (if maybepet ({_maybepet -> _maybepet.name     }(notnil maybepet)) "abc")
 )
 """,
-        "*(nflt32,nflt32,*str:(nint8))",
+        "*(%flt64,%flt64,%*str:(nint8))",
+        "*(%flt64,%flt64,%*str:(nint8))",
+        "*[20](_, flt64,  flt64,  *[4]str:(nint8))",
         "*[20](_, Scalar, Scalar, *[4]str:(nint8))",
         "[20]",null);
   }
@@ -1882,6 +2038,4 @@ maybepet = petcage.get;
     }
   }
 
-
 }
-
