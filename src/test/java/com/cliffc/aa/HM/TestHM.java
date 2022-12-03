@@ -2,11 +2,11 @@ package com.cliffc.aa.HM;
 
 import com.cliffc.aa.HM.HM.Root;
 import com.cliffc.aa.type.*;
-
-import org.junit.*;
+import org.junit.BeforeClass;
+import org.junit.FixMethodOrder;
+import org.junit.Ignore;
+import org.junit.Test;
 import org.junit.runners.MethodSorters;
-
-import java.io.*;
 
 import static org.junit.Assert.assertEquals;
 
@@ -28,10 +28,10 @@ public class TestHM {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_HMT=true;
+    DO_HMT=false;
     DO_GCP=true;
-    RSEED=0;
-    f_gcp_hmt_03();
+    RSEED=2;
+    h_variance_03();
   }
 
   private void _run0s( String prog, String rprog, String rez_hm, Type gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -69,7 +69,7 @@ public class TestHM {
     if( JIG )
       _run0s(prog,rprog,rez_hm,gcp,RSEED,esc_ptrs,esc_funs);
     else
-      for( int rseed=0; rseed<32; rseed++ )
+      for( int rseed=0; rseed<4; rseed++ )
         _run0s(prog,rprog,rez_hm,gcp,rseed,esc_ptrs,esc_funs);
   }
 
@@ -95,7 +95,11 @@ public class TestHM {
   private void run( String prog,               String rez_hm, String frez_gcp, String esc_ptrs, String esc_funs ) { run(prog,null ,rez_hm,null,frez_gcp,null,esc_ptrs,esc_funs); }
   private void run( String prog,               String rez_hm, String frez_gcp                                   ) { run(prog,null ,rez_hm,null,frez_gcp,null,null    ,null    ); }
 
-  private static String stripIndent(String s){ return s.replace("\n","").replace(" ",""); }
+  private static String stripIndent(String s){
+    String s2 = s.replaceAll("//.*(?=\\n)", "");
+    String s3 = s2.replace("\n","").replace(" ","");
+    return s3;
+  }
 
 
   @Test public void a_basic_00() { run( "3", "3", "3");  }
@@ -151,7 +155,7 @@ public class TestHM {
   @Test public void a_basic_err_01() {
     run("(+ \"abc\" 0)",
         "%[Cannot unify int64 and *str:(97)?]",
-        "nScalar");
+        "int64");
   }
 
 
@@ -1308,22 +1312,25 @@ fz = (if (rand 2) fx fy);
   }
 
 
-  // A List, effectively a List<Object> that only has ints in it
+
+  // A List, effectively a List<Object>.  Make a list with
+  // mixed ints and strings.
   @Test public void h_variance_00() {
+    String  list = "List = { lst val -> @{ nxt=lst; val=val }};";
+    String  size = "size = { lst -> (if lst            (+ (size  lst.nxt) 1)                  0) };";
+    String rsize = "size = { lst -> (if lst ({ _lst -> (+ (size _lst.nxt) 1) } ( notnil lst)) 0) };";
     String prog = """
-List = { lst val -> @{
-    nxt=lst;
-    val=val
-}};
 list_int0 = (List 0 17);
 list_int1 = (List list_int0 19);
-list_int1
+list_int2 = (List list_int1 "abc");
+(pair (size list_int2) list_int2)
 """;
-    // Note that the H-M type is completely unrolled, same as the code
-    run(prog,
-        "*@{nxt=*@{nxt=A?;val=17};val=19}",
-        "PA:*[17]@{_; nxt=PA; val=nint8}",
-        "[17]",null);
+    run(list +  size + prog,
+        list + rsize + prog,
+        // Note that the H-M type is completely unrolled, same as the code
+        "*( %int64, *@{ nxt=*@{ nxt=*@{ nxt=A?; val=17}; val=19}; val=*str:(97)})",
+        "*[18](_, int64, 1=PA:*[17]@{_; nxt=PA; val=nScalar})",
+        "[17,18]",null);
   }
 
   // A List of Ints, forced by use as an Int by "(dec val)'.
@@ -1331,10 +1338,7 @@ list_int1
     String prog = """
 ListInt = { lst val ->
     dummy = (dec val);
-    @{
-        nxt=lst;
-        val=val
-    }
+    @{ nxt=lst; val=val }
 };
 list_int0 = (ListInt 0 17);
 list_int1 = (ListInt list_int0 "abc");
@@ -1350,108 +1354,71 @@ list_int1
         "[17]",null);
   }
 
+  // Core aa for computing size of linked list
+  static final String  SIZE = "_size = { lst -> (if lst            (+ 1 (_size  lst.next))                  0) };";
+  static final String RSIZE = "_size = { lst -> (if lst ({ _lst -> (+ 1 (_size _lst.next)) } ( notnil lst)) 0) };";
 
+  static final String LIST = """
+// Constructor for a typed linked-list.  Constructor is passed in a
+// type-verifier function: a function which will not type if elements are the
+// wrong type.
+List = { generic ->
+  // Hidden internal function to make a new List container
+  list = { head ->
+    // Structure for the List container
+    @{
+       append = { value ->
+         ignore = (generic value); // Type check element
+         // The list entries have only a next and value field
+         (list @{next=head; value=value})
+       };
+       head = head;
+       size = { -> (_size head) }
+    }
+  };
+
+  // This is the constructor function.  Call with no args to make a new
+  // zero-length typed list.  Same as "new List<T>()"
+  { -> (list 0)}
+};
+
+ListInt = (List {value -> (dec     value)}); // Confirm elements are ints   ; same as "new List<int>()"
+ListStr = (List {value -> (isempty value)}); // Confirm elements are strings; same as "new List<String>()"
+""";
+    
   // A generic List, which is given a way to force the values to be a specific
   // type.
   @Test public void h_variance_02() {
     String prog = """
-List = { generic ->
-  { lst val ->
-    dummy = (generic val);
-    @{  nxt=lst;  val=val }
-  }
-};
-
-ListInt = (List {val -> (dec     val)});
-ListStr = (List {val -> (isempty val)});
-
-list_int0 = (ListInt 0 17);
-list_int1 = (ListInt list_int0 19);
-
-list_str0 = (ListStr 0 "red");
-list_str1 = (ListStr list_str0 "blue");
-
+list_int1 = ((ListInt).append 17   );
+list_str1 = ((ListStr).append "red");
 (pair list_int1 list_str1)
 """;
     // Note that the H-M type is completely unrolled, same as the code
-    run(prog,
-        prog,
-        "*( *@{nxt=*@{nxt = A?; val = int64      }; val = int64      } ," +
-        "   *@{nxt=*@{nxt = B?; val = *str:(int8)}; val = *str:(int8)} )",
-        "*[18](_, 0=PA:*[17]@{_; nxt=PA; val=nScalar}, 1=PA)",
-        "[17,18]",null);
+    run(SIZE  + LIST + prog,
+        RSIZE + LIST + prog,
+        "*( A:*@{append = {  int64      ->A}; head = B:*@{next=B; value=int64}?; size = {->%int64} } ,"+
+        "   C:*@{append = {D:*str:(int8)->C}; head = E:*@{next=E; value=D    }?; size = {->%int64} } )",
+        "*[19](_, 0=PA:*[18]@{_; append=[34]{any,3 -> PA }; head=PB:*[17]@{_; next=PB; value=Scalar}?; size=[35]{any,2 -> int64 }}, 1=PA)",
+        "[17,18,19]","[34,35]");
   }
 
   // A generic List, which is given a way to force the values to be a specific
   // type.  Errors if created with the wrong type.
   @Test public void h_variance_03() {
     String prog = """
-List = { generic ->
-  { lst val ->
-    dummy = (generic val);
-    @{  nxt=lst;  val=val }
-  }
-};
-
-ListInt = (List {val -> (dec     val)});
-ListStr = (List {val -> (isempty val)});
-
-list_int0 = (ListInt 0 "red");
-list_str0 = (ListStr 0 17);
+list_int0 = ((ListInt) "red");
+list_str0 = ((ListStr) 17   );
 (pair list_int0 list_str0)
 """;
-    run(prog,
-        prog,
-        "*( *@{nxt = A?; val = [Cannot unify int64 and *str:(114 )]} ," +
-        "   *@{nxt = B?; val = [Cannot unify 17    and *str:(int8)]} )",
-        "*[18](_, 0=PA:*[17]@{_; nxt=xnil; val=nScalar}, 1=PA)",
-        "[17,18]",null);
+    run(SIZE  + LIST + prog,
+        RSIZE + LIST + prog,
+        "*( A:[Cannot unify {*str:(114)->A} and *@{append={   int64     -> A }; head = B:*@{next=B;value=int64}?;size={->%int64}}] ," +
+        "   C:[Cannot unify {17       -> C} and *@{append={D:*str:(int8)-> C }; head = E:*@{next=E;value=D    }?;size={->%int64}}] )" ,
+        "*[19](_, Scalar, Scalar)",
+        "[17,18,19]",null);
   }
 
-  // Disallow mixing list types.  Fails to catch, e.g.
-  //   (ListCat (ListPet (ListPet someDog) someCat) otherCat)
-  // where the List head claims "all cats" but the List tail is a mix of Pets
-  @Test public void h_variance_04() {
-    String prog = """
-List = { generic ->
-  { lst val ->
-    dummy0 = (generic val);
-    dummy1 = (if lst (lst.generic val) 0);
-    @{  nxt=lst;  val=val;  generic=generic }
-  }
-};
-
-ListInt = (List {val -> (dec     val)});
-ListStr = (List {val -> (isempty val)});
-
-list_int0 = (ListInt 0 17);
-list_str1 = (ListStr list_int0 "red");
-list_str1
-""";
-    String rprog = """
-List = { generic ->
-  { lst val ->
-    dummy0 = (generic val);
-    dummy1 = (if lst ({_lst -> (_lst.generic val)} (notnil lst)) 0);
-    @{ generic=generic;  nxt=lst;  val=val }
-  }
-};
-
-ListInt = (List {val -> (dec     val)});
-ListStr = (List {val -> (isempty val)});
-
-list_int0 = (ListInt 0 17);
-list_str1 = (ListStr list_int0 "red");
-list_str1
-""";
-    run(prog, rprog,
-        "*@{ generic = { A:[Cannot unify int64 and *str:(int8)] -> %int64}; " +
-        "    nxt = *@{ generic={A->%int64}; nxt = *@{ generic = {A -> %B?};...}?; val=A}?;" +
-        "    val = A" +
-        "  }",
-        "PA:*[17]@{_; generic=[35,37]{any,3 -> int64 }; nxt=PA; val=nScalar}",
-        "[17,18]",null);
-  }
 
 
   // Create a boolean-like structure, and unify.

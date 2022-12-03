@@ -115,7 +115,7 @@ public interface Cyclic {
       // in a different order on a later install.  Requires 2 passes.
       long cyc_hash=0;
       for( Type c : ts )  cyc_hash ^= c.static_hash(); // Just XOR all the static hashes
-      if( cyc_hash==0 ) cyc_hash = 0xcafebabe;         // Disallow zero hash
+      if( cyc_hash==0 ) cyc_hash = 0xcafebabeL;        // Disallow zero hash
       for( Type c : ts )  c._cyc_hash = cyc_hash;      // Set cyc_hash to the same for all cycle members
       for( Type c : ts )  c._hash = c.compute_hash();  // Now compute proper hash - depends on cyc_hash plus the member specifics
 
@@ -129,14 +129,15 @@ public interface Cyclic {
         // Keep the entire cycle.  xdual/rdual/hash/retern
         Type.RECURSIVE_MEET++; // Stop xdual interning TypeFlds
         // Build the dual cycle, with dual leader
-        for( Type c : ts ) { Type d = c._dual = c.xdual(); d._dual = c; }
+        for( Type c : ts ) if( !(c instanceof TypeStruct) ) { Type d = c._dual = c.xdual(); d._dual = c; }
+        for( Type c : ts ) if( c._dual == null            ) { Type d = c._dual = c.xdual(); d._dual = c; }
         Type dleader = leader.dual();
         dleader.set_cyclic(dleader); // Dual cycle-leader, head of the dual cycle
         for( Type c : ts ) { c.rdual(); c._dual.set_cyclic(dleader); }
         // Compute the dual hash
         long dcyc_hash = 0;
         for( Type c : ts ) dcyc_hash ^= c._dual.static_hash();
-        if( dcyc_hash==0 ) dcyc_hash = 0xcafebabe; // Disallow zero hash
+        if( dcyc_hash==0 ) dcyc_hash = 0xcafebabeL; // Disallow zero hash
         for( Type c : ts ) { c._dual._cyc_hash = dcyc_hash; }
         for( Type c : ts ) { c._dual._hash = c._dual.compute_hash(); }
         

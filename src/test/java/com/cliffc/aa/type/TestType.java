@@ -66,6 +66,7 @@ public class TestType {
       "PA:*[7]@{_; add=[23]{any,4 -> PA }; i=int64}", // Struct with function return self-reference
       "PA:*[18]@{_; n1=*[17]@{_; n1=PA; FB:v1=7}; FB}", // DUP Field
       "*[18](_, 0=PA:*[17](_, *[4,5]@{_; x=nScalar}, nScalar), 1=PA)",
+      "@{FA:head=*[17]@{_; FA}?}", // Shared field in unrelated structs
       "{Ctrl,[[_all_]],SB:int:int64,SB}", // Label on a wrapped int
     };
     for( String s : ss ) {

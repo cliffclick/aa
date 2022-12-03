@@ -310,12 +310,13 @@ public class HM {
   // Program text for parsing
   private static int X;
   private static byte[] BUF;
-  @Override public String toString() { return new String(BUF,X,BUF.length-X); }
+  @Override public String toString() { return str(); }
+  static String str() { return new String(BUF,X,BUF.length-X); }
   static Root parse( String s ) {
     X = 0;
     BUF = s.getBytes();
     Syntax prog = fterm();
-    if( skipWS() != -1 ) throw unimpl("Junk at end of program: "+new String(BUF,X,BUF.length-X));
+    if( skipWS() != -1 ) throw unimpl("Junk at end of program: " + new String(BUF, X, BUF.length - X));
     // Inject IF at root
     return new Root(prog);
   }
@@ -2030,14 +2031,15 @@ public class HM {
     @Override Type apply( Type[] flows) {
       Type t0 = flows[0];
       Type t1 = flows[1];
-      if( t0 == TypeNil.XNIL ) return t1.meet(TypeInt.INT64.dual());
-      if( t1 == TypeNil.XNIL ) return t0.meet(TypeInt.INT64.dual());
+      if( t0.must_nil() || t1.must_nil() )
+        return TypeInt.INT64;   // Mixing ~_0int64 (NIL AND choice-int)
       if( t0.above_center() || t1.above_center() )
         return TypeInt.INT64.dual();
-      if( t0 instanceof TypeInt && t1 instanceof TypeInt ) {
-        if( t0.is_con() && t1.is_con() )
-          return TypeInt.con(t0.getl()+t1.getl());
-      }
+      if( t0 == TypeNil.XNIL ) return t1.meet(TypeInt.INT64.dual());
+      if( t1 == TypeNil.XNIL ) return t0.meet(TypeInt.INT64.dual());
+      if( t0 instanceof TypeInt && t1 instanceof TypeInt &&
+          t0.is_con() && t1.is_con() )
+        return TypeInt.con(t0.getl()+t1.getl());
       return TypeInt.INT64;
     }
   }
