@@ -1354,7 +1354,8 @@ list_int1
         "[17]",null);
   }
 
-  // Core aa for computing size of linked list
+  // Core aa for computing size of linked list.  Only cares that 'lst' has a
+  // next field pointing to more things with more next fields.
   static final String  SIZE = "_size = { lst -> (if lst            (+ 1 (_size  lst.next))                  0) };";
   static final String RSIZE = "_size = { lst -> (if lst ({ _lst -> (+ 1 (_size _lst.next)) } ( notnil lst)) 0) };";
 
