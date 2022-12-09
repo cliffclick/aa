@@ -1,7 +1,7 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.*;
-import java.util.Arrays;
+import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.Util;
 
 // An AryI generified to TypeFld
 public class TypeFlds extends AryI<TypeFld> {
@@ -56,7 +56,7 @@ public class TypeFlds extends AryI<TypeFld> {
 
   // Append a field.  Preserve alpha order.  Does not hash-cons.
   // Does not free the original (in case it was interned).
-  public static TypeFld[] add(TypeFld[] flds, TypeFld fld) {
+  public static TypeFld[] add_sort(TypeFld[] flds, TypeFld fld) {
     TypeFld[] fs = copyOf(flds,flds.length+1);
     fs[flds.length]=fld;
     int i=0;

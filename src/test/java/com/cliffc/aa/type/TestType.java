@@ -12,22 +12,17 @@ import static org.junit.Assert.*;
 public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
-    Type mtx = Type.valueOf(" @{add =  XA: [ 4]{all, 4 -> XA }     }");
-    Type mtd = Type.valueOf("~@{add!=! XA:~[-4]{any,-4 -> XA }; ...}");
-    //Type mtx = Type.valueOf(" XA: [ 4]{all, 4 -> XA }");
-    //Type mtd = Type.valueOf(" XA:~[-4]{any,-4 -> XA }");
-    assertEquals(mtd,mtx._dual);
-    assertSame  (mtd,mtx._dual);
+    Type t0 = TypeNil.XNIL;
+    Type t1 = TypeStruct.ISUSED._dual;
+    Type mt01 = t0.meet(t1);
+    Type t2 = TypeInt.INT64._dual;
+    Type mt012 = mt01.meet(t2);
+    assertSame(TypeNil.SCALAR,mt012);
 
-
-    
-    //Type t0 = Type.valueOf("PA:*[3]@{_; add=[4]{any,4 -> PA }; i=int64}");
-    //Type t1 = t0._dual;
-    //Type mt = t0.meet(t1);
-    //Type t0d = Type.valueOf("PA:~*[-3]~@{^!=!all; add!=!~[-4]{all,-4 -> PA }; i!=!~int64; ...}");
-    //// check symmetry
-    //Type t0x = mtd.meet(t0._dual);
-    //assertSame(t0._dual,t0x);
+    //Type t2 = TypeInt.INT64._dual;
+    //Type t3 = TypeStruct.C0._dual;
+    //Type mt23 = t2.meet(t3);
+    //assertSame(TypeNil.SCALAR,mt23);    
   }
 
   // Test for a collection of Types, that toString and valueOf are a bijection
@@ -38,7 +33,7 @@ public class TestType {
       ss[i] = ts.at(i).str(new SB(), true, false).toString();
     for( int i=0; i<ts.len(); i++ ) {
       Type t = Type._valueOf(ss[i]);
-      assertEquals(ts.at(i),t);
+      assertSame(ts.at(i),t);
     }
   }
   // Test for a collection of Strings, that toString and valueOf are a bijection
@@ -470,18 +465,18 @@ public class TestType {
     // AS0AS0AS0AS0AS0AS0...
     final int alias2 = BitsAlias.new_alias(BitsAlias.ALLX);
     TypeMemPtr tptr2= TypeMemPtr.make_nil(alias2,TypeStruct.ISUSED); // *[0,2]
-    TypeStruct ta2 = TypeStruct.make("A:",Type.ALL,TypeFld.make("n",tptr2),fldv); // @{n:*[0,2],v:int}
+    TypeStruct ta2 = TypeStruct.make_test("A:",Type.ALL,TypeFld.make("n",tptr2),fldv); // @{n:*[0,2],v:int}
 
     // Peel A once without the nil: Memory#3: A:@{n:*[2],v:int}
     // ASAS0AS0AS0AS0AS0AS0...
     final int alias3 = BitsAlias.new_alias(BitsAlias.ALLX);
     TypeMemPtr tptr3= TypeMemPtr.make(alias3,TypeStruct.ISUSED); // *[3]
-    TypeStruct ta3 = TypeStruct.make("A:",Type.ALL,TypeFld.make("n",tptr2),fldv); // @{n:*[0,2],v:int}
+    TypeStruct ta3 = TypeStruct.make_test("A:",Type.ALL,TypeFld.make("n",tptr2),fldv); // @{n:*[0,2],v:int}
 
     // Peel A twice without the nil: Memory#4: A:@{n:*[3],v:int}
     // ASASAS0AS0AS0AS0AS0AS0...
     final int alias4 = BitsAlias.new_alias(BitsAlias.ALLX);
-    TypeStruct ta4 = TypeStruct.make("A:",Type.ALL,TypeFld.make("n",tptr3),fldv); // @{n:*[3],v:int}
+    TypeStruct ta4 = TypeStruct.make_test("A:",Type.ALL,TypeFld.make("n",tptr3),fldv); // @{n:*[3],v:int}
 
     // Then make a MemPtr{3,4}, and ld - should be a PeelOnce
     // Starting with the Struct not the A we get:
@@ -501,12 +496,12 @@ public class TestType {
     Type mta = mem234.ld(ptr34);
     //assertEquals(ta3,mta);
     TypeMemPtr ptr023 = (TypeMemPtr)TypeMemPtr.make_nil(alias2,TypeStruct.ISUSED).meet(TypeMemPtr.make(alias3,TypeStruct.ISUSED));
-    TypeStruct xta = TypeStruct.make("A:",Type.ALL,TypeFld.make("n",ptr023),fldv);
+    TypeStruct xta = TypeStruct.make_test("A:",Type.ALL,TypeFld.make("n",ptr023),fldv);
     assertEquals(xta,mta);
 
     // Mismatched Names in a cycle; force a new cyclic type to appear
     final int alias5 = BitsAlias.new_alias(BitsAlias.ALLX);
-    TypeStruct tfb = TypeStruct.make("B:",Type.ALL,TypeFld.make("n",TypeMemPtr.make_nil(alias5,TypeStruct.ISUSED)),TypeFld.make("v",TypeFlt.FLT64));
+    TypeStruct tfb = TypeStruct.make_test("B:",Type.ALL,TypeFld.make("n",TypeMemPtr.make_nil(alias5,TypeStruct.ISUSED)),TypeFld.make("v",TypeFlt.FLT64));
     Type mtab = ta2.meet(tfb);
 
     // TODO: Needs a way to easily test simple recursive types

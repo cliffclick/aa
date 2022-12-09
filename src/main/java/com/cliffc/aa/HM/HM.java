@@ -2113,10 +2113,11 @@ public class HM {
     TypeMemPtr tmp();
     // Assemble a rich / deep pointer from parts
     default TypeMemPtr _tmp(int alias, String[] ids, Type[] ts) {
-      TypeFld[] tfs = TypeFlds.make(TypeFld.NO_DISP); // Display
+      TypeFld[] tfs = TypeFlds.get(1);  // Display
+      tfs[0] = TypeFld.NO_DISP;
       for( int i=0; i<ts.length; i++ )                // Insert and alpha sort 
-        tfs = TypeFlds.add(tfs,TypeFld.make(ids[i],ts[i]));
-      return TypeMemPtr.make(alias,TypeStruct.make("", Type.ALL,TypeFlds.hash_cons(tfs)));
+        tfs = TypeFlds.add_sort(tfs,TypeFld.make(ids[i],ts[i]));
+      return TypeMemPtr.make(alias,TypeStruct.make_flds("", Type.ALL,tfs));
     }
     // Get a flow type from a field id
     Type fld(String id, Syntax foo);
@@ -2446,7 +2447,7 @@ public class HM {
         if( tstr==null ) {
           // Returning a high version of struct
           Type.RECURSIVE_MEET++;
-          tstr = TypeStruct.malloc("",is_open() ? Type.ANY : Type.ALL,TypeFlds.get(0));
+          tstr = TypeStruct.malloc(false,"",Type.ALL.oob(is_open()),TypeFlds.get(0));
           if( _args!=null ) {
             for( String fld : _args.keySet() )
               if( fld.endsWith(":") ) tstr._clz = fld; // Move a nomative tag into the clz field

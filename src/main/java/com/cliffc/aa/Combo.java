@@ -188,7 +188,7 @@ public abstract class Combo {
       n.combo_unify();
 
       // Very expensive assert: everything that can make progress is on worklist
-      assert Env.ROOT.more_work(false)==0;
+      //assert Env.ROOT.more_work(false)==0;
     }
     return cnt;
   }

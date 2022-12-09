@@ -516,7 +516,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
 
   // Compute the meet
   public final Type meet( Type t ) {
-    // Short cut for the self case
+    // Shortcut for the self case
     if( t == this ) return this;
     // Short-cut for seeing this meet before
     Type mt = Key.get(this,t);
@@ -544,7 +544,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       if( t0._type==TNIL ) return t0.nmeet(t1); 
       if( t1._type==TNIL ) return t1.nmeet(t0);
       // Mis-matched TypeNil subclasses
-      return t0.cross_nil(t1);
+      return t0.widen_sub().meet(t1.widen_sub());
     }
     return Type.ALL;        // Mixing 2 unrelated types not subclassing TypeNil
   }
@@ -568,9 +568,10 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // By design in meet, args are already flipped to order _type, which forces
   // symmetry for things with badly ordered _type fields.  The question is
   // still interesting for other orders.
-  private boolean check_commute( Type t, Type mt ) {
+  private boolean check_commute( Type t ) {
     if( t==this ) return true;
     if( is_simple() && !t.is_simple() ) return true; // By design, flipped the only allowed order
+    Type mt  = this.meet(t);
     Type mt2 = t.meet(this);   // Reverse args and try again
 
     if( mt==mt2 ) return true;
@@ -580,8 +581,9 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // A & B = MT
   // Expect: ~A & ~MT == ~A
   // Expect: ~B & ~MT == ~B
-  private boolean check_symmetric( Type t, Type mt ) {
+  private boolean check_symmetric( Type t ) {
     if( t==this ) return true;
+    Type mt  = this.meet(t);
     Type ta = mt._dual.meet(t._dual);
     Type tb = mt._dual.meet(  _dual);
     if( ta==t._dual && tb==_dual ) return true;
@@ -653,9 +655,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     // Confirm commutative & complete
     for( Type t0 : ts )
       for( Type t1 : ts ) {
-        Type mt = t0.meet(t1);
-        if( !t0.check_commute  (t1,mt) ) errs++;
-        if( !t0.check_symmetric(t1,mt) ) errs++;
+        if( !t0.check_commute  (t1) ) errs++;
+        if( !t0.check_symmetric(t1) ) errs++;
       }
     assert errs==0 : "Found "+errs+" symmetric errors";
 
@@ -753,10 +754,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     return arf;
   }
   BitsFun _all_reaching_fidxs( TypeMem tmem ) { return BitsFun.EMPTY; }
-  // Recursion strings are always 2 chars, all upper-case
-  private static boolean isRecur(String s) {
-    return s.length()==2 && Character.isUpperCase(s.charAt(0)) && Character.isUpperCase(s.charAt(1));
-  }
 
   // Parse an indented string to get a Type back.  Handles cyclic types.
   // Example: "[0,ALL]{all,1 ->PA:*[0,5]@{^=any; n1=PA; v1=Scalar} }"

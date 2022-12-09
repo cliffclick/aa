@@ -43,6 +43,7 @@ public class TypeFlt extends TypeNil<TypeFlt> {
     return switch(cid) {
     case "flt64"  -> FLT64;
     case "flt32"  -> FLT32;
+    case "nflt64" -> NFLT64;
     case "nflt32" -> NFLT32;
     default       -> null;
     };
@@ -57,15 +58,13 @@ public class TypeFlt extends TypeNil<TypeFlt> {
     TypeFlt t1 = POOLS[TFLT].malloc();
     return t1.init(any,nil,sub,z,con).hashcons_free();
   }
-  @Override TypeFlt make_from( boolean any, boolean nil, boolean sub ) {
-    nil &= sub;
-    return any == _any && nil == _nil && sub == _sub ? this : make(any,nil,sub,_z,_con);
-  }
+  @Override TypeFlt make_from( boolean nil, boolean sub ) { return make(_any,nil,sub,_z,_con); }
 
   public static TypeFlt con(double con) { return make(false,false,true,0,con); }
 
   public static final TypeFlt FLT64 = make(false,false,false,64,0);
   public static final TypeFlt FLT32 = make(false,false,false,32,0);
+  public static final TypeFlt NFLT64= make(false,false,true ,64,0);
   public static final TypeFlt NFLT32= make(false,false,true ,32,0);
   public static final TypeFlt PI    = con(Math.PI);
   public static final TypeFlt HALF  = con(0.5);

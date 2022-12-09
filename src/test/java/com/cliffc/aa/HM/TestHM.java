@@ -30,8 +30,8 @@ public class TestHM {
 
     DO_HMT=false;
     DO_GCP=true;
-    RSEED=2;
-    h_variance_03();
+    RSEED=0;
+    f_gcp_hmt_02();
   }
 
   private void _run0s( String prog, String rprog, String rez_hm, Type gcp, int rseed, String esc_ptrs, String esc_funs  ) {

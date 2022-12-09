@@ -62,7 +62,7 @@ public final class RetNode extends Node {
     TypeFld[] ts = TypeFlds.get(_nargs-DSP_IDX);
     for( int i=DSP_IDX; i<_nargs; i++ )
       ts[i-DSP_IDX] = TypeFld.make_tup(parms[i]==null ? Type.ANY : parms[i]._t, i);
-    return TypeStruct.make0("",Type.ALL,ts);
+    return TypeStruct.make(ts);
   }
 
 

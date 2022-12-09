@@ -1264,7 +1264,7 @@ public class Parse implements Comparable<Parse> {
   private Type ttuple() {
     int oldx = _x;
     peek('(');
-    TypeStruct ts = TypeStruct.malloc("",Type.ALL,TypeFlds.EMPTY);
+    TypeStruct ts = TypeStruct.malloc(false,"",Type.ALL,TypeFlds.EMPTY);
     while(true) {
       Type t = type(false,null);
       if( t==null ) { _x=oldx; return ts.free(null); }

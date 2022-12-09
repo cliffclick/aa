@@ -55,7 +55,7 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeNil tn) || _type != tn._type ) return false;
-    return _any==tn._any && _sub ==tn._sub && _nil ==tn._nil;
+    return _eq(tn);
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
 
@@ -64,8 +64,9 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   boolean static_eq(N t) {
     if( this==t ) return true;
     if( _type != t._type ) return false;
-    return _any==t._any && _sub ==t._sub && _nil ==t._nil;
+    return _eq(t);
   }
+  boolean _eq(TypeNil tn) { return _any==tn._any && _nil==tn._nil && _sub==tn._sub;  }
 
   static final String[][][] NSTRS = new String[][][]{
     {{ ""    , "n" },  // all, !nil, {!sub,sub}  AND, NOT
@@ -112,7 +113,7 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     TypeNil tn = POOLS[TNIL].malloc();
     return (TypeNil)tn.init(any, nil, sub).hashcons_free();
   }
-  TypeNil make_from( boolean any, boolean nil, boolean sub ) { throw unimpl(); }
+  TypeNil make_from( boolean nil, boolean sub ) { return make(_any,nil,sub); }
 
   // Plain TypeNil (no subclass) has 8 possibilities:
   // XSCALAR OR  NIL  -- choice of anything
@@ -150,34 +151,27 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     boolean any = _any & tn._any;
     boolean nil = _nil & tn._nil;
     boolean sub = _sub & tn._sub;
-    // No edge to nil
+    // No edge xnil -> nil.  See testLattice22_nil2()
     TypeNil rez = make(any,nil,sub);
     if( rez==NIL && (tn==XNIL || this==XNIL) )
       return SCALAR;
     return rez;
   }
 
-  // LHS is TypeNil directly; RHS is a TypeNil subclass
-  final TypeNil nmeet(TypeNil tn) {
-    assert _type==TNIL && tn._type!=TNIL;
-    boolean any = _any & tn._any;
-    boolean nil = _nil & tn._nil;
-    boolean sub = _sub & tn._sub;
-    if( !_any ) return make(any,nil,sub); // Falling past 'tn' to a low TypeNil
-    // If type would fall to subtype YES-nil, fall to AND-nil instead
-    nil &= sub;
-    return tn.make_from(any,nil,sub);
+  // LHS is TypeNil directly; RHS is a TypeNil subclass.
+  final Type nmeet(TypeNil tsub) {
+    assert _type==TNIL && tsub._type!=TNIL;
+    if( !_any )                 // Falling past 'tsub' to a low TypeNil
+      return meet(tsub.widen_sub());
+    boolean nil = _nil & tsub._nil;
+    boolean sub = _sub & tsub._sub;
+    nil &= sub; // If type would fall to subtype YES-nil, fall to AND-nil instead
+    if( nil==tsub._nil && sub==tsub._sub ) return tsub;
+    return tsub.make_from( nil, sub );
   }
 
-  // Meet the nil bits, but the subclass parts are not the same.
-  // Fall to a TypeUnion.
-  Type cross_nil( TypeNil tn ) {
-    assert _type!=tn._type && _type!=TNIL && tn._type!=TNIL;   // Unrelated subclass parts
-    boolean any = false; // Unrelated sub-parts cannot keep their choices; falls to Scalar-plus-nil-whatever
-    boolean nil = _nil & tn._nil;
-    boolean sub = _sub & tn._sub;
-    return make(any,nil,sub);
-  }
+  // Widen subtype to a TypeNil, losing its sub structure.
+  final Type widen_sub() { return _type==TNIL ? this : make(false,_nil,_sub); }
 
   // Type must support a nil
   @Override public boolean must_nil() { return !_sub; }

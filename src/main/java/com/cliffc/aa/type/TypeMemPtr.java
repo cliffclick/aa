@@ -29,8 +29,8 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     _obj=obj;
     return this;
   }
-  private TypeMemPtr init(boolean any, boolean nil, BitsAlias aliases, TypeStruct obj ) {
-    super.init(any,nil);
+  private TypeMemPtr init(boolean any, boolean haz_nil, BitsAlias aliases, TypeStruct obj ) {
+    super.init(any,haz_nil);
     return _init(aliases,obj);
   }
   private TypeMemPtr init(boolean any, boolean nil, boolean sub, BitsAlias aliases, TypeStruct obj ) {
@@ -97,16 +97,16 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
 
 
   static { new Pool(TMEMPTR,new TypeMemPtr()); }
-  public static TypeMemPtr malloc(boolean any, boolean nil, BitsAlias aliases, TypeStruct obj ) {
+  public static TypeMemPtr malloc(boolean any, boolean haz_nil, BitsAlias aliases, TypeStruct obj ) {
     TypeMemPtr t1 = POOLS[TMEMPTR].malloc();
-    return t1.init(any,nil,aliases,obj);
+    return t1.init(any,haz_nil,aliases,obj);
   }
-  public static TypeMemPtr make(boolean nil, BitsAlias aliases, TypeStruct obj ) {
+  public static TypeMemPtr make(boolean haz_nil, BitsAlias aliases, TypeStruct obj ) {
     assert !aliases.is_empty(); // Ambiguous
-    return malloc(aliases.above_center(),nil,aliases,obj).hashcons_free();
+    return malloc(aliases.above_center(),haz_nil,aliases,obj).hashcons_free();
   }
-  public static TypeMemPtr make(boolean any, boolean nil, BitsAlias aliases, TypeStruct obj ) {
-    return malloc(any,nil,aliases,obj).hashcons_free();
+  public static TypeMemPtr make(boolean any, boolean haz_nil, BitsAlias aliases, TypeStruct obj ) {
+    return malloc(any,haz_nil,aliases,obj).hashcons_free();
   }
   public static TypeMemPtr malloc(boolean any, boolean nil, boolean sub, BitsAlias aliases, TypeStruct obj ) {
     TypeMemPtr t1 = POOLS[TMEMPTR].malloc();
@@ -120,14 +120,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public static TypeMemPtr make_nil( int alias, TypeStruct obj ) { return make(true,BitsAlias.make0(alias),obj); }
   public TypeMemPtr make_from( TypeStruct obj ) { return _obj==obj ? this : malloc_from(obj).hashcons_free(); }
   public TypeMemPtr make_from( BitsAlias aliases ) { return _aliases==aliases ? this : make(aliases.test(0),aliases.clear(0),_obj); }
-  public TypeMemPtr make_from_nil( BitsAlias aliases ) {
-    if( _aliases==aliases ) return this;
-    return make(_aliases.test(0),aliases,_obj);
-  }
-  @Override TypeMemPtr make_from( boolean any, boolean nil, boolean sub ) {
-    nil &= sub;
-    return any == _any && nil == _nil && sub == _sub ? this : malloc(any,nil,sub,_aliases,_obj).hashcons_free();
-  }
+  @Override TypeMemPtr make_from( boolean nil, boolean sub ) { return malloc(_any,nil,sub,_aliases,_obj).hashcons_free(); }
 
   // Legacy constructor for legacy HM tests
   public static final int STR_ALIAS = 4; // Legacy str ptr value
@@ -152,7 +145,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     TypeStruct.RECURSIVE_MEET++;
     TypeFld[] flds = TypeFlds.make(DISP_FLD);
     TypeStruct.RECURSIVE_MEET--;
-    DISPLAY = TypeStruct.malloc("",Type.ALL,flds);
+    DISPLAY = TypeStruct.malloc(false,"",ALL,flds);
     DISPLAY_PTR = malloc(false,false,BitsAlias.NALL,DISPLAY);
     DISP_FLD.setX(DISPLAY_PTR);
     TypeStruct ds = Cyclic.install(DISPLAY);

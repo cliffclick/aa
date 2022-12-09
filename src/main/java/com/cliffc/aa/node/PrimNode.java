@@ -105,8 +105,8 @@ public abstract class PrimNode extends Node {
     // Gather
     Ary<PrimNode> allprims = new Ary<>(others);
     for( PrimNode prim : others ) allprims.push(prim);
-    for( PrimNode prims[] : INTS   ) for( PrimNode prim : prims ) allprims.push(prim);
-    for( PrimNode prims[] : FLTS   ) for( PrimNode prim : prims ) allprims.push(prim);
+    for( PrimNode[] prims : INTS   ) for( PrimNode prim : prims ) allprims.push(prim);
+    for( PrimNode[] prims : FLTS   ) for( PrimNode prim : prims ) allprims.push(prim);
     PRIMS = allprims.asAry();
 
     // Build the int and float types and prototypes
@@ -122,8 +122,8 @@ public abstract class PrimNode extends Node {
   public static TypeStruct make_int(long   i) { return TypeStruct.make_int(TypeInt.con(i)); }
   public static TypeStruct make_flt(double d) { return TypeStruct.make_flt(TypeFlt.con(d)); }
 
-  public static TypeStruct make_wrap(Type t) {
-    return TypeStruct.make(t instanceof TypeInt ? "int:" : "flt:",t);
+  public static TypeStruct make_wrap(TypeNil t) {
+    return TypeStruct.make(false,t instanceof TypeInt ? "int:" : "flt:",t,TypeFlds.EMPTY);
   }
   public static TypeInt unwrap_i(Type t) { return (TypeInt)((TypeStruct)t)._def; }
   public static TypeFlt unwrap_f(Type t) { return (TypeFlt)((TypeStruct)t)._def; }
@@ -543,7 +543,7 @@ public abstract class PrimNode extends Node {
       if( val(1)==Type.ALL ) return TypeStruct.INT;
       TypeInt t = unwrap_i(val(1));
       if( TypeInt.INT64.dual().isa(t) && t.isa(TypeInt.INT64) )
-        return make_wrap(t.meet(TypeNil.XNIL));
+        return make_wrap((TypeNil)t.meet(TypeNil.XNIL));
       return t.oob(TypeStruct.INT);
     }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }

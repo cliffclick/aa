@@ -114,8 +114,6 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   public static TypeFld make( String fld ) { return make(fld,TypeNil.SCALAR,Access.Final); }
   public static TypeFld make( Type def ) { return make(fldBot,def,Access.Final); }
   public static TypeFld make_dsp(Type t) { return make("^",t,Access.Final); }
-  // Make a not-interned version for building cyclic types
-  public TypeFld malloc_from() { return malloc(_fld,_t,_access); }
 
   // Some convenient default constructors
   static final String[] ARGS = new String[]{" ctl", " mem", "^","x","y","z"};
@@ -143,21 +141,6 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     Type   t     = _t     .meet(f._t     );
     Access access= _access.meet(f._access);
     return make(fld,t,access);
-  }
-
-  private static TypeFld malloc( String fld, Access a ) {
-    TypeFld tfld = POOLS[TFLD].malloc();
-    return tfld.init(fld,null,a);
-  }
-
-  // Used during cyclic struct meets, either side (but not both) might be null,
-  // and the _t field is not filled in.  A new TypeFld is returned.
-  static TypeFld cmeet(TypeFld f0, TypeFld f1) {
-    if( f0==null ) return malloc(f1._fld,f1._access);
-    if( f1==null ) return malloc(f0._fld,f0._access);
-    String fld   = smeet(f0._fld,  f1._fld);
-    Access access= f0._access.meet(f1._access);
-    return malloc(fld,access);
   }
 
   public enum Access {
@@ -193,16 +176,6 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     if( Util.eq(s0,fldTop) ) return s1;
     if( Util.eq(s1,fldTop) ) return s0;
     return fldBot;
-  }
-  // True if fld0 < fld1
-  static boolean sbefore(TypeFld fld0, TypeFld fld1) {
-    if( fld0==null ) return false;
-    if( fld1==null ) return true ;
-    if( Util.eq(fld0._fld,fldTop) ) return true;
-    if( Util.eq(fld0._fld,fldBot) ) return true;
-    if( Util.eq(fld1._fld,fldTop) ) return false;
-    if( Util.eq(fld1._fld,fldBot) ) return false;
-    return fld0._fld.compareTo(fld1._fld)<0;
   }
 
   public static final TypeFld NO_DISP = make("^",Type.ANY,Access.Final);

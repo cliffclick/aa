@@ -102,7 +102,6 @@ public class TypeTuple extends Type<TypeTuple> {
   public  static final TypeTuple CALLE= make(CTRL, TypeMem.ALLMEM, ALL); // Type of CallEpiNodes
   public  static final TypeTuple TEST0= make(CTRL, TypeMem.ALLMEM, TypeFunPtr.GENERIC_FUNPTR, TypeNil.SCALAR); // Call with 1 arg
   public  static final TypeTuple TEST1= make(CTRL, TypeMem.ANYMEM, TypeFunPtr.GENERIC_FUNPTR, TypeNil.SCALAR); // Call with 1 arg
-  public  static final TypeTuple ROOT0= make(CTRL, TypeMem.ALLMEM, TypeRPC.ALL_CALL, TypeFunPtr.make(BitsFun.NALL,1),TypeMemPtr.ISUSED.make_from(BitsAlias.NALL));
   // Arguments
   public  static final TypeTuple INT64      = make(CTRL, TypeMem.ALLMEM, TypeStruct.INT); // {int->flt}
   public  static final TypeTuple FLT64      = make(CTRL, TypeMem.ALLMEM, TypeStruct.FLT); // {flt->flt}
@@ -119,7 +118,7 @@ public class TypeTuple extends Type<TypeTuple> {
     INT64, FLT64, INT64_INT64, FLT64_FLT64, OOP_OOP
   };
 
-  // The length of Tuples is a constant, and so is its own dual.  Otherwise
+  // The length of Tuples is a constant, and so is its own dual.  Otherwise,
   // just dual each element.  Also flip the infinitely extended tail type.
   @Override protected TypeTuple xdual() {
     Type[] ts = Types.get(_ts.length);

@@ -195,7 +195,7 @@ public class StructNode extends Node {
     TypeFld[] flds = TypeFlds.get(_flds.len());
     for( int i=0; i<flds.length; i++ )
       flds[i] = TypeFld.make(_flds.at(i),in(i)._val,_accesses.at(i));
-    return TypeStruct.make0(_clz,_def,flds);
+    return TypeStruct.make_flds(_clz,_def,flds);
   }
 
   // Return liveness for a field

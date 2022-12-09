@@ -42,7 +42,7 @@ public class TypeRPC extends TypeNil<TypeRPC> {
     return POOLS[TRPC].<TypeRPC>malloc().init(any,nil,sub,rpcs);
   }
   public static TypeRPC make( boolean any, boolean nil, boolean sub, BitsRPC rpcs ) { return malloc(any,nil,sub,rpcs).hashcons_free(); }
-  @Override TypeRPC make_from( boolean any, boolean nil, boolean sub ) { return make(any,nil,sub,_rpcs); }
+  @Override TypeRPC make_from( boolean nil, boolean sub ) { return make(_any,nil,sub,_rpcs); }
 
   public static TypeRPC make( int rpc ) { return make(false,false,true,BitsRPC.make0(rpc)); }
   public static final TypeRPC ALL_CALL = make(false,false,true,BitsRPC.NALL);
