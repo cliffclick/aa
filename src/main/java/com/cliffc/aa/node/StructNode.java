@@ -83,6 +83,14 @@ public class StructNode extends Node {
     _fld_starts = new Ary<>(new Parse[1],0);
   }
 
+  public StructNode make_con(TypeNil t) {
+    StructNode ts = new StructNode(false,false,_paren_start,_clz,_def);
+    ts.add_fld("!",TypeFld.Access.Final,this,null);
+    ts.add_fld(".",TypeFld.Access.Final,con(t),null);
+    ts.close();
+    return ts.init();
+  }
+  
   @Override String str() {
     SB sb = new SB().p(_clz).p("@{");
     if( _flds.isEmpty() ) return sb.p("}").toString();

@@ -186,7 +186,7 @@ public abstract class PrimNode extends Node {
   // Build and install match package
   private static StructNode make_math(PrimNode rand) {
     StructNode rec = new StructNode(false,false,null,"",Type.ALL);
-    rec.add_fld("pi",Access.Final,SetFieldNode.make("flt:",TypeFlt.PI),null);
+    rec.add_fld("pi",Access.Final,FLT.make_con(TypeFlt.PI),null);
     rec.add_fld(rand._name,Access.Final,rand.as_fun(),null);
     rec.init();
     rec.close();

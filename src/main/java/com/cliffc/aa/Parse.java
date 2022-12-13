@@ -1424,9 +1424,9 @@ public class Parse implements Comparable<Parse> {
   private Node mem() { return scope().mem(); }
   private void set_mem( Node n) { scope().set_mem(n); }
 
-  private Node con( Type t, String intflt ) {
-    StructNode ts = _e.lookup_type(intflt);
-    return gvn(new SetFieldNode("!",Access.Final,ts,Node.con(t),null));
+  private Node con( TypeNil t, String intflt ) {
+    StructNode proto = _e.lookup_type(intflt);
+    return gvn(proto.make_con(t));
   }
 
   // Lookup & extend scopes
