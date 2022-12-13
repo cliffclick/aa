@@ -5,7 +5,10 @@ import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.VBitSet;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 
 import static com.cliffc.aa.AA.*;
 
@@ -49,8 +52,6 @@ public class Env implements AutoCloseable {
   public static final ConNode ALL;   // Common ALL / used for errors
   public static final ConNode XCTRL; // Always dead control
   public static final ConNode XNIL;  // Default 0
-  public static final ConNode INT;   // Default int parameter
-  public static final ConNode FLT;   // Default flt parameter
   public static final ConNode THUNK; // Default thunk parameter
   public static final ConNode UNUSED;// Dead alias
   public static final ConNode ALLMEM;//   Used whole memory
@@ -86,8 +87,6 @@ public class Env implements AutoCloseable {
     ALL   = keep(new ConNode<>(Type.ALL   ));
     XCTRL = keep(new ConNode<>(Type.XCTRL ));
     XNIL  = keep(new ConNode<>(TypeNil.XNIL));
-    INT   = keep(new ConNode<>(TypeStruct.INT));
-    FLT   = keep(new ConNode<>(TypeStruct.FLT));
     THUNK = keep(new ConNode<>(TypeFunPtr.THUNK));
     UNUSED= keep(new ConNode<>(TypeStruct.UNUSED));
     ALLMEM= keep(new ConNode<>(TypeMem.ALLMEM));
@@ -158,10 +157,11 @@ public class Env implements AutoCloseable {
 
     Node rez = Env.ROOT.in(REZ_IDX);
     Type mem = Env.ROOT.in(MEM_IDX)._val;
+    Type val = rez._val;   
     TypeTuple ttroot = (TypeTuple)Env.ROOT._val;
     BitsFun   fidxs   = ((TypeFunPtr)ttroot.at(3)).fidxs(); // Can return a meet-of-joins?
     BitsAlias aliases = ((TypeMemPtr)ttroot.at(4))._aliases;
-    return new TypeEnv(rez._val,
+    return new TypeEnv(val,     // GCP result
                        fidxs,   // Escaping FIDXS
                        aliases, // Escaping ALIASES
                        mem instanceof TypeMem ? (TypeMem)mem : mem.oob(TypeMem.ALLMEM),

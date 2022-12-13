@@ -29,7 +29,6 @@ import static com.cliffc.aa.AA.unimpl;
  *    T = Vnnn               | // Leaf number nnn
  *        Xnnn>>T            | // Unified; lazily collapsed with 'find()' calls
  *        base               | // any lattice element, all are nilable
- *        T0?T1              | // T1 is a not-nil T0; stacked not-nils collapse
  *        { T* -> Tret }     | // Lambda, arg count is significant
  *        *T0                | // Ptr-to-struct; T0 is either a leaf, or unified, or a struct
  *        @{ (label = T;)* } | // ';' is a field-separator not a field-end
@@ -48,7 +47,7 @@ abstract public class TV3 {
   private TV3 _uf=null;
 
   // Outgoing edges for structural recursion.
-  final TV3[] _args;
+  TV3[] _args;
 
   // All uses of this type-var are value-equivalent to the def.
   // Makes a one-shot transition from true to false.
@@ -70,7 +69,7 @@ abstract public class TV3 {
     return u;
   }
 
-  // Find the leader, with rollup.  Used in many many places.
+  // Find the leader, with rollup.  Used in many, many places.
   public TV3 find() {
     if( _uf    ==null ) return this;// Shortcut, no rollup
     if( _uf._uf==null ) return _uf; // Unrolled once shortcut, no rollup
@@ -78,7 +77,7 @@ abstract public class TV3 {
     // Additional read-barrier for TVNil to collapse nil-of-something
     return leader instanceof TVNil tnil ? tnil.find_nil() : leader;
   }
-  // Long-hand lookup of leader, 
+  // Long-hand lookup of leader.
   private TV3 _find() {
     TV3 leader = _uf._uf.debug_find();    // Leader
     TV3 u = this;
@@ -87,21 +86,23 @@ abstract public class TV3 {
   }
 
   // Fetch a specific arg index, with rollups
-  TV3 _find( int i ) {
+  public TV3 arg( int i ) {
+    assert !unified();          // No body nor outgoing edges in non-leaders
     TV3 arg = _args[i], u = arg.find();
     return u==arg ? u : (_args[i]=u);
   }
 
+  public int len() { return _args.length; }  
+  
   // -----------------
   // U-F union; this becomes that; returns 'that'.
   // No change if only testing, and reports progress.
-  boolean union(TV3 that, boolean test) {
+  boolean union(TV3 that) {
     assert !unified() && !that.unified(); // Cannot union twice
     if( this==that ) return false;
-    if( test ) return true;     // Report progress without changing
-    _uf = that;                 // U-F union
     that._is_copy &= _is_copy;  // Both must be is_copy to keep is_copy
     _union_impl(that);          // Merge subclass specific bits
+    _uf = that;                 // U-F union
     return true;
   }
 
@@ -131,15 +132,26 @@ abstract public class TV3 {
   // afterwards.
   private boolean _unify(TV3 that, boolean test) {
     assert !unified() && !that.unified();
-    if( this==that ) return false;    
+    if( this==that ) return false;
+    if( test ) return true;
     // Any leaf immediately unifies with any non-leaf; triangulate
-    if( that instanceof TVLeaf )
-      return that._unify_impl(this,test);
-    // Ask subclass unification
-    return _unify_impl(that,test);
+    if( !(this instanceof TVLeaf) && that instanceof TVLeaf )
+      return that._unify_impl(this);
+    if( !(that instanceof TVLeaf) && this instanceof TVLeaf )
+      return this._unify_impl(that);
+    
+    // If 'this' and 'that' are different classes, unify both into an error
+    if( getClass() != that.getClass() )
+      throw unimpl();
+
+    // Swap to keep uid low.
+    // Do subclass unification.
+    return _uid > that._uid
+      ? this._unify_impl(that)
+      : that._unify_impl(this);
   }
 
-  abstract boolean _unify_impl(TV3 that, boolean test);
+  abstract boolean _unify_impl(TV3 that);
   
   // -------------------------------------------------------------
   public boolean fresh_unify( TV3 that, TV3[] nongen, boolean test ) {
@@ -199,7 +211,7 @@ abstract public class TV3 {
     }
 
     // Dup printing for all but bases (which are short, just repeat them)
-    if( dup && (debug || !(this instanceof TVBase) || this instanceof TVErr) ) {
+    if( dup && (debug || !(this instanceof TVBase) ) ) {
       vname(sb,debug,false);            // Leading V123
       if( visit.tset(_uid) ) return sb; // V123 and nothing else
       sb.p(':');                        // V123:followed_by_type_descr
@@ -227,7 +239,7 @@ abstract public class TV3 {
   }
   
   // Debugging tool
-  TV3 find(int uid) { return _find(uid,new VBitSet()); }
+  TV3 f(int uid) { return _find(uid,new VBitSet()); }
   private TV3 _find(int uid, VBitSet visit) {
     if( visit.tset(_uid) ) return null;
     if( _uid==uid ) return this;

@@ -522,7 +522,7 @@ public class CallNode extends Node {
       GVN.add_flow(fptr);   // Probably goes unused
       return fptr.display();
     }
-    throw unimpl(); // Need a FP2DISP
+    return new FP2DSPNode(fdx()).init();
   }
   void set_rpc(int rpc) { unelock(); _rpc=rpc; } // Unlock before changing hash
   @Override public int hashCode() { return super.hashCode()+_rpc; }

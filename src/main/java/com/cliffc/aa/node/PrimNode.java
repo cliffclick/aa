@@ -26,30 +26,29 @@ import static com.cliffc.aa.type.TypeFld.Access;
 // FunNode for function Node structure.  The wrapping function preserves the
 // order in the ParmNodes.
 
-// Both 'int' and 'flt' are clazzes, refer to internal Structs and containing
-// fields for each of the primitive operator function wrappers.  The normal
-// primitives are wrapped in a named Struct with a single field 'x', and the
-// Field lookup node checks the clazz after looking in the wrapper.
-
 public abstract class PrimNode extends Node {
   public final String _name;    // Unique name (and program bits)
   public final TypeFunPtr _tfp; // FIDX, nargs, display argument, WRAPPED primitive return type
-  public final TypeTuple _formals; // Formals are indexed by order NOT name and are wrapped prims.
-  public final Type _ret;       // Wrapped primitive return
+  public final TypeTuple _formals; // Formals are indexed by order NOT name and are unwrapped prims.
+  public final TypeNil _ret;    // unrapped primitive return
   public final boolean _is_lazy;// 2nd arg is lazy (thunked by parser)
   Parse[] _badargs;             // Filled in when inlined in CallNode
-  public PrimNode( String name, TypeTuple formals, Type ret ) { this(name,false,formals,ret); }
-  public PrimNode( String name, boolean is_lazy, TypeTuple formals, Type ret ) {
+  public PrimNode( String name, TypeTuple formals, TypeNil ret ) { this(name,false,formals,ret); }
+  public PrimNode( String name, boolean is_lazy, TypeTuple formals, TypeNil ret ) {
     super(OP_PRIM);
     _name = name;
     _is_lazy = is_lazy;
     int fidx = BitsFun.new_fidx();
+    for( int i=DSP_IDX; i<formals._ts.length; i++ ) assert formals._ts[i] instanceof TypeNil; // Formals are unwrapped
     _formals = formals;
     _ret = ret;
     _tfp=TypeFunPtr.make(fidx,formals.len(),TypeMemPtr.NO_DISP,ret);
     _badargs=null;
   }
 
+  public static StructNode INT;
+  public static StructNode FLT;
+  
   private static PrimNode[] PRIMS = null; // All primitives
 
   public static PrimNode[] PRIMS() {
@@ -68,7 +67,7 @@ public abstract class PrimNode extends Node {
       { new EQ_I64(), new EQ_IF64() },
       { new NE_I64(), new NE_IF64() },
       { new MinusI64() }, { new NotI64() }, { new ModI64() },
-      { new AndI64() }, { new OrI64  () },
+      { new AndI64() }, { new OrI64() },
       { new AndThen() }, { new OrElse() },
     };
 
@@ -84,13 +83,14 @@ public abstract class PrimNode extends Node {
       { new EQ_F64(), new EQ_FI64() },
       { new NE_F64(), new NE_FI64() },
       { new MinusF64() },
+      { new SinF64() },
     };
     // Other primitives, not binary operators
     PrimNode rand = new RandI64();
     PrimNode[] others = new PrimNode[] {
       // These are called like a function, so do not have a precedence
-      rand,
-      new ConvertI64F64(),
+      //rand,
+      //new ConvertI64F64(),
 
       //new EQ_OOP(), new NE_OOP(), new Not(),
       //// These are balanced-ops, called by Parse.term()
@@ -110,8 +110,10 @@ public abstract class PrimNode extends Node {
     PRIMS = allprims.asAry();
 
     // Build the int and float types and prototypes
-    Env.STK_0.add_fld("flt",Access.Final,make_prim("flt",FLTS,TypeStruct.FLT),null);
-    Env.STK_0.add_fld("int",Access.Final,make_prim("int",INTS,TypeStruct.INT),null);
+    FLT = new StructNode(false,false,null, "flt:", Type.ALL).init();
+    INT = new StructNode(false,false,null, "int:", Type.ALL).init();
+    Env.STK_0.add_fld("flt",Access.Final,make_prim(FLT,FLTS,TypeFlt.FLT64),null);
+    Env.STK_0.add_fld("int",Access.Final,make_prim(INT,INTS,TypeInt.INT64),null);
 
     // Math package
     Env.STK_0.add_fld("math",Access.Final,make_math(rand),null);
@@ -119,22 +121,20 @@ public abstract class PrimNode extends Node {
     return PRIMS;
   }
 
-  public static TypeStruct make_int(long   i) { return TypeStruct.make_int(TypeInt.con(i)); }
-  public static TypeStruct make_flt(double d) { return TypeStruct.make_flt(TypeFlt.con(d)); }
-
-  public static TypeStruct make_wrap(TypeNil t) {
-    return TypeStruct.make(false,t instanceof TypeInt ? "int:" : "flt:",t,TypeFlds.EMPTY);
+  // Make a wrapped primitive
+  public static TypeStruct make_int(long i) { return make_int(TypeInt.con(i)); }
+  public static TypeStruct make_int(TypeInt ti) { return ((TypeStruct)INT._val).make_int(ti); }
+  public static TypeStruct make_flt(double d) { return make_flt(TypeFlt.con(d)); }
+  public static TypeStruct make_flt(TypeFlt td) { return ((TypeStruct)FLT._val).make_flt(td); }
+  public static TypeStruct make_wrap(TypeNil rez) {
+    return rez instanceof TypeInt ti ? make_int(ti) : make_flt((TypeFlt)rez);
   }
-  public static TypeInt unwrap_i(Type t) { return (TypeInt)((TypeStruct)t)._def; }
-  public static TypeFlt unwrap_f(Type t) { return (TypeFlt)((TypeStruct)t)._def; }
-  public static long   unwrap_ii(Type t) { return t==TypeNil.XNIL ? 0 : unwrap_i(t).getl(); }
-  public static double unwrap_ff(Type t) { return unwrap_f(t).getd(); }
 
   // Primitive wrapped as a simple function.
   // Fun Parm_dsp [Parm_y] prim Ret
   // No memory, no RPC.  Display is first arg.
-  private FunPtrNode as_fun( boolean is_oper ) {
-    if( is_oper ) Oper.make(_name,_is_lazy);
+  private FunPtrNode as_fun( ) {
+    if( is_oper() ) Oper.make(_name,_is_lazy);
 
     FunNode fun = new FunNode(this,_name);
     fun.add_def(new CRProjNode(fun._fidx).init()); // Need FIDX to make the default control
@@ -145,11 +145,11 @@ public abstract class PrimNode extends Node {
       // Make a Parm for every formal
       Type tformal = _formals.at(i);
       Node nformal;
-      if(      tformal==TypeStruct.INT ) nformal = Env.INT;
-      else if( tformal==TypeStruct.FLT ) nformal = Env.FLT;
-      else if( tformal==Type.ALL       ) nformal = Env.ALL;
-      else if( tformal==TypeFunPtr.THUNK)nformal = Env.THUNK;
-      else if( tformal==TypeMem.ALLMEM ) nformal = Env.ALLMEM;
+      if(      tformal==TypeInt.INT64   ) nformal = Env.ALL;
+      else if( tformal==TypeFlt.FLT64   ) nformal = Env.ALL;
+      else if( tformal==Type.ALL        ) nformal = Env.ALL;
+      else if( tformal==TypeFunPtr.THUNK) nformal = Env.THUNK;
+      else if( tformal==TypeMem.ALLMEM  ) nformal = Env.ALLMEM;
       else throw unimpl();
       add_def(new ParmNode(i,fun,null,tformal,nformal).init());
     }
@@ -162,34 +162,32 @@ public abstract class PrimNode extends Node {
     // Return the result
     RetNode ret = new RetNode(zctrl,zmem,zrez,rpc,fun).init();
     // FunPtr is UNBOUND here, will be bound when loaded thru a named struct to the Clazz.
-    return new FunPtrNode(_name,ret,Env.ALL).init();
+    return new FunPtrNode(_name,ret,null).init();
   }
 
   // Make and install a primitive Clazz.
-  private static StructNode make_prim( String s, PrimNode[][] primss, TypeStruct canonical_prim ) {
-    String tname = (s+":").intern();
-    StructNode rec = new StructNode(false,false,null, canonical_prim._clz, canonical_prim._def);
+  private static StructNode make_prim( StructNode rec, PrimNode[][] primss, TypeNil base ) {
     for( PrimNode[] prims : primss ) {
       StructNode over = new StructNode(false,false,null,"",Type.ALL);
       int cnt=0;
       for( PrimNode prim : prims )
-        over.add_fld((""+cnt++).intern(),Access.Final,prim.as_fun(true),null);
+        over.add_fld((""+cnt++).intern(),Access.Final,prim.as_fun(),null);
       over.init();
       over.close();
       rec.add_fld(prims[0]._name,Access.Final,over,null);
     }
     rec.init();
     rec.close();
-    Env.PROTOS.put(tname,rec);     // clazz String -> clazz Struct mapping, for values
-    Env.SCP_0.add_type(tname,rec); // type  String -> clazz Struct mapping, for types
+    Env.PROTOS.put(rec._clz,rec);     // clazz String -> clazz Struct mapping, for values
+    Env.SCP_0.add_type(rec._clz,rec); // type  String -> clazz Struct mapping, for types
     return rec;
   }
 
   // Build and install match package
   private static StructNode make_math(PrimNode rand) {
     StructNode rec = new StructNode(false,false,null,"",Type.ALL);
-    rec.add_fld("pi",Access.Final,Node.con(make_wrap(TypeFlt.PI)),null);
-    rec.add_fld(rand._name,Access.Final,rand.as_fun(false),null);
+    rec.add_fld("pi",Access.Final,SetFieldNode.make("flt:",TypeFlt.PI),null);
+    rec.add_fld(rand._name,Access.Final,rand.as_fun(),null);
     rec.init();
     rec.close();
     return rec;
@@ -197,7 +195,7 @@ public abstract class PrimNode extends Node {
 
 
   // Apply uses the same alignment as the arguments, ParmNodes, _formals.
-  public abstract Type apply( Type[] args ); // Execute primitive
+  abstract TypeNil apply( TypeNil[] args ); // Execute primitive
   // Pretty print short primitive signature based on first argument:
   //  + :{int int -> int }  ==>>   + :int
   //  + :{flt flt -> flt }  ==>>   + :flt
@@ -206,40 +204,38 @@ public abstract class PrimNode extends Node {
   // str:{flt     -> str }  ==>>  str:flt
   // == :{ptr ptr -> int1}  ==>>  == :ptr
   @Override public String xstr() { return _name; }
-  private static final Type[] TS = new Type[ARG_IDX+1];
+  private static final TypeNil[] TS = new TypeNil[ARG_IDX+1];
   @Override public Type value() {
     if( is_keep() ) return _val;
     // If all inputs are constants we constant-fold.  If any input is high, we
     // return high otherwise we return low.
     boolean is_con = true, has_high = false;
     for( int i=DSP_IDX; i<_formals.len(); i++ ) {
-      Type tactual = TS[i-DSP_IDX] = val(i-DSP_IDX);
-      Type tformal = _formals.at(i);
-      Type t = tformal.dual().meet(tactual);
+      Type twrap = val(i-DSP_IDX);
+      TypeNil tactual = TS[i-DSP_IDX] = (TypeNil)(twrap instanceof TypeStruct ts ? ts._def : twrap);
+      TypeNil tformal = (TypeNil)_formals.at(i);
+      TypeNil t = (TypeNil)tformal.dual().meet(tactual);
+      // Expect: tformal is a expanded TypeStruct, so t is also.
       if( tactual != TypeNil.XNIL && !t.is_con() ) {
         is_con = false;         // Some non-constant
         if( t.above_center() ) has_high=true;
       }
     }
-    return is_con ? apply(TS) : (has_high ? _ret.dual() : _ret);
+    return make_wrap(is_con ? apply(TS) : (has_high ? (TypeNil)_ret.dual() : _ret));
   }
+  boolean is_oper() { return true; }
 
+  
   @Override public boolean has_tvar() { return true; }
 
   // In the test HM, all primitives are a Lambda without a body.  Here they are
   // effectively Applies/Calls and the primitive computes a result.
-  @Override public void set_tvar() {
-    if( _tvar==null ) {
-      // Return is some primitive, and is typically never a copy
-      _tvar = new TVBase(false,_ret); 
-      // All arguments are pre-unified the dual-formal (so very high Bases).
-      // They will probably fall, but as long as they stay above the formals
-      // they are ok.
-      for( int i=DSP_IDX; i<_formals.len(); i++ ) {
-        in(i-DSP_IDX).set_tvar();
-        tvar(i-DSP_IDX).unify(new TVBase(true,_formals.at(i).dual()),false);
-      }
-    }
+  @Override TV3 _set_tvar() {
+    // All arguments are pre-unified to unique copy bases.
+    for( int i=DSP_IDX; i<_formals.len(); i++ )
+      in(i-DSP_IDX).set_tvar().unify(TVBase.make(true,_formals.at(i)),false);
+    // Return is some primitive, and is typically never a copy
+    return TVBase.make(false,_ret);
   }
   
   // All work done in set_tvar, no need to unify
@@ -265,15 +261,17 @@ public abstract class PrimNode extends Node {
     return Util.eq(_name,p._name) && _formals==p._formals;
   }
 
-  public static class ConvertI64F64 extends PrimNode {
-    public ConvertI64F64() { super("flt",TypeTuple.INT64,TypeStruct.FLT); }
-    @Override public Type apply( Type[] args ) { return make_flt((double)unwrap_ii(args[0])); }
-  }
+  //public static class ConvertI64F64 extends PrimNode {
+  //  public ConvertI64F64() { super("flt",TypeTuple.INT64,TypeFlt.FLT64); }
+  //  @Override Type apply( Type[] args ) {
+  //    return make_flt((double)unwrap_ii(args[0]));
+  //  }
+  //}
 
   // 1Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim1OpF64 extends PrimNode {
-    Prim1OpF64( String name ) { super(name,TypeTuple.FLT64,TypeStruct.FLT); }
-    public Type apply( Type[] args ) { return make_flt(op(unwrap_ff(args[0]))); }
+    Prim1OpF64( String name ) { super(name,TypeTuple.FLT64,TypeFlt.FLT64); }
+    @Override TypeFlt apply( TypeNil[] args ) {  return TypeFlt.con(op(args[0].getd()));  }
     abstract double op( double d );
   }
 
@@ -281,36 +279,22 @@ public abstract class PrimNode extends Node {
 
   // 1Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim1OpI64 extends PrimNode {
-    Prim1OpI64( String name ) { super(name,TypeTuple.INT64,TypeStruct.INT); }
-    @Override public Type apply( Type[] args ) { return make_int(op(unwrap_ii(args[0]))); }
+    Prim1OpI64( String name ) { super(name,TypeTuple.INT64,TypeInt.INT64); }
+    @Override TypeInt apply( TypeNil[] args ) {  return TypeInt.con(op(args[0].getl()));  }
     abstract long op( long d );
   }
 
   static class MinusI64 extends Prim1OpI64 { MinusI64() { super("-_"); } long op( long x ) { return -x; } }
   static class NotI64 extends PrimNode {
-    // Rare function which takes a Scalar (works for both ints and ptrs).
-    public NotI64() { super("!_",TypeTuple.INT64,TypeStruct.BOOL); }
-    @Override public Type value() {
-      Type t0 = val(0);
-      if( t0==Type.ANY ) return TypeStruct.BOOL.dual();
-      if( t0 == TypeNil.NIL || t0 == TypeNil.XNIL )
-        return make_int(1);     // !nil is 1
-      if( t0==Type.ALL ) return TypeStruct.BOOL;
-      TypeInt t1 = unwrap_i(t0);
-      if( t1._nil ) {
-        return t1._sub ? TypeStruct.BOOL.dual() : make_int(1);
-      } else {
-        return t1._sub ? TypeNil.XNIL : TypeStruct.BOOL;
-      }
-    }
-    @Override public Type apply( Type[] args ) { throw AA.unimpl(); }
+    public NotI64() { super("!_",TypeTuple.INT64,TypeInt.BOOL); }
+    @Override public TypeNil apply( TypeNil[] args ) { throw AA.unimpl(); }
   }
 
 
   // 2Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim2OpF64 extends PrimNode {
-    Prim2OpF64( String name ) { super(name,TypeTuple.FLT64_FLT64,TypeStruct.FLT); }
-    @Override public Type apply( Type[] args ) { return make_flt(op(unwrap_ff(args[0]),unwrap_ff(args[1]))); }
+    Prim2OpF64( String name ) { super(name,TypeTuple.FLT64_FLT64,TypeFlt.FLT64); }
+    @Override TypeFlt apply( TypeNil[] args ) { return TypeFlt.con(op(args[0].getd(),args[1].getd())); }
     abstract double op( double x, double y );
   }
 
@@ -321,8 +305,8 @@ public abstract class PrimNode extends Node {
 
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpF64 extends PrimNode {
-    Prim2RelOpF64( String name ) { super(name,TypeTuple.FLT64_FLT64,TypeStruct.BOOL); }
-    @Override public Type apply( Type[] args ) { return op(unwrap_ff(args[0]),unwrap_ff(args[1]))?make_int(1):TypeNil.XNIL; }
+    Prim2RelOpF64( String name ) { super(name,TypeTuple.FLT64_FLT64,TypeInt.BOOL); }
+    @Override public TypeNil apply( TypeNil[] args ) { return op(args[0].getd(),args[1].getd()) ? TypeInt.TRUE : TypeNil.XNIL ; }
     abstract boolean op( double x, double y );
   }
 
@@ -335,8 +319,8 @@ public abstract class PrimNode extends Node {
 
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpFI64 extends PrimNode {
-    Prim2RelOpFI64( String name ) { super(name,TypeTuple.FLT64_INT64,TypeStruct.BOOL); }
-    @Override public Type apply( Type[] args ) { return op(unwrap_ff(args[0]),unwrap_ii(args[1]))?make_int(1):TypeNil.XNIL; }
+    Prim2RelOpFI64( String name ) { super(name,TypeTuple.FLT64_INT64,TypeInt.BOOL); }
+    @Override public TypeNil apply( TypeNil[] args ) { return op(args[0].getd(),args[1].getl()) ? TypeInt.TRUE : TypeNil.XNIL ; }
     abstract boolean op( double x, long y );
   }
 
@@ -350,8 +334,8 @@ public abstract class PrimNode extends Node {
 
   // 2Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim2OpI64 extends PrimNode {
-    Prim2OpI64( String name ) { super(name,TypeTuple.INT64_INT64,TypeStruct.INT); }
-    @Override public Type apply( Type[] args ) { return make_int(op(unwrap_ii(args[0]),unwrap_ii(args[1]))); }
+    Prim2OpI64( String name ) { super(name,TypeTuple.INT64_INT64,TypeInt.INT64); }
+    @Override public TypeNil apply( TypeNil[] args ) { return TypeInt.con(op(args[0].getl(),args[1].getl())); }
     abstract long op( long x, long y );
   }
 
@@ -362,8 +346,8 @@ public abstract class PrimNode extends Node {
   static class ModI64 extends Prim2OpI64 { ModI64() { super("_%_"); } long op( long l, long r ) { return r==0 ? 0 : l%r; } }
 
   abstract static class Prim2OpIF64 extends PrimNode {
-    Prim2OpIF64( String name ) { super(name,TypeTuple.INT64_FLT64,TypeStruct.FLT); }
-    @Override public Type apply( Type[] args ) { return make_flt(op(unwrap_ii(args[0]),unwrap_ff(args[1]))); }
+    Prim2OpIF64( String name ) { super(name,TypeTuple.INT64_FLT64,TypeFlt.FLT64); }
+    @Override public TypeFlt apply( TypeNil[] args ) { return TypeFlt.con(op(args[0].getl(),args[1].getd())); }
     abstract double op( long x, double y );
   }
   static class AddIF64 extends Prim2OpIF64 { AddIF64() { super("_+_"); } double op( long l, double r ) { return l+r; } }
@@ -372,8 +356,8 @@ public abstract class PrimNode extends Node {
   static class DivIF64 extends Prim2OpIF64 { DivIF64() { super("_/_"); } double op( long l, double r ) { return l/r; } } // Float division, by 0 gives infinity
 
   abstract static class Prim2OpFI64 extends PrimNode {
-    Prim2OpFI64( String name ) { super(name,TypeTuple.FLT64_INT64,TypeStruct.FLT); }
-    @Override public Type apply( Type[] args ) { return make_flt(op(unwrap_ff(args[0]),unwrap_ii(args[1]))); }
+    Prim2OpFI64( String name ) { super(name,TypeTuple.FLT64_INT64,TypeFlt.FLT64); }
+    @Override public TypeFlt apply( TypeNil[] args ) { return TypeFlt.con(op(args[0].getd(),args[1].getl())); }
     abstract double op( double x, long y );
   }
   static class AddFI64 extends Prim2OpFI64 { AddFI64() { super("_+_"); } double op( double l, long r ) { return l+r; } }
@@ -384,69 +368,19 @@ public abstract class PrimNode extends Node {
   public static class AndI64 extends Prim2OpI64 {
     public AndI64() { super("_&_"); }
     // And can preserve bit-width
-    @Override public Type value() {
-      Type t0 = val(0), t1 = val(1);
-      if( t0==Type.ANY || t1==Type.ANY ) return TypeStruct.INT.dual();
-      if( t0==Type.ALL || t1==Type.ALL ) return TypeStruct.INT;
-      // 0 AND anything is 0
-      if( t0 == TypeNil.XNIL || t1 == TypeNil.XNIL ) return TypeNil.XNIL;
-      // If either is high - results might fall to something reasonable
-      t0 = unwrap_i(t0);
-      t1 = unwrap_i(t1);
-      if( t0.above_center() || t1.above_center() )
-        return TypeStruct.INT.dual();
-      // Both are low-or-constant, and one is not valid - return bottom result
-      if( !t0.isa(TypeInt.INT64) || !t1.isa(TypeInt.INT64) )
-        return TypeStruct.INT;
-      // If both are constant ints, return the constant math.
-      if( t0.is_con() && t1.is_con() ) {
-        long i2 = t0.getl() & t1.getl();
-        return i2==0 ? TypeNil.XNIL : make_int(i2);
-      }
-      //if( !(t0 instanceof TypeInt) || !(t1 instanceof TypeInt) )
-      //  return TypeStruct.INT;
-      // Preserve width
-      return make_wrap(((TypeInt)t0).minsize((TypeInt)t1));
-    }
     @Override long op( long l, long r ) { return l&r; }
   }
 
   public static class OrI64 extends Prim2OpI64 {
     public OrI64() { super("_|_"); }
     // And can preserve bit-width
-    @Override public Type value() {
-      if( is_keep() ) return _val;
-      Type t0 = val(0), t1 = val(1);
-      if( t0==Type.ANY || t1==Type.ANY ) return TypeStruct.INT.dual();
-      if( t0==Type.ALL || t1==Type.ALL ) return TypeStruct.INT;
-      // 0 OR anything is that thing
-      if( t0 == TypeNil.XNIL ) return t1;
-      if( t1 == TypeNil.XNIL ) return t0;
-      t0 = unwrap_i(t0);
-      t1 = unwrap_i(t1);
-      // If either is high - results might fall to something reasonable
-      if( t0.above_center() || t1.above_center() )
-        return TypeStruct.INT.dual();
-      // Both are low-or-constant, and one is not valid - return bottom result
-      if( !t0.isa(TypeInt.INT64) || !t1.isa(TypeInt.INT64) )
-        return TypeStruct.INT;
-      // If both are constant ints, return the constant math.
-      if( t0.is_con() && t1.is_con() )
-        return make_int(t0.getl() | t1.getl());
-      //if( !(t0 instanceof TypeInt) || !(t1 instanceof TypeInt) )
-      //  return TypeInt.INT64;
-      // Preserve width
-      return make_wrap(((TypeInt)t0).maxsize((TypeInt)t1));
-    }
     @Override long op( long l, long r ) { return l&r; }
   }
 
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpI64 extends PrimNode {
-    Prim2RelOpI64( String name ) { super(name,TypeTuple.INT64_INT64,TypeStruct.BOOL); }
-    @Override public Type apply( Type[] args ) {
-      return op(unwrap_ii(args[0]),unwrap_ii(args[1]))?make_int(1):TypeNil.XNIL;
-    }
+    Prim2RelOpI64( String name ) { super(name,TypeTuple.INT64_INT64,TypeInt.BOOL); }
+    @Override public TypeNil apply( TypeNil[] args ) { return op(args[0].getl(),args[1].getl()) ? TypeInt.TRUE : TypeNil.XNIL; }
     abstract boolean op( long x, long y );
   }
 
@@ -458,8 +392,8 @@ public abstract class PrimNode extends Node {
   public static class NE_I64 extends Prim2RelOpI64 { public NE_I64() { super("_!=_"); } boolean op( long l, long r ) { return l!=r; } }
 
   abstract static class Prim2RelOpIF64 extends PrimNode {
-    Prim2RelOpIF64( String name ) { super(name,TypeTuple.INT64_FLT64,TypeStruct.BOOL); }
-    @Override public Type apply( Type[] args ) { return op(unwrap_ii(args[0]),unwrap_ff(args[1]))?make_int(1):TypeNil.XNIL; }
+    Prim2RelOpIF64( String name ) { super(name,TypeTuple.INT64_FLT64,TypeInt.BOOL); }
+    @Override public TypeNil apply( TypeNil[] args ) { return op(args[0].getl(),args[1].getd()) ? TypeInt.TRUE : TypeNil.XNIL; }
     abstract boolean op( long x, double y );
   }
 
@@ -473,8 +407,8 @@ public abstract class PrimNode extends Node {
 
   public static class EQ_OOP extends PrimNode {
     public EQ_OOP() { super("_==_",TypeTuple.OOP_OOP,TypeInt.BOOL); }
-    @Override public Type value() {
-      if( is_keep() ) return _val;
+    @Override public TypeStruct value() {
+      //if( is_keep() ) return _val;
       //// Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
       //// Probably need a java-like "eq" vs "==" to mean deep-equals.  You are
       //// equals if your inputs are the same node, and you are unequals if your
@@ -497,7 +431,7 @@ public abstract class PrimNode extends Node {
       //return TypeInt.BOOL;
       throw unimpl();
     }
-    @Override public Type apply( Type[] args ) { throw AA.unimpl(); }
+    @Override public TypeNil apply( TypeNil[] args ) { throw AA.unimpl(); }
     static Type vs_nil( Type tx, Type t, Type f ) {
       if( tx==TypeNil.XNIL ) return t;
       //if( tx.above_center() ) return tx.isa(TypeNil.XNIL) ? TypeInt.BOOL.dual() : f;
@@ -508,8 +442,8 @@ public abstract class PrimNode extends Node {
 
   public static class NE_OOP extends PrimNode {
     public NE_OOP() { super("_!=_",TypeTuple.OOP_OOP,TypeInt.BOOL); }
-    @Override public Type value() {
-      if( is_keep() ) return _val;
+    @Override public TypeStruct value() {
+      //if( is_keep() ) return _val;
       //// Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
       //// Probably need a java-like "===" vs "==" to mean deep-equals.  You are
       //// equals if your inputs are the same node, and you are unequals if your
@@ -532,32 +466,26 @@ public abstract class PrimNode extends Node {
       //return TypeInt.BOOL;
       throw unimpl();
     }
-    @Override public Type apply( Type[] args ) { throw AA.unimpl(); }
+    @Override public TypeNil apply( TypeNil[] args ) { throw AA.unimpl(); }
   }
 
 
   public static class RandI64 extends PrimNode {
-    public RandI64() { super("rand",TypeTuple.ALL_INT64,TypeStruct.INT); }
-    @Override public Type value() {
-      if( val(1).above_center() ) return make_wrap(TypeInt.BOOL.dual());
-      if( val(1)==Type.ALL ) return TypeStruct.INT;
-      TypeInt t = unwrap_i(val(1));
-      if( TypeInt.INT64.dual().isa(t) && t.isa(TypeInt.INT64) )
-        return make_wrap((TypeNil)t.meet(TypeNil.XNIL));
-      return t.oob(TypeStruct.INT);
-    }
-    @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
+    public RandI64() { super("rand",TypeTuple.INT64,TypeInt.INT64); }
+    @Override boolean is_oper() { return false; }
+    @Override public TypeNil apply( TypeNil[] args ) { throw AA.unimpl(); }
     // Rands have hidden internal state; 2 Rands are never equal
     @Override public boolean equals(Object o) { return this==o; }
   }
 
   // Classic '&&' short-circuit.  Lazy in the RHS, so passed a 'thunk', a
   // zero-argument function to be evaluated if the LHS is true.
+  // TODO: Move to a (not yet made) XNIL/SCAlAR class.
   public static class AndThen extends PrimNode {
-    private static final TypeTuple ANDTHEN = TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, Type.ALL, TypeFunPtr.THUNK); // {val tfp -> val }
+    private static final TypeTuple ANDTHEN = TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, TypeInt.INT64, TypeFunPtr.THUNK); // {val tfp -> val }
     // Takes a value on the LHS, and a THUNK on the RHS.
     public AndThen() { super("_&&_",true/*lazy*/,ANDTHEN,TypeNil.SCALAR); }
-    @Override public Type apply(Type[] ts) { throw unimpl(); }
+    @Override public TypeNil apply(TypeNil[] ts) { throw unimpl(); }
     @Override public Type value() { return TypeTuple.RET; }
     // Expect this to inline everytime
     @Override public Node ideal_grow() {
@@ -594,21 +522,15 @@ public abstract class PrimNode extends Node {
       }
     }
 
-    // Pre-cook type: { A? { -> B } -> B? }
-    // Bind display to A?
-    // Bind arg3 to { -> B } and return to B?
-    @Override public void set_tvar() {
-      if( _tvar!=null ) return;
-      TVLeaf b = new TVLeaf();
-      _tvar = new TVNil(b);     // Result is B?
-      // Unify display to A?
-      in(DSP_IDX).set_tvar();
-      tvar(DSP_IDX).unify(new TVNil(new TVLeaf()),false);
-      // Unify arg3 to { -> B }
-      in(ARG_IDX).set_tvar();
-      TVLambda lam = new TVLambda(0); // No args
-      lam.set_ret(b);                 // { -> B }
-      tvar(ARG_IDX).unify(lam,false);
+    // Pre-cook type: { A { -> A } -> A }
+    // Bind display to A
+    // Bind arg3 to { -> A } and return to A
+    @Override TV3 _set_tvar() {
+      TV3 a = in(DSP_IDX).set_tvar();
+      // Unify arg3 to a no-args lambda { -> A }
+      TVLambda lam = new TVLambda(DSP_IDX,null,a); 
+      in(ARG_IDX).set_tvar().unify(lam,false);
+      return a;
     }
     // All work done in set_tvar, no need to unify
     @Override public boolean unify( boolean test ) { return false; }
@@ -625,11 +547,12 @@ public abstract class PrimNode extends Node {
 
   // Classic '||' short-circuit.  Lazy in the RHS, so passed a 'thunk', a
   // zero-argument function to be evaluated if the LHS is false.
+  // TODO: Move to a (not yet made) XNIL/SCAlAR class.
   public static class OrElse extends PrimNode {
-    private static final TypeTuple ORELSE = TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, Type.ALL, TypeFunPtr.THUNK); // {val tfp -> val }
+    private static final TypeTuple ORELSE = TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, TypeInt.INT64, TypeFunPtr.THUNK); // {val tfp -> val }
     // Takes a value on the LHS, and a THUNK on the RHS.
     public OrElse() { super("_||_",true/*lazy*/,ORELSE,TypeNil.SCALAR); }
-    @Override public Type apply(Type[] ts) { throw unimpl(); }
+    @Override public TypeNil apply(TypeNil[] ts) { throw unimpl(); }
     @Override public Type value() { return TypeTuple.RET; }
     // Expect this to inline everytime
     @Override public Node ideal_grow() {
@@ -669,18 +592,12 @@ public abstract class PrimNode extends Node {
     // Pre-cook type: { A { -> A } -> A }
     // Bind display to A
     // Bind arg3 to { -> A } and return to A
-    @Override public void set_tvar() {
-      if( _tvar!=null ) return;
-      TVLeaf a = new TVLeaf();
-      _tvar = a;
-      // Unify display to A
-      in(DSP_IDX).set_tvar();
-      tvar(DSP_IDX).unify(a,false);
-      // Unify arg3 to { -> A }
-      in(ARG_IDX).set_tvar();
-      TVLambda lam = new TVLambda(0); // No args
-      lam.set_ret(a);                 // { -> a }
-      tvar(ARG_IDX).unify(lam,false);
+    @Override TV3 _set_tvar() {
+      TV3 a = in(DSP_IDX).set_tvar();
+      // Unify arg3 to a no-args lambda { -> A }
+      TVLambda lam = new TVLambda(DSP_IDX,null,a); 
+      in(ARG_IDX).set_tvar().unify(lam,false);
+      return a;
     }
     // All work done in set_tvar, no need to unify
     @Override public boolean unify( boolean test ) { return false; }
@@ -694,5 +611,13 @@ public abstract class PrimNode extends Node {
       return _defs._len==ARG_IDX+1 ? null : in(idx);
     }
   }
+
+  public static class SinF64 extends PrimNode {
+    public SinF64() { super("sin",TypeTuple.FLT64,TypeFlt.FLT64); }
+    @Override boolean is_oper() { return false; }
+    @Override public Type value() { return FLT._val; }
+    @Override public TypeNil apply( TypeNil[] args ) { throw AA.unimpl(); }
+  }
+
 
 }

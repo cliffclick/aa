@@ -38,7 +38,7 @@ public class FreshNode extends Node {
 
   @Override public boolean has_tvar() { return true; }
   
-  @Override public void set_tvar() {
+  @Override public TV3 _set_tvar() {
     //_tvar = new_tvar();
     //if( id()._tvar==null ) id().walk_initype();
     //id().tvar().push_dep(this);

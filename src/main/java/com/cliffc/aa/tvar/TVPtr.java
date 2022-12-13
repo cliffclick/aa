@@ -1,5 +1,6 @@
 package com.cliffc.aa.tvar;
 
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 
 import static com.cliffc.aa.AA.unimpl;
@@ -12,14 +13,15 @@ public class TVPtr extends TVNilable {
   public TVPtr( TV3 rec ) { super(true,false,rec); }
   // Get the Struct
   public TVStruct load() { return (TVStruct)_args[0]; }
-  
+
   // -------------------------------------------------------------
-  @Override void _union_impl(TV3 that) {
+  @Override
+  void _union_impl(TV3 that) {
     if( !(that instanceof TVBase base) ) throw unimpl();
     throw unimpl();
   }
 
-  @Override boolean _unify_impl(TV3 that, boolean test ) {
+  @Override boolean _unify_impl(TV3 that ) {
     throw unimpl();
   }
   

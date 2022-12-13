@@ -12,6 +12,7 @@ import java.util.function.IntSupplier;
 import java.util.function.Predicate;
 
 import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.type.TypeFld.Access;
 
 // Sea-of-Nodes
 public abstract class Node implements Cloneable, IntSupplier {
@@ -25,31 +26,32 @@ public abstract class Node implements Cloneable, IntSupplier {
   static final byte OP_ERR    = 8;
   static final byte OP_FIELD  = 9;
   static final byte OP_FRESH  =10;
-  static final byte OP_FUN    =11;
-  static final byte OP_FUNPTR =12;
-  static final byte OP_IF     =13;
-  static final byte OP_JOIN   =14;
-  static final byte OP_KEEP   =15;
-  static final byte OP_LOAD   =16;
-  static final byte OP_NEW    =17; // Allocate a new struct
-  static final byte OP_PARM   =18;
-  static final byte OP_PHI    =19;
-  static final byte OP_PRIM   =20;
-  static final byte OP_PROJ   =21;
-  static final byte OP_REGION =22;
-  static final byte OP_RET    =23;
-  static final byte OP_ROOT   =24;
-  static final byte OP_SCOPE  =25;
-  static final byte OP_SETFLD =26;
-  static final byte OP_SPLIT  =27;
-  static final byte OP_STORE  =28;
-  static final byte OP_STRUCT =29;
-  static final byte OP_TYPE   =30;
-  static final byte OP_UNR    =31;
-  static final byte OP_VAL    =32;
-  static final byte OP_MAX    =33;
+  static final byte OP_FP2DSP =11;
+  static final byte OP_FUN    =12;
+  static final byte OP_FUNPTR =13;
+  static final byte OP_IF     =14;
+  static final byte OP_JOIN   =15;
+  static final byte OP_KEEP   =16;
+  static final byte OP_LOAD   =17;
+  static final byte OP_NEW    =18; // Allocate a new struct
+  static final byte OP_PARM   =19;
+  static final byte OP_PHI    =20;
+  static final byte OP_PRIM   =21;
+  static final byte OP_PROJ   =22;
+  static final byte OP_REGION =23;
+  static final byte OP_RET    =24;
+  static final byte OP_ROOT   =25;
+  static final byte OP_SCOPE  =26;
+  static final byte OP_SETFLD =27;
+  static final byte OP_SPLIT  =28;
+  static final byte OP_STORE  =29;
+  static final byte OP_STRUCT =30;
+  static final byte OP_TYPE   =31;
+  static final byte OP_UNR    =32;
+  static final byte OP_VAL    =33;
+  static final byte OP_MAX    =34;
 
-  private static final String[] STRS = new String[] { null, "BindFP", "Call", "CallEpi", "Cast", "Con", "ConType", "CProj", "Err", "Field", "Fresh", "Fun", "FunPtr", "If", "Join", "Keep", "Load", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Root", "Scope","SetFld","Split", "Store", "Struct", "Type", "Unresolved", "Val" };
+  private static final String[] STRS = new String[] { null, "BindFP", "Call", "CallEpi", "Cast", "Con", "ConType", "CProj", "Err", "Field", "Fresh", "FP2DSP", "Fun", "FunPtr", "If", "Join", "Keep", "Load", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Root", "Scope","SetFld","Split", "Store", "Struct", "Type", "Unresolved", "Val" };
   static { assert STRS.length==OP_MAX; }
 
   // Unique dense node-numbering
@@ -92,7 +94,10 @@ public abstract class Node implements Cloneable, IntSupplier {
   }
   abstract public boolean has_tvar();
   public TV3 tvar(int x) { return in(x).tvar(); } // nth TV2
-  public void set_tvar() { assert has_tvar(); if( _tvar==null ) _tvar = new TVLeaf(); }
+  // Initial set of type variables; lazy; handles cycles.
+  public final TV3 set_tvar() { assert has_tvar();  return _tvar==null ? (_tvar = _set_tvar()) : _tvar; }
+  // Initial compute of type variables.  No set, no smarts.  Overridden.
+  TV3 _set_tvar() { return new TVLeaf(); }
 
   // Hash is function+inputs, or opcode+input_uids, and is invariant over edge
   // order (so we can swap edges without rehashing)
@@ -639,6 +644,11 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( should_con(_val) )
       return con(_val);
 
+    // Replace with a prototyped constant, if possible
+    Node pcon = should_proto(_val);
+    if( pcon!=null )
+      return Env.GVN.add_flow(pcon);
+    
     // Try CSE
     if( !_elock ) {             // Not in VALS and can still replace
       Node x = VALS.get(this);  // Try VALS
@@ -742,6 +752,44 @@ public abstract class Node implements Cloneable, IntSupplier {
     return Env.GVN.add_flow(con); // Updated live flows
   }
 
+  // Inline a prototype constant
+  public Node should_proto( Type t ) {
+    // Prototype constants are always a TypeStruct, with a prototype clazz and
+    // some extra constant fields.
+    if( !(t instanceof TypeStruct ts) ) return null;
+    // Prototype clazz
+    StructNode pstruct = Env.PROTOS.get(ts._clz);
+    if( pstruct==null ) return null;
+    // Already a SetField of a constant into a prototype clazz
+    if( this instanceof SetFieldNode sfn && sfn.in(0)==pstruct && sfn.in(1) instanceof ConNode ) return null;
+    // Prototype type
+    TypeStruct proto = (TypeStruct)pstruct._val;
+    // Already same type as prototype
+    if( proto==ts ) return null;
+    // Must be same shape
+    if( proto._def != ts._def ) return null;
+    if( proto.len() != ts.len() ) return null;
+    // All final fields must match, non-finals are R/W and must be constants
+    for( int i=0; i<proto.len(); i++ ) {
+      TypeFld pfld = proto.fld(i);
+      if( pfld._access==Access.Final ) {
+        if( pfld!= ts.fld(i) ) return null; // Modified a final field???
+      } else {
+        assert pfld._access==Access.RW;
+        if( !ts.fld(i).is_con() ) return null; // Non-final is not a constant
+      }
+    }
+    // Replace with a SetField of a constant
+    Node rez = pstruct;
+    for( int i=0; i<proto.len(); i++ ) {
+      TypeFld fld = proto.fld(i);
+      if( fld._access==Access.RW )
+        rez = new SetFieldNode(fld._fld,Access.Final,pstruct,con(ts.fld(i)._t),null).init();
+    }
+    return rez;
+  }
+
+  
   // Forward reachable walk, setting types to ANY and making all dead.
   public final void walk_initype(  ) {
     if( Env.GVN.on_flow(this) ) return; // Been there, done that

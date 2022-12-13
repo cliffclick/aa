@@ -28,6 +28,8 @@ public class TestType {
   // Test for a collection of Types, that toString and valueOf are a bijection
   @Test public void testToString() {
     Ary<Type> ts = Type.ALL_TYPES();
+    PrimNode.PRIMS();
+    Type.Parse.set_proto((TypeStruct)PrimNode.INT._val,(TypeStruct)PrimNode.FLT._val);
     String[] ss = new String[ts.len()];
     for( int i=0; i<ts.len(); i++ )
       ss[i] = ts.at(i).str(new SB(), true, false).toString();
@@ -38,6 +40,8 @@ public class TestType {
   }
   // Test for a collection of Strings, that toString and valueOf are a bijection
   @Test public void testValueOf() {
+    PrimNode.PRIMS();
+    Type.Parse.set_proto((TypeStruct)PrimNode.INT._val,(TypeStruct)PrimNode.FLT._val);
     String[] ss = new String[] {
       "Scalar",                 // The Scalars and Nils
       "nScalar",
@@ -183,12 +187,12 @@ public class TestType {
     // Lattice around int8 and 0 is well formed; exactly 3 edges, 3 nodes
     // Confirm lattice: {~i16 -> ~i8 -> 0 -> i8 -> i16 }
     // Confirm lattice: {        ~i8 -> 1 -> i8        }
-    TypeStruct  i16= TypeStruct.make_int(TypeInt.INT16);
-    TypeStruct  i8 = TypeStruct.make_int(TypeInt.INT8 );
+    TypeStruct  i16= PrimNode.make_int(TypeInt.INT16);
+    TypeStruct  i8 = PrimNode.make_int(TypeInt.INT8 );
     TypeStruct xi8 = i8.dual();
     TypeStruct xi16= i16.dual();
-    TypeStruct z   = TypeStruct.make_int(TypeInt.con(0));
-    TypeStruct o   = TypeStruct.make_int(TypeInt.TRUE );
+    TypeStruct z   = PrimNode.make_int(TypeInt.con(0));
+    TypeStruct o   = PrimNode.make_int(TypeInt.TRUE );
     assertEquals(xi8,xi8.meet(xi16)); // ~i16-> ~i8
     //assertEquals( z ,z  .meet(xi8 )); // ~i8 ->  0 // No longer applies single redoing nil
     assertEquals(i8 ,i8 .meet(xi8 )); //  ~i8 -> i8
@@ -522,10 +526,10 @@ public class TestType {
     // less than 5.  Any data loop must contain a Phi; if structures are
     // nesting infinitely deep, then it must contain a NewNode also.
     //int alias = BitsAlias.new_alias(BitsAlias.ALLX);
-    //TypeStruct ts = TypeStruct.make(TypeFld.make("ptr",TypeNil.NIL),TypeFld.make("cnt",TypeInt.con(0)));
+    //TypeStruct ts = PrimNode.make(TypeFld.make("ptr",TypeNil.NIL),TypeFld.make("cnt",TypeInt.con(0)));
     //TypeMemPtr phi = TypeMemPtr.make(alias,ts);
     //for( int i=1; i<20; i++ ) {
-    //  TypeStruct newt = TypeStruct.make(TypeFld.make("ptr",phi),TypeFld.make("cnt",TypeInt.con(i)));
+    //  TypeStruct newt = PrimNode.make(TypeFld.make("ptr",phi),TypeFld.make("cnt",TypeInt.con(i)));
     //  TypeStruct approx = newt.approx(BitsAlias.make0(alias));
     //  phi = TypeMemPtr.make(alias,approx);
     //}

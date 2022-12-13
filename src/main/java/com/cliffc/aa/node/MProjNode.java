@@ -12,6 +12,7 @@ public class MProjNode extends ProjNode {
   public MProjNode( Node head, int idx ) { super(head,idx); }
   @Override public String xstr() { return "MProj"+_idx; }
   @Override public boolean is_mem() { return true; }
+  NewNode nnn() { return (NewNode)in(0); }
 
   @Override public void add_flow_def_extra(Node chg) {
     // Dropping last mem use enables Store folding into New

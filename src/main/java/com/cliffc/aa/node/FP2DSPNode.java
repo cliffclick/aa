@@ -7,17 +7,23 @@ import com.cliffc.aa.type.TypeFunPtr;
 import static com.cliffc.aa.AA.unimpl;
 
 // Bind a 'this' into an unbound function pointer.
-public class BindFPNode extends Node {
-  public BindFPNode( Node fp, Node dsp ) { super(OP_BINDFP,fp,dsp); }
-  @Override public String xstr() {return "BindFP"; }
+public class FP2DSPNode extends Node {
+  public FP2DSPNode( Node fp ) { super(OP_FP2DSP,fp); }
+  @Override public String xstr() {return "FP2DSP"; }
 
   Node fp() { return in(0); }
-  Node dsp() { return in(1); }
   @Override public Type value() {
     if( !(fp()._val instanceof TypeFunPtr tfp) ) return fp()._val.oob();
-    assert !tfp.has_dsp();
-    return tfp.make_from(dsp()._val);
+    assert tfp.has_dsp();
+    return tfp.dsp();
   }
+  
+  @Override public Node ideal_reduce() {
+    if( fp() instanceof BindFPNode bind ) return bind.dsp();
+    if( fp() instanceof FunPtrNode fptr ) return fptr.display();
+    return null;
+  }
+  
   @Override public boolean has_tvar() { return true; }
   @Override TV3 _set_tvar() {
     // Display is included in the argument count, and is unified with first argument

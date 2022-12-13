@@ -758,6 +758,10 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // Parse an indented string to get a Type back.  Handles cyclic types.
   // Example: "[0,ALL]{all,1 ->PA:*[0,5]@{^=any; n1=PA; v1=Scalar} }"
   static class Parse {
+    // Required to parse the shortcuts "int:" or "flt:"
+    static TypeStruct _iproto, _fproto;
+    static void set_proto(TypeStruct iproto, TypeStruct fproto) { _iproto = iproto; _fproto = fproto; }
+                     
     final String _str;
     int _x;
     final NonBlockingHashMap<String,Type> _dups = new NonBlockingHashMap<>();
@@ -858,11 +862,11 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
           // Shortcut for ints/flts.  Check for "int:int_type" or "flt:flt_type"
           if( Util.eq(id,"int") ) {
             TypeInt tint = TypeInt.valueOfInt(id_num());
-            yield maybe_dup(dup,TypeStruct.make_int(tint==null ? TypeInt.con((long)back_num(oldx2)) : tint));
+            yield maybe_dup(dup,_iproto.make_int(tint==null ? TypeInt.con((long)back_num(oldx2)) : tint));
           }
           if( Util.eq(id,"flt") ) {
             TypeFlt tflt = TypeFlt.valueOfFlt(id_num());
-            yield maybe_dup(dup,TypeStruct.make_flt(tflt==null ? TypeFlt.con(      back_num(oldx2)) : tflt));
+            yield maybe_dup(dup,_fproto.make_flt(tflt==null ? TypeFlt.con(      back_num(oldx2)) : tflt));
           }
 
           // Ok, really start a recursive type

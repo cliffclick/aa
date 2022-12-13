@@ -6,7 +6,6 @@ import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.AryInt;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.Util;
-import org.jetbrains.annotations.NotNull;
 
 import java.text.NumberFormat;
 import java.text.ParsePosition;
@@ -575,8 +574,11 @@ public class Parse implements Comparable<Parse> {
       _x -= binop.adjustx(tok); // Chosen op can be shorter than tok
       skipWS();
       int rhsx = _x;            // Invariant: WS already skipped
-      // Get the oper function to call
-      Node opfun = gvn(new FieldNode(lhs,binop._name,errMsg(opx)));
+      Parse err = errMsg(opx);
+      // Get the overloaded operator field
+      Node overfun = gvn(new FieldNode(lhs,binop._name,err));
+      // Get the resolved operator from the overload
+      Node opfun = gvn(new FieldNode(overfun,null,err));
       int fidx = opfun.push();
       // Parse the RHS operand
       Node rhs = binop._lazy
@@ -787,7 +789,7 @@ public class Parse implements Comparable<Parse> {
     ScopeNode scope = lookup_scope(tok=tok.intern(),false); // Find prior scope of token
     // Need a load/call/store sensible options
     if( scope==null ) {         // Token not already bound to a value
-      do_store(null,con(TypeNil.XNIL),Access.RW,tok,null,TypeNil.SCALAR,null);
+      do_store(null,Env.XNIL,Access.RW,tok,null,TypeNil.SCALAR,null);
       scope = scope();
     } else {                    // Check existing token for mutable
       if( !scope.is_mutable(tok) )
@@ -807,7 +809,7 @@ public class Parse implements Comparable<Parse> {
     // Do a full lookup on "+", and execute the function
     int nidx = n.push();
     Node plus = gvn(new FieldNode(n,"_+_",bad));
-    Node inc = con(TypeStruct.make_int(TypeInt.con(d)));
+    Node inc = con(TypeInt.con(d),"int:");
     Node sum = do_call(errMsgs(_x-2,_x,_x), args(plus,inc));
     Node stf = gvn(new SetFieldNode(tok,Access.RW,Node.peek(ld_x),sum,bad));
     // Active memory for the chosen scope, after the call to plus
@@ -1093,8 +1095,8 @@ public class Parse implements Comparable<Parse> {
     mem .add_def(mem ());
     val .add_def(rez   );
     set_ctrl(Env.XCTRL);
-    set_mem (con(TypeMem.ANYMEM));
-    return con(TypeNil.XNIL);
+    set_mem (Node.con(TypeMem.ANYMEM));
+    return Env.XNIL;
   }
 
   /** A balanced operator as a fact().  Any balancing token can be used.
@@ -1152,9 +1154,9 @@ public class Parse implements Comparable<Parse> {
     if( n instanceof Long   ) {
       if( _buf[_x-1]=='.' ) _x--; // Java default parser allows "1." as an integer; pushback the '.'
       long l = n.longValue();
-      return l==0 ? Env.XNIL : con(PrimNode.make_int(l));
+      return l==0 ? Env.XNIL : con(TypeInt.con(l),"int:");
     }
-    if( n instanceof Double ) return con(PrimNode.make_flt(n.doubleValue()));
+    if( n instanceof Double ) return con(TypeFlt.con(n.doubleValue()),"flt:");
     throw new RuntimeException(n.getClass().toString()); // Should not happen
   }
   // Parse a small positive integer; WS already skipped and sitting at a digit.
@@ -1241,7 +1243,7 @@ public class Parse implements Comparable<Parse> {
       } else {
         access = Access.RW;     // Arbitrary AA type, not const-expr
         t = peek(':') ? type(true,null) : TypeNil.SCALAR;
-        val = con(t);
+        val = Node.con(t);
       }
       // Insert the field into the structure.
       proto.add_fld(tok.intern(),access, val,null);
@@ -1422,7 +1424,10 @@ public class Parse implements Comparable<Parse> {
   private Node mem() { return scope().mem(); }
   private void set_mem( Node n) { scope().set_mem(n); }
 
-  private @NotNull ConNode con( Type t ) { return (ConNode)Node.con(t); }
+  private Node con( Type t, String intflt ) {
+    StructNode ts = _e.lookup_type(intflt);
+    return gvn(new SetFieldNode("!",Access.Final,ts,Node.con(t),null));
+  }
 
   // Lookup & extend scopes
   public  Node lookup( String tok ) { return _e.lookup(tok); }

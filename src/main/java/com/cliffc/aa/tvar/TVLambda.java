@@ -2,6 +2,8 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.util.*;
 
+import static com.cliffc.aa.AA.DSP_IDX;
+import static com.cliffc.aa.AA.ARG_IDX;
 import static com.cliffc.aa.AA.unimpl;
 
 /** A lambda, higher-order function
@@ -9,28 +11,31 @@ import static com.cliffc.aa.AA.unimpl;
  */
 public class TVLambda extends TVNilable {
 
-  public TVLambda( int nargs ) { super(true,false,make_fun(nargs)); }
-  private static TV3[] make_fun(int nargs) {
-    TV3[] tvs = new TV3[nargs+1];
-    for( int i=0; i<nargs; i++ )
-      tvs[i+1] = new TVLeaf();
-    return tvs;
+  public TVLambda( int nargs, TV3 dsp, TV3 ret ) {
+    super(true,false,new TV3[nargs]);
+    // Slot 0/CTL_IDX is reserved for the return.
+    // Slot 1/MEM_IDX is unused.
+    // Slot 2/DSP_IDX is for the display/self/this argument
+    // Slots 3+ are normal arguments past display/self/this
+    _args[0] = ret;
+    if( nargs>DSP_IDX ) _args[DSP_IDX] = dsp;
+    for( int i=ARG_IDX; i<nargs; i++ )
+      _args[i] = new TVLeaf();
   }
-  // Used during recursive initial setup
-  public void set_ret( TV3 ret ) { assert _args[0]==null; _args[0]=ret; }
-  // return in slot 0, display in slot 1, args in slots 2+
-  public TV3 ret() { return _find(0); }
-  public TV3 dsp() { return arg(0); }  // Display is arg0
-  public TV3 arg(int argn) { return _find(argn+1); } // Args are 1-based to skip return
+  // return in slot 0, display in slot 2, args in slots 3+
+  public TV3 ret() { return arg(0); }
+  public TV3 dsp() { return arg(DSP_IDX); }
+  public int nargs() { return len(); }
 
 
   // -------------------------------------------------------------
-  @Override void _union_impl(TV3 that) {
+  @Override
+  void _union_impl(TV3 that) {
     if( !(that instanceof TVBase base) ) throw unimpl();
     throw unimpl();
   }
 
-  @Override boolean _unify_impl(TV3 that, boolean test ) {
+  @Override boolean _unify_impl(TV3 that ) {
     throw unimpl();
   }
 

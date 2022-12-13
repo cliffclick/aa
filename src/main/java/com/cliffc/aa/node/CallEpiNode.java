@@ -498,63 +498,36 @@ public final class CallEpiNode extends Node {
   @Override public boolean unify( boolean test ) {
     assert !_is_copy;
     boolean progress = false;
-    CallNode call = call();
-    int nargs = call.nargs();
-    Node fdx = call.fdx();
-    TV3 tfun = fdx.tvar();
-    //if( !tfun.is_fun() ) {
-    //  if( test ) return true;
-    //  TV3[] targs = new TV3[nargs+1];
-    //  targs[DSP_IDX] = new TVLeaf();
-    //  for( int i=ARG_IDX; i<nargs; i++ ) targs[i] = call.tvar(i);
-    //  targs[nargs] = tvar();    // Return
-    //  TV3 nfun = TV3.make_fun("CallEpi_unify", false, targs);
-    //  progress = tfun.unify(nfun,test);
-    //} else {
-    //
-    //  // Check for progress amongst args
-    //  int miss=0;
-    //  for( int i=ARG_IDX; i<nargs; i++ ) {
-    //    TV3 formal = tfun.arg(TV3.argname(i));
-    //    if( formal == null && tfun.is_open() ) {
-    //      if( test ) return true;
-    //      tfun._args.put(TV3.argname(i),formal=TV3.make_leaf("CallEpi_unify_open"));
-    //    }
-    //    if( formal == null ) {      // No matching formal (too many args pass)
-    //      miss++;
-    //      progress |= bad_arg_cnt(test);
-    //    } else {
-    //      TV3 actual = call.tvar(i);
-    //      progress |= actual.unify(formal, test);
-    //      if( progress && test ) return true; // Early exit
-    //      tfun = tfun.find();
-    //    }
-    //  }
-    //  // Too few args passed, some formals missed
-    //  if( (tfun.size()-1)-(nargs-miss) > 0 && !tfun.is_err() )
-    //    progress |= bad_arg_cnt(test);
-    //  // Check for progress on the return
-    //  progress |= tvar().unify(tfun.arg(" ret"),test);
-    //}
-    //
-    //// Flag HMT result as widening, if GCP falls to a TFP which widens in HMT.
-    //TV3 tret = tfun.find().arg(" ret");
-    //if( tret.is_copy() && fdx._val instanceof TypeFunPtr tfp && tfp.fidxs()!=BitsFun.NALL ) {
-    //  for( int fidx : tfp.fidxs() ) {
-    //    if( fidx==0 ) continue;
-    //    RetNode ret = RetNode.FUNS.at(fidx);
-    //    FunPtrNode fptr = ret.funptr();
-    //    TV3 tfun2 = fptr.tvar();
-    //    if( !tfun2.is_fun() ) tfun2.push_dep(this); // Come back around when this becomes a function
-    //    else if( tfun2.arg(" ret").is_copy() ) {
-    //      if( !test ) tret.clr_cp();
-    //      return true;
-    //    }
-    //  }
-    //}
-    //
-    //return progress;
-    throw unimpl();
+    CallNode call = call();     // Call header for Apply
+    Node fdx = call.fdx();      // node {dsp args -> ret}
+    TV3 tv3 = fdx.tvar();       // type {dsp args -> ret}
+    
+    // Peek thru any error
+    if( tv3 instanceof TVErr err ) {
+      tv3 = err.as_lambda();
+      throw unimpl();           // Errors are poisonous
+    }
+
+    // If not one already, make a lambda term for the function.
+    if( !(tv3 instanceof TVLambda tfun) )
+      return test | tv3.unify(new TVLambda(call.nargs(),new TVLeaf(),tvar()),test);
+    
+    // Check for progress amongst args
+    int nargs = Math.min(call.nargs(),tfun.nargs());
+    for( int i=ARG_IDX; i<nargs; i++ ) {
+      TV3 formal = tfun.arg(i);
+      TV3 actual = call.tvar(i);
+      progress |= actual.unify(formal,test);
+      if( progress && test ) return true;
+    }
+
+    // Check for progress on the return
+    progress |= tvar().unify(tfun.ret(),test);
+
+    if( tfun.nargs() > nargs ) throw unimpl(); // Missing arguments
+    if( call.nargs() > nargs ) throw unimpl(); // Too many arguments
+    
+    return progress;
   }
 
   private boolean bad_arg_cnt(boolean test) {

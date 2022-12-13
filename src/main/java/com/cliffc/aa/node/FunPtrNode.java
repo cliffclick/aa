@@ -102,9 +102,9 @@ public final class FunPtrNode extends Node {
   }
   // Called if Display goes unused
   @Override public void add_flow_use_extra(Node chg) {
-    Type tdsp = display()._val;
-    if( tdsp instanceof TypeMemPtr tmp && tmp._obj==TypeStruct.UNUSED )
-      Env.GVN.add_reduce(this);
+    //Type tdsp = display()._val;
+    //if( tdsp instanceof TypeMemPtr tmp && tmp._obj==TypeStruct.UNUSED )
+    //  Env.GVN.add_reduce(this);
   }
 
 
@@ -113,7 +113,8 @@ public final class FunPtrNode extends Node {
       return TypeFunPtr.EMPTY;
     RetNode ret = ret();
     TypeTuple tret = (TypeTuple)(ret._val instanceof TypeTuple ? ret._val : ret._val.oob(TypeTuple.RET));
-    return TypeFunPtr.make(ret._fidx,nargs(),display()._val,tret.at(REZ_IDX));
+    Node dsp = display();
+    return TypeFunPtr.make(ret._fidx,nargs(),dsp==null ? Type.ALL : dsp._val,tret.at(REZ_IDX));
   }
   @Override public void add_flow_extra(Type old) {
     //if( old==_live )            // live impacts value
@@ -140,13 +141,9 @@ public final class FunPtrNode extends Node {
 
   @Override public boolean has_tvar() { return true; }
 
-  @Override public void set_tvar() {
-    if( _tvar!=null ) return;
-    // Display is included in the argument count
-    TVLambda lam = new TVLambda(nargs()-AA.DSP_IDX); _tvar = lam;
-    Node rez = ret().rez();
-    rez.set_tvar();
-    lam.set_ret(rez.tvar());
+  @Override public TV3 _set_tvar() {
+    Node dsp = display();
+    return new TVLambda(nargs(),dsp==null ? new TVLeaf() : dsp.set_tvar(),ret().rez().set_tvar());
   }
 
   // Implements class HM.Lambda unification.
@@ -162,7 +159,7 @@ public final class FunPtrNode extends Node {
     for( int i=DSP_IDX; i<parms.length; i++ )
       // Parms can be missing (and display might not support a TVar)
       if( parms[i]!=null ) {
-        progress |= lam.arg(i-DSP_IDX).unify(parms[i].tvar(),test);
+        progress |= lam.arg(i).unify(parms[i].tvar(),test);
         if( test && progress ) return true;
       }
     progress |= lam.ret().unify(ret.rez().tvar(),test);
@@ -173,8 +170,7 @@ public final class FunPtrNode extends Node {
   // HM changes; push related neighbors
   public void add_work_hm() {
     super.add_work_hm();
-    if( display().has_tvar() )
-      Env.GVN.add_flow(display());
+    Env.GVN.add_flow(display());
   }
 
 }

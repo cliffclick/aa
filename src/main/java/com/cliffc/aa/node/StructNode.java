@@ -211,25 +211,21 @@ public class StructNode extends Node {
 
   @Override public boolean has_tvar() { return true; }
 
-  @Override public void set_tvar() {
-    if( _tvar!=null ) return;   // Been here, done that
+  @Override TV3 _set_tvar() {
     TVStruct ts = new TVStruct(_flds);
-    _tvar = new TVPtr(ts);
-    for( int i=0; i<len(); i++ ) {
-      if( in(i)._tvar==null ) in(i).set_tvar(); // Recursively set
-      ts.set_fld(i,tvar(i));                    // Must be set here
-    }
+    for( int i=0; i<len(); i++ )
+      ts.set_fld(i,in(i).set_tvar()); 
+    return ts;
   }
   
 
   @Override public boolean unify( boolean test ) {
-    TVPtr ptr = (TVPtr)tvar();
-    TVStruct rec = ptr.load();
+    TVStruct rec = (TVStruct)tvar();
 
     // Unify existing fields.  Ignore extras on either side.
     boolean progress = false;
     for( int i=0; i<len(); i++ ) {
-      TV3 fld = rec.fld(_flds.at(i)); // Field lookup by string
+      TV3 fld = rec.arg(_flds.at(i)); // Field lookup by string
       if( fld!=null ) progress |= fld.unify(tvar(i),test);
       if( test && progress ) return true;
     }

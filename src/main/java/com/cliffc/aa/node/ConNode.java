@@ -16,6 +16,8 @@ public class ConNode<T extends Type> extends Node {
   public ConNode( T t ) {
     super(OP_CON,Env.ROOT);
     assert t.simple_ptr()==t;
+    // Use SetField on the CLZ instead
+    assert !(_t instanceof TypeStruct ts && ts._clz != null );
     _t=t;
   }
   @Override public String xstr() {
@@ -25,7 +27,8 @@ public class ConNode<T extends Type> extends Node {
   @Override public Type value() { return _t; }
 
   @Override public boolean has_tvar() {
-    if( _t.is_simple() ) return false; // No on CTRL, XCTRL, ANY, ALL
+    if( _t==Type.ALL ) return true;  // Specifically allowed for various unused-displays on primitives
+    if( _t.is_simple() ) return false; // No on CTRL, XCTRL, ANY
     if( _t instanceof TypeRPC ) return false; // For now, no closures
     if( _t.is_nil() ) return true;     // Yes on NIL, INT, FLT, MEMPTR, FUNPTR
     if( _t instanceof TypeStruct ) return true;
@@ -34,11 +37,11 @@ public class ConNode<T extends Type> extends Node {
     return false;
   }
 
-  @Override public void set_tvar() {
-    if( _tvar == null )
-      _tvar = _t==TypeNil.XNIL
-        ? new TVNil( new TVLeaf() ) // xnil gets a HM nilable instead of a base
-        : new TVBase(true,_t);
+  @Override public TV3 _set_tvar() {
+    if( _t==TypeNil.XNIL )
+      return new TVNil( new TVLeaf() ); // xnil gets a HM nilable instead of a base
+    // Default case, just a Base wrapper over GCP type
+    return TVBase.make(true,_t);
   }
   
   @Override public boolean unify( boolean test ) {

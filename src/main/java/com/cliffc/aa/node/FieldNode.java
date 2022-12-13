@@ -3,7 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 
@@ -42,8 +42,9 @@ public class FieldNode extends Node {
         return t.oob();
       // Mid-resolve?  No field name yet.
       if( is_resolving() )
+        // Pre-HMT, dunno which one, use meet.
         // Still resolving, use the join of all fields.
-        return Combo.HM_AMBI ? meet(ts) : join(ts);
+        return (_tvar==null || Combo.HM_AMBI) ? meet(ts) : join(ts);
       // Normal field lookup
       TypeFld fld = ts.get(_fld);
       // Hit with field name
@@ -53,16 +54,16 @@ public class FieldNode extends Node {
       if( sclz.isEmpty() )
         return missing_field();
     }
-    // Prototype lookup
-    StructNode proto = Env.PROTOS.get(sclz);    
-    TypeFld pfld = ((TypeStruct) proto._val).get(_fld);
-    if( pfld==null ) return missing_field();
-    assert pfld._access == TypeFld.Access.Final;
-    return pfld._t;
+    throw unimpl();
   }
 
   private static Type meet(TypeStruct ts) { Type t = TypeNil.XSCALAR; for( TypeFld t2 : ts )  t = t.meet(t2._t); return t; }
-  private static Type join(TypeStruct ts) { Type t = TypeNil. SCALAR; for( TypeFld t2 : ts )  t = t.join(t2._t); return t; }
+  private static Type join(TypeStruct ts) {
+    Type t = TypeNil.SCALAR;
+    for( TypeFld t2 : ts )
+      t = t.join( t2._t instanceof TypeFunPtr tfp2  ? tfp2.make_from(tfp2.fidxs().dual()) : t2._t );
+    return t;
+  }
 
   // Checks is_err from HMT from StructNode.
   // Gets the T2 from the base StructNode.
@@ -73,22 +74,6 @@ public class FieldNode extends Node {
 
   
   @Override public Node ideal_reduce() {
-    if( in(0) instanceof StructNode clz )
-      //return clz.in_bind(_fld,in(0),_bad);
-      throw unimpl();
-    // For named prototypes, if the field load fails, try again in the
-    // prototype.  Only valid for final fields.
-    //String sclz=null;
-    //Type t = val(0);
-    //if( t == TypeNil.XNIL ) sclz = "int:";
-    //else if( t instanceof TypeStruct ts ) sclz = ts.clz();
-    //if( sclz!=null ) {
-    //  StructNode clz = proto(sclz);
-    //  if( clz!=null )
-    //    //return clz.in_bind(_fld,in(0),_bad);
-    //    throw unimpl();
-    //}
-
     // Back-to-back SetField/Field
     if( in(0) instanceof SetFieldNode sfn && sfn.err(true)==null )
       return Util.eq(_fld, sfn._fld)
@@ -123,19 +108,22 @@ public class FieldNode extends Node {
   @Override public boolean unify( boolean test ) {
     TV3 self = tvar();
     TV3 rec = tvar(0);
-    //if( !test ) rec.push_dep(this);
-    //assert rec.arg("*")==null;  // No ptrs here, just structs
-    //
-    //// Look up field
-    //TV3 fld = rec.arg(_fld);
-    //if( fld!=null )           // Unify against a pre-existing field
-    //  return fld.unify(self, test);
-    //
-    //// Add struct-ness if possible
-    //if( !rec.is_obj() ) {
-    //  if( test ) return true;
-    //  rec.make_struct_from();
-    //}
+    assert !(rec instanceof TVPtr); // No ptrs here, just structs
+
+    // Add struct-ness if needed
+    TVStruct str;
+    if( !(rec instanceof TVStruct str0) ) {
+      if( test ) return true;
+      throw unimpl();
+    } else {
+      str = str0;
+    }
+
+    // Look up field
+    TV3 fld = str.arg(_fld);
+    if( fld!=null )           // Unify against a pre-existing field
+      return fld.unify(self, test);
+
     //// Add the field
     //if( rec.is_obj() && rec.is_open() ) {
     //  if( !test ) rec.add_fld(_fld,self);

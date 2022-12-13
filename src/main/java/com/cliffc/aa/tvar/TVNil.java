@@ -18,12 +18,13 @@ public class TVNil extends TV3 {
   TV3 find_nil() { throw unimpl(); }
   
   // -------------------------------------------------------------
-  @Override void _union_impl(TV3 that) {
+  @Override
+  void _union_impl(TV3 that) {
     if( !(that instanceof TVBase base) ) throw unimpl();
     throw unimpl();
   }
 
-  @Override boolean _unify_impl(TV3 that, boolean test ) {
+  @Override boolean _unify_impl(TV3 that ) {
     throw unimpl();
   }
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {

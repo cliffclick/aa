@@ -23,11 +23,6 @@ public class LoadNode extends Node {
   @Override public Type value() {
     Type tadr = adr()._val;
     Type tmem = mem()._val;       // Memory
-    // We allow Loads against Clazz types
-    if( tadr instanceof TypeStruct ts ) {
-      StructNode clz = Env.PROTOS.get(ts.clz());
-      if( clz != null ) return clz._val;
-    }
     if( !(tadr instanceof TypeMemPtr tmp) ) return tadr.oob();
     if( !(tmem instanceof TypeMem    tm ) ) return tmem.oob(); // Nothing sane
     return tm.ld(tmp);

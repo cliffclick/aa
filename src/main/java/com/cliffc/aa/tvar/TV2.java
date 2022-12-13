@@ -417,7 +417,7 @@ public class TV2 {
   TV2 _clz_arg( String key ) {
     if( _clz==null || _clz.isEmpty() ) return null;
     // Clazz must exist, but might not be unified/structured yet.
-    StructNode sclz = Env.PROTOS.get(_clz);
+    //StructNode sclz = Env.PROTOS.get(_clz);
     //TV2 clz = sclz.tvar();
     //// If not yet a clazz, make it one
     //if( !clz.is_obj() ) {

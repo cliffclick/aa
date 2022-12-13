@@ -1,8 +1,9 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFld;
 import com.cliffc.aa.type.TypeStruct;
@@ -56,51 +57,52 @@ public class SetFieldNode extends Node {
   // Unify the named field against a TV3.is_obj same named field.
   // Other fields are just passed through.
   @Override public boolean unify( boolean test ) {
+    boolean progress = false;
     TV3 self = tvar();
     TV3 rec = tvar(0);
     TV3 tvf = tvar(1);
-    //assert rec.arg("*")==null && !rec.is_nil() && self.arg("*")==null && !self.is_nil();
-    //
-    //// Unify all other fields common to both
-    //boolean progress = false;
-    //if( self.is_obj() )
-    //  if( rec.is_obj() ) {
-    //    for( String fld : self._args.keySet() )
-    //      if( !Util.eq(fld,_fld) ) { // All fields except the replaced one
-    //        TV3 rfld = rec.arg(fld);
-    //        progress |= rfld!=null && self.arg(fld).unify(rfld,test);
-    //        if( test && progress ) return true;
-    //      }
-    //  } else
-    //    rec.push_dep(this);    // When this becomes a obj, need to unify here
-    //
-    //// Lookup field in self
-    //TV3 fld = self.arg(_fld);
-    //if( fld!=null )
-    //  return fld.unify(tvf,test) | progress;
-    //
-    //// Add struct-ness if possible
-    //if( !self.is_obj() ) {
-    //  if( test ) return true;
-    //  self.make_struct_from();
-    //}
-    //
-    //// Add the field
-    //if( self.is_obj() && self.is_open() ) {
-    //  if( !test ) self.add_fld(_fld,tvf);
-    //  return true;
-    //}
-    //
-    //// Closed/non-record, field is missing
-    //return self.set_err(("Missing field "+_fld).intern(),test);
-    throw unimpl();
+
+    // Add struct-ness as needed
+    TVStruct objrec;
+    if( !(rec instanceof TVStruct rec0) ) {
+      if( test ) return true;
+      objrec = new TVStruct(new String[]{_fld},new TV3[]{new TVLeaf()},true);
+      progress |= rec.unify(objrec,test);
+    } else objrec = rec0;
+
+    // Add struct-ness as needed
+    TVStruct objslf;
+    if( !(self instanceof TVStruct self0) ) {
+      if( test ) return true;
+      objslf = new TVStruct(new String[]{_fld},new TV3[]{tvf},true);
+      progress |= self.unify(objslf,test);
+    } else objslf = self0;
+
+    // Add the field to both
+    if( objrec.is_open() && objrec.arg(_fld)==null )
+      progress |= test || objrec.add_fld(_fld,new TVLeaf());
+    
+    if( objslf.is_open() && objslf.arg(_fld)==null )
+      progress |= test || objslf.add_fld(_fld,tvf);
+
+    // Check for missing field, or unify
+    TV3 tvfld = objslf.arg(_fld);    
+    if( tvfld==null ) throw unimpl();
+    progress |= tvfld.unify(tvf,test);
+    if( test && progress ) return true;
+
+    // Unify all other common fields, same as normal struct unification
+    progress |= objrec.half_unify(objslf,_fld,test);
+    progress |= objslf.half_unify(objrec,_fld,test);
+    return progress;
   }
 
   @Override public ErrMsg err( boolean fast ) {
     if( !(val(0) instanceof TypeStruct ts) )
       return val(0).above_center() ? null : bad("Unknown",fast,null);
     TypeFld fld = ts.get(_fld);
-    if( fld==null ) return bad("No such",fast,ts);
+    if( fld==null )
+      return bad("No such",fast,ts);
     Access access = fld._access;
     if( access!=Access.RW )
       return bad("Cannot re-assign "+access,fast,ts);

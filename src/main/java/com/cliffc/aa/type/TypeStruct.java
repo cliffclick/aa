@@ -250,9 +250,10 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   public static TypeStruct make( TypeFld[] flds ) { return make(false,"",ALL,flds); }
   public static TypeStruct make( TypeFld fld0 ) { return make(TypeFlds.make(fld0)); }
 
-  public static TypeStruct make_int(TypeInt ti) { return make(false,"int:",ti,TypeFlds.EMPTY); }
-  public static TypeStruct make_flt(TypeFlt tf) { return make(false,"flt:",tf,TypeFlds.EMPTY); }
-
+  // Starting from the int/flt prototype, make a concrete instance
+  public TypeStruct make_int(TypeInt ti) { return make_test("int:",ALL,TypeFld.make("!",this),TypeFld.make(".",ti));  }
+  public TypeStruct make_flt(TypeFlt tf) { return make_test("flt:",ALL,TypeFld.make("!",this),TypeFld.make(".",tf));  }
+  
   // The TypeFld[] is not interned.
   public static TypeStruct make_flds(String clz, Type def, TypeFld[] flds) { return make(false,clz,def,TypeFlds.hash_cons(remove_dups(def,flds))); }
 
@@ -315,11 +316,6 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   // All fields are available as ANY.
   public static final TypeStruct UNUSED = ISUSED.dual();
 
-  // Wrapped primitive prototypes
-  public static final TypeStruct INT = make_int(TypeInt.INT64);
-  public static final TypeStruct FLT = make_flt(TypeFlt.FLT64);
-  public static final TypeStruct BOOL= make_int(TypeInt.BOOL );
-
   // A bunch of types for tests
   public  static final TypeStruct POINT = make_test(TypeFld.make("x",TypeFlt.FLT64),TypeFld.make("y",TypeFlt.FLT64));
   public  static final TypeStruct NAMEPT= POINT.set_name("Point:");
@@ -329,7 +325,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   public  static final TypeStruct ARW   = make_test("a",TypeFlt.FLT64,Access.RW   );
 
   // Pile of sample structs for testing
-  static final TypeStruct[] TYPES = new TypeStruct[]{ISUSED,POINT,NAMEPT,A,C0,D1,ARW,INT,FLT};
+  static final TypeStruct[] TYPES = new TypeStruct[]{ISUSED,POINT,NAMEPT,A,C0,D1,ARW};
 
   // --------------------------------------------------------------------------
   // Meet and dual
@@ -649,6 +645,11 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
         dups.put(_uid,"S"+(char)('A'+ucnt._ts++));
       return;
     }
+    // Do not walk the primitive prototype from the primitive, because it will
+    // use short-cut printing.
+    if( (Util.eq("int:",_clz) || Util.eq("flt:",_clz)) && get(".")!=null )
+      return;
+    
     for( int i=0; i<len(); i++ ) // DO NOT USE iter syntax, else toString fails when the iter pool exhausts during a debug session
       if( get(i)!=null )
         get(i)._str_dups(visit,dups,ucnt);
@@ -666,8 +667,9 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     //       flt:3.14
     if( _clz.isEmpty() && dups.get(_uid)!=null )  sb.p(':');
     // Shortcut print for 'int:1234" and 'flt:3.14'
-    if( Util.eq("int:",_clz) && _flds.length==0 && _def instanceof TypeInt ) return _def._str(visit,dups,sb,debug,indent);
-    if( Util.eq("flt:",_clz) && _flds.length==0 && _def instanceof TypeFlt ) return _def._str(visit,dups,sb,debug,indent);
+    TypeFld tf;
+    if( Util.eq("int:",_clz) && (tf=get("."))!=null ) return tf._t._str(visit,dups,sb,debug,indent);
+    if( Util.eq("flt:",_clz) && (tf=get("."))!=null ) return tf._t._str(visit,dups,sb,debug,indent);
     boolean is_tup = is_tup();
     sb.p(is_tup ? "(" : "@{");
     // Set the indent flag once for the entire struct.  Indent if any field is complex.

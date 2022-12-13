@@ -30,7 +30,8 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    test("!1", "xnil", "A?");
+    test("1", "int:1", "int:1");
+    //test("-1", "int:-1", "int:-1");
   }
 
   @Test public void testParse00() {
