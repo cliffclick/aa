@@ -251,8 +251,8 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   public static TypeStruct make( TypeFld fld0 ) { return make(TypeFlds.make(fld0)); }
 
   // Starting from the int/flt prototype, make a concrete instance
-  public TypeStruct make_int(TypeInt ti) { return make_test("int:",ALL,TypeFld.make("!",this),TypeFld.make(".",ti));  }
-  public TypeStruct make_flt(TypeFlt tf) { return make_test("flt:",ALL,TypeFld.make("!",this),TypeFld.make(".",tf));  }
+  public static TypeStruct make_int(Type proto, TypeInt ti) { return make_test("int:",ALL,TypeFld.make("!",proto),TypeFld.make(".",ti));  }
+  public static TypeStruct make_flt(Type proto, TypeFlt tf) { return make_test("flt:",ALL,TypeFld.make("!",proto),TypeFld.make(".",tf));  }
   
   // The TypeFld[] is not interned.
   public static TypeStruct make_flds(String clz, Type def, TypeFld[] flds) { return make(false,clz,def,TypeFlds.hash_cons(remove_dups(def,flds))); }

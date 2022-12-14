@@ -48,7 +48,7 @@ public abstract class PrimNode extends Node {
 
   public static StructNode INT;
   public static StructNode FLT;
-  
+
   private static PrimNode[] PRIMS = null; // All primitives
 
   public static PrimNode[] PRIMS() {
@@ -123,9 +123,9 @@ public abstract class PrimNode extends Node {
 
   // Make a wrapped primitive
   public static TypeStruct make_int(long i) { return make_int(TypeInt.con(i)); }
-  public static TypeStruct make_int(TypeInt ti) { return ((TypeStruct)INT._val).make_int(ti); }
+  public static TypeStruct make_int(TypeInt ti) { return TypeStruct.make_int(INT._val,ti); }
   public static TypeStruct make_flt(double d) { return make_flt(TypeFlt.con(d)); }
-  public static TypeStruct make_flt(TypeFlt td) { return ((TypeStruct)FLT._val).make_flt(td); }
+  public static TypeStruct make_flt(TypeFlt td) { return TypeStruct.make_flt(FLT._val,td); }
   public static TypeStruct make_wrap(TypeNil rez) {
     return rez instanceof TypeInt ti ? make_int(ti) : make_flt((TypeFlt)rez);
   }
@@ -145,13 +145,13 @@ public abstract class PrimNode extends Node {
       // Make a Parm for every formal
       Type tformal = _formals.at(i);
       Node nformal;
-      if(      tformal==TypeInt.INT64   ) nformal = Env.ALL;
-      else if( tformal==TypeFlt.FLT64   ) nformal = Env.ALL;
+      if(      tformal==TypeInt.INT64   ) nformal = INT;
+      else if( tformal==TypeFlt.FLT64   ) nformal = FLT;
       else if( tformal==Type.ALL        ) nformal = Env.ALL;
       else if( tformal==TypeFunPtr.THUNK) nformal = Env.THUNK;
       else if( tformal==TypeMem.ALLMEM  ) nformal = Env.ALLMEM;
       else throw unimpl();
-      add_def(new ParmNode(i,fun,null,tformal,nformal).init());
+      add_def(new ParmNode(i,fun,null,TypeNil.SCALAR,nformal).init());
     }
     // The primitive, working on and producing wrapped prims
     init();
@@ -176,7 +176,8 @@ public abstract class PrimNode extends Node {
       over.close();
       rec.add_fld(prims[0]._name,Access.Final,over,null);
     }
-    rec.init();
+    Env.GVN.add_work_new(rec);
+    rec._val = rec.value();
     rec.close();
     Env.PROTOS.put(rec._clz,rec);     // clazz String -> clazz Struct mapping, for values
     Env.SCP_0.add_type(rec._clz,rec); // type  String -> clazz Struct mapping, for types
@@ -211,10 +212,10 @@ public abstract class PrimNode extends Node {
     // return high otherwise we return low.
     boolean is_con = true, has_high = false;
     for( int i=DSP_IDX; i<_formals.len(); i++ ) {
-      Type twrap = val(i-DSP_IDX);
-      TypeNil tactual = TS[i-DSP_IDX] = (TypeNil)(twrap instanceof TypeStruct ts ? ts._def : twrap);
       TypeNil tformal = (TypeNil)_formals.at(i);
-      TypeNil t = (TypeNil)tformal.dual().meet(tactual);
+      Type twrap = val(i-DSP_IDX);
+      Type tactual = twrap instanceof TypeStruct ts && ts.get(".")!=null ? ts.at(".") : tformal;
+      TypeNil t = TS[i-DSP_IDX] = (TypeNil)tformal.dual().meet(tactual);
       // Expect: tformal is a expanded TypeStruct, so t is also.
       if( tactual != TypeNil.XNIL && !t.is_con() ) {
         is_con = false;         // Some non-constant
@@ -225,7 +226,7 @@ public abstract class PrimNode extends Node {
   }
   boolean is_oper() { return true; }
 
-  
+
   @Override public boolean has_tvar() { return true; }
 
   // In the test HM, all primitives are a Lambda without a body.  Here they are
@@ -237,7 +238,7 @@ public abstract class PrimNode extends Node {
     // Return is some primitive, and is typically never a copy
     return TVBase.make(false,_ret);
   }
-  
+
   // All work done in set_tvar, no need to unify
   @Override public boolean unify( boolean test ) { return false; }
 
@@ -528,13 +529,13 @@ public abstract class PrimNode extends Node {
     @Override TV3 _set_tvar() {
       TV3 a = in(DSP_IDX).set_tvar();
       // Unify arg3 to a no-args lambda { -> A }
-      TVLambda lam = new TVLambda(DSP_IDX,null,a); 
+      TVLambda lam = new TVLambda(DSP_IDX,null,a);
       in(ARG_IDX).set_tvar().unify(lam,false);
       return a;
     }
     // All work done in set_tvar, no need to unify
     @Override public boolean unify( boolean test ) { return false; }
-    
+
     // Unify trailing result ProjNode with the AndThen directly.
     @Override public boolean unify_proj( ProjNode proj, boolean test ) {
       assert proj._idx==REZ_IDX;
@@ -588,20 +589,20 @@ public abstract class PrimNode extends Node {
         return this;
       }
     }
-    
+
     // Pre-cook type: { A { -> A } -> A }
     // Bind display to A
     // Bind arg3 to { -> A } and return to A
     @Override TV3 _set_tvar() {
       TV3 a = in(DSP_IDX).set_tvar();
       // Unify arg3 to a no-args lambda { -> A }
-      TVLambda lam = new TVLambda(DSP_IDX,null,a); 
+      TVLambda lam = new TVLambda(DSP_IDX,null,a);
       in(ARG_IDX).set_tvar().unify(lam,false);
       return a;
     }
     // All work done in set_tvar, no need to unify
     @Override public boolean unify( boolean test ) { return false; }
-    
+
     // Unify trailing result ProjNode with the AndThen directly.
     @Override public boolean unify_proj( ProjNode proj, boolean test ) {
       assert proj._idx==REZ_IDX;

@@ -241,14 +241,14 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // Internal tick of tick-tock printing
   final SB _str( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     if( _hash==0 ) sb.p("!!!");
-    
+
     // Some early cutouts for common bulky cases
     if( this==TypeStruct.ISUSED ) return sb.p("()"); // Shortcut for common case
     //if( this instanceof TypeStruct ts && ts.is_top_clz() ) return sb.p("$TOP");
     //if( this instanceof TypeStruct ts && ts.is_int_clz() ) return sb.p("$INT");
     //if( this instanceof TypeStruct ts && ts.is_flt_clz() ) return sb.p("$FLT");
     //if( this instanceof TypeStruct ts && ts.is_math_clz() ) return sb.p("$MATH");
-    
+
     // Print a dups label, and optionally the type
     String s = dups.get(_uid);
     if( s!=null ) {
@@ -541,7 +541,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     // Triangulate on is_nil without being the same class
     if( this instanceof TypeNil t0 && t instanceof TypeNil t1 ) {
       // LHS is TypeNil directly
-      if( t0._type==TNIL ) return t0.nmeet(t1); 
+      if( t0._type==TNIL ) return t0.nmeet(t1);
       if( t1._type==TNIL ) return t1.nmeet(t0);
       // Mis-matched TypeNil subclasses
       return t0.widen_sub().meet(t1.widen_sub());
@@ -761,20 +761,20 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     // Required to parse the shortcuts "int:" or "flt:"
     static TypeStruct _iproto, _fproto;
     static void set_proto(TypeStruct iproto, TypeStruct fproto) { _iproto = iproto; _fproto = fproto; }
-                     
+
     final String _str;
     int _x;
     final NonBlockingHashMap<String,Type> _dups = new NonBlockingHashMap<>();
     Parse(String str) { _str = str; }
     Type type() { return type(null,false,-2); }
-    
+
     // dup: the parsed type has a dup label, and as soon as possible needs to
     //      be installed in the dups table.  Due to cycles the sub-type parser
     //      generally needs to make a partially-initialized object to install.
     // any: some earlier syntax inverts this type
     // fld_num: -2 , never a field
     //          -1 , always a field and a label must be found
-    //           0+, always a field; label is optional and is the stringified value    
+    //           0+, always a field; label is optional and is the stringified value
     Type type(String dup, boolean any, int fld_num) {
       // Field parse:
       // [ DUP: ] [label] [Access.SHORTS] type
@@ -829,11 +829,11 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         // NIL          // Any one of several constant types
         int oldx = _x;
         String id = id();
-        
+
         // duplicate! - Use a repeat name
         Type t = _dups.get(id);
         if( t!=null ) yield t;
-        
+
         // Leading id, then ':'.  Can be
         // DUP:non_struct_type or
         // CLZ:struct_type or
@@ -862,11 +862,11 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
           // Shortcut for ints/flts.  Check for "int:int_type" or "flt:flt_type"
           if( Util.eq(id,"int") ) {
             TypeInt tint = TypeInt.valueOfInt(id_num());
-            yield maybe_dup(dup,_iproto.make_int(tint==null ? TypeInt.con((long)back_num(oldx2)) : tint));
+            yield maybe_dup(dup,TypeStruct.make_int(_iproto,tint==null ? TypeInt.con((long)back_num(oldx2)) : tint));
           }
           if( Util.eq(id,"flt") ) {
             TypeFlt tflt = TypeFlt.valueOfFlt(id_num());
-            yield maybe_dup(dup,_fproto.make_flt(tflt==null ? TypeFlt.con(      back_num(oldx2)) : tflt));
+            yield maybe_dup(dup,TypeStruct.make_flt(_fproto,tflt==null ? TypeFlt.con(      back_num(oldx2)) : tflt));
           }
 
           // Ok, really start a recursive type
@@ -877,7 +877,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         t = simple_type(id);
         if( t!=null )
           yield any ? t.dual() : t;
-        
+
         // Failed to parse 'id'
         throw unimpl();
       }
@@ -964,7 +964,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         ('a' <= c && c <= 'z');
     }
     private static boolean isId1(char c) {
-      return isId0(c) || 
+      return isId0(c) ||
         ('0' <= c && c <= '9') ||
         (c=='*'); // See Oper.isOp
     }
