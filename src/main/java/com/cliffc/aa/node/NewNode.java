@@ -2,6 +2,9 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.TVPtr;
+import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
 
@@ -87,7 +90,11 @@ public class NewNode extends Node {
 //      Env.GVN.add_reduce(chg);
 //  }
 
-  @Override public boolean has_tvar() { return false; }
+  @Override public boolean has_tvar() { return true; }
+
+  @Override public TV3 _set_tvar() {
+    return new TVPtr(rec().set_tvar());
+  }
 
   @Override public Node ideal_reduce() {
     // NewNode is dead (no pointer use), so kill the struct ref.  When the
@@ -174,7 +181,7 @@ public class NewNode extends Node {
   // ProjNode after New produces a pointer TV2 from whole cloth
   @Override public boolean unify_proj( ProjNode proj, boolean test ) {
     assert proj._idx == REZ_IDX;
-    return false;
+    return tvar().unify(proj.tvar(),test);
   }
 
 
@@ -188,6 +195,22 @@ public class NewNode extends Node {
     return nnn;
   }
 
+
+  public StructNode make_con(TypeStruct ts) {
+    ProjNode ptr = ProjNode.proj(this,REZ_IDX);
+    StructNode proto = (StructNode)rec();
+    StructNode sn = new StructNode(false,false,null,proto._clz,proto._def);
+    sn.add_fld("!",TypeFld.Access.Final,ptr,null);
+
+    for( TypeFld fld : ts )
+      if( !Util.eq("!",fld._fld) )
+          sn.add_fld(".",fld._access,con(fld._t),null);
+    sn.close();
+    return sn.init();
+  }
+  
+
+  
   @Override public int hashCode() { return super.hashCode()+ _alias; }
   // Only ever equal to self, because of unique _alias.  We can collapse equal
   // NewNodes and join alias classes, but this is not the normal CSE and so is

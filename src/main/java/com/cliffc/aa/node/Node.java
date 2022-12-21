@@ -12,7 +12,6 @@ import java.util.function.IntSupplier;
 import java.util.function.Predicate;
 
 import static com.cliffc.aa.AA.unimpl;
-import static com.cliffc.aa.type.TypeFld.Access;
 
 // Sea-of-Nodes
 public abstract class Node implements Cloneable, IntSupplier {
@@ -546,7 +545,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     // TODO: rethink how deps work in SSA
     //tvar().add_deps_flow();
     //for( Node def : _defs ) if( def!=null && def.has_tvar() ) Env.GVN.add_flow(def);
-    //for( Node use : _uses ) if( use!=null && use.has_tvar() ) Env.GVN.add_flow(use);
+    for( Node use : _uses ) if( use!=null && use.has_tvar() ) Env.GVN.add_flow(use);
   }
 
   // Do One Step of forwards-dataflow analysis.  Assert monotonic progress.
@@ -594,10 +593,10 @@ public abstract class Node implements Cloneable, IntSupplier {
   public void combo_unify() {
     if( _live== Type.ANY ) return; // No HM progress on dead code
     if( _val == Type.ANY ) return; // No HM progress on untyped code
-    TV3 old = _tvar==null ? null : tvar();
-    if( old instanceof TVErr ) return;  // No unifications with error
+    TV3 old = _tvar;
+    if( old==null ) return;
     if( unify(false) ) {
-      assert old==null || !_tvar.debug_find().unify(old.debug_find(),true);// monotonic: unifying with the result is no-progress
+      assert !_tvar.debug_find().unify(old.debug_find(),true);// monotonic: unifying with the result is no-progress
       add_work_hm();            // Neighbors on worklist
     }
   }
@@ -754,39 +753,22 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Inline a prototype constant
   public Node should_proto( Type t ) {
-    // Prototype constants are always a TypeStruct, with a prototype clazz and
-    // some extra constant fields.
-    if( !(t instanceof TypeStruct ts) ) return null;
-    // Prototype clazz
-    StructNode pstruct = Env.PROTOS.get(ts._clz);
-    if( pstruct==null ) return null;
-    // Already a SetField of a constant into a prototype clazz
-    if( this instanceof SetFieldNode sfn && sfn.in(0)==pstruct && sfn.in(1) instanceof ConNode ) return null;
-    // Prototype type
-    TypeStruct proto = (TypeStruct)pstruct._val;
-    // Already same type as prototype
-    if( proto==ts ) return null;
-    // Must be same shape
-    if( proto._def != ts._def ) return null;
-    if( proto.len() != ts.len() ) return null;
-    // All final fields must match, non-finals are R/W and must be constants
-    for( int i=0; i<proto.len(); i++ ) {
-      TypeFld pfld = proto.fld(i);
-      if( pfld._access==Access.Final ) {
-        if( pfld!= ts.fld(i) ) return null; // Modified a final field???
-      } else {
-        assert pfld._access==Access.RW;
-        if( !ts.fld(i).is_con() ) return null; // Non-final is not a constant
-      }
-    }
-    // Replace with a SetField of a constant
-    Node rez = pstruct;
-    for( int i=0; i<proto.len(); i++ ) {
-      TypeFld fld = proto.fld(i);
-      if( fld._access==Access.RW )
-        rez = new SetFieldNode(fld._fld,Access.Final,pstruct,con(ts.fld(i)._t),null).init();
-    }
-    return rez;
+    if( this instanceof ProjNode && in(0) instanceof CallNode )
+      return null;
+    // Prototype constants are always a TypeStruct, with a prototype "!" field
+    // and some extra constant fields.
+    TypeFld pproto;
+    if( !(t instanceof TypeStruct ts) || (pproto=ts.get("!"))==null ) return null;
+    if( this instanceof StructNode sn && sn.find("!")==0 )
+      return null;              // Already a canonical prototype constant
+    if( !(pproto._t instanceof TypeMemPtr tptr) ) return null;
+    int alias = tptr.aliases().abit();
+    if( alias <= 0 ) return null;
+    for( int i=1; i<ts.len(); i++ )
+      if( !ts.get(i).is_con() )
+        return null;
+    NewNode nnn = Env.PROTOS.get(alias);
+    return nnn.make_con(ts);
   }
 
   
@@ -794,14 +776,13 @@ public abstract class Node implements Cloneable, IntSupplier {
   public final void walk_initype(  ) {
     if( Env.GVN.on_flow(this) ) return; // Been there, done that
     Env.GVN.add_flow(this);             // On worklist and mark visited
-    if( AA.DO_GCP ) {
-      _val = _live = Type.ANY;  // Highest value
-      if( this instanceof CallNode call ) call._not_resolved_by_gcp = false; // Try again
-    } else {                    // Not doing optimistic GCP...
-      assert _val==value() && _live==live();
-    }
-    if( has_tvar() )
-      set_tvar();
+    if( has_tvar() ) set_tvar();
+
+    if( AA.DO_GCP ) _val = _live = Type.ANY;  // Highest value
+    else assert _val==value() && _live==live(); // No more progress
+    if( this instanceof FieldNode fld && fld.is_resolving() )
+      TVField.FIELDS.put(fld._fld,fld); // Track resolving field names
+    
     // Walk reachable graph
     for( Node def : _defs ) if( def != null ) def.walk_initype();
     for( Node use : _uses )                   use.walk_initype();
@@ -879,10 +860,14 @@ public abstract class Node implements Cloneable, IntSupplier {
         errs += _report_bug("Progress bug");
     }
     // Check for HMT progress
-    if( AA.DO_HMT && oliv!=Type.ANY && oval!=Type.ANY && _tvar!=null ) {
+    if( !lifting &&                         // Falling, in Combo, so HM is running
+        oliv!=Type.ANY && oval!=Type.ANY && // Alive in any way
+        has_tvar() &&                       // Doing TVar things
+        (!Env.GVN.on_flow(this) || Combo.HM_FREEZE) ) { // Not already on worklist, or past freezing
       if( unify(true) ) {
         if( Combo.HM_FREEZE ) errs += _report_bug("Progress after freezing");
-        if( !Env.GVN.on_flow(this) ) errs += _report_bug("Progress bug");
+        errs += _report_bug("Progress bug");
+        FLOW_VISIT.set(_uid); // Reset if progressing past breakpoint
       }
     }
     for( Node def : _defs ) if( def != null ) errs = def.more_work(lifting,errs);

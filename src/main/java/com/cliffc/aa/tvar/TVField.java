@@ -1,5 +1,7 @@
 package com.cliffc.aa.tvar;
 
+import java.util.HashMap;
+
 import static com.cliffc.aa.AA.unimpl;
 
 /** Field reference from a Struct
@@ -8,9 +10,9 @@ public class TVField extends TV3 {
   
   public TVField( TV3 ptr ) { super(true,ptr); }
 
-  // True if this field is still resolving: the actual field being referenced
-  // is not yet known.
-  static boolean is_resolving(String id) { return id.charAt(0)=='&'; }
+  // Unresolved field names; typically "&nnn" where `nnn` is the FieldNode id
+  public static final HashMap<String,Resolvable> FIELDS = new HashMap<>();
+  public static void reset_to_init0() { FIELDS.clear(); }
 
   // -------------------------------------------------------------
   @Override

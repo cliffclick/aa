@@ -1,9 +1,15 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.*;
-import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.*;
+import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.TVStruct;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeFld;
+import com.cliffc.aa.type.TypeFlds;
+import com.cliffc.aa.type.TypeStruct;
+import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.unimpl;
 
@@ -83,14 +89,6 @@ public class StructNode extends Node {
     _fld_starts = new Ary<>(new Parse[1],0);
   }
 
-  public StructNode make_con(TypeNil t) {
-    StructNode ts = new StructNode(false,false,_paren_start,_clz,_def);
-    ts.add_fld("!",TypeFld.Access.Final,this,null);
-    ts.add_fld(".",TypeFld.Access.Final,con(t),null);
-    ts.close();
-    return ts.init();
-  }
-  
   @Override String str() {
     SB sb = new SB().p(_clz).p("@{");
     if( _flds.isEmpty() ) return sb.p("}").toString();
@@ -127,6 +125,7 @@ public class StructNode extends Node {
   //
   public TypeFld.Access access(String name) { return _accesses.at(find(name)); }
 
+  public String fld(int idx) { return _flds.at(idx); }
 
   // One-time transition when closing a Struct to new fields.
   public StructNode close() { assert !_closed; _closed=true; return this; }

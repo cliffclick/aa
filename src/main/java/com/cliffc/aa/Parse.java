@@ -574,12 +574,15 @@ public class Parse implements Comparable<Parse> {
       _x -= binop.adjustx(tok); // Chosen op can be shorter than tok
       skipWS();
       int rhsx = _x;            // Invariant: WS already skipped
+      int lhsidx = lhs.push();
       Parse err = errMsg(opx);
       // Get the overloaded operator field
-      Node overfun = gvn(new FieldNode(lhs,binop._name,err));
+      Node over = gvn(new FieldNode(lhs,binop._name,err));
       // Get the resolved operator from the overload
-      Node opfun = gvn(new FieldNode(overfun,null,err));
-      int fidx = opfun.push();
+      Node unbound_fun = gvn(new FieldNode(over,null,err));
+      // Binds the function
+      Node bound_fun = gvn(new BindFPNode(unbound_fun,Node.pop(lhsidx)));
+      int fidx = bound_fun.push();
       // Parse the RHS operand
       Node rhs = binop._lazy
         ? _lazy_expr(binop)
@@ -684,12 +687,13 @@ public class Parse implements Comparable<Parse> {
       if( op.is_open() ) throw unimpl(); // Parse the close
       if( op._nargs!=1 ) throw unimpl(); // No binary/trinary allowed here
       int e0idx = e0.push();
+      Parse err = errMsg(oldx);
       // Load field e0.op2_ as an overload, load again to resolve to a TFP,
       // bind, and instance call.  Returns an overload from the clazz, typed as
       // a TypeStruct tuple where the fields hold the function choices.
-      Node over = gvn(new FieldNode(e0,op._name,errMsg(oldx)));
+      Node over = gvn(new FieldNode(e0,op._name,err));
       // Selects the correct function from the TypeStruct tuple.
-      Node unbound_fun = gvn(new FieldNode(over,null,errMsg(oldx)));
+      Node unbound_fun = gvn(new FieldNode(over,null,err));
       // Binds the function
       Node bound_fun = gvn(new BindFPNode(unbound_fun,Node.pop(e0idx)));
       n = do_call(errMsgs(oldx,oldx),args(bound_fun));
@@ -1426,7 +1430,10 @@ public class Parse implements Comparable<Parse> {
 
   private Node con( TypeNil t, String intflt ) {
     StructNode proto = _e.lookup_type(intflt);
-    return gvn(proto.make_con(t));
+    for( Node n : proto._uses )
+      if( n instanceof NewNode nnn )
+        return gvn(nnn.make_con(TypeStruct.make(TypeFld.make(".",t))));
+    throw unimpl();
   }
 
   // Lookup & extend scopes

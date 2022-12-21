@@ -39,6 +39,17 @@ public class TVLambda extends TVNilable {
     throw unimpl();
   }
 
+  // Sub-classes specify trial_unify on sub-parts.
+  // Check arguments, not return.
+  @Override boolean _trial_unify_ok_impl( TV3 tv3, boolean extras ) {
+    TVLambda that = (TVLambda)tv3; // Invariant when called
+    if( nargs() != that.nargs() ) return false; // Fails to be equal
+    for( int i=DSP_IDX; i<nargs(); i++ )
+      if( !arg(i)._trial_unify_ok(that.arg(i), extras) )
+        return false;           // Arg failed, so trial fails
+    return true;                // Unify will work
+  }
+
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     sb.p("{ ");
     for( int i=1; i<_args.length; i++ )

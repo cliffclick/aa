@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.node.PrimNode;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
@@ -12,24 +13,37 @@ import static org.junit.Assert.*;
 public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
-    Type t0 = TypeNil.XNIL;
-    Type t1 = TypeStruct.ISUSED._dual;
-    Type mt01 = t0.meet(t1);
-    Type t2 = TypeInt.INT64._dual;
-    Type mt012 = mt01.meet(t2);
-    assertSame(TypeNil.SCALAR,mt012);
+    Type t0 = Type.valueOf("SZ:*[8]~@{ AND = SZ;... }");
+    Type t1 = Type.valueOf("SZ:*[8]~@{ OR_ = SZ;... }");
+    Type mt = t0.meet(t1);
+    System.out.println(mt);
 
-    //Type t2 = TypeInt.INT64._dual;
-    //Type t3 = TypeStruct.C0._dual;
-    //Type mt23 = t2.meet(t3);
-    //assertSame(TypeNil.SCALAR,mt23);    
+    //Type foo = Type.valueOf("SZ::@{ AND= @{OR_= SZ} }");
+    //
+    //Type mfoo = mt.join((TypeStruct)foo);
+    //System.out.println(mfoo);
+    
+    //Type t0 = Type.valueOf("SZ::~@{ AND !=! [-4]{SI::~@{base!=!int64; clz!=!SZ;... },4 -> SI };... }");
+    //Type t1 = Type.valueOf("SZ::~@{ OR_ !=! [-5]{SI::~@{base!=!int64; clz!=!SZ;... },4 -> SI };... }");
+    //Type mt = t0.meet(t1);
+    //System.out.println(mt);
+    //
+    //((TypeStruct)t0).at("AND")
+    //
+    //
+    //Type trez = Type.valueOf("SZ::~@{"+
+    //                         "  AND!=![-4]{SA:~@{FB:base!=!int64; clz !=! SZ; ...},4 -> SA };"+
+    //                         "  OR_!=![-5]{SA                                     ,4 -> SA };"+
+    //                         "  ..."+
+    //                         "}");
+    //System.out.println(trez);
   }
 
   // Test for a collection of Types, that toString and valueOf are a bijection
   @Test public void testToString() {
     Ary<Type> ts = Type.ALL_TYPES();
-    PrimNode.PRIMS();
-    Type.Parse.set_proto((TypeStruct)PrimNode.INT._val,(TypeStruct)PrimNode.FLT._val);
+    Object dummy = Env.TOP;
+    Type.Parse.set_proto((TypeMemPtr)PrimNode.PINT._val,(TypeMemPtr)PrimNode.PFLT._val);
     String[] ss = new String[ts.len()];
     for( int i=0; i<ts.len(); i++ )
       ss[i] = ts.at(i).str(new SB(), true, false).toString();
@@ -41,7 +55,7 @@ public class TestType {
   // Test for a collection of Strings, that toString and valueOf are a bijection
   @Test public void testValueOf() {
     PrimNode.PRIMS();
-    Type.Parse.set_proto((TypeStruct)PrimNode.INT._val,(TypeStruct)PrimNode.FLT._val);
+    Type.Parse.set_proto((TypeMemPtr)PrimNode.PINT._val,(TypeMemPtr)PrimNode.PFLT._val);
     String[] ss = new String[] {
       "Scalar",                 // The Scalars and Nils
       "nScalar",

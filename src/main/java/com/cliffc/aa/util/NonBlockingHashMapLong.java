@@ -356,7 +356,7 @@ public class NonBlockingHashMapLong<TypeV>
     return res == TOMBSTONE ? null : (TypeV)res;
   }
 
-  /** Removes all of the mappings from this map. */
+  /** Removes all the mappings from this map. */
   public void clear() {         // Smack a new empty table down
     CHM newchm = new CHM(this,new ConcurrentAutoTable(),MIN_SIZE_LOG);
     while( !CAS(_chm_offset,_chm,newchm) ) { /*Spin until the clear works*/}

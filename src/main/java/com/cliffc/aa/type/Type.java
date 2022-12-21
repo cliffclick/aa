@@ -757,10 +757,10 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
 
   // Parse an indented string to get a Type back.  Handles cyclic types.
   // Example: "[0,ALL]{all,1 ->PA:*[0,5]@{^=any; n1=PA; v1=Scalar} }"
-  static class Parse {
+  public static class Parse {
     // Required to parse the shortcuts "int:" or "flt:"
-    static TypeStruct _iproto, _fproto;
-    static void set_proto(TypeStruct iproto, TypeStruct fproto) { _iproto = iproto; _fproto = fproto; }
+    static TypeMemPtr _iproto, _fproto;
+    public static void set_proto(TypeMemPtr iproto, TypeMemPtr fproto) { _iproto = iproto; _fproto = fproto; }
 
     final String _str;
     int _x;

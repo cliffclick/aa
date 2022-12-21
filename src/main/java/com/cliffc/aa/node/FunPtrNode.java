@@ -143,7 +143,7 @@ public final class FunPtrNode extends Node {
 
   @Override public TV3 _set_tvar() {
     Node dsp = display();
-    return new TVLambda(nargs(),dsp==null ? new TVLeaf() : dsp.set_tvar(),ret().rez().set_tvar());
+    return new TVLambda(nargs(),dsp==Env.ANY ? new TVLeaf() : dsp.set_tvar(),ret().rez().set_tvar());
   }
 
   // Implements class HM.Lambda unification.

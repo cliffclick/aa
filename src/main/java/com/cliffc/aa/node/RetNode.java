@@ -212,7 +212,7 @@ public final class RetNode extends Node {
 
 
   @Override public Node is_copy(int idx) { throw com.cliffc.aa.AA.unimpl(); }
-  boolean is_copy() { return !(in(4) instanceof FunNode) || fun()._fidx != _fidx; }
+  boolean is_copy() { return _defs.len() <= 4 || !(in(4) instanceof FunNode) || fun()._fidx != _fidx; }
 
   // Find RetNode by fidx
   private static int FLEN;      // Primitives length; reset amount

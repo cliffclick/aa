@@ -162,7 +162,10 @@ public final class CallEpiNode extends Node {
     for( Node parm : rrez._defs )
       if( parm != null && parm != fun &&
           !(parm instanceof ParmNode && parm.in(0) == fun) &&
-          !(parm instanceof ConNode) )
+          !(parm instanceof ConNode) &&
+          !(parm==PrimNode.PINT) &&
+          !(parm==PrimNode.PFLT) 
+          )
         can_inline=false;       // Not trivial
     if( can_inline ) {
       Node irez = rrez.copy(false); // Copy the entire function body
@@ -549,6 +552,8 @@ public final class CallEpiNode extends Node {
 
   @Override public void add_work_hm() {
     super.add_work_hm();
+    // My tvar changed to a Lambda, so the calls lambda changes
+    Env.GVN.add_flow(call().fdx());
     // My tvar changed, so my value lift changes
     Env.GVN.add_flow(this);
   }

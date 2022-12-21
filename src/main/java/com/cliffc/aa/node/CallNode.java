@@ -87,7 +87,6 @@ public class CallNode extends Node {
   int _rpc;                 // Call-site return PC
   boolean _unpacked;        // One-shot flag; call site allows unpacking a tuple
   boolean _is_copy;         // One-shot flag; Call will collapse
-  public boolean _not_resolved_by_gcp; // One-shot flag set when GCP cannot resolve; this Call is definitely in-error
   // Example: call(arg1,arg2)
   // _badargs[0] points to the opening paren.
   // _badargs[1] points to the start of arg1, same for arg2, etc.
@@ -100,7 +99,7 @@ public class CallNode extends Node {
     _badargs = badargs;
   }
 
-  @Override public String xstr() { return (_is_copy ? "CopyCall" : (is_dead() ? "Xall" : "Call"))+(_not_resolved_by_gcp?"_UNRESOLVED":""); } // Self short name
+  @Override public String xstr() { return (_is_copy ? "CopyCall" : (is_dead() ? "Xall" : "Call")); } // Self short name
   String  str() { return xstr(); }       // Inline short name
   @Override boolean is_CFG() { return !_is_copy; }
   @Override public boolean is_mem() {    // Some calls are known to not write memory
@@ -126,7 +125,6 @@ public class CallNode extends Node {
   Node set_arg (int idx, Node arg) { assert idx>=DSP_IDX && idx <nargs(); return set_def(idx,arg); }
   public CallNode set_fdx( Node fun) { set_def(DSP_IDX, fun); return this; }
   public void set_mem( Node mem) { set_def(MEM_IDX, mem); }
-  @Override void walk_reset0() { _not_resolved_by_gcp = false; }
 
   // Add a bunch of utilities for breaking down a Call.value tuple:
   // takes a Type, upcasts to tuple, & slices by name.

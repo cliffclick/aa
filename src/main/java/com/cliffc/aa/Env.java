@@ -3,11 +3,11 @@ package com.cliffc.aa;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.util.VBitSet;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 
 import static com.cliffc.aa.AA.*;
@@ -69,7 +69,7 @@ public class Env implements AutoCloseable {
   // (dictates visibility of a name).  During semantic analysis a named type
   // can be Loaded from as a class obj, requiring Loads reverse the type name
   // to the prototype obj.
-  public static final HashMap<String,StructNode> PROTOS;
+  public static final NonBlockingHashMapLong<NewNode> PROTOS;
 
   // Add a permanent edge use to all these Nodes, keeping them alive forever.
   @SuppressWarnings("unchecked")
@@ -101,7 +101,7 @@ public class Env implements AutoCloseable {
     // All the Calls in the Universe, which might call somebody.
     ALL_CALL=keep(new ProjNode(ROOT,2));
 
-    PROTOS = new HashMap<>();
+    PROTOS = new NonBlockingHashMapLong<>();
 
     // The Top-Level environment; holds the primitives.
     TOP = new Env();

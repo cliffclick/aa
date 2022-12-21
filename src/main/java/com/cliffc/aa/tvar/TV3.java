@@ -77,7 +77,7 @@ abstract public class TV3 {
     // Additional read-barrier for TVNil to collapse nil-of-something
     return leader instanceof TVNil tnil ? tnil.find_nil() : leader;
   }
-  // Long-hand lookup of leader.
+  // Long-hand lookup of leader, with rollups
   private TV3 _find() {
     TV3 leader = _uf._uf.debug_find();    // Leader
     TV3 u = this;
@@ -92,8 +92,14 @@ abstract public class TV3 {
     return u==arg ? u : (_args[i]=u);
   }
 
+  // Fetch a specific arg index, withOUT rollups
+  public TV3 debug_arg( int i ) { return _args[i].debug_find(); }
+
   public int len() { return _args.length; }  
-  
+
+  private long dbl_uid(TV3 t) { return dbl_uid(t._uid); }
+  private long dbl_uid(long uid) { return ((long)_uid<<32)|uid; }
+
   // -----------------
   // U-F union; this becomes that; returns 'that'.
   // No change if only testing, and reports progress.
@@ -130,27 +136,39 @@ abstract public class TV3 {
   // Structural unification, 'this' into 'that'.  No change if just testing and
   // returns a progress flag.  If updating, both 'this' and 'that' are the same
   // afterwards.
-  private boolean _unify(TV3 that, boolean test) {
+  boolean _unify(TV3 that, boolean test) {
     assert !unified() && !that.unified();
     if( this==that ) return false;
-    if( test ) return true;
+    
     // Any leaf immediately unifies with any non-leaf; triangulate
-    if( !(this instanceof TVLeaf) && that instanceof TVLeaf )
-      return that._unify_impl(this);
-    if( !(that instanceof TVLeaf) && this instanceof TVLeaf )
-      return this._unify_impl(that);
+    if( !(this instanceof TVLeaf) && that instanceof TVLeaf ) return test || that._unify_impl(this);
+    if( !(that instanceof TVLeaf) && this instanceof TVLeaf ) return test || this._unify_impl(that);
+
+    // Nil can unify with a non-nil anything, typically
+    if( !(this instanceof TVNil) && that instanceof TVNil ) throw unimpl();
+    if( !(that instanceof TVNil) && this instanceof TVNil ) throw unimpl();
     
     // If 'this' and 'that' are different classes, unify both into an error
     if( getClass() != that.getClass() )
       throw unimpl();
 
-    // Swap to keep uid low.
+    // Cycle check
+    long luid = dbl_uid(that);    // long-unique-id formed from this and that
+    TV3 rez = DUPS.get(luid);
+    if( rez==that ) return false; // Been there, done that
+    assert rez==null;
+    DUPS.put(luid,that);        // Close cycles
+    
+    
+    if( test ) return true;     // Always progress from here
+    // Same classes.   Swap to keep uid low.
     // Do subclass unification.
-    return _uid > that._uid
-      ? this._unify_impl(that)
-      : that._unify_impl(this);
+    if( _uid > that._uid ) { this._unify_impl(that);  find().union(that.find()); }
+    else                   { that._unify_impl(this);  that.find().union(find()); }
+    return true;
   }
 
+  // Must always return true; used in flow-coding in many places
   abstract boolean _unify_impl(TV3 that);
   
   // -------------------------------------------------------------
@@ -159,6 +177,34 @@ abstract public class TV3 {
     throw unimpl();
   }
 
+  // Do a trial unification between this and that.
+  // Report back false if any error happens, or true if no error.
+  // No change to either side, this is a trial only.
+  private static final NonBlockingHashMapLong<TV3> TDUPS = new NonBlockingHashMapLong<>();
+  boolean trial_unify_ok(TV3 that, boolean extras) {
+    TDUPS.clear();
+    return _trial_unify_ok(that, extras);
+  }
+  boolean _trial_unify_ok(TV3 that, boolean extras) {
+    assert !unified() && !that.unified();
+    long duid = dbl_uid(that._uid);
+    if( TDUPS.putIfAbsent(duid,this)!=null )
+      return true;              // Visit only once, and assume will resolve
+    if( this==that )             return true; // No error
+    if( this instanceof TVLeaf ) return true; // No error
+    if( that instanceof TVLeaf ) return true; // No error
+    
+    // Different classes always fail
+    if( getClass() != that.getClass() )
+      throw unimpl();
+    // Subclasses check subparts
+    return _trial_unify_ok_impl(that, extras);
+  }
+
+  // Sub-classes specify on sub-parts
+  boolean _trial_unify_ok_impl( TV3 that, boolean extras ) {
+    throw unimpl();
+  }
   
   // -----------------
   public void add_deps_flow() {
@@ -250,6 +296,6 @@ abstract public class TV3 {
     //return null;
     throw unimpl();
   }
-  
-  public static void reset_to_init0() { CNT=0; }
+
+  public static void reset_to_init0() { CNT=0; TVField.reset_to_init0(); }
 }

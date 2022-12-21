@@ -19,11 +19,16 @@ public class TVBase extends TVNilable {
   @Override
   void _union_impl(TV3 t) {
     TVBase that = (TVBase)t;
-    Type foo = that._t.meet(_t);
-    that._t = foo;
+    that._t = that._t.meet(_t);
   }
   
   @Override boolean _unify_impl(TV3 t ) { return union(t); }
+
+  @Override boolean _trial_unify_ok_impl( TV3 tv3, boolean extras ) {
+    TVBase that = (TVBase)tv3; // Invariant when called
+    // Unifies OK if bases will unify, e.g. both ints or both floats
+    return _t.getClass() == that._t.getClass();
+  }
 
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) { return sb.p(_t); }  
 }

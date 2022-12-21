@@ -72,7 +72,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     return Cyclic.Link.min(dsplk,retlk);
   }
 
-  public boolean has_dsp() { return _dsp!=ALL; }
+  public boolean has_dsp() { return _dsp!=ANY; }
   public Type dsp() { return _dsp; }
   void set_dsp( Type dsp) { assert un_interned() && (has_dsp() || _dsp==dsp); _dsp = dsp; }
 

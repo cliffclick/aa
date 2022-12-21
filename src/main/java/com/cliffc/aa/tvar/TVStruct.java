@@ -26,7 +26,7 @@ public class TVStruct extends TV3 {
   
   public TVStruct( Ary<String> flds ) { this(flds.asAry(),new TV3[flds.len()]);  }
   // Made from a StructNode; fields are known, so this is closed
-  TVStruct( String[] flds, TV3[] tvs ) { this(flds,tvs,false); }
+  public TVStruct( String[] flds, TV3[] tvs ) { this(flds,tvs,false); }
   // Made from a Field or SetField; fields are unknown so this is open
   public TVStruct( String[] flds, TV3[] tvs, boolean open ) {
     super(true,tvs);
@@ -55,12 +55,20 @@ public class TVStruct extends TV3 {
     throw unimpl();
   }
 
+  @Override public int len() { return _max; }  
+
   public String fld( int i ) { return _flds[i]; }
   
   // Return the TV3 for field 'fld' or null if missing
   public TV3 arg(String fld) {
     int i = Util.find(_flds,fld);
     return i>=0 ? arg(i) : null;
+  }
+  
+  // Return the TV3 for field 'fld' or null if missing, with OUT rollups
+  public TV3 debug_arg(String fld) {
+    int i = Util.find(_flds,fld);
+    return i>=0 ? debug_arg(i) : null;
   }
 
   public boolean is_open() { return _open; }
@@ -88,25 +96,103 @@ public class TVStruct extends TV3 {
   }
   
   // -------------------------------------------------------------
-  @Override
-  void _union_impl(TV3 that) {
-    if( !(that instanceof TVBase base) ) throw unimpl();
-    throw unimpl();
+  @Override void _union_impl( TV3 tv3) {
+    assert _uid > tv3._uid;
+    TVStruct that = (TVStruct)tv3; // Invariant when called
+    that._open &= _open;
   }
 
-  @Override boolean _unify_impl(TV3 that ) {
-    throw unimpl();
+  @Override boolean _unify_impl( TV3 tv3 ) {
+    TVStruct thsi = this;          // So we can update 'this'
+    TVStruct that = (TVStruct)tv3; // Invariant when called
+    if( trial_resolve_all(false) ) thsi = (TVStruct)thsi.find();
+    assert !that.trial_resolve_all(false); // TODO: need a test case
+
+    // Unify LHS fields into RHS
+    boolean open = that.is_open();
+    for( int i=0; i<thsi._flds.length; i++ ) {
+      String key = thsi._flds[i];
+      TV3 fthis = thsi.arg(key);         // Field of this
+      TV3 fthat = that.arg(key);         // Field of that
+      if( fthat==null ) {                // Missing field in that
+        if( open &&                      // RHS is open
+            !Resolvable.is_resolving(key) ) // Do not add or remove until resolved
+          that.add_fld(key,fthis);       // Add to RHS
+      } else {
+        fthis._unify(fthat,false); // Unify both into RHS
+        // Progress may require another find()
+        thsi = (TVStruct)thsi.find();
+        that = (TVStruct)that.find();
+      }
+    }
+
+    // Fields on the RHS are aligned with the LHS also
+    if( !thsi.is_open() )
+      for( int i=0; i<that._flds.length; i++ ) {
+        String key = that._flds[i];
+        if( !Resolvable.is_resolving(key) && // Do not remove until resolved
+            thsi.arg(key)==null )            // Fields in both already done
+          that.del_fld(i);                   // Drop from RHS
+      }
+
+    assert !that.unified(); // Missing a find
+    return true;
+  }
+
+  private boolean trial_resolve_all(boolean test) {
+    boolean progress = false;
+    for( int i=0; i<len(); i++ ) {
+      String key = _flds[i];
+      Resolvable res = TVField.FIELDS.get(key);
+      if( res==null ) continue;  // Field is already resolved, or not a resolvable field
+      // Field is still resolving?
+      if( res.is_resolving() ) {
+        if( !is_open() ) // More fields possible, so trial_resolve cannot be tried
+          throw unimpl();
+      } else {
+        throw unimpl();
+      }
+    }
+    return progress;
+  }
+
+  @Override boolean _trial_unify_ok_impl( TV3 tv3, boolean extras ) {
+    TVStruct that = (TVStruct)tv3; // Invariant when called
+    for( int i=0; i<_args.length; i++ ) {
+      TV3 lhs = arg(i);
+      TV3 rhs = that.arg(_flds[i]); // RHS lookup by field name
+      if( rhs==null ) {
+        throw unimpl();         // Missing RHS, check for extras
+      } else {
+        if( !lhs._trial_unify_ok(rhs,extras) )
+          return false;         // Child fails to unify
+      }      
+    }
+
+    // Check for extras
+    if( !is_open() ) {
+      for( int i=0; i<that._args.length; i++ ) {
+        TV3 lhs = that.arg(i);
+        TV3 rhs = arg(that._flds[i]); // LHS lookup by field name
+        if( rhs==null ) {
+          throw unimpl();       // Extra on LHS
+        }
+      }
+    }
+    return true;                // Unifies OK
   }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     // Find any special instance tag fields, and print shortcuts.
-    if( Util.find(_flds,"!") == 0 ) {
+    TV3 bang = debug_arg("!");
+    if( bang instanceof TVPtr ptr ) {
+      TVStruct proto = ptr.load();
       String clz=null;
-      if( Util.find(_flds,"_&&_") != -1 ) clz = "int:";
-      if( Util.find(_flds,"sin" ) != -1 ) clz = "flt:";
+      if( proto.arg("_&&_") != null ) clz = "int:";
+      if( proto.arg("sin" ) != null ) clz = "flt:";
       if( clz!=null ) {
         sb.p(clz);
-        TV3 prim = _args[0].debug_find();
+        TV3 prim = debug_arg(".");
         if( prim instanceof TVBase base ) return sb.p(base._t);
       }
     }
@@ -118,7 +204,7 @@ public class TVStruct extends TV3 {
       for( int idx : sorted_flds() ) {
         String fld = _flds[idx];
         // Skip resolved field names in a tuple
-        if( !is_tup || TVField.is_resolving(fld) )
+        if( !is_tup || Resolvable.is_resolving(fld) )
           sb.p(fld).p("= ");
         if( _args[idx] == null ) sb.p("_");
         else _args[idx]._str(sb,visit,dups,debug);

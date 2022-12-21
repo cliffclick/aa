@@ -1,10 +1,10 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.TVLambda;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFunPtr;
-
-import static com.cliffc.aa.AA.unimpl;
 
 // Bind a 'this' into an unbound function pointer.
 public class BindFPNode extends Node {
@@ -18,18 +18,38 @@ public class BindFPNode extends Node {
     assert !tfp.has_dsp();
     return tfp.make_from(dsp()._val);
   }
+
+  @Override public Type live_use(Node def) {
+    // GENERIC_FUNPTR indicates the display is dead.
+    if( _live==TypeFunPtr.GENERIC_FUNPTR )
+      return Type.ALL.oob(def==dsp());
+    return _live;
+  }
+  
   @Override public boolean has_tvar() { return true; }
   @Override TV3 _set_tvar() {
-    // Display is included in the argument count, and is unified with first argument
-    //TVLambda lam = new TVLambda(nargs()-DSP_IDX); _tvar = lam;
-    //Node rez = ret().rez();
-    //rez.set_tvar();
-    //lam.set_ret(rez.tvar());
-    throw unimpl();
+    return fp().set_tvar();
   }
 
-  // Implements class HM.Lambda unification.
   @Override public boolean unify( boolean test ) {
-    throw unimpl();
+    TV3 tv = tvar();
+    if( !(tv instanceof TVLambda lam) ) return false;
+    // Unify display on a bound function
+    return lam.dsp().unify(dsp().tvar(),test);
+  }
+
+  @Override public Node ideal_reduce() {
+    if( fp() instanceof FunPtrNode fptr )
+      return new FunPtrNode(fptr._name,fptr.ret(),dsp());
+    
+    // If the display is dead, do not bind
+    if( _live==TypeFunPtr.GENERIC_FUNPTR ) return fp();
+    return null;
+  }
+
+  @Override public void add_flow_extra(Type old) {
+    if( old!=_live && _live==TypeFunPtr.GENERIC_FUNPTR )
+      Env.GVN.add_reduce(this);
   }  
+  
 }

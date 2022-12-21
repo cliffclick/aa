@@ -1,5 +1,6 @@
 package com.cliffc.aa;
 
+import com.cliffc.aa.node.PrimNode;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
@@ -23,6 +24,8 @@ public class TestParse {
   @BeforeClass
   public static void jig_setup() {
     JIG=false;
+    Object dummy = Env.GVN;
+    Type.Parse.set_proto((TypeMemPtr) PrimNode.PINT._val,(TypeMemPtr)PrimNode.PFLT._val);
   }
   @Ignore @Test public void testJig() {
     JIG=true;
@@ -30,8 +33,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    test("1", "int:1", "int:1");
-    //test("-1", "int:-1", "int:-1");
+    test("1+2", "int:3", "int:3");
   }
 
   @Test public void testParse00() {

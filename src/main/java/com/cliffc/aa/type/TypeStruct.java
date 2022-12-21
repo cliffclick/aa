@@ -670,6 +670,12 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     TypeFld tf;
     if( Util.eq("int:",_clz) && (tf=get("."))!=null ) return tf._t._str(visit,dups,sb,debug,indent);
     if( Util.eq("flt:",_clz) && (tf=get("."))!=null ) return tf._t._str(visit,dups,sb,debug,indent);
+    // Shortcut print for the full int and flt prototypes.
+    if( Util.eq("int:",_clz) && (tf=get("_+_"))!=null && sb.len() > 4 ) // Longer than 'int:' already printed
+      return sb.unchar(4).p("@{INT}");
+    if( Util.eq("flt:",_clz) && (tf=get("_+_"))!=null && sb.len() > 4 ) // Longer than 'flt:' already printed
+      return sb.unchar(4).p("@{FLT}");
+    
     boolean is_tup = is_tup();
     sb.p(is_tup ? "(" : "@{");
     // Set the indent flag once for the entire struct.  Indent if any field is complex.

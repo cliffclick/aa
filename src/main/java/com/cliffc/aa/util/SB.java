@@ -59,5 +59,6 @@ public final class SB {
   public SB unchar(int x) { _sb.setLength(_sb.length()-x); return this; }
 
   public SB clear() { _sb.setLength(0); return this; }
+  public int len() { return _sb.length(); }
   @Override public String toString() { return _sb.toString(); }
 }
