@@ -77,7 +77,7 @@ public abstract class Node implements Cloneable, IntSupplier {
 
 
   public int _uid;      // Unique ID, will have gaps, used to give a dense numbering to nodes
-  final byte _op;       // Opcode (besides the object class), used to avoid v-calls in some places
+  public final byte _op;// Opcode (besides the object class), used to avoid v-calls in some places
   public boolean _elock;// Edge-lock: cannot modify edges because messes up hashCode & GVN
   public Type _val;     // Value; starts at ALL and lifts towards ANY.
   public Type _live;    // Liveness; assumed live in gvn.iter(), assumed dead in gvn.gcp().
@@ -128,7 +128,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       _elock=false;             // Unlock
       Node x = VALS.remove(this);
       assert x==this;           // Got the right node out
-      Env.GVN.add_reduce(Env.GVN.add_flow(this));
+      Env.GVN.add_reduce(add_flow());
     }
   }
   public Node _elock() {        // No assert version, used for new nodes
@@ -184,7 +184,6 @@ public abstract class Node implements Cloneable, IntSupplier {
     old._uses.del(this);
     // Either last use of old & goes dead, or at least 1 fewer uses & changes liveness
     Env.GVN.add_unuse(old);
-    old.add_flow_def_extra(this);
     return this;
   }
 
@@ -213,6 +212,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   public Node kill( ) {
     if( is_dead() ) return null;
     assert _uses._len==0;
+    deps_work_clear();          // Put dependents on worklist
     // Similar to unelock(), except do not put on any worklist
     if( _elock ) { _elock = false; Node x = VALS.remove(this); assert x == this; }
     while( _defs._len > 0 ) unuse(_defs.pop());
@@ -220,18 +220,6 @@ public abstract class Node implements Cloneable, IntSupplier {
     return this;
   }
   public boolean is_dead() { return _uses == null; }
-
-  // "keep" a Node during all optimizations because it is somehow unfinished.
-  // Typically, used when needing to build several Nodes before building the
-  // typically using Node; during construction the earlier Nodes have no users
-  // (yet) and are not dead.  Acts "as if" there is an unknown user.
-  public <N extends Node> N keep() { throw unimpl(); }
-  public <N extends Node> N keep(int d) { throw unimpl(); }
-  // Remove the keep flag, but do not delete.
-  public <N extends Node> N unkeep() { throw unimpl(); }
-  public <N extends Node> N unkeep(int d) { throw unimpl(); }
-  // Remove the keep flag, and immediately allow optimizations.
-  public <N extends Node> N unhook() { throw unimpl(); }
 
   // Keep a Node alive during all optimizations, because future direct uses
   // will yet appear.  The Node can otherwise be fully optimized and replaced
@@ -249,12 +237,33 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Uses.  Generally variable length; unordered, no nulls, compressed, unused trailing space
   public Ary<Node> _uses;
 
+  // Dependents.  Changes to 'this' adds these to the worklist, and clears the list.
+  Ary<Node> _deps;
+  int _dep_mark;
+  // Add a dep
+  void deps_add(Node dep) {
+    if( _deps==null ) _deps = new Ary<>(new Node[1],0);
+    if( _deps.find(dep)==-1 ) _deps.push(dep);
+  }
+  // Mark the current deps set; used before the start of idealizing.
+  void deps_mark() { if( _deps != null ) _dep_mark = _deps._len; }
+  // Reset deps list to mark (deps added during this idealizing do not count).
+  // Add other deps to the flow & reduce lists, and clear the deps.
+  public final void deps_work_clear() {
+    if( _deps == null ) return;
+    for( int i=0; i<_dep_mark; i++ )
+      Env.GVN.add_reduce(_deps._es[i].add_flow());
+    _deps.clear();
+  }
+
+  
   Node( byte op ) { this(op,new Node[0]); }
   Node( byte op, Node... defs ) {
     _op   = op;
     _uid  = newuid();
     _defs = new Ary<>(defs);
     _uses = new Ary<>(new Node[1],0);
+    _deps = null;
     for( Node def : defs ) if( def != null ) def._uses.add(this);
     _val  = _live = Type.ALL;
     _tvar = null;
@@ -484,8 +493,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     Type nval = value(); // Get best type
     if( nval!=oval ) {
       _val = nval;
-      Env.GVN.add_flow_uses(this); // Put uses on worklist... values flows downhill
-      add_flow_extra(oval);
+      add_flow_uses(); // Put uses on worklist... values flows downhill
     }
     return nval;
   }
@@ -515,8 +523,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     Type nliv = live(); // Get new live
     if( nliv!=oliv ) {
       _live = nliv;
-      Env.GVN.add_flow_uses(this); // Put uses on worklist... values flows downhill
-      add_flow_extra(oliv);
+      add_flow_uses();  // Put uses on worklist... values flows downhill
     }
   }
   // Compute local contribution of use liveness to this def.
@@ -525,11 +532,8 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // The _val changed here, and more than the immediate neighbors might change value/live
   public void add_flow_defs() { Env.GVN.add_flow_defs(this); }
-  public void add_flow_extra(Type old) { }
-  public void add_flow_use_extra(Node chg) { }
-  public void add_flow_def_extra(Node chg) { }
-  // Inputs changed here, and more than the immediate neighbors might reduce
-  public void add_reduce_extra() { }
+  public void add_flow_uses() { Env.GVN.add_flow_uses(this); }
+  public Node add_flow     () { return Env.GVN.add_flow(this); }
 
   // Unifies this Node with others; Call/CallEpi with Fun/Parm/Ret.  NewNodes &
   // Load/Stores, etc.  Returns true if progressed, and puts neighbors back on
@@ -542,40 +546,27 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // HM changes; push related neighbors
   public void add_work_hm() {
-    // TODO: rethink how deps work in SSA
-    //tvar().add_deps_flow();
-    //for( Node def : _defs ) if( def!=null && def.has_tvar() ) Env.GVN.add_flow(def);
-    for( Node use : _uses ) if( use!=null && use.has_tvar() ) Env.GVN.add_flow(use);
+    for( Node def : _defs ) if( def!=null && def.has_tvar() ) def.add_flow();
+    for( Node use : _uses ) if(              use.has_tvar() ) use.add_flow();
   }
 
   // Do One Step of forwards-dataflow analysis.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
   public void combo_forwards() {
+    deps_mark();
     Type oval = _val;           // Old local type
     Type nval = value();        // New type
     if( oval == nval ) return;  // No progress
-    //assert nval==nval.simple_ptr(); // Only simple pointers in node types
     assert oval.isa(nval);      // Monotonic
     _val = nval;                // Record progress
-
-    // Classic forwards flow on change.  Also wire Call Graph edges.
-    for( Node use : _uses ) {
-      Env.GVN.add_flow(use).add_flow_use_extra(this);
-      if( use instanceof CallEpiNode cepi ) cepi.check_and_wire(true);
-    }
-    add_flow_extra(oval);
-    if( this instanceof CallEpiNode cepi ) cepi.check_and_wire(true);
-    // All liveness is skipped if may_be_con, since the possible constant has
-    // no inputs.  If values drop from being possible constants to not being a
-    // constant, liveness must be revisited.
-    //assert may_be_con_live(oval) || !may_be_con_live(nval); // May_be_con_live is monotonic
-    //if( may_be_con_live(oval) && !may_be_con_live(nval) )
-    //  for( Node def : _defs ) work.add(def); // Now check liveness
+    add_flow_uses();            // Classic forwards flow on change.
+    deps_work_clear();          // Any extra flow changes
   }
 
   // Do One Step of backwards-dataflow analysis.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
   public void combo_backwards() {
+    deps_mark();
     Type oliv = _live;
     Type nliv = live();
     // TODO: If use._value >= constant, force live-use to ANY.
@@ -583,9 +574,8 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( oliv == nliv ) return;  // No progress
     assert oliv.isa(nliv);      // Monotonic
     _live = nliv;               // Record progress
-    add_flow_extra(oliv);
-    for( Node def : _defs )     // Classic reverse flow on change
-      if( def!=null ) Env.GVN.add_flow(def).add_flow_def_extra(this);
+    add_flow_defs();            // Classic reverse flow on change.
+    deps_work_clear();          // Any extra flow changes
   }
 
   // Do One Step of Hindley-Milner unification.  Assert monotonic progress.
@@ -612,26 +602,14 @@ public abstract class Node implements Cloneable, IntSupplier {
   // VALS table.  Return null if no progress, or this or the replacement.
   public Node do_reduce() {
     assert check_vals();
+    deps_mark();
     Node nnn = _do_reduce();
-    if( nnn!=null ) {                   // Something happened
-      if( nnn!=this ) {                 // Replacement
-        Env.GVN.add_flow_uses(this);    // Visit users
-        add_reduce_extra();
-        subsume(nnn);                   // Replace
-        for( Node use : nnn._uses ) {
-          use.add_reduce_extra();
-          use.add_flow_use_extra(nnn);
-        }
-      }
-      Env.GVN.add_reduce(nnn);  // Rerun the replacement
-      // Any new nodes made post-Combo-HM need a TVar
-      if( Combo.HM_FREEZE && nnn.has_tvar() && nnn._tvar==null ) { 
-        nnn.set_tvar();
-        assert Env.GVN.on_flow(nnn);
-      }
+    if( nnn!=null ) {           // Something happened
+      if( nnn!=this )           // Replacement
+        subsume(nnn);           // Replace
       return nnn._elock();      // After putting in VALS
     }
-    // No progress; put in VALS and return
+    // No progress; put in VALS and return no-change
     _elock();
     return null;
   }
@@ -646,7 +624,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     // Replace with a prototyped constant, if possible
     Node pcon = should_proto(_val);
     if( pcon!=null )
-      return Env.GVN.add_flow(pcon);
+      return pcon.add_flow();
     
     // Try CSE
     if( !_elock ) {             // Not in VALS and can still replace
@@ -659,7 +637,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     Node x = ideal_reduce();    // Try the general reduction
     if( x != null ) {
       assert _live.isa(x._live);
-      return Env.GVN.add_flow(x); // Graph replace with x
+      return x.add_flow();      // Graph replace with x
     }
 
     return null;                // No change
@@ -668,6 +646,7 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Change values at this Node directly.
   public Node do_flow() {
+    deps_mark();
     Node progress=null;
     // Compute live bits.  If progressing, push the defs on the flow worklist.
     // This is a reverse flow computation.  Always assumed live if keep.
@@ -677,9 +656,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       progress = this;          // Progress!
       assert nliv.isa(oliv);    // Monotonically improving
       _live = nliv;             // Record progress
-      for( Node def : _defs )   // Put defs on worklist... liveness flows uphill
-        if( def != null ) Env.GVN.add_flow(def).add_flow_def_extra(this);
-      add_flow_extra(oliv);
+      add_flow_defs();          // Classic reverse flow
     }
 
     // Compute best value.  If progressing, push uses on the flow worklist.
@@ -690,28 +667,25 @@ public abstract class Node implements Cloneable, IntSupplier {
       progress = this;          // Progress!
       assert nval.isa(oval);    // Monotonically improving
       _val = nval;
-      // Put uses on worklist... values flows downhill
-      for( Node use : _uses )
-        Env.GVN.add_flow(use).add_flow_use_extra(this);
-      // Progressing on CFG can mean CFG paths go dead
-      if( is_CFG() ) for( Node use : _uses ) if( use.is_CFG() ) Env.GVN.add_reduce(use);
-      if( !(this instanceof ConNode) && nval.is_con() ) Env.GVN.add_reduce(this);// Replace a constant
-      add_flow_extra(oval);
+      add_flow_uses();          // Classic forwards flow
+      if( nval.is_con() ) Env.GVN.add_reduce(this);// Replace a constant
     }
     return progress;
   }
 
   public Node do_mono() {
-    Node x= ideal_mono();
+    deps_mark();
+    Node x = ideal_mono();
     if( x==null ) return null;
     assert x==this;
-    return Env.GVN.add_mono(Env.GVN.add_flow(Env.GVN.add_reduce(x)));
+    return Env.GVN.add_mono(Env.GVN.add_reduce(x.add_flow()));
   }
 
   public Node do_grow() {
+    deps_mark();
     Node nnn = ideal_grow();
     if( nnn==null || nnn==this || is_dead() ) return nnn;
-    return Env.GVN.add_flow(Env.GVN.add_reduce(nnn));
+    return Env.GVN.add_reduce(nnn.add_flow());
   }
 
   // Replace with a ConNode iff
@@ -778,8 +752,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     Env.GVN.add_flow(this);             // On worklist and mark visited
     if( has_tvar() ) set_tvar();
 
-    if( AA.DO_GCP ) _val = _live = Type.ANY;  // Highest value
-    else assert _val==value() && _live==live(); // No more progress
+    _val = _live = Type.ANY;  // Highest value
     if( this instanceof FieldNode fld && fld.is_resolving() )
       TVField.FIELDS.put(fld._fld,fld); // Track resolving field names
     
@@ -829,13 +802,13 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( bs.tset(_uid) ) return false; // Been there, done that
     if( !is_keep() ) { // Only non-keeps, which is just top-level scope and prims
       Node x;
-      x = do_reduce(); if( x != null )
-                         return true; // Found an ideal call
-      x = do_mono  (); if( x != null )
-                         return true; // Found an ideal call
-      x = do_grow  (); if( x != null )
-                         return true; // Found an ideal call
-      if( this instanceof FunNode ) ((FunNode)this).ideal_inline(true);
+      if( !Env.GVN.on_reduce(this) ) { x = do_reduce(); if( x != null )
+                                                         return true; } // Found an ideal call
+      if( !Env.GVN.on_mono  (this) ) { x = do_mono  (); if( x != null )
+                                                         return true; } // Found an ideal call
+      if( !Env.GVN.on_grow  (this) ) { x = do_grow  (); if( x != null )
+                                                         return true; } // Found an ideal call
+      if( this instanceof FunNode fun && !Env.GVN.on_inline(fun) ) fun.ideal_inline(true);
     }
     for( Node def : _defs ) if( def != null && def.more_ideal(bs) ) return true;
     for( Node use : _uses ) if( use != null && use.more_ideal(bs) ) return true;

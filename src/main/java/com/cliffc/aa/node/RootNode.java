@@ -89,7 +89,7 @@ public class RootNode extends Node {
           FunPtrNode fptr = ret.funptr();
           if( fptr !=null && fptr.has_tvar() ) {
             TV3 tfun = ret.funptr().tvar();
-            tfun.add_deps_work();
+            //tfun.add_deps_work();
             //tfun.arg(" ret").clr_cp();
             throw unimpl();
           }

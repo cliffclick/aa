@@ -20,11 +20,6 @@ public class FreshNode extends Node {
   TV3[] nongen() { return fun()==null ? null : fun()._nongen; }
 
   @Override public Type value() { return id()._val; }
-  @Override public void add_flow_extra(Type old) {
-    // Types changed, now might collapse
-    if( !no_tvar_structure(old) && no_tvar_structure(_val) )
-      Env.GVN.add_reduce(this);
-  }
 
   @Override public Type live_use(Node def ) {
     if( def==id() ) return _live; // Pass full liveness along

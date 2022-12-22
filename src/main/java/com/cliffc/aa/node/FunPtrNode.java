@@ -100,12 +100,6 @@ public final class FunPtrNode extends Node {
     }
     return null;
   }
-  // Called if Display goes unused
-  @Override public void add_flow_use_extra(Node chg) {
-    //Type tdsp = display()._val;
-    //if( tdsp instanceof TypeMemPtr tmp && tmp._obj==TypeStruct.UNUSED )
-    //  Env.GVN.add_reduce(this);
-  }
 
 
   @Override public Type value() {
@@ -115,21 +109,6 @@ public final class FunPtrNode extends Node {
     TypeTuple tret = (TypeTuple)(ret._val instanceof TypeTuple ? ret._val : ret._val.oob(TypeTuple.RET));
     Node dsp = display();
     return TypeFunPtr.make(ret._fidx,nargs(),dsp==null ? Type.ALL : dsp._val,tret.at(REZ_IDX));
-  }
-  @Override public void add_flow_extra(Type old) {
-    //if( old==_live )            // live impacts value
-    //  Env.GVN.add_flow(this);
-    //if( _live==Type.ANY && display() != Env.ANY )
-    //  Env.GVN.add_reduce(this);
-    //if( old instanceof TypeFunPtr )
-    //  for( Node use : _uses )
-    //    if( use instanceof UnresolvedNode )
-    //      for( Node call : use._uses )
-    //        if( call instanceof CallNode ) {
-    //          TypeFunPtr tfp = CallNode.ttfp(call._val);
-    //          if( tfp.fidxs()==((TypeFunPtr)old).fidxs() )
-    //            Env.GVN.add_flow(call);
-    //        }
   }
 
   @Override public Type live_use(Node def ) {

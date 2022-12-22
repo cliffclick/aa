@@ -53,11 +53,6 @@ public class CastNode extends Node {
     // Lift result.
     return _t.join(t);
   }
-  @Override public void add_flow_extra(Type old) {
-    // If address sharpens, Cast can go dead because all Load uses make constants.
-    if( _val!=old )
-      Env.GVN.add_flow(this);
-  }
 
   @Override public Type live_use(Node def ) {
     return def==in(0) ? Type.ALL : _live;

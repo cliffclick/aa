@@ -580,7 +580,7 @@ public abstract class PrimNode extends Node {
         set_def(CTL_IDX,reg );
         set_def(MEM_IDX,phim);
         set_def(REZ_IDX,phi );
-        pop();                  // Remove args, trigger is_copy
+        while( _defs._len > ARG_IDX ) pop(); // Remove args, trigger is_copy
         return this;
       }
     }
@@ -604,7 +604,7 @@ public abstract class PrimNode extends Node {
       return tvar().unify(proj.tvar(),test);
     }
     @Override public Node is_copy(int idx) {
-      return _defs._len==ARG_IDX+1 ? null : in(idx);
+      return _defs._len>ARG_IDX ? null : in(idx);
     }
   }
 
@@ -647,7 +647,7 @@ public abstract class PrimNode extends Node {
         set_def(CTL_IDX,reg );
         set_def(MEM_IDX,phim);
         set_def(REZ_IDX,phi );
-        pop();                // Remove args, trigger is_copy
+        while( _defs._len > ARG_IDX ) pop(); // Remove args, trigger is_copy
         return this;
       }
     }
@@ -671,7 +671,7 @@ public abstract class PrimNode extends Node {
       return tvar().unify(proj.tvar(),test);
     }
     @Override public Node is_copy(int idx) {
-      return _defs._len==ARG_IDX+1 ? null : in(idx);
+      return _defs._len>ARG_IDX ? null : in(idx);
     }
   }
 

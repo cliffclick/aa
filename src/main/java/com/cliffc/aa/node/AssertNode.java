@@ -99,10 +99,6 @@ public class AssertNode extends Node {
     // Value is capped to the assert value.
     return t1.oob(t0);
   }
-  @Override public void add_flow_use_extra(Node chg) {
-    if( ideal_reduce()!=null )
-      Env.GVN.add_reduce(this);
-  }
 
   @Override public Type live_use(Node def ) {
     if( def==arg() ) return _live;                   // Alive as I am

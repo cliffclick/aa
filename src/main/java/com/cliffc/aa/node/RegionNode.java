@@ -73,25 +73,6 @@ public class RegionNode extends Node {
     return null;
   }
 
-  @Override public void add_flow_def_extra(Node chg) {
-    if( chg.is_CFG() ) {           // If losing an extra CFG user
-      for( Node use : _uses )
-        if( use._op == OP_REGION ) // Then stacked regions can fold
-          Env.GVN.add_reduce(use); // Put lower region of stack on worklist
-      if( this instanceof FunNode && ((FunNode)this).ret()==null )
-        Env.GVN.add_reduce(this);
-    }
-    // Dropped a display Parm from a function, all FunPtrs might want to drop
-    // their display input as being dead.
-    if( chg instanceof ParmNode parm && parm._idx==DSP_IDX ) {
-      RetNode ret = ((FunNode)this).ret();
-      if( ret != null )
-        for( Node fptr : ret._uses )
-          if( fptr instanceof FunPtrNode )
-            Env.GVN.add_reduce(fptr);
-    }
-  }
-
   // Collapse stacked regions.
   Node stacked_region() {
     if( _op != OP_REGION ) return null; // Does not apply to e.g. functions & loops
@@ -143,15 +124,6 @@ public class RegionNode extends Node {
         return Type.CTRL;
     }
     return Type.XCTRL;
-  }
-  // Control into a Region allows Phis to make progress
-  @Override public void add_flow_use_extra(Node chg) {
-    Env.GVN.add_reduce(this);
-    for( Node phi : _uses )
-      if( phi instanceof PhiNode ) {
-        Env.GVN.add_flow(phi);
-        phi.add_flow_defs(); // Inputs to Phi change liveness
-      }
   }
 
   @Override public Type live_use(Node def ) { return Type.ALL; }

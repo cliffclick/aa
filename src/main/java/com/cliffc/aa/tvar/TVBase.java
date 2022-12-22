@@ -16,8 +16,7 @@ public class TVBase extends TVNilable {
   }
   
   // -------------------------------------------------------------
-  @Override
-  void _union_impl(TV3 t) {
+  @Override void _union_impl(TV3 t) {
     TVBase that = (TVBase)t;
     that._t = that._t.meet(_t);
   }

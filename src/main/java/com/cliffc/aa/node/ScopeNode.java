@@ -102,21 +102,6 @@ public class ScopeNode extends Node {
   // functions, on behalf of the following CEProjs.
   @Override public Type value() { return Type.CTRL; }
 
-  @Override public void add_flow_use_extra(Node chg) {
-    if( chg==rez() ) {          // If the result changed
-      for( Node use : _uses ) {
-        if( use != this ) Env.GVN.add_flow(use);
-        if( use instanceof FunNode ) // If escaping functions, their parms now take the default path
-          for( Node useuse : use._uses )
-            Env.GVN.add_flow(useuse);
-      }
-    }
-    if( chg==mem() )            // If the memory changed
-      for( Node use : _uses )
-        if( use instanceof FunNode ) // If escaping functions, their parms now take the default path
-          Env.GVN.add_flow(((FunNode)use).parm(MEM_IDX));
-  }
-
   // From a memory and a possible pointer-to-memory, find all the reachable
   // aliases and fold them into 'live'.  This is unlike other live_use
   // because this "turns around" the incoming live memory to also be the

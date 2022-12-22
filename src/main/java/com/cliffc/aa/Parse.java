@@ -537,7 +537,7 @@ public class Parse implements Comparable<Parse> {
       int line_last = _lines.binary_search(old_last);
       int line_now  = _lines.binary_search(_x);
       if( line_last != line_now ) {
-        _x = oldx;  _lastNWS = old_last;  expr.unhook();
+        _x = oldx;  _lastNWS = old_last;
         return err_ctrl2("Lisp-like function application split between lines "+line_last+" and "+line_now+", but must be on the same line; possible missing semicolon?");
       }
       expr = do_call(errMsgs(oldx,oldx),args(Node.pop(eidx),arg)); // Pass the 1 arg
@@ -765,7 +765,7 @@ public class Parse implements Comparable<Parse> {
 
         String tok1 = token0();
         Oper bcl = Oper.balanced(tok0,tok1);
-        if( bcl==null ) { n.unhook(); return err_ctrl2("Missing close after '"+tok0+"'"); }
+        if( bcl==null ) return err_ctrl2("Missing close after '"+tok0+"'");
 
         //require(fun._bal_close,oldx);
         //if( fun.nargs()==ARG_IDX+2 ) { // array, index
@@ -1072,13 +1072,13 @@ public class Parse implements Comparable<Parse> {
     s.early_kill();
     if( ctrl == null ) return Node.pop(ridx); // No other exits to merge into
     try(GVNGCM.Build<Node> X = _gvn.new Build<>()) {
-      ctrl = ctrl.add_def(ctrl()).unkeep();
+      ctrl = ctrl.add_def(ctrl());
       ctrl._val = Type.CTRL;
       set_ctrl(ctrl=X.init(ctrl));
-      mem.unkeep().set_def(0,ctrl);
-      val.unkeep().set_def(0,ctrl);
+      mem.set_def(0,ctrl);
+      val.set_def(0,ctrl);
       Node mem2 = X.xform(mem.add_def(mem()));
-      Node val2 = X.xform(val.add_def(rez.unkeep()));
+      Node val2 = X.xform(val.add_def(rez));
       set_mem(mem2);
       return (X._ret=val2);
     }
@@ -1091,9 +1091,9 @@ public class Parse implements Comparable<Parse> {
     Node mem  = s.early_mem ();
     Node val  = s.early_val ();
     if( ctrl == null ) {
-      s.set_def(4,ctrl=new RegionNode((Node)null).keep()); ctrl._val=Type.CTRL;
-      s.set_def(5,mem =new PhiNode(TypeMem.ALLMEM, null,(Node)null).keep());
-      s.set_def(6,val =new PhiNode(TypeNil.SCALAR, null,(Node)null).keep());
+      s.set_def(4,ctrl=new RegionNode((Node)null)); ctrl._val=Type.CTRL;
+      s.set_def(5,mem =new PhiNode(TypeMem.ALLMEM, null,(Node)null));
+      s.set_def(6,val =new PhiNode(TypeNil.SCALAR, null,(Node)null));
     }
     ctrl.add_def(ctrl());
     mem .add_def(mem ());

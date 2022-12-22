@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVLambda;
 import com.cliffc.aa.type.Type;
@@ -46,10 +45,5 @@ public class BindFPNode extends Node {
     if( _live==TypeFunPtr.GENERIC_FUNPTR ) return fp();
     return null;
   }
-
-  @Override public void add_flow_extra(Type old) {
-    if( old!=_live && _live==TypeFunPtr.GENERIC_FUNPTR )
-      Env.GVN.add_reduce(this);
-  }  
   
 }

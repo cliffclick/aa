@@ -22,13 +22,4 @@ public class CProjNode extends ProjNode {
     if( x==Type.ALL ) return Type. CTRL;
     return x;
   }
-  @Override public void add_flow_use_extra(Node chg) {
-    // Control from Calls
-    if( chg instanceof CallNode ) {
-      // if the Call changes val the function might be callable
-      for( Node fun : _uses )
-        if( fun instanceof FunNode )
-          Env.GVN.add_flow(fun);
-    }
-  }
 }

@@ -1,10 +1,8 @@
 package com.cliffc.aa.tvar;
 
-import static com.cliffc.aa.AA.unimpl;
-
 public interface Resolvable {
   boolean is_resolving();
-  void resolve(String lab);
+  String resolve(String lab);
   // True if this field is still resolving: the actual field being referenced
   // is not yet known.
   static boolean is_resolving(String id) { return id.charAt(0)=='&'; }
@@ -24,9 +22,17 @@ public interface Resolvable {
         else return false;
       }
     }
+    if( lab==null ) return false; // No match, so error and never resolves
     // Field can be resolved to label
     if( test ) return true;     // Will be progress to resolve
-    
-    throw unimpl();
+
+    String old_fld = resolve(lab);   // Change field label
+    boolean old = lhs.del_fld(old_fld); // Remove old label from lhs, if any
+    TV3 prior = lhs.arg(lab);      // Get prior matching lhs label, if any
+    if( prior==null ) {
+      assert old;             // Expect an unresolved label
+      lhs.add_fld(lab,pattern);   // Add label and pattern, basically replace unresolved old_fld with lab
+    } else prior.unify(pattern,test); // Merge pattern and prior label in LHS
+    return true;              // Progress
   }
 }

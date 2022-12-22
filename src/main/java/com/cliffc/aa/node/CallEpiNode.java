@@ -26,6 +26,7 @@ public final class CallEpiNode extends Node {
   public boolean _is_copy;
   public CallEpiNode( Node... nodes ) {
     super(OP_CALLEPI,nodes);
+    Env.GVN.add_reduce(call());
   }
   @Override public String xstr() {// Self short name
     if( _is_copy ) return "CopyEpi";
@@ -412,15 +413,6 @@ public final class CallEpiNode extends Node {
   //  TypeMem tmem3 = TypeMem.make0(pubs);
   //  return tmem3;
   //}
-
-  @Override public void add_flow_use_extra(Node chg) {
-    if( chg instanceof CallNode ) {    // If the Call changes value
-      Env.GVN.add_flow(chg.in(MEM_IDX));       // The called memory   changes liveness
-      Env.GVN.add_flow(((CallNode)chg).fdx()); // The called function changes liveness
-      for( int i=0; i<nwired(); i++ )  // Called returns change liveness
-        Env.GVN.add_flow(wired(i));
-    }
-  }
 
   // Sanity check
   boolean sane_wiring() {

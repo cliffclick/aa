@@ -66,17 +66,6 @@ public class StoreNode extends Node {
     return ts;                  // Live-use for the rez() which is a TypeStruct liveness    
   }
 
-  @Override public void add_flow_use_extra(Node chg) {
-    if( chg==adr() && !chg._val.above_center() ) // Address becomes alive, implies rez is more alive
-      Env.GVN.add_flow(rez());
-  }
-
-  // Liveness changes, check if reduce
-  @Override public void add_flow_extra(Type old) {
-    Env.GVN.add_reduce(this); // Args can be more-alive
-    if( old.above_center() && !_live.above_center() ) Env.GVN.add_flow(this);
-  }
-
   @Override public Node ideal_reduce() {
     if( _live == Type.ANY ) return null; // Dead from below; nothing fancy just await removal
     Node mem = mem();
@@ -171,13 +160,6 @@ public class StoreNode extends Node {
       }
     }
     return null;
-  }
-  // If changing an input or value allows the store to no longer be in-error,
-  // following Loads can collapse
-  @Override public void add_reduce_extra() {
-    for( Node use : _uses )
-      if( use instanceof LoadNode )
-        Env.GVN.add_mono(Env.GVN.add_reduce(use));
   }
 
   @Override public ErrMsg err( boolean fast ) {

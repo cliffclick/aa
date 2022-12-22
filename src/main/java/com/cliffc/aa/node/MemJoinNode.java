@@ -45,15 +45,6 @@ public class MemJoinNode extends Node {
 
     return null;
   }
-  @Override public void add_flow_def_extra(Node chg) {
-    if( _uses._len==1 ) {
-      Node u = _uses.at(0);
-      //if( u instanceof StoreNode ||
-      //    u instanceof MrgProjNode )
-      //  GVN.add_reduce(u);
-      throw unimpl();
-    }
-  }
 
   @Override public Node ideal_mono() {
     // If the Split memory has an obvious SESE region, move it into the Split

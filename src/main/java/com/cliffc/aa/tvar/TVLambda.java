@@ -2,6 +2,7 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.util.*;
 
+import static com.cliffc.aa.AA.MEM_IDX;
 import static com.cliffc.aa.AA.DSP_IDX;
 import static com.cliffc.aa.AA.ARG_IDX;
 import static com.cliffc.aa.AA.unimpl;
@@ -29,14 +30,19 @@ public class TVLambda extends TVNilable {
 
 
   // -------------------------------------------------------------
-  @Override
-  void _union_impl(TV3 that) {
-    if( !(that instanceof TVBase base) ) throw unimpl();
-    throw unimpl();
+  @Override void _union_impl( TV3 tv3) {
+    assert _uid > tv3._uid;
+    // No subparts to union
   }
 
-  @Override boolean _unify_impl(TV3 that ) {
-    throw unimpl();
+  @Override boolean _unify_impl(TV3 tv3 ) {
+    TVLambda that = (TVLambda)tv3; // Invariant when called
+    if( nargs() != that.nargs() ) throw unimpl(); // Mismatched argument lengths
+    for( int i=0; i<len(); i++ ) {
+      if( i==MEM_IDX ) continue; // Unused
+      arg(i)._unify(that.arg(i),false);
+    }
+    return true;
   }
 
   // Sub-classes specify trial_unify on sub-parts.

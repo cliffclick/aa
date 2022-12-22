@@ -22,8 +22,12 @@ public class GVNGCM {
   private final WorkNode _work_grow   = new WorkNode("grow"  );
   private final WorkNode _work_inline = new WorkNode("inline");
   private final WorkNode _work_dom    = new WorkNode("dom"   );
-  public boolean on_dead( Node n ) { return _work_dead.on(n); }
-  public boolean on_flow( Node n ) { return _work_flow.on(n); }
+  public boolean on_dead  ( Node n ) { return _work_dead  .on(n); }
+  public boolean on_flow  ( Node n ) { return _work_flow  .on(n); }
+  public boolean on_reduce( Node n ) { return _work_reduce.on(n); }
+  public boolean on_mono  ( Node n ) { return _work_mono  .on(n); }
+  public boolean on_grow  ( Node n ) { return _work_grow  .on(n); }
+  public boolean on_inline( Node n ) { return _work_inline.on(n); }
 
   static public <N extends Node> N add_work( WorkNode work, N n ) {
     if( n==null || n.is_dead() ) return n;
@@ -36,8 +40,8 @@ public class GVNGCM {
   public <N extends Node> N add_mono  ( N n ) { return add_work(_work_mono  ,n); }
   public void add_grow  ( Node n ) { add_work(_work_grow  ,n); }
   public void add_inline( FunNode n ) { add_work(_work_inline, n); }
-  public void add_flow_defs  ( Node n ) { add_work_defs(_work_flow  ,n); }
-  public void add_flow_uses  ( Node n ) { add_work_uses(_work_flow  ,n); }
+  public void add_flow_defs  ( Node n ) { add_work_defs(_work_flow,n); }
+  public void add_flow_uses  ( Node n ) { add_work_uses(_work_flow,n); }
   public void add_flow( UQNodes deps ) { if( deps != null ) for( Node dep : deps.values() ) add_flow(dep); }
   public void add_dom(Node n) { add_work(_work_dom,n); }
   public void add_reduce_uses( Node n ) { add_work_uses(_work_reduce,n); }
@@ -46,12 +50,12 @@ public class GVNGCM {
     if( n._uses._len==0 ) add_dead(n); // might be dead
     else add_reduce(add_flow(n));
   }
-  static public void add_work_defs( WorkNode work, Node n ) {
+  public static void add_work_defs( WorkNode work, Node n ) {
     for( Node def : n._defs )
       if( def != null && def != n )
         add_work(work,def);
   }
-  static public void add_work_uses( WorkNode work, Node n ) {
+  public static void add_work_uses( WorkNode work, Node n ) {
     for( Node use : n._uses )
       if( use != n )
         add_work(work,use);
@@ -66,7 +70,8 @@ public class GVNGCM {
       _work_inline.add(n);
     return n;
   }
-
+  public void add_flow( Ary<Node> ary ) { for( Node n : ary ) add_flow(n); }
+  
   public Node pop_flow() { return _work_flow.pop(); }
 
   // Initial state after loading e.g. primitives.
@@ -101,6 +106,9 @@ public class GVNGCM {
   public <N extends Node> N init( N n ) {
     assert n._uses._len==0;     // New to GVN
     n._val = n.value();
+    // Any new nodes made post-Combo-HM need a TVar
+    if( Combo.HM_FREEZE && n.has_tvar() ) 
+      n.set_tvar();
     add_work_new(n);
     return n;
   }
@@ -113,13 +121,18 @@ public class GVNGCM {
     do_iter();
     return pop(idx);
   }
+  
+  // During start-up, ~2000 total iterations, something like 95% of which are
+  // no-ops.  Also, about 500 nodes for primitives, and each hits flow, reduce,
+  // mono and grow worklists (so 4 times) for no-progress.
+  static int ITER_CNT;
+  static int ITER_CNT_NOOP;
 
   // Any time anything is on any worklist we can always conservatively iterate on it.
   // Empties the worklists, attempting to do every possible thing.
-  static int ITER_CNT;
-  static int ITER_CNT_NOOP;
   void do_iter() {
     while( true ) {
+      ITER_CNT++; assert ITER_CNT < 10000; // Catch infinite ideal-loops
       Node n, m;
       if( false ) ;
       else if( (n=_work_dead  .pop())!=null ) m = n._uses._len == 0 ? n.kill() : null;
@@ -129,15 +142,16 @@ public class GVNGCM {
       else if( (n=_work_grow  .pop())!=null ) m = n.do_grow  ();
       else if( (n=_work_inline.pop())!=null ) m = ((FunNode)n).ideal_inline(false);
       else break;
-      ITER_CNT++; assert ITER_CNT < 10000; // Catch infinite ideal-loops
       if( m == null ) ITER_CNT_NOOP++;     // No progress profiling
-      else assert m.is_dead() || m.check_vals();
+      else n.deps_work_clear();            // Progress; deps on worklist
       // VERY EXPENSIVE ASSERT
       //assert Env.ROOT == null || Env.ROOT.more_work(true) == 0; // Initial conditions are correct
+      //IDEAL_VISIT.clear();
+      //assert !Env.ROOT.more_ideal(IDEAL_VISIT);
     }
   }
-
-  // Top-level iter cleanout.  Empties all queues & aggressively checks
+  
+  // Top-level iter clean-out.  Empties all queues & aggressively checks
   // no-more-progress.
   private static final VBitSet IDEAL_VISIT = new VBitSet();
   public void iter() {
@@ -156,7 +170,7 @@ public class GVNGCM {
     };
     // Expensive assert
     //assert Env.ROOT.more_work(true)==0;
-    IDEAL_VISIT.clear();
+    //IDEAL_VISIT.clear();
     //assert !Env.ROOT.more_ideal(IDEAL_VISIT);
   }
 

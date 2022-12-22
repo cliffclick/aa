@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
@@ -28,16 +29,20 @@ public class FieldNode extends Node implements Resolvable {
   @Override public String xstr() { return "."+(is_resolving() ? "_" : _fld); }   // Self short name
   String  str() { return xstr(); } // Inline short name
   @Override public boolean is_resolving() { return Resolvable.is_resolving(_fld); }
-  @Override public void resolve(String label) {
-    throw unimpl();
+  @Override public String resolve(String label) {
+    unelock();                  // Hash changes
+    String old = _fld;
+    _fld = label;
+    add_flow();
+    return old;
   }
 
   @Override public Type value() {
     Type t = val(0);
     if( is_resolving() ) {
-      boolean lo = _tvar==null || Combo.HM_AMBI;
       // Pre-HMT, dunno which one, use meet.
       // Still resolving, use the join of all fields.
+      boolean lo = _tvar==null || Combo.HM_AMBI;
       if( t instanceof TypeStruct ts )
         return lo ? meet(ts) : join(ts);
       return TypeNil.SCALAR.oob(!lo);
@@ -153,7 +158,9 @@ public class FieldNode extends Node implements Resolvable {
     // Attempt resolve
     if( is_resolving() && !str.is_open() ) {
       progress = trial_resolve(tvar(), str, str, test);
-      if( progress && test ) return true;
+      if( test ) { if( progress ) return true; }
+      // Revisit if parts change to allow unification
+      else tvar().deps_add_deep(str.deps_add_deep(this));        
     }
 
     // Look up field
@@ -179,8 +186,14 @@ public class FieldNode extends Node implements Resolvable {
 
     // If the field is not there and the struct is closed, then the field is
     // missing.
-    if( !str.is_open() )
+    if( !str.is_open() ) {
+      // Might yet get a prototype and find field
+      if( proto instanceof TVLeaf ) {
+        proto.deps_add_deep(this);
+        return false;
+      }
       throw unimpl();
+    }
 
     // Add the field
     if( test ) return true;

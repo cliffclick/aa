@@ -456,11 +456,6 @@ public class TestNodeSmall {
         if( key0.isa(key1) )
           assertTrue(cvals.get(key0).isa(cvals.get(key1)));
 
-    arg3.unkeep(2);
-    arg4.unkeep(2);
-    fdx.unkeep(2);
-    call.unkeep(2);
-    cepi.unhook().unhook();
     Env.top_reset();                   // Hard reset
   }
 
@@ -670,9 +665,9 @@ public class TestNodeSmall {
     assert targ2.simple_ptr()==targ2;
     ConNode ctl = gvn.init(new ConNode<>(Type.CTRL));
     ConNode cmem= (ConNode)gvn.xform(new ConNode<>(TypeMem.ALLMEM));
-    CallNode call = gvn.init(new CallNode(true, null, ctl.unkeep(2), cmem, null/*fidx*/, null/*x*/, null/*y*/));
+    CallNode call = gvn.init(new CallNode(true, null, ctl, cmem, null/*fidx*/, null/*x*/, null/*y*/));
     CallEpiNode cepi = gvn.init(new CallEpiNode(call)); // Unwired
-    Node    cpj = gvn.init(new CProjNode(call.unkeep(2),0));
+    Node    cpj = gvn.init(new CProjNode(call,0));
     ConNode mem = gvn.init(new ConNode<>(tmem ));
     ConNode arg1= gvn.init(new ConNode<>(targ1));
     ConNode arg2= gvn.init(new ConNode<>(targ2));

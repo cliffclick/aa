@@ -4,6 +4,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.TVLambda;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
@@ -195,8 +196,7 @@ public class CallNode extends Node {
     }
 
     Type tc = _val;
-    if( !(tc instanceof TypeTuple) ) return null;
-    TypeTuple tcall = (TypeTuple)tc;
+    if( !(tc instanceof TypeTuple tcall) ) return null;
 
     // Dead, do nothing
     if( tctl(tcall)!=Type.CTRL ) { // Dead control (NOT dead self-type, which happens if we do not resolve)
@@ -247,14 +247,6 @@ public class CallNode extends Node {
       if( progress != null ) return this;
     }
     return null;
-  }
-
-  // Call reduces, then check the CEPI for reducing
-  @Override public void add_reduce_extra() {
-    Node cepi = cepi();
-    if( !_is_copy && cepi!=null )
-      GVN.add_reduce(cepi);
-    GVN.add_flow(mem()); // Dead pointer args reduced to ANY, so mem() liveness lifts
   }
 
   @Override public Node ideal_grow() {
@@ -369,39 +361,6 @@ public class CallNode extends Node {
     return TypeTuple.make(ts);
   }
 
-  @Override public void add_flow_extra(Type old) {
-    if( old==Type.ANY || _val==Type.ANY ||
-        (old instanceof TypeTuple && ttfp(old).above_center()) )
-      add_flow_defs();      // Args can be more-alive or more-dead
-    // If Call flips to being in-error, all incoming args forced live/escape
-     if( err(true)!=null )
-      for( Node def : _defs )
-        if( def!=null )
-          GVN.add_flow(def);
-  }
-
-  @Override public void add_flow_def_extra(Node chg) {
-    // Projections live after a call alter liveness of incoming args
-    if( chg instanceof ProjNode proj && proj._idx < len())
-      GVN.add_flow(in(proj._idx));
-  }
-
-  @Override public void add_flow_use_extra(Node chg) {
-    CallEpiNode cepi = cepi();
-    if( chg == fdx() ) {           // FIDX falls to sane from too-high
-      add_flow_defs();             // All args become alive
-      if( cepi!=null ) {
-        GVN.add_work_new (cepi); // FDX gets stable, might wire, might unify_lift
-        GVN.add_flow_defs(cepi); // Wired Rets might no longer be alive (might unwire)
-      }
-    } else if( chg == mem() ) {
-      //if( cepi != null ) Env.GVN.add_flow(cepi);
-    } else {                    // Args lifted, may resolve
-      if( fdx() instanceof UnresolvedNode )
-        GVN.add_reduce(this);
-    }
-  }
-
   @Override public Type live_use(Node def) {
     Type tcall = _val;
     if( !(tcall instanceof TypeTuple) ) // Call is has no value (yet)?
@@ -421,10 +380,19 @@ public class CallNode extends Node {
           !fidxs.test_recur(ret._fidx) )     // FIDX directly not used
         //return TypeMem.DEAD;                 // Not in the fidx set.
         throw unimpl();    // premature optimization?
-      // Otherwise, the FIDX is alive.  Check the display.
-      ProjNode dsp = ProjNode.proj(this,DSP_IDX);
-      return ((!_is_copy && !cepi.is_all_wired()) || // Unwired calls remain, dsp could be alive yet
-              (dsp!=null && dsp._live==Type.ALL)) ? Type.ALL : TypeFunPtr.GENERIC_FUNPTR;
+      
+      // Otherwise, the FIDX is alive.  Check the display; if alive then the
+      // live_use is ALL, if display is dead then GEN_FUN.
+      // Unwired calls remain, dsp could be alive yet
+      boolean dsp_alive = !_is_copy && !cepi.is_all_wired();
+      if( !dsp_alive ) {
+        ProjNode dsp = ProjNode.proj(this,DSP_IDX);
+        if( dsp != null ) {
+          dsp_alive = (dsp._live==Type.ALL);
+          dsp.deps_add(def);      // Re-check function input if display changes
+        }
+      }
+      return dsp_alive ? Type.ALL : TypeFunPtr.GENERIC_FUNPTR;
     }
 
     // Check that all fidxs are wired; an unwired fidx might be in-error,
@@ -434,7 +402,9 @@ public class CallNode extends Node {
     // All wired, the arg is dead if the matching projection is dead
     int argn = _defs.find(def);
     ProjNode proj = ProjNode.proj(this, argn);
-    return proj == null ? Type.ANY : proj._live; // Pass through live
+    if( proj== null ) return Type.ANY;
+    proj.deps_add(def);      // Re-check function input if projection change liveness
+    return proj._live; // Pass through live
   }
 
   @Override public boolean has_tvar() { return false; }
@@ -445,14 +415,11 @@ public class CallNode extends Node {
     TV3 tv3 = tvar(proj._idx); // Input tvar matching projection
     if( proj._idx!=DSP_IDX )
       return tvp.unify(tv3,test); // Unify with Call arguments
-    //// Specifically for the function/display, only unify on the display part.
-    //if( tv3.is_fun() ) {        // Expecting the call input to be a function
-    //  TV3 tdsp = tv3.arg("2");  // Unify against the function display
-    //  return tdsp != null && tvp.unify(tdsp,test);
-    //}
-    //tv3.push_dep(proj);         // Proj will unify once tv3 becomes a fun
-    //return false;
-    throw unimpl();
+    // Specifically for the function/display, only unify on the display part.
+    if( tv3 instanceof TVLambda lam ) // Expecting the call input to be a function
+      return lam.dsp().unify(tvp,test);
+    tv3.deps_add_deep(proj);    // Proj will unify once tv3 becomes a fun
+    return false;
   }
 
   @Override public ErrMsg err( boolean fast ) {

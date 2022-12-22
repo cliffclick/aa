@@ -75,10 +75,6 @@ public final class RetNode extends Node {
     Type val = rez()._val;
     return TypeTuple.make(ctl,mem,val);
   }
-  @Override public void add_flow_extra(Type old) {
-    // Return type changed, so Fun._sig changes.
-    if( !is_copy() ) Env.GVN.add_reduce(fun());
-  }
 
   @Override public Type live_use(Node def ) {
     return def==mem() ? _live : Type.ALL;

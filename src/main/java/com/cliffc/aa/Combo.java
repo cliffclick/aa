@@ -176,13 +176,11 @@ public abstract class Combo {
     while( (n=Env.GVN.pop_flow()) != null ) {
       cnt++; assert cnt < 100000; // Infinite loop check
 
-      if( AA.DO_GCP ) {
-        // Forwards flow
-        n.combo_forwards();
+      // Forwards flow
+      n.combo_forwards();
 
-        // Backwards flow
-        n.combo_backwards();
-      }
+      // Backwards flow
+      n.combo_backwards();
 
       // H-M unification
       n.combo_unify();

@@ -1,5 +1,7 @@
 package com.cliffc.aa.tvar;
 
+import com.cliffc.aa.Env;
+import com.cliffc.aa.node.Node;
 import com.cliffc.aa.util.*;
 
 import static com.cliffc.aa.AA.unimpl;
@@ -52,6 +54,9 @@ abstract public class TV3 {
   // All uses of this type-var are value-equivalent to the def.
   // Makes a one-shot transition from true to false.
   boolean _is_copy = true;
+
+  // Nodes to put on a worklist, if this TV3 is modified.
+  UQNodes _deps = null;
   
   //
   TV3() { _args=null; }
@@ -109,6 +114,8 @@ abstract public class TV3 {
     that._is_copy &= _is_copy;  // Both must be is_copy to keep is_copy
     _union_impl(that);          // Merge subclass specific bits
     _uf = that;                 // U-F union
+    this._deps_work_clear();
+    that._deps_work_clear();
     return true;
   }
 
@@ -207,11 +214,32 @@ abstract public class TV3 {
   }
   
   // -----------------
-  public void add_deps_flow() {
-    throw unimpl();
+  
+  // Recursively add 'n' to 'this' and all children.
+  
+  // Stops when it sees 'n'; this closes cycles and short-cuts repeated adds of
+  // 'n'.  Requires internal changes propagate internal _deps.
+  public Node deps_add_deep( Node n ) {
+    if( !_dep_add(n) ) return n;
+    if( _args!=null )
+      for( int i=0; i<len(); i++ )
+        if( _args[i]!=null )
+          arg(i).deps_add_deep(n);
+    return n;
   }
-  public void add_deps_work() {
-    throw unimpl();
+  // Add n to _deps.  Returns true if added, false if already there
+  private boolean _dep_add( Node n ) {
+    if( _deps==null ) _deps = UQNodes.make(n);
+    else if( _deps.containsKey(n._uid) ) return false;
+    else _deps = _deps.add(n);
+    return true;
+  }
+
+  // Something changed; add the deps to the worklist and clear.
+  private void _deps_work_clear() {
+    if( _deps == null ) return;
+    Env.GVN.add_flow(_deps);
+    _deps = null;
   }
   
   // -----------------

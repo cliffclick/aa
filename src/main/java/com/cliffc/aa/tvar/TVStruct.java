@@ -51,10 +51,20 @@ public class TVStruct extends TV3 {
     _max++;
     return true;
   }
+  // Remove
   boolean del_fld(int i) {
     throw unimpl();
   }
-
+  // Remove field; true if something got removed
+  boolean del_fld(String fld) {
+    int idx = Util.find(_flds,fld);
+    if( idx== -1 ) return false;
+    _args[idx] = _args[_max-1];
+    _flds[idx] = _flds[_max-1];
+    _max--;
+    return true;
+  }
+  
   @Override public int len() { return _max; }  
 
   public String fld( int i ) { return _flds[i]; }
@@ -110,7 +120,7 @@ public class TVStruct extends TV3 {
 
     // Unify LHS fields into RHS
     boolean open = that.is_open();
-    for( int i=0; i<thsi._flds.length; i++ ) {
+    for( int i=0; i<thsi._max; i++ ) {
       String key = thsi._flds[i];
       TV3 fthis = thsi.arg(key);         // Field of this
       TV3 fthat = that.arg(key);         // Field of that
@@ -128,7 +138,7 @@ public class TVStruct extends TV3 {
 
     // Fields on the RHS are aligned with the LHS also
     if( !thsi.is_open() )
-      for( int i=0; i<that._flds.length; i++ ) {
+      for( int i=0; i<that._max; i++ ) {
         String key = that._flds[i];
         if( !Resolvable.is_resolving(key) && // Do not remove until resolved
             thsi.arg(key)==null )            // Fields in both already done
@@ -141,7 +151,7 @@ public class TVStruct extends TV3 {
 
   private boolean trial_resolve_all(boolean test) {
     boolean progress = false;
-    for( int i=0; i<len(); i++ ) {
+    for( int i=0; i<_max; i++ ) {
       String key = _flds[i];
       Resolvable res = TVField.FIELDS.get(key);
       if( res==null ) continue;  // Field is already resolved, or not a resolvable field
@@ -158,7 +168,7 @@ public class TVStruct extends TV3 {
 
   @Override boolean _trial_unify_ok_impl( TV3 tv3, boolean extras ) {
     TVStruct that = (TVStruct)tv3; // Invariant when called
-    for( int i=0; i<_args.length; i++ ) {
+    for( int i=0; i<_max; i++ ) {
       TV3 lhs = arg(i);
       TV3 rhs = that.arg(_flds[i]); // RHS lookup by field name
       if( rhs==null ) {
@@ -171,7 +181,7 @@ public class TVStruct extends TV3 {
 
     // Check for extras
     if( !is_open() ) {
-      for( int i=0; i<that._args.length; i++ ) {
+      for( int i=0; i<that._max; i++ ) {
         TV3 lhs = that.arg(i);
         TV3 rhs = arg(that._flds[i]); // LHS lookup by field name
         if( rhs==null ) {
@@ -197,7 +207,7 @@ public class TVStruct extends TV3 {
       }
     }
 
-    boolean is_tup = _flds.length==0 || Character.isDigit(_flds[0].charAt(0));
+    boolean is_tup = _max==0 || Character.isDigit(_flds[0].charAt(0));
     sb.p(is_tup ? "(" : "@{");
     if( _args==null ) sb.p(", ");
     else {

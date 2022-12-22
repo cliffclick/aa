@@ -84,17 +84,16 @@ public class PhiNode extends Node {
   //@Override BitsAlias escapees() { return BitsAlias.FULL; }
   @Override public Type live_use(Node def ) {
     Node r = in(0);
-    if( r==def ) return Type.ALL;
-    if( r!=null ) {
-      if( r.len() != len() ) return _live;
-      // The same def can appear on several inputs; check them all.
-      int i; for( i=1; i<_defs._len; i++ )
-        if( in(i)==def && !r.val(i).above_center() )
-          break;                           // This input is live
-      if( i==_defs._len ) return Type.ANY; // All matching defs are not live on any path
-    }
-    // Def is alive (on some path)
-    return _live;
+    if( r==def  ) return Type.ALL; // Self-loop, error
+    if( r==null ) return _live;    // Mid-collapse, error, pass live thru
+    if( r.len() != len() ) return _live; // Error, pass live thru
+    // The same def can appear on several inputs; check them all.
+    for( int i=1; i<_defs._len; i++ )
+      if( in(i)==def && !r.val(i).above_center() )
+        return _live;           // This input is as live as i am
+    // If the control changes, recompute live
+    for( int i=1; i<_defs._len; i++ ) if( in(i)==def )  r.in(i).deps_add(def);
+    return Type.ANY;            // All matching defs are not live on any path
   }
 
   @Override public ErrMsg err( boolean fast ) {

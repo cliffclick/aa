@@ -1,7 +1,9 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.TypeStruct;
+import com.cliffc.aa.type.TypeTuple;
 
 import static com.cliffc.aa.AA.MEM_IDX;
 
@@ -13,22 +15,6 @@ public class MProjNode extends ProjNode {
   @Override public String xstr() { return "MProj"+_idx; }
   @Override public boolean is_mem() { return true; }
   NewNode nnn() { return (NewNode)in(0); }
-
-  @Override public void add_flow_def_extra(Node chg) {
-    // Dropping last mem use enables Store folding into New
-    if( in(0) instanceof NewNode )
-      for( Node use : _uses )
-        if( use instanceof StoreNode )
-          Env.GVN.add_reduce(use);
-  }
-  @Override public void add_flow_use_extra(Node chg) {
-    if( chg instanceof CallNode ) {    // If the Call changes value
-      Env.GVN.add_flow(chg.in(MEM_IDX));       // The called memory   changes liveness
-      Env.GVN.add_flow(((CallNode)chg).fdx()); // The called function changes liveness
-    }
-    if( chg instanceof NewNode nnn && chg._uses._len==1 && nnn.rec()==Env.UNUSED )
-      Env.GVN.add_reduce(this);
-  }
 
   @Override public Type live_use( Node def ) { return _live; }
 
@@ -43,9 +29,11 @@ public class MProjNode extends ProjNode {
       TypeMem tnnn = (TypeMem)((TypeTuple)nnn._val).at(1);
       TypeStruct tns = tnnn.at(nnn._alias);
       // All memory has to be monotonic; easiest to require all the same
-      if( tnnn==_val && tnnn==nnn.mem()._val && tns==TypeStruct.UNUSED )
-        return nnn.mem();
-    }
+      if( tnnn==_val ) {
+        if( tnnn==nnn.mem()._val && tns==TypeStruct.UNUSED ) return nnn.mem();
+        else nnn.mem().deps_add(this); // Rerun self if nnn.mem upgrades
+      } else in(0).deps_add(this);
+    } else in(0).deps_add(this);
     return null;
   }
 }

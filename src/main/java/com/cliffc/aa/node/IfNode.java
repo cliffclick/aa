@@ -53,15 +53,6 @@ public class IfNode extends Node {
     throw unimpl();
   }
 
-  // Some CSE folded my input, extra Casts might optimize
-  @Override public void add_flow_use_extra(Node chg) {
-    if( in(1)==chg )
-      for( Node uctl : _uses )
-        for( Node cast : uctl._uses )
-          if( cast instanceof CastNode )
-            Env.GVN.add_flow(cast);
-  }
-
   @Override public TypeTuple value() {
     // If the input is exactly zero, we can return false: {ANY,CONTROL}
     // If the input excludes   zero, we can return true : {CONTROL,ANY}
