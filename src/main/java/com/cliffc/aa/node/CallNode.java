@@ -335,29 +335,23 @@ public class CallNode extends Node {
   // merge from that path.  Result tuple type:
   @Override public Type value() {
     if( _is_copy ) return _val; // Freeze until unwind
-    // Pinch to XCTRL/CTRL
-    Type ctl = ctl()._val;
-    if( ctl != Type.CTRL ) return ctl.oob();
-    // Function pointer.
-    Node fdx = fdx();
-    if( !(fdx._val instanceof TypeFunPtr tfx) ) return fdx._val.oob();
+    // Result type includes a type-per-input, plus one for the function
+    final Type[] ts = Types.get(_defs._len+1);
+    ts[CTL_IDX] = ctl()._val;
     // Not a memory to the call?
     Type mem = mem()==null ? TypeMem.ANYMEM : mem()._val;
     TypeMem tmem = mem instanceof TypeMem ? (TypeMem)mem : mem.oob(TypeMem.ALLMEM);
-
-    // Result type includes a type-per-input
-    final Type[] ts = Types.get(_defs._len+1/*+1 tescs turned off*/);
-    ts[CTL_IDX] = Type.CTRL;
     ts[MEM_IDX] = tmem;         // Memory into the callee, not caller
 
+    // Function pointer.
+    Node fdx = fdx();
+    TypeFunPtr tfx = fdx._val instanceof TypeFunPtr tfx2 ? tfx2 : TypeFunPtr.GENERIC_FUNPTR;
     // Copy args for called functions.  FIDX is already refined.
     // Also gather all aliases from all args.
     ts[DSP_IDX] = tfx.dsp();
     for( int i=ARG_IDX; i<nargs(); i++ )
       ts[i] = arg(i)==null ? TypeNil.XSCALAR : arg(i)._val;
     ts[_defs._len] = tfx;
-    // Resolve if possible, based on argument types and formals
-    ts[_defs._len] = UnresolvedNode.resolve_value(ts);
     return TypeTuple.make(ts);
   }
 

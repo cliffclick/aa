@@ -581,15 +581,17 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Do One Step of Hindley-Milner unification.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
   public void combo_unify() {
-    if( _live== Type.ANY ) return; // No HM progress on dead code
     if( _val == Type.ANY ) return; // No HM progress on untyped code
     TV3 old = _tvar;
     if( old==null ) return;
+    if( _live== Type.ANY && !has_call_use() ) // No HM progress on dead code
+      return;
     if( unify(false) ) {
       assert !_tvar.debug_find().unify(old.debug_find(),true);// monotonic: unifying with the result is no-progress
       add_work_hm();            // Neighbors on worklist
     }
   }
+  private boolean has_call_use() { for( Node use : _uses ) if( use._op==OP_CALL ) return true; return false; }
 
   // Return any type error message, or null if no error
   public ErrMsg err( boolean fast ) { return null; }
@@ -605,6 +607,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     deps_mark();
     Node nnn = _do_reduce();
     if( nnn!=null ) {           // Something happened
+      add_flow_uses();          // Users of change should recheck
       if( nnn!=this )           // Replacement
         subsume(nnn);           // Replace
       return nnn._elock();      // After putting in VALS
