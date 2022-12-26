@@ -16,8 +16,6 @@ public class ConNode<T extends Type> extends Node {
   public ConNode( T t ) {
     super(OP_CON,Env.ROOT);
     assert t.simple_ptr()==t;
-    // Use SetField on the CLZ instead
-    assert !(_t instanceof TypeStruct ts && ts._clz != null );
     _t=t;
   }
   @Override public String xstr() {
@@ -38,10 +36,13 @@ public class ConNode<T extends Type> extends Node {
   }
 
   @Override public TV3 _set_tvar() {
-    if( _t==TypeNil.XNIL )
-      return new TVNil( new TVLeaf() ); // xnil gets a HM nilable instead of a base
-    // Default case, just a Base wrapper over GCP type
-    return TVBase.make(true,_t);
+    unelock(); // Hash now depends on TVars
+    _tvar = _t==TypeNil.XNIL
+      ? new TVNil( new TVLeaf() ) // xnil gets a HM nilable instead of a base
+      // Default case, just a Base wrapper over GCP type
+      : TVBase.make(true,_t);
+    _elock();
+    return _tvar;
   }
   
   @Override public boolean unify( boolean test ) {
@@ -52,15 +53,17 @@ public class ConNode<T extends Type> extends Node {
   @Override public int hashCode() {
     // In theory also slot 0, but slot 0 is always Start.
     // Two XNILs are typically different because their TV3s are different
-    return _t.hashCode();
+    return _t.hashCode() + (_tvar == null ? 0 : _tvar._uid);
   }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !(o instanceof ConNode con) ) return false;
-    if( _t==TypeNil.NIL && con._t==TypeNil.NIL )
-      return false;             // Different versions of TV3 NotNil
-    return _t==con._t;
+    if( _t!=con._t ) return false;
+    // Check TVars, if they exist.
+    if( _tvar==null ) { assert con._tvar==null; return true; }
+    return tvar()==con.tvar();
   }
+  
   @Override Node walk_dom_last( Predicate<Node> P) { return null; }
   @SuppressWarnings({"unused","unchecked"}) // Found as java_class_node in _prims.aa
   public static class PI extends ConNode {

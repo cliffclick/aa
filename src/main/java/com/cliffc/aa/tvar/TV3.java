@@ -1,8 +1,11 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.Env;
+import com.cliffc.aa.node.ConNode;
 import com.cliffc.aa.node.Node;
-import com.cliffc.aa.util.*;
+import com.cliffc.aa.util.NonBlockingHashMapLong;
+import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
 
 import static com.cliffc.aa.AA.unimpl;
 
@@ -41,7 +44,7 @@ import static com.cliffc.aa.AA.unimpl;
 
 abstract public class TV3 {
   private static int CNT=1;
-  final int _uid=CNT++;         // Unique dense int, used in many graph walks for a visit bit
+  public final int _uid=CNT++; // Unique dense int, used in many graph walks for a visit bit
 
   // Disjoint Set Union set-leader.  Null if self is leader.  Not-null if not a
   // leader, but pointing to a chain leading to a leader.  Rolled up to point
@@ -113,9 +116,9 @@ abstract public class TV3 {
     if( this==that ) return false;
     that._is_copy &= _is_copy;  // Both must be is_copy to keep is_copy
     _union_impl(that);          // Merge subclass specific bits
-    _uf = that;                 // U-F union
-    this._deps_work_clear();
+    this._deps_work_clear();    // This happens before the unification
     that._deps_work_clear();
+    _uf = that;                 // U-F union
     return true;
   }
 
@@ -239,6 +242,7 @@ abstract public class TV3 {
   private void _deps_work_clear() {
     if( _deps == null ) return;
     Env.GVN.add_flow(_deps);
+    for( Node n : _deps.values() ) if( n instanceof ConNode) n.unelock(); // hash changes
     _deps = null;
   }
   

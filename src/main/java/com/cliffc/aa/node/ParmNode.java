@@ -21,13 +21,9 @@ public class ParmNode extends PhiNode {
   }
   public FunNode fun() { return (FunNode) in(0); }
   @Override public String xstr() { return "Parm:"+_idx; }
-  @Override public int hashCode() { return super.hashCode()+_idx; }
-  @Override public boolean equals(Object o) {
-    if( this==o ) return true;
-    if( !super.equals(o) ) return false;
-    if( !(o instanceof ParmNode) ) return false;
-    ParmNode parm = (ParmNode)o;
-    return _idx==parm._idx;
+  @Override void walk_reset0() {
+    while( is_prim() && len()>2 )
+      pop(); // Kill wired primitive inputs
   }
 
   @Override public Node ideal_reduce() {
@@ -68,4 +64,12 @@ public class ParmNode extends PhiNode {
   // Parms are already treated by the H-M algo, and (via fresh_unify) get
   // "fresh" TVars for every input path.
   @Override public boolean unify( boolean test ) { return false; }
+  
+  @Override public int hashCode() { return super.hashCode()+_idx; }
+  @Override public boolean equals(Object o) {
+    if( this==o ) return true;
+    if( !super.equals(o) ) return false;
+    if( !(o instanceof ParmNode parm) ) return false;
+    return _idx==parm._idx;
+  }
 }

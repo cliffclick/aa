@@ -128,7 +128,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       _elock=false;             // Unlock
       Node x = VALS.remove(this);
       assert x==this;           // Got the right node out
-      Env.GVN.add_reduce(add_flow());
+      //Env.GVN.add_reduce(add_flow());
     }
   }
   public Node _elock() {        // No assert version, used for new nodes
@@ -640,6 +640,9 @@ public abstract class Node implements Cloneable, IntSupplier {
     Node x = ideal_reduce();    // Try the general reduction
     if( x != null ) {
       assert _live.isa(x._live);
+      if(   _tvar instanceof TVBase base0 &&
+          x._tvar instanceof TVBase base1 )
+        base1._t = base0._t.join(base1._t);
       return x.add_flow();      // Graph replace with x
     }
 
@@ -718,6 +721,8 @@ public abstract class Node implements Cloneable, IntSupplier {
       : new ConNode<>(t);
     Node con2 = VALS.get(con);
     if( con2 != null ) {        // Found a prior constant
+      if( con2.has_tvar() && con2._tvar!=null && con2.tvar() instanceof TVBase base && base._t != t )
+        throw unimpl();
       con.kill();               // Kill the just-made one
       con = con2;
       con._live = Type.ALL;     // Adding more liveness
@@ -758,6 +763,8 @@ public abstract class Node implements Cloneable, IntSupplier {
     _val = _live = Type.ANY;  // Highest value
     if( this instanceof FieldNode fld && fld.is_resolving() )
       TVField.FIELDS.put(fld._fld,fld); // Track resolving field names
+    if( this instanceof ConNode && _tvar!=null )
+      _tvar.deps_add_deep(this); // Constant hash depends on tvar      
     
     // Walk reachable graph
     for( Node def : _defs ) if( def != null ) def.walk_initype();

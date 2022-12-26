@@ -33,7 +33,7 @@ public class TestParse {
     DO_GCP=false;
     DO_HMT=true;
     RSEED=0;
-    test("1  < 2", "int:1", "int:1");
+    test("1+2*3", "int:7", "int:7");
   }
 
   @Test public void testParse00() {

@@ -24,10 +24,6 @@ public class PhiNode extends Node {
     if( !(o instanceof PhiNode phi) ) return false;
     return _t==phi._t;
   }
-  @Override void walk_reset0() {
-    while( len()>1 && !in(len()-1).is_prim() )
-      pop(); // Kill wired primitive inputs
-  }
 
   @Override public Node ideal_reduce() {
     if( in(0)==null ) return null; // Mid-construction

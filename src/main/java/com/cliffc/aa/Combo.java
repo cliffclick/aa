@@ -130,8 +130,6 @@ public abstract class Combo {
     // Set all values to ANY and lives to DEAD, their most optimistic types.
     // Set all type-vars to Leafs.
     Env.ROOT.walk_initype();
-
-    // Make the non-gen set in a pre-pass
     assert Env.ROOT.more_work(false)==0; // Initial conditions are correct
 
     // Init
