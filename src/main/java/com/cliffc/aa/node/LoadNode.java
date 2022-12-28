@@ -60,20 +60,14 @@ public class LoadNode extends Node {
     //return self.unify(rec,test);
     throw unimpl();
   }
-  public void add_work_hm() {
-    super.add_work_hm();
-    Env.GVN.add_flow(adr());
-  }
 
   // Strictly reducing optimizations
   @Override public Node ideal_reduce() {
     Node adr = adr();
     Type tadr = adr._val;
-    // We allow Loads against Clazz types
-    if( tadr instanceof TypeStruct ts ) {
-      assert !ts.clz().isEmpty();
+    // We allow Loads against structs to allow for nested (inlined) structs.
+    if( tadr instanceof TypeStruct ts )
       return adr();
-    }
     if( !(tadr instanceof TypeMemPtr tmp) ) return null;
     // If we can find an exact previous store, fold immediately to the value.
     Node ps = find_previous_struct(mem(),adr,tmp._aliases,true);

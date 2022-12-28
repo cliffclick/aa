@@ -6,7 +6,8 @@ import com.cliffc.aa.type.TypeFunPtr;
 
 import static com.cliffc.aa.AA.unimpl;
 
-// Bind a 'this' into an unbound function pointer.
+// Strip out the display argument from a bound function.
+// Inverse of BindFP.
 public class FP2DSPNode extends Node {
   public FP2DSPNode( Node fp ) { super(OP_FP2DSP,fp); }
   @Override public String xstr() {return "FP2DSP"; }
@@ -20,19 +21,10 @@ public class FP2DSPNode extends Node {
   
   @Override public Node ideal_reduce() {
     if( fp() instanceof BindFPNode bind ) return bind.dsp();
-    if( fp() instanceof FunPtrNode fptr ) return fptr.display();
     return null;
   }
   
   @Override public boolean has_tvar() { return true; }
-  @Override TV3 _set_tvar() {
-    // Display is included in the argument count, and is unified with first argument
-    //TVLambda lam = new TVLambda(nargs()-DSP_IDX); _tvar = lam;
-    //Node rez = ret().rez();
-    //rez.set_tvar();
-    //lam.set_ret(rez.tvar());
-    throw unimpl();
-  }
 
   // Implements class HM.Lambda unification.
   @Override public boolean unify( boolean test ) {

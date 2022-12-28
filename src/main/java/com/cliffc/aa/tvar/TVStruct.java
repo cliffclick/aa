@@ -116,7 +116,7 @@ public class TVStruct extends TV3 {
     TVStruct thsi = this;          // So we can update 'this'
     TVStruct that = (TVStruct)tv3; // Invariant when called
     if( trial_resolve_all(false) ) thsi = (TVStruct)thsi.find();
-    assert !that.trial_resolve_all(false); // TODO: need a test case
+    assert !that.trial_resolve_all(true); // TODO: need a test case
 
     // Unify LHS fields into RHS
     boolean open = that.is_open();
@@ -158,7 +158,7 @@ public class TVStruct extends TV3 {
       // Field is still resolving?
       if( res.is_resolving() ) {
         if( !is_open() ) // More fields possible, so trial_resolve cannot be tried
-          throw unimpl();
+          progress |= res.trial_resolve(arg(i),this,this,test); // Attempt resolve
       } else {
         throw unimpl();
       }

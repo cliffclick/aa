@@ -30,10 +30,10 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_GCP=false;
-    DO_HMT=true;
+    DO_GCP=true;
+    DO_HMT=false;
     RSEED=0;
-    test("1+2*3", "int:7", "int:7");
+    testerr("math.pi(1)", "A function is being called, but 3.141592653589793 is not a function",7);
   }
 
   @Test public void testParse00() {
@@ -44,7 +44,7 @@ public class TestParse {
     // Binary operators
     test("1+2", "int:3", "int:3");
     test("1-2", "int:-1",  "int:-1");
-    test("1+2*3", "int:7", "int:7");
+    test("1+2*3", "int:7", "A:int:int64");
     test("1  < 2", "int:1", "int:1");
     test("1  <=2", "int:1", "int:1");
     test("1  > 2", "xnil", "A?");
@@ -59,10 +59,10 @@ public class TestParse {
     test("1.2!=2", "int:1", "int:1");
 
     // Binary with precedence check
-    test(" 1+2 * 3+4 *5", "int:27", "int:27");
-    test("(1+2)*(3+4)*5", "int:105", "int:105");
+    test(" 1+2 * 3+4 *5", "int:27", "A:int:int64");
+    test("(1+2)*(3+4)*5", "int:105", "A:int:int64");
     test("1// some comment\n+2", "int:3", "int:3"); // With bad comment
-    test("-1-2*3-4*5", "int:-27", "int:-27");
+    test("-1-2*3-4*5", "int:-27", "A:int:int64");
     test("1&3|1&2", "int:1", "int:1");
 
     // Float
@@ -78,9 +78,9 @@ public class TestParse {
     testerr("_+_", "Syntax error; trailing junk",0);
     testerr("!_", "Missing term after operator '!_'",1);
     // Function application, traditional paren/comma args
-    test("1._+_(2)", "int:3" ,"int:3" );
-    test("1._-_(2)", "int:-1","int:-1"); // binary version
-    test("1.-_()"  , "int:-1","int:-1"); // unary version
+    test("1._+_._(2)", "int:3" ,"int:3" );
+    test("1._-_._(2)", "int:-1","int:-1"); // binary version
+    test("1.-_._()"  , "int:-1","int:-1"); // unary version
     // error; mismatch arg count
     testerr("math.pi(1)", "A function is being called, but 3.141592653589793 is not a function",7);
     testerr("1._+_(2,3)", "Passing 3 arguments to _+_ which takes 2 arguments",5);

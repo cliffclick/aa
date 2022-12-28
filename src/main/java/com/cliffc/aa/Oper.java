@@ -63,7 +63,7 @@ public class Oper {
   public final int _nargs;      // Count of '_' same as count of arguments, including any 'self'
   public final boolean _lazy;   // Bin op, with lazy 2nd arg
 
-  static boolean isOp0(byte c) { return "!#$%*+-.=<>^[]~/&|".indexOf(c) != -1; }
+  static boolean isOp0(byte c) { return "!#$%*+-=<>^[]~/&|".indexOf(c) != -1; }
   static boolean isOp1(byte c) { return isOp0(c) || ":?_{}".indexOf(c) != -1; }
 
   // Precedence is based on the single first non-'_' character

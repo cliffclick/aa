@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFunPtr;
 import com.cliffc.aa.type.TypeTuple;
@@ -20,34 +19,34 @@ public class CEProjNode extends CProjNode {
     if( in(0).is_copy(0) != null ) return Type.CTRL;
     if( is_keep() ) return Type.CTRL;
     // Expect a call here
-    return good_call(val(0),(FunNode)_uses.at(0)) ? Type.CTRL : Type.XCTRL;
+    return Type.XCTRL.oob(good_call(val(0),(FunNode)_uses.at(0)));
   }
 
   // Never equal to another CEProj, since Call-Graph *edges* are unique
   @Override public boolean equals(Object o) { return this==o; }
 
-  static boolean good_call(Type tcall, FunNode fun ) {
-    if( !(tcall instanceof TypeTuple ttcall) ) return !tcall.above_center();
+  static boolean good_call(Type tcall0, FunNode fun ) {
+    if( !(tcall0 instanceof TypeTuple tcall) ) return tcall0!=Type.ANY; // ANY is XCTRL, all other is CTRL
     // Call type tuple
-    if( ttcall.at(0)!=Type.CTRL ) return false; // Call not executing
-    TypeFunPtr tfp = CallNode.ttfp(ttcall);
+    if( CallNode.tctl(tcall)!=Type.CTRL ) return false; // Call not executing
+    TypeFunPtr tfp = CallNode.ttfp(tcall);
     if( tfp.fidxs().above_center() ) return false; // Call not executing yet
-    if( !tfp.fidxs().test_recur(fun._fidx) )
-      return false;             // Call not executing this wired path
+    if( !tfp.fidxs().test_recur(fun._fidx) ) return false; // Call not executing this wired path
     // Argument count mismatch
-    return ttcall.len()-1/*tfp*//*-1 tesc turned off*/ == fun.nargs();
+    return tcall.len()-1/*tfp*/ == fun.nargs();
   }
 
-  static boolean wired_arg_check( Type tcall, FunNode fun ) {
-    if( !good_call(tcall,fun) ) return false;
+  static boolean wired_arg_check( Type tcall0, FunNode fun ) {
+    if( !good_call(tcall0,fun) ) return false;
+    TypeTuple tcall = (TypeTuple)tcall0;
     // Check that args are monotonic before wiring
     Node[] parms = fun.parms();
     for( int i=DSP_IDX; i<parms.length; i++ ) {
       if( parms[i]==null ) continue; // Unused args always good
       Type actual = CallNode.targ(tcall,i);
       Type formal = ((ParmNode)parms[i])._t;
-      if( !actual.isa(formal) )
-        return false;
+      //if( !actual.isa(formal) ) return false;
+      assert actual.isa(formal);
     }
     return true;
   }

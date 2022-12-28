@@ -7,33 +7,14 @@ import com.cliffc.aa.type.*;
 import static com.cliffc.aa.AA.*;
 
 // See CallNode and FunNode comments. The FunPtrNode converts a RetNode into a
-// TypeFunPtr with a constant fidx and variable displays.  Used to allow first
-// class functions to be passed about.
+// TypeFunPtr with a constant fidx.  Used to allow first class functions to be
+// passed about.
 
-// FIDXs above-center are used by UnresolvedNode to represent choice.
-// Normal FunPtrs, in both GCP and Opto/Iter, should be a single (low) FIDX.
-
-// Display is e.g. *[12] (alias 12 struct), or some other thing to represent an
-// unused/dead display.  I've been using either ANY or XNIL.
-
-// There are several invariants we'd like to have:
-
-// The FIDX and DISP match sign: so {-15,ANY} and {+15,NIL} are OK, but
-// {+15,XNIL} and {+15,ANY} are not.  This one is in conflict with the others,
-// and is DROPPED.  Instead we allow e.g. {+15,ANY} to indicate a FIDX 15 with
-// no display.
+// FIDXs above-center are used to represent choice.  Normal FunPtrs, in both
+// GCP and Opto/Iter, should be a single (low) FIDX.
 //
 // FunPtrNodes strictly fall during GCP; lift during Opto.
 // So e.g. any -> [-15,any] -> [-15,-12] -> [+15,+12] -> [+15,all] -> all.
-// But need to fall preserving the existing of DISP.
-// So e.g.  any -> [-15,any] -> [-15,xnil] -> [+15,nil] -> [+15,all] -> all.
-// So e.g.  any -> [-15,-12] ->                            [+15,+12] -> all.
-//
-// FunPtrNodes start being passed e.g. [+12], but during GCP can discover DISP
-// is dead... but then after GCP need to migrate the types from [+15,+12] to
-// [+15,nil] which is sideways.  Has to happen in a single monolithic pass
-// covering all instances of [+15,+12].  Also may impact mixed +15 and other
-// FIDXs with unrelated DISPs.  Instead a dead display just flips to ANY.
 
 public final class FunPtrNode extends Node {
   public String _name;          // Optional for debug only
@@ -45,16 +26,13 @@ public final class FunPtrNode extends Node {
   // interesting thing is when an out-of-scope TVar uses the same TVar
   // internally in different parts - the copy replicates this structure.  When
   // unified, it forces equivalence in the same places.
-  public  FunPtrNode( String name, RetNode ret, Node display ) {
-    super(OP_FUNPTR,ret,display);
+  public  FunPtrNode( String name, RetNode ret ) {
+    super(OP_FUNPTR,ret);
     _name = name;
   }
-  // Explicitly, no display
-  public  FunPtrNode( String name, RetNode ret ) { this(name,ret, Env.ANY ); }
   // Display (already fresh-loaded) but no name.
-  public  FunPtrNode( Node ret, Node display ) { this(((RetNode)ret).fun()._name,((RetNode)ret),display); }
+  public  FunPtrNode( RetNode ret ) { this(ret.fun()._name,ret); }
   public RetNode ret() { return in(0)==null ? null : (RetNode)in(0); }
-  public Node display(){ return in(1); }
   public FunNode fun() { return ret().fun(); }
   public FunNode xfun() { RetNode ret = ret(); return ret !=null && ret.in(4) instanceof FunNode ? ret.fun() : null; }
   int nargs() { return ret()._nargs; }
@@ -86,43 +64,18 @@ public final class FunPtrNode extends Node {
     fun().bind(tok);
   }
 
-  @Override public Node ideal_reduce() {
-    Node dsp = display();
-    if( dsp!=Env.ANY ) {
-      FunNode fun;
-      // Display is known dead?
-      if( _live==Type.ANY ||
-          // Collapsing to a gensym, no need for display
-          ret().is_copy() ||
-          // Also unused if function has no display parm.
-          ((fun=xfun())!=null && fun.is_copy(0)==null && fun.parm(DSP_IDX)==null)  )
-        return set_def(1,Env.ANY); // No display needed
-    }
-    return null;
-  }
-
-
   @Override public Type value() {
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;
     RetNode ret = ret();
     TypeTuple tret = (TypeTuple)(ret._val instanceof TypeTuple ? ret._val : ret._val.oob(TypeTuple.RET));
-    Node dsp = display();
-    return TypeFunPtr.make(ret._fidx,nargs(),dsp==null ? Type.ALL : dsp._val,tret.at(REZ_IDX));
-  }
-
-  @Override public Type live_use(Node def ) {
-    if( _live==Type.ALL ) return Type.ALL;
-    // GENERIC_FUNPTR is a sentinel for "display is dead but function is alive"
-    assert _live==TypeFunPtr.GENERIC_FUNPTR;
-    return def==display() ? Type.ANY : Type.ALL;
+    return TypeFunPtr.make(ret._fidx,nargs(),Type.ANY,tret.at(REZ_IDX));
   }
 
   @Override public boolean has_tvar() { return true; }
 
   @Override public TV3 _set_tvar() {
-    Node dsp = display();
-    return new TVLambda(nargs(),dsp==Env.ANY ? new TVLeaf() : dsp.set_tvar(),ret().rez().set_tvar());
+    return new TVLambda(nargs(),new TVLeaf(),ret().rez().set_tvar());
   }
 
   // Implements class HM.Lambda unification.
@@ -145,11 +98,4 @@ public final class FunPtrNode extends Node {
 
     return progress;
   }
-
-  // HM changes; push related neighbors
-  public void add_work_hm() {
-    super.add_work_hm();
-    Env.GVN.add_flow(display());
-  }
-
 }

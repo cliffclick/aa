@@ -130,9 +130,9 @@ public class SetFieldNode extends Node {
     //TypeFld tfld = rec.get(_fld);
     //if( tfld== null ) return false;
     //// Folding unambiguous functions?
-    //if( rez() instanceof FunPtrNode || rez() instanceof UnresolvedNode ) {
+    //if( rez() instanceof FunPtrNode ) {
     //  if( rez().is_forward_ref() ) return false;
-    //  nnn.add_fun(_fld, _fin, (FunPtrNode) rez(), _bad); // Stacked FunPtrs into an Unresolved
+    //  nnn.add_fun(_fld, _fin, (FunPtrNode) rez(), _bad); // Stacked FunPtrs into an overload
     //  // Field is modifiable; update New directly.
     //} else if( tfld._access==Access.RW )
     //  //nnn.set_fld(tfld.make_from(tfld._t,_fin),rez()); // Update the value, and perhaps the final field

@@ -22,6 +22,8 @@ public class CastNode extends Node {
     // Cast is useless?  Remove same as a TypeNode
     Node ctrl = in(0), addr = in(1);
     Type c = ctrl._val, t = addr._val;
+    // Cast when Load/Field from a Struct?  Never nil, can be removed.
+    if( t instanceof TypeStruct ) return addr;
     if( c != Type.CTRL ) return null;
     if( t.isa(_t) ) return in(1);
     return null;
@@ -104,11 +106,6 @@ public class CastNode extends Node {
     //// Unify the maynil with a nilable version of notnil
     //return TV3.make_nil(notnil,"Cast_unify").find().unify(maynil,test);
     throw unimpl();
-  }
-
-  @Override public void add_work_hm() {
-    Env.GVN.add_flow(in(1));
-    Env.GVN.add_flow_uses(this);
   }
 
   @Override public @NotNull CastNode copy( boolean copy_edges) {

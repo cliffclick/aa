@@ -134,11 +134,11 @@ public final class RetNode extends Node {
     Node ctl = ctl();
     if( ctl._op!=OP_REGION ) return null;
     int idx; for( idx=1; idx<ctl._defs._len; idx++ ) {
-      Node c = ctl.in(idx), cepi = c.in(0);
-      if( c._op == OP_CPROJ && cepi._op == OP_CALLEPI &&
-          ((CallEpiNode)cepi).nwired()==1 &&
-          ((CallEpiNode)cepi).wired(0)== this && // TODO: if in tail position, can be a tail call not self-recursive
-          ((CallEpiNode)cepi).call().fdx()._op == OP_FUNPTR ) // And a direct call
+      Node c = ctl.in(idx), cepi0 = c.in(0);
+      if( c._op == OP_CPROJ && cepi0 instanceof CallEpiNode cepi &&
+          cepi.nwired()==1 &&
+          cepi.wired(0)== this && // TODO: if in tail position, can be a tail call not self-recursive
+          cepi.call().fdx()._op == OP_FUNPTR ) // And a direct call
         break;
     }
     if( idx == ctl._defs._len ) return null; // No call-epi found

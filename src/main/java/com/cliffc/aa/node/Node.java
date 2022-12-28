@@ -46,11 +46,10 @@ public abstract class Node implements Cloneable, IntSupplier {
   static final byte OP_STORE  =29;
   static final byte OP_STRUCT =30;
   static final byte OP_TYPE   =31;
-  static final byte OP_UNR    =32;
-  static final byte OP_VAL    =33;
-  static final byte OP_MAX    =34;
+  static final byte OP_VAL    =32;
+  static final byte OP_MAX    =33;
 
-  private static final String[] STRS = new String[] { null, "BindFP", "Call", "CallEpi", "Cast", "Con", "ConType", "CProj", "Err", "Field", "Fresh", "FP2DSP", "Fun", "FunPtr", "If", "Join", "Keep", "Load", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Root", "Scope","SetFld","Split", "Store", "Struct", "Type", "Unresolved", "Val" };
+  private static final String[] STRS = new String[] { null, "BindFP", "Call", "CallEpi", "Cast", "Con", "ConType", "CProj", "Err", "Field", "Fresh", "FP2DSP", "Fun", "FunPtr", "If", "Join", "Keep", "Load", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Root", "Scope","SetFld","Split", "Store", "Struct", "Type", "Val" };
   static { assert STRS.length==OP_MAX; }
 
   // Unique dense node-numbering
@@ -326,18 +325,17 @@ public abstract class Node implements Cloneable, IntSupplier {
       for( Node n : _defs ) if( n instanceof ScopeNode ) n.dump(d+1,max,bs,sb,typebs,dups,hmt_bs,hmt_dups,prims,plive,ptvar);
       // Print constants early
       for( Node n : _defs ) if( n instanceof ConNode ) n.dump(d+1,max,bs,sb,typebs,dups,hmt_bs,hmt_dups,prims,plive,ptvar);
-      // Do not recursively print root Scope, nor Unresolved of primitives.
+      // Do not recursively print root Scope, nor primitives.
       // These are too common, and uninteresting.
       for( Node n : _defs ) if( n != null && (!prims && n.is_prim() && n._defs._len > 3) ) bs.set(n._uid);
       // Recursively print most of the rest, just not the multi-node combos and
       // Unresolve & FunPtrs.
       for( Node n : _defs )
-        if( n != null && !n.is_multi_head() && !n.is_multi_tail() &&
-            !(n instanceof UnresolvedNode) && !(n instanceof FunPtrNode) )
+        if( n != null && !n.is_multi_head() && !n.is_multi_tail() && !(n instanceof FunPtrNode) )
           n.dump(d+1,max,bs,sb,typebs,dups,hmt_bs,hmt_dups,prims,plive,ptvar);
-      // Print Unresolved and FunPtrs, which typically catch whole functions.
+      // Print FunPtrs, which typically catch whole functions.
       for( Node n : _defs )
-        if( (n instanceof UnresolvedNode) || (n instanceof FunPtrNode) )
+        if( n instanceof FunPtrNode )
           n.dump(d+1,max,bs,sb,typebs,dups,hmt_bs,hmt_dups,prims,plive,ptvar);
       // Print anything not yet printed, including multi-node combos
       for( Node n : _defs ) if( n != null && !n.is_multi_head() ) n.dump(d+1,max,bs,sb,typebs,dups,hmt_bs,hmt_dups,prims,plive,ptvar);
@@ -514,6 +512,7 @@ public abstract class Node implements Cloneable, IntSupplier {
         Type ulive = use.live_use(this);
         live = live.meet(ulive); // Make alive used fields
       }
+    assert live==Type.ANY || live==Type.ALL || assert_live(live);
     return live;
   }
 
@@ -528,9 +527,9 @@ public abstract class Node implements Cloneable, IntSupplier {
   }
   // Compute local contribution of use liveness to this def.
   // Overridden in subclasses that do per-def liveness.
-  public Type live_use( Node def ) { return _live; }
+  Type live_use( Node def ) { return _live; }
+  boolean assert_live(Type live) { return false; }
 
-  // The _val changed here, and more than the immediate neighbors might change value/live
   public void add_flow_defs() { Env.GVN.add_flow_defs(this); }
   public void add_flow_uses() { Env.GVN.add_flow_uses(this); }
   public Node add_flow     () { return Env.GVN.add_flow(this); }
@@ -543,12 +542,6 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Unify this Proj with the matching TV2 part from the multi-TV2-producing
   public boolean unify_proj( ProjNode proj, boolean test ) { throw unimpl(); }
-
-  // HM changes; push related neighbors
-  public void add_work_hm() {
-    for( Node def : _defs ) if( def!=null && def.has_tvar() ) def.add_flow();
-    for( Node use : _uses ) if(              use.has_tvar() ) use.add_flow();
-  }
 
   // Do One Step of forwards-dataflow analysis.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
@@ -588,7 +581,9 @@ public abstract class Node implements Cloneable, IntSupplier {
       return;
     if( unify(false) ) {
       assert !_tvar.debug_find().unify(old.debug_find(),true);// monotonic: unifying with the result is no-progress
-      add_work_hm();            // Neighbors on worklist
+      // HM changes; push related neighbors
+      for( Node def : _defs ) if( def!=null && def.has_tvar() ) def.add_flow();
+      for( Node use : _uses ) if(              use.has_tvar() ) use.add_flow();
     }
   }
   private boolean has_call_use() { for( Node use : _uses ) if( use._op==OP_CALL ) return true; return false; }
@@ -717,17 +712,18 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Make globally shared common ConNode for this type.
   public static @NotNull Node con( Type t ) {
     Node con = t instanceof TypeFunPtr tfp && tfp.is_fidx() && tfp.fidx()!=BitsFun.ALLX
-      ? new FunPtrNode(RetNode.get(tfp.fidx()),con(tfp.dsp()))
+      ? new FunPtrNode(RetNode.get(tfp.fidx()))
       : new ConNode<>(t);
     Node con2 = VALS.get(con);
     if( con2 != null ) {        // Found a prior constant
-      if( con2.has_tvar() && con2._tvar!=null && con2.tvar() instanceof TVBase base && base._t != t )
+      if( Combo.HM_FREEZE && con2.tvar() instanceof TVBase base && base._t != t )
         throw unimpl();
       con.kill();               // Kill the just-made one
       con = con2;
       con._live = Type.ALL;     // Adding more liveness
     } else {                    // New constant
       con._val = t;             // Typed
+      if( Combo.HM_FREEZE ) con.set_tvar();
       con._elock(); // Put in VALS, since if Con appears once, probably appears again in the same XFORM call
     }
     return Env.GVN.add_flow(con); // Updated live flows
@@ -850,7 +846,6 @@ public abstract class Node implements Cloneable, IntSupplier {
       if( unify(true) ) {
         if( Combo.HM_FREEZE ) errs += _report_bug("Progress after freezing");
         errs += _report_bug("Progress bug");
-        FLOW_VISIT.set(_uid); // Reset if progressing past breakpoint
       }
     }
     for( Node def : _defs ) if( def != null ) errs = def.more_work(lifting,errs);
@@ -861,6 +856,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     FLOW_VISIT.clear(_uid); // Pop-frame & re-run in debugger
     System.err.println(msg);
     System.err.println(dump(0,new SB(),null,null,null,null,true,false)); // Rolling backwards not allowed
+    FLOW_VISIT.set(_uid); // Reset if progressing past breakpoint
     return 1;
   }
 

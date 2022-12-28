@@ -291,54 +291,55 @@ public class Parse implements Comparable<Parse> {
     // standard fref in a fact() (probably as a constructor call).
     // Look for a prior type assignment, from e.g. a type annotation
 
-    // Make a forward-ref constructor, if not one already
-    UnresolvedNode construct = (UnresolvedNode)_e.lookup(tok);
-    if( construct==null ) construct = val_fref(tok,errMsg());
-    else if( !construct.is_forward_ref() )
-      return err_ctrl2("Cannot re-assign val '"+tok+"' as a type");
-    construct.scoped();
-
-    // Make a forward-ref type, if not one already
-    StructNode typenode  = _e.lookup_type(tname);
-    if( typenode == null ) typenode = type_fref(tname,is_val); // None, so create
-    else throw unimpl(); // Double-define error
-
-    // Nest an environment for parsing named type contents, usually const-expr initializers
-    int pidx;
-    try( Env e = new Env(_e, null, false, ctrl(), mem(), _e._scope.stk(), typenode) ) {
-      _e = e;                   // Push nested environment
-
-      Type newtype = type(false,typenode);
-      if( newtype==null ) return err_ctrl2("Missing type after ':'");
-
-      // Value or reference type
-      if( newtype instanceof TypeMemPtr ) {
-        typenode.close();
-        typenode.define();                           // No longer a forward ref
-        if( is_val ) {
-          //// Build a default constructor, add to the pile of constructors
-          //construct.add_def(typenode.defalt().fill());
-          //construct.define();     // Value type is defined
-          //Env.GVN.add_flow(construct);
-          if( true ) throw unimpl();
-        } else
-          throw unimpl();         // Reference type
-
-      } else {
-        // Other types?  e.g. defining a named function-type needs a breakdown of
-        // the returned function to make a TypeFunSig.  No constructor in this
-        // case, but can be used in type-checks.
-        // TODO: Need to toss the un-needed typenodeb
-        throw unimpl();
-      }
-
-      e._par._scope.set_ctrl(ctrl()); // Carry any control changes back to outer scope
-      e._par._scope.set_mem (mem ()); // Carry any memory  changes back to outer scope
-      _e = e._par;                    // Pop nested environment
-      pidx = construct.push();        // A pointer to the constructed object
-    } // Pop lexical scope around type parse
-
-    return Node.pop(pidx);
+    //// Make a forward-ref constructor, if not one already
+    //UnresolvedNode construct = (UnresolvedNode)_e.lookup(tok);
+    //if( construct==null ) construct = val_fref(tok,errMsg());
+    //else if( !construct.is_forward_ref() )
+    //  return err_ctrl2("Cannot re-assign val '"+tok+"' as a type");
+    //construct.scoped();
+    //
+    //// Make a forward-ref type, if not one already
+    //StructNode typenode  = _e.lookup_type(tname);
+    //if( typenode == null ) typenode = type_fref(tname,is_val); // None, so create
+    //else throw unimpl(); // Double-define error
+    //
+    //// Nest an environment for parsing named type contents, usually const-expr initializers
+    //int pidx;
+    //try( Env e = new Env(_e, null, false, ctrl(), mem(), _e._scope.stk(), typenode) ) {
+    //  _e = e;                   // Push nested environment
+    //
+    //  Type newtype = type(false,typenode);
+    //  if( newtype==null ) return err_ctrl2("Missing type after ':'");
+    //
+    //  // Value or reference type
+    //  if( newtype instanceof TypeMemPtr ) {
+    //    typenode.close();
+    //    typenode.define();                           // No longer a forward ref
+    //    if( is_val ) {
+    //      //// Build a default constructor, add to the pile of constructors
+    //      //construct.add_def(typenode.defalt().fill());
+    //      //construct.define();     // Value type is defined
+    //      //Env.GVN.add_flow(construct);
+    //      if( true ) throw unimpl();
+    //    } else
+    //      throw unimpl();         // Reference type
+    //
+    //  } else {
+    //    // Other types?  e.g. defining a named function-type needs a breakdown of
+    //    // the returned function to make a TypeFunSig.  No constructor in this
+    //    // case, but can be used in type-checks.
+    //    // TODO: Need to toss the un-needed typenodeb
+    //    throw unimpl();
+    //  }
+    //
+    //  e._par._scope.set_ctrl(ctrl()); // Carry any control changes back to outer scope
+    //  e._par._scope.set_mem (mem ()); // Carry any memory  changes back to outer scope
+    //  _e = e._par;                    // Pop nested environment
+    //  pidx = construct.push();        // A pointer to the constructed object
+    //} // Pop lexical scope around type parse
+    //
+    //return Node.pop(pidx);
+    throw unimpl();
   }
 
   /** A statement is a list of variables to final-assign or re-assign, and an
@@ -580,16 +581,15 @@ public class Parse implements Comparable<Parse> {
       Node over = gvn(new FieldNode(lhs,binop._name,err));
       // Get the resolved operator from the overload
       Node unbound_fun = gvn(new FieldNode(over,null,err));
-      // Binds the function
-      Node bound_fun = gvn(new BindFPNode(unbound_fun,Node.pop(lhsidx)));
-      int fidx = bound_fun.push();
+      int fidx = unbound_fun.push();
       // Parse the RHS operand
       Node rhs = binop._lazy
         ? _lazy_expr(binop)
         : _expr_higher_require(binop);
       // Emit the call to both terms
+      unbound_fun = Node.pop(fidx);
       // LHS in unhooked prior to optimizing/replacing.
-      lhs = do_call(errMsgs(opx,lhsx,rhsx), args(Node.pop(fidx),rhs));
+      lhs = do_call(errMsgs(opx,lhsx,rhsx), args(Node.pop(lhsidx),rhs,unbound_fun));
       // Invariant: LHS is unhooked
     }
   }
@@ -694,9 +694,8 @@ public class Parse implements Comparable<Parse> {
       Node over = gvn(new FieldNode(e0,op._name,err));
       // Selects the correct function from the TypeStruct tuple.
       Node unbound_fun = gvn(new FieldNode(over,null,err));
-      // Binds the function
-      Node bound_fun = gvn(new BindFPNode(unbound_fun,Node.pop(e0idx)));
-      n = do_call(errMsgs(oldx,oldx),args(bound_fun));
+      //
+      n = do_call(errMsgs(oldx,oldx),args(Node.pop(e0idx),unbound_fun));
     } else {
       // Normal leading term
       _x=oldx;
@@ -735,20 +734,28 @@ public class Parse implements Comparable<Parse> {
         } else {
           Parse bad = errMsg(fld_start);
           Node st = gvn(new LoadNode(mem(),castnn,bad));
-          n = gvn(new FieldNode(st,fld,bad));
+          // Using a plain underscore for the field name is a Resolving field.
+          n = gvn(new FieldNode(st,Util.eq(fld,"_") ? null : fld,bad));
         }
 
       } else if( peek('(') ) {  // Attempt a function-call
         oldx = _x;              // Just past paren
-        skipWS();               // Skip to start of 1st arg
+        skipWS();               // Skip to start of 1st arg past "this"
         int first_arg_start = _x;
         int nidx = n.push();    // Keep alive across arg parse
-        StructNode arg = tuple(oldx-1,stmts(),first_arg_start); // Parse argument list
-        n = Node.pop(nidx);     // Function
-        if( arg == null )       // tfact but no arg is just the tfact not a function call
-          { _x = oldx; return n; }
-        Parse[] badargs = arg.fld_starts(); // Args from tuple
-        n = do_call0(false,badargs,args(n,arg)); // Pass the tuple
+        Node dsp = gvn(new FP2DSPNode(n));
+        // Argument tuple, with "this" or display first arg
+        StructNode args = new StructNode(false,false,errMsg(oldx-1), "", Type.ALL);
+        args.add_fld("0",Access.Final,dsp,null); // TODO: get the display start for errors
+        int aidx = args.push();
+        Node arg1 = stmts();
+        args = (StructNode)Node.pop(aidx);
+        // Parse rest of arguments
+        _tuple(oldx-1,arg1,errMsg(first_arg_start),args); // Parse argument list
+
+        n = Node.pop(nidx);                       // Function
+        Parse[] badargs = args.fld_starts();      // Args from tuple
+        n = do_call0(false,badargs,args(args,n)); // Pass the tuple
 
       } else {
         // Check for balanced op with a leading term, e.g. "ary [ idx ]" or
@@ -895,7 +902,8 @@ public class Parse implements Comparable<Parse> {
       // tail-half of a balanced-op, which is parsed by term() above.
       if( isOp(tok) ) { _x = oldx; return null; }
       // Must be a forward reference
-      return val_fref(tok,bad);
+      //return val_fref(tok,bad);
+      throw unimpl();
     }
 
     // Must load against most recent display update, in case some prior store
@@ -917,9 +925,12 @@ public class Parse implements Comparable<Parse> {
    *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
    */
   private StructNode tuple(int oldx, Node s, int first_arg_start) {
-    StructNode nn = new StructNode(false,false,errMsg(oldx), "", Type.ALL).init();
     // First stmt is parsed already
+    StructNode nn = new StructNode(false,false,errMsg(oldx), "", Type.ALL).init();
     Parse bad = errMsg(first_arg_start);
+    return _tuple(oldx,s,bad,nn);
+  }
+  private StructNode _tuple(int oldx, Node s, Parse bad, StructNode nn) {
     while( s!= null ) {         // More args
       nn.add_fld((""+nn.len()).intern(),Access.Final,s,bad);
       if( !peek(',') ) break;   // Final comma is optional
@@ -1307,18 +1318,18 @@ public class Parse implements Comparable<Parse> {
     throw unimpl();
   }
 
-  // Create a value forward-reference.  Must turn into a function call later.
-  // Called when seeing a name for the first time, in a function-call context,
-  // OR when defining a type constructor.  Not allowed to forward-ref normal
-  // variables, so this is a function variable, not yet defined.  Use an
-  // Unresolved until it gets defined.
-  private UnresolvedNode val_fref(String tok, Parse bad) {
-    UnresolvedNode fref = init(UnresolvedNode.forward_ref(tok,bad));
-    // Place in nearest enclosing closure scope, this will keep promoting until we find the actual scope
-    StructNode stk = scope().stk();
-    stk.add_fld(tok,Access.Final,fref,null);
-    return fref;
-  }
+  //// Create a value forward-reference.  Must turn into a function call later.
+  //// Called when seeing a name for the first time, in a function-call context,
+  //// OR when defining a type constructor.  Not allowed to forward-ref normal
+  //// variables, so this is a function variable, not yet defined.  Use an
+  //// Unresolved until it gets defined.
+  //private UnresolvedNode val_fref(String tok, Parse bad) {
+  //  UnresolvedNode fref = init(UnresolvedNode.forward_ref(tok,bad));
+  //  // Place in nearest enclosing closure scope, this will keep promoting until we find the actual scope
+  //  StructNode stk = scope().stk();
+  //  stk.add_fld(tok,Access.Final,fref,null);
+  //  return fref;
+  //}
   // Create a type forward-reference.  Must be type-defined later.  Called when
   // seeing a name in a type context for the first time.  Builds an empty type
   // NewNode and returns it.
@@ -1464,6 +1475,7 @@ public class Parse implements Comparable<Parse> {
   // Wiring for call arguments
   private Node[] args(Node a0                           ) { return _args(new Node[]{null,null,a0}); }
   private Node[] args(Node a0, Node a1                  ) { return _args(new Node[]{null,null,a0,a1}); }
+  private Node[] args(Node a0, Node a1, Node a2         ) { return _args(new Node[]{null,null,a0,a1,a2}); }
   private Node[] _args(Node[] args) {
     args[CTL_IDX] = ctrl();     // Always control
     args[MEM_IDX] = mem();      // Always memory

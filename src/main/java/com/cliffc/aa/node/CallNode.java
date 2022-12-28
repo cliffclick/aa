@@ -18,8 +18,8 @@ import static com.cliffc.aa.Env.GVN;
 //
 // Control is not required for an apply but inlining the function body will
 // require it; slot 0 is for Control.  Slot 1 is function memory, slot 2 the
-// function ptr - a Node typed as a TypeFunPtr; can be a FunPtrNode, an
-// Unresolved, or e.g. a Phi or a Load.  Slots 3+ are for other args.
+// display; slot 3 is a Node typed as a TypeFunPtr; can be a FunPtrNode, or
+// e.g. a Phi or a Load.  Slots 3+ are for other args.
 //
 // When the function type simplifies to a single FIDX, the Call can inline.
 //
@@ -108,24 +108,23 @@ public class CallNode extends Node {
     return cepi!=null && ProjNode.proj(cepi,MEM_IDX)!=null;
   }
 
+  // Number of actual arguments, including closure/display at DSP_IDX.
+  int nargs() { return _defs._len-1; }
   // Call arguments:
   // 0 - Control.  If XCTRL, call is not reached.
   // 1 - Memory.  This is memory into the call and also arg#0
-  // 2 - Function.  A TypeFunPtr; includes the display type.
+  // 2 - Display; the first argument.
   // 3+  Other "normal" arguments, numbered#ARG_IDX and up.
-  //     The output type here is trimmed to what is "resolved"
-  public  Node ctl() { return in(CTL_IDX); }
-  public  Node mem() { return in(MEM_IDX); }
-  public  Node fdx() { return in(DSP_IDX); } // Function and display
-
-  // Number of actual arguments, including closure/display at DSP_IDX.
-  int nargs() { return _defs._len; }
-  // Actual arguments.  Arg(1) is allowed and refers to memory; arg(2) to the Display/TFP.
+  // N - Last input is the function.
+  public Node ctl() { return in(CTL_IDX); }
+  public Node mem() { return in(MEM_IDX); }
+  public Node dsp() { return in(DSP_IDX); } // Display
+  public Node fdx() { return in(nargs()); } // Function
   Node arg ( int x ) { assert x>=0; return _defs.at(x); }
-  // Set an argument.  Use 'set_fun' to set the Code.
+  // Set arguments
+  void set_mem( Node mem) { set_def(MEM_IDX, mem); }
   Node set_arg (int idx, Node arg) { assert idx>=DSP_IDX && idx <nargs(); return set_def(idx,arg); }
-  public CallNode set_fdx( Node fun) { set_def(DSP_IDX, fun); return this; }
-  public void set_mem( Node mem) { set_def(MEM_IDX, mem); }
+  CallNode set_fdx( Node fun) { assert fun._val instanceof TypeFunPtr; set_def(nargs(), fun); return this; }
 
   // Add a bunch of utilities for breaking down a Call.value tuple:
   // takes a Type, upcasts to tuple, & slices by name.
@@ -136,24 +135,20 @@ public class CallNode extends Node {
   // ts[4] == in(4) == arg(4)
   // ....
   // ts[_defs._len]   = Function, as a TFP
-  // ts[_defs._len+1] = Escape-in aliases as a TMP
-  static        Type       tctl( Type tcall ) { return             ((TypeTuple)tcall).at(CTL_IDX); }
-  static        TypeMem    emem( Type tcall ) { return emem(       ((TypeTuple)tcall)._ts ); }
-  static        TypeMem    emem( Type[] ts  ) { return (TypeMem   ) ts[MEM_IDX]; } // callee memory passed into function
-  static        TypeMemPtr tesc( Type tcall ) {
-    //if( !(tcall instanceof TypeTuple) ) return tcall.oob(TypeMemPtr.OOP);
-    //TypeTuple tt = (TypeTuple)tcall;
-    //return (TypeMemPtr)tt.at(tt.len()-1);
-    throw unimpl();
-  }
+  static Type    targ( TypeTuple tcall, int i ) { return tcall._ts[i]; }
+  static Type    tctl( TypeTuple tcall ) { return targ(tcall,CTL_IDX); }
+  static TypeMem emem( TypeTuple tcall ) { return emem(tcall._ts); }
+  static TypeMem emem( Type[] ts ) { return (TypeMem)ts[MEM_IDX]; } // callee memory passed into function
   // No-check must-be-correct get TFP
   static public TypeFunPtr ttfp( Type t ) {
-    if( !(t instanceof TypeTuple tcall) ) return (TypeFunPtr)t.oob(TypeFunPtr.GENERIC_FUNPTR);
-    return (TypeFunPtr)tcall.at(tcall.len()-1/*-1 tescs turned off*/);
+    return (TypeFunPtr)((t instanceof TypeTuple tcall)
+                        ? tcall._ts[tcall.len()-1]
+                        : t.oob(TypeFunPtr.GENERIC_FUNPTR));
   }
-  static TypeTuple set_ttfp( TypeTuple tcall, TypeFunPtr nfptr ) { return tcall.set(tcall.len()-1/*-1 tescs turned off*/,nfptr); }
-  static Type targ( Type tcall, int x ) { return targ(((TypeTuple)tcall)._ts,x); }
-  static Type targ( Type[] ts, int x ) { return ts[x]; }
+  TypeTuple set_ttfp(TypeFunPtr tfp) {
+    TypeTuple tt = (TypeTuple)_val;
+    return tt.set(nargs(),tfp);
+  }
 
   // Clones during inlining all become unique new call sites.  The original RPC
   // splits into 2, and the two new children RPCs replace it entirely.  The
@@ -177,9 +172,10 @@ public class CallNode extends Node {
     // When do I do 'pattern matching'?  For the moment, right here: if not
     // already unpacked a tuple, and can see the NewNode, unpack it right now.
     if( !_unpacked &&           // Not yet unpacked a tuple
-        val(ARG_IDX) instanceof TypeStruct ts && // An arg collection
+        val(DSP_IDX) instanceof TypeStruct ts && // An arg collection
         ts.is_tup() ) {                          // A tuple
       // Find a tuple being passed in directly; unpack
+      Node fun = pop(); // Pop off the function
       Node nnn = pop(); // Pop off the tuple
       if( nnn instanceof StructNode )
         for( Node n : nnn._defs ) // Push the args; unpacks the tuple
@@ -189,7 +185,8 @@ public class CallNode extends Node {
         for( TypeFld fld : ts )
           add_def(Node.con(fld._t));
       }
-      _unpacked = true;     // Only do it once
+      add_def(fun);             // Function at end
+      _unpacked = true;         // Only do it once
       xval(); // Recompute value, this is not monotonic since replacing tuple with args
       GVN.add_work_new(this);// Revisit after unpacking
       return this;
@@ -221,11 +218,6 @@ public class CallNode extends Node {
     // Try to resolve to single-target
     Node fdx = fdx();
     if( fdx instanceof FreshNode fresh ) fdx = fresh.id();
-    if( fdx instanceof UnresolvedNode unr ) {
-      Node fdx2 = unr.resolve_node(tcall._ts);
-      if( fdx2!=null )
-        return set_fdx(fdx2);
-    }
 
     // Wire valid targets.
     CallEpiNode cepi = cepi();
@@ -336,7 +328,7 @@ public class CallNode extends Node {
   @Override public Type value() {
     if( _is_copy ) return _val; // Freeze until unwind
     // Result type includes a type-per-input, plus one for the function
-    final Type[] ts = Types.get(_defs._len+1);
+    final Type[] ts = Types.get(_defs._len);
     ts[CTL_IDX] = ctl()._val;
     // Not a memory to the call?
     Type mem = mem()==null ? TypeMem.ANYMEM : mem()._val;
@@ -345,13 +337,12 @@ public class CallNode extends Node {
 
     // Function pointer.
     Node fdx = fdx();
-    TypeFunPtr tfx = fdx._val instanceof TypeFunPtr tfx2 ? tfx2 : TypeFunPtr.GENERIC_FUNPTR;
+    TypeFunPtr tfx = fdx._val instanceof TypeFunPtr tfx2 ? tfx2 : (TypeFunPtr)fdx._val.oob(TypeFunPtr.GENERIC_FUNPTR);
     // Copy args for called functions.  FIDX is already refined.
     // Also gather all aliases from all args.
-    ts[DSP_IDX] = tfx.dsp();
-    for( int i=ARG_IDX; i<nargs(); i++ )
+    for( int i=DSP_IDX; i<nargs(); i++ )
       ts[i] = arg(i)==null ? TypeNil.XSCALAR : arg(i)._val;
-    ts[_defs._len] = tfx;
+    ts[_defs._len-1] = tfx;
     return TypeTuple.make(ts);
   }
 
@@ -362,44 +353,23 @@ public class CallNode extends Node {
     if( is_keep()  ) return Type.ALL; // Still under construction, all alive
     if( def==ctl() ) return Type.ALL;
     if( def==mem() ) return _live;
-
-    CallEpiNode cepi = cepi();
-    if( def==fdx() ) {          // Function argument
-      TypeFunPtr tfp = ttfp(tcall);
-      BitsFun fidxs = tfp.fidxs();
-      // If using a specific FunPtr and its in the resolved set, test more precisely
-      RetNode ret;
-      if( def instanceof FunPtrNode fptr &&  // Have a FunPtr
-          (ret=fptr.ret())!=null &&          // Well-structured function
-          !fidxs.test_recur(ret._fidx) )     // FIDX directly not used
-        //return TypeMem.DEAD;                 // Not in the fidx set.
-        throw unimpl();    // premature optimization?
-      
-      // Otherwise, the FIDX is alive.  Check the display; if alive then the
-      // live_use is ALL, if display is dead then GEN_FUN.
-      // Unwired calls remain, dsp could be alive yet
-      boolean dsp_alive = !_is_copy && !cepi.is_all_wired();
-      if( !dsp_alive ) {
-        ProjNode dsp = ProjNode.proj(this,DSP_IDX);
-        if( dsp != null ) {
-          dsp_alive = (dsp._live==Type.ALL);
-          dsp.deps_add(def);      // Re-check function input if display changes
-        }
-      }
-      return dsp_alive ? Type.ALL : TypeFunPtr.GENERIC_FUNPTR;
-    }
-
+    if( def==fdx() ) return Type.ALL;
     // Check that all fidxs are wired; an unwired fidx might be in-error,
-    // and we want the argument alive for errors.  This is a value turn-
+    // and we want the argument alive for errors.  This is a value turn
     // around point (high fidxs need to fall)
-    if( !_is_copy && !cepi.is_all_wired() ) return Type.ALL;
+    CallEpiNode cepi = cepi();
+    boolean all_wired = _is_copy || cepi.is_all_wired();
+    if( all_wired ) deps_add(def);
+    else return Type.ALL;
     // All wired, the arg is dead if the matching projection is dead
     int argn = _defs.find(def);
     ProjNode proj = ProjNode.proj(this, argn);
-    if( proj== null ) return Type.ANY;
-    proj.deps_add(def);      // Re-check function input if projection change liveness
-    return proj._live; // Pass through live
+    if( proj == null ) return Type.ANY;
+    proj.deps_add(def); // Re-check function input if projection change liveness
+    return proj._live;  // Pass through live
   }
+  @Override boolean assert_live(Type live) { return live instanceof TypeMem; }
+
 
   @Override public boolean has_tvar() { return false; }
 
@@ -476,12 +446,7 @@ public class CallNode extends Node {
   @Override public Node is_copy(int idx) {
     if( !_is_copy ) return null;
     if( _val==Type.ANY ) return Env.ANY;
-    if( idx!=DSP_IDX ) return in(idx);
-    if( fdx() instanceof FunPtrNode fptr ) {
-      GVN.add_flow(fptr);   // Probably goes unused
-      return fptr.display();
-    }
-    return new FP2DSPNode(fdx()).init();
+    return in(idx);
   }
   void set_rpc(int rpc) { unelock(); _rpc=rpc; } // Unlock before changing hash
   @Override public int hashCode() { return super.hashCode()+_rpc; }

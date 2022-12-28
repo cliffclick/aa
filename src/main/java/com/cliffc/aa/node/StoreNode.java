@@ -195,9 +195,4 @@ public class StoreNode extends Node {
     throw unimpl();
   }
 
-  @Override public void add_work_hm() {
-    Env.GVN.add_flow(adr());
-    Env.GVN.add_flow(rez());
-  }
-
 }

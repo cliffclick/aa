@@ -1,9 +1,6 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
-import com.cliffc.aa.Combo;
-import com.cliffc.aa.Env;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
@@ -13,6 +10,18 @@ import static com.cliffc.aa.AA.unimpl;
 // Takes a static field name, a TypeStruct and returns the field value.
 // Basically a ProjNode except it does lookups by field name in TypeStruct
 // instead of by index in TypeTuple.
+
+// Lookups that miss the field name will try again in a prototype.  A 2nd
+// lookup for field "!" (the prototype field) will be tried.  If this works and
+// produces a pointer with a single PROTOS alias, the field will be looked up
+// in the prototype and if found, the result will be bound to the original.
+//
+// Example: a lookup of "_+_" in the wrapped struct for 1, "@{!=int:clazz,.=1}".
+// The field "_+_" is not found in the wrapped 1; so the lookup goes again on
+// the int clazz.  This hits, and returns an overload of integer-add functions:
+// "( { int   int -> int}; { int   flt -> flt})".  This value is then bound:
+// "( { int:1 int -> int}; { int:1 flt -> flt})".
+
 public class FieldNode extends Node implements Resolvable {
   
   // Field being loaded from a TypeStruct.  If null, the field name is inferred
@@ -86,7 +95,8 @@ public class FieldNode extends Node implements Resolvable {
       // Add an edge, so prototype updates trigger updates here
       if( len()==1 ) add_def(proto);
       else assert in(1)==proto;
-      return fld._t;
+      // Bind the result.
+      return BindFPNode.bind(fld._t,t);
     }
     
     // True missing field
@@ -108,13 +118,29 @@ public class FieldNode extends Node implements Resolvable {
     throw unimpl();
   }
 
-  
   @Override public Node ideal_reduce() {
+    if( is_resolving() ) return null;
+    
     // Back-to-back SetField/Field
     if( in(0) instanceof SetFieldNode sfn && sfn.err(true)==null )
       return Util.eq(_fld, sfn._fld)
         ? sfn.in(1)             // Same field, use same
         : set_def(0, sfn.in(0)); // Unrelated field, bypass
+
+    // Hitting in the prototype requires rewiring.  Wire directly to the
+    // prototype, remove the prototype edge, and insert a BindFP.
+    if( len()>1 ) {
+      // Wire directly to the prototype (not doing a prototype-style lookup on
+      // the prototype, just a normal lookup).  Remove the prootype edge.
+      Node fld = new FieldNode(in(1),_fld,_bad).init();
+      return new BindFPNode(fld,in(0));
+    }
+    
+    // Skip past a BindFP
+    if( in(0) instanceof BindFPNode bind ) {
+      FieldNode fld2 = new FieldNode(bind.fp(),_fld,_bad).init();
+      return new BindFPNode(fld2,bind.dsp()).init();
+    }
 
     return null;
   }
@@ -156,11 +182,14 @@ public class FieldNode extends Node implements Resolvable {
     }
 
     // Attempt resolve
-    if( is_resolving() && !str.is_open() ) {
-      progress = trial_resolve(tvar(), str, str, test);
-      if( test ) { if( progress ) return true; }
-      // Revisit if parts change to allow unification
-      else tvar().deps_add_deep(str.deps_add_deep(this));        
+    if( is_resolving() ) {
+      if( str.is_open() ) str.deps_add_deep(this);
+      else {
+        progress = trial_resolve(tvar(), str, str, test);
+        if( test ) { if( progress ) return true; }
+        // Revisit if parts change to allow unification
+        else tvar().deps_add_deep(str.deps_add_deep(this));
+      }
     }
 
     // Look up field

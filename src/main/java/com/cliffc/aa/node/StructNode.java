@@ -11,6 +11,8 @@ import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.Util;
 
+import java.util.Arrays;
+
 import static com.cliffc.aa.AA.unimpl;
 
 // Makes a TypeStruct without allocation
@@ -145,6 +147,7 @@ public class StructNode extends Node {
     _flds.push(fld);            // Field name
     _accesses.push(access);     // Access rights to field
     _fld_starts.push(badt);     // Parser offset for errors
+    add_flow();
     return this;
   }
 
@@ -173,10 +176,10 @@ public class StructNode extends Node {
   // and get promoted.  Other locals are no longer kept alive, but live or die
   // according to use.
   public void promote_forward( StructNode parent ) {
-    //assert parent != null;
-    //for( int i=0; i<_defs._len; i++ ) {
-    //  Node n = in(i);
-    //  if( n.is_forward_ref() ) {
+    assert parent != null;
+    for( int i=0; i<_defs._len; i++ ) {
+      Node n = in(i);
+      if( n.is_forward_ref() ) {
     //    // Is this Unresolved defined in this scope, or some outer scope?
     //    if( ((UnresolvedNode)n).is_scoped() ) {
     //      // Definitely defined here, and all stores are complete; all fcns added
@@ -193,28 +196,31 @@ public class StructNode extends Node {
     //      Env.GVN.add_flow_uses(this);
     //    }
     //  }
-    //}
+        throw unimpl();
+      }
+    }
   }
 
   // Gather inputs into a TypeStruct.
   @Override public Type value() {
     assert _defs._len==_flds.len();
     TypeFld[] flds = TypeFlds.get(_flds.len());
-    for( int i=0; i<flds.length; i++ )
-      flds[i] = TypeFld.make(_flds.at(i),in(i)._val,_accesses.at(i));
+    for( int i=0; i<_flds.len(); i++ )
+      flds[i] = TypeFld.make(_flds.at(i),val(i),_accesses.at(i));
+    Arrays.sort(flds,(tf0,tf1) -> tf0._fld.compareTo(tf1._fld));
     return TypeStruct.make_flds(_clz,_def,flds);
   }
 
   // Return liveness for a field
   @Override public Type live_use( Node def ) {
-    if( !(_live instanceof TypeStruct ts) )
-      { assert _live==Type.ANY || _live==Type.ALL; return _live; }
+    if( !(_live instanceof TypeStruct ts) ) return _live;
     int idx = _defs.find(def);        // Get Node index
     String fld = _flds.at(idx);       // Get field name
     // Use name lookup to get liveness for that field
     TypeFld lfld = ts.get(fld);       // Liveness for this field name
     return lfld==null ? ts.oob() : lfld._t.oob();
   }
+  @Override boolean assert_live(Type live) { return live instanceof TypeStruct; }
 
   @Override public boolean has_tvar() { return true; }
 

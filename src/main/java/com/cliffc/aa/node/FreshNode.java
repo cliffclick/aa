@@ -44,27 +44,6 @@ public class FreshNode extends Node {
     TV3[] nongen = nongen();
     return id().tvar().fresh_unify(tvar(),nongen,test);
   }
-  @Override public void add_work_hm() {
-    super.add_work_hm();
-    Env.GVN.add_flow(id());
-    TV3 t = id().tvar();
-    //if( t.nongen_in(nongen()) )
-    //  t.add_deps_flow(); // recursive work.add(_deps)
-    throw unimpl();
-  }
-
-  @Override public Node ideal_reduce() {
-    if( id()==this ) return null; // Dead self-cycle
-    // Remove Fresh of base type values: things that can never have structure.
-    if( no_tvar_structure(_val) )
-      return id();
-    // Remove if TVar has already unified with the input.
-    if( has_tvar() && tvar()==id().tvar() )
-     return id();
-
-    return null;
-  }
-
   // Two FreshNodes are only equal, if they have compatible TVars
   @Override public boolean equals(Object o) {
     if( !has_tvar() ) return this==o;

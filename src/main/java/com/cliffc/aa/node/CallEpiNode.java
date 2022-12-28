@@ -113,10 +113,6 @@ public final class CallEpiNode extends Node {
     // Replace a resolved
     Node fdx = call.fdx();
     if( fdx instanceof FreshNode frsh ) fdx = frsh.id();
-    if( fdx instanceof UnresolvedNode unr ) {
-      FunPtrNode vfn = unr.resolve_node(tcall._ts);
-      if( vfn !=null ) call.set_fdx(vfn);
-    }
 
     // Only inline wired single-target function with valid args.  CallNode wires.
     if( !is_all_wired() ) return null;
@@ -468,7 +464,7 @@ public final class CallEpiNode extends Node {
   }
 
   // Compute local contribution of use liveness to this def.  If the call is
-  // Unresolved, then none of CallEpi targets are (yet) alive.
+  // unresolved, then none of CallEpi targets are (yet) alive.
   @Override public Type live_use(Node def ) {
     if( _is_copy ) return def._live; // A copy
     // Not a copy
@@ -486,6 +482,7 @@ public final class CallEpiNode extends Node {
       return Type.ANY;    // Call does not call this, so not alive.
     return _live;
   }
+  @Override boolean assert_live(Type live) { return live instanceof TypeMem; }
 
   @Override public boolean has_tvar() { return true; }
 
@@ -504,8 +501,11 @@ public final class CallEpiNode extends Node {
     }
 
     // If not one already, make a lambda term for the function.
-    if( !(tv3 instanceof TVLambda tfun) )
-      return test | tv3.unify(new TVLambda(call.nargs(),new TVLeaf(),tvar()),test);
+    if( !(tv3 instanceof TVLambda tfun) ) {
+      if( test ) return true;
+      add_flow();           // Re-unify after forcing a Lambda, to get the args
+      return tv3.unify(new TVLambda(call.nargs(),new TVLeaf(),tvar()),test);
+    }
     
     // Check for progress amongst args
     int nargs = Math.min(call.nargs(),tfun.nargs());
@@ -540,14 +540,6 @@ public final class CallEpiNode extends Node {
   @Override public boolean unify_proj( ProjNode proj, boolean test ) {
     assert proj._idx==REZ_IDX;
     return tvar().unify(proj.tvar(),test);
-  }
-
-  @Override public void add_work_hm() {
-    super.add_work_hm();
-    // My tvar changed to a Lambda, so the calls lambda changes
-    Env.GVN.add_flow(call().fdx());
-    // My tvar changed, so my value lift changes
-    Env.GVN.add_flow(this);
   }
 
   // Return the set of updatable memory - including everything reachable from

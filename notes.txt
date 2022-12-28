@@ -1,4 +1,15 @@
 =======================================
+12/27/2022
+
+A little more on field/bindfp/clz handling.
+
+"1 + 2" - expands to bind(1,int._+_)._(2)
+x.fld - expands to a Field load from struct x...
+but if fld misses in 'x' and hits in "x_clazz' then
+the expansion is:
+  "bind(x,clazz.fld)"
+
+=======================================
 11/18/2022
 
 Main code base:

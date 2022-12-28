@@ -186,6 +186,7 @@ public class FunNode extends RegionNode {
     if( rpc_parm == null ) return null; // Single caller const-folds the RPC, but also inlines in CallNode
     if( !check_callers() ) return null;
     if( _defs._len <= 2  ) return null; // No need to split callers if only 1
+    if( noinline() ) return null;
 
     // Every input path is wired to an output path
     RetNode ret = ret();
@@ -199,26 +200,23 @@ public class FunNode extends RegionNode {
     }
 
     // Look for appropriate type-specialize callers
-    TypeStruct formals = null; // type_special(parms);
     Ary<Node> body = find_body(ret);
-    int path = -1;              // Paths will split according to type
-    if( formals == null ) {     // No type-specialization to do
-      if( _cnt_size_inlines >= 10 && !is_prim() ) return null;
-      // Large code-expansion allowed; can inline for other reasons
-      path = split_size(body,parms); // Forcible size-splitting first path
-      if( path == -1 ) return null;
-      assert CallNode.ttfp(in(path).val(0)).fidx()!=-1; // called by a single-target call
-      Node fdx = ((CallNode)in(path).in(0)).fdx();
-      if( fdx instanceof FreshNode fsh ) fdx = fsh.id();
-      assert fdx instanceof FunPtrNode; // Shoulda cleared out
-      body.add(fdx);
-      if( !is_prim() ) _cnt_size_inlines++; // Disallow infinite size-inlining of recursive non-primitives
+    if( !is_prim() ) {
+      if( _cnt_size_inlines >= 10 ) return null;
+      _cnt_size_inlines++; // Disallow infinite size-inlining of recursive non-primitives
     }
-
-    if( noinline() ) return null;
+    // Large code-expansion allowed; can inline for other reasons
+    int path = split_size(body,parms); // Forcible size-splitting first path
+    if( path == -1 ) return null;
+    CallNode call = (CallNode)in(path).in(0);
+    assert CallNode.ttfp(call._val).fidx()!=-1; // called by a single-target call
+    Node fdx = call.fdx();
+    if( fdx instanceof FreshNode fsh ) fdx = fsh.id();
+    assert fdx instanceof FunPtrNode; // Shoulda cleared out
+    body.add(fdx);
 
     assert _must_inline==0; // Failed to inline a prior inline?
-    if( path > 0 ) _must_inline = in(path).in(0)._uid;
+    if( path > 0 ) _must_inline = call._uid;
     assert !check_progress;     // Not expecting progress
 
     // --------------
@@ -255,162 +253,6 @@ public class FunNode extends RegionNode {
         ret = use;
       }
     return true;
-  }
-
-  // Visit all ParmNodes, looking for unresolved call uses that can be improved
-  // by type-splitting
-  private int find_type_split_index( ParmNode[] parms ) {
-    for( Node parm : parms )     // For all parms
-      if( parm != null )         // (some can be dead)
-        for( Node use : parm._uses ) { // See if a parm-user needs a type-specialization split
-          if( use instanceof CallNode call ) {
-            Node fdx = call.fdx();
-            if( fdx instanceof FreshNode ) fdx = ((FreshNode)fdx).id();
-            if( (fdx==parm && !parm._val.isa(TypeFunPtr.GENERIC_FUNPTR) ) ||
-                fdx instanceof UnresolvedNode ) { // Call overload not resolved
-              Type t0 = parm.val(1);                   // Generic type in slot#1
-              for( int i=2; i<parm._defs._len; i++ ) { // For all other wired inputs
-                Type tp = parm.val(i);
-                if( tp.above_center() ) continue; // This parm input is in-error
-                Type ti = tp.widen();             // Get the widen'd type
-                if( !ti.isa(t0) ) continue; // Must be isa-generic type, or else type-error
-                if( ti != t0 ) return i; // Sharpens?  Then splitting here should help
-              }
-            }
-            // Else no split will help this call, look for other calls to help
-          }
-        }
-
-    return -1; // No unresolved calls; no point in type-specialization
-  }
-
-  // Find types for which splitting appears to help.
-  private TypeStruct find_type_split( ParmNode[] parms ) {
-
-    // Look for splitting to help an Unresolved Call.
-    int idx = find_type_split_index(parms);
-    if( idx != -1 ) {           // Found; split along a specific input path using widened types
-      //TypeStruct formals = _sig._formals;
-      //for( TypeFld fld : formals.flds() ) {
-      //  Node parm = parms[fld._order];
-      //  TypeFld fld2 = fld.make_from(parm==null ? Type.ALL : parm.val(idx).widen());
-      //  if( fld2.isa(fld) )
-      //    formals = formals.replace_fld(fld2);
-      //}
-      //return formals;
-      throw unimpl();
-    }
-
-    // Look for splitting to help a pointer from an unspecialized type
-    Node mem = parms[MEM_IDX];
-    if( mem==null ) return null; // Pure function, has no memory read/write
-    Type tmem = mem._val;
-    //if( tmem instanceof TypeMem ) {
-      //boolean progress = false;
-      //TypeStruct formals = TypeStruct.UNUSED;
-      //for( int i=DSP_IDX; i<parms.length; i++ ) { // For all parms
-      //  if( i==DSP_IDX ) continue; // No split on the display
-      //  ParmNode parm = (ParmNode)parms[i];
-      //  if( parm == null ) continue;            // (some can be dead)
-      //  if( parm._val==Type.ALL ) return null;  // No split with error args
-      //  // Best possible type
-      //  Type tp = Type.ALL;
-      //  for( Node def : parm._defs )
-      //    if( def != this )
-      //      tp = tp.join(def._val);
-      //  formals = formals.add_fld(parm._name, TypeFld.Access.Final,tp,i);
-      //  if( !(tp instanceof TypeMemPtr) ) continue; // Not a pointer
-      //  TypeObj to = (TypeObj)((TypeMem)tmem).ld((TypeMemPtr)tp).widen(); //
-      //  // Are all the uses of parm compatible with this TMP?
-      //  // Also, flag all used fields.
-      //  if( bad_mem_use(parm, to) )
-      //    continue;               // So bad usage
-      //
-      //  TypeMemPtr arg = TypeMemPtr.make(BitsAlias.FULL,to); // Signature takes any alias but has sharper guts
-      //  formals = formals.replace_fld(TypeFld.make(parm._name,arg,i));
-      //  progress = true;
-      //}
-      //if( progress ) return formals;
-
-      // TODO: Turn off type-splitting until we have a better heuristic
-    //  throw unimpl();
-    //}
-
-    return null;
-  }
-
-  // Check all uses are compatible with sharpening to a pointer.
-  // TODO: Really should be a virtual call
-  private static boolean bad_mem_use( Node n, TypeStruct to) {
-    //for( Node use : n._uses ) {
-    //  switch( use._op ) {
-    //  case OP_TYPE: return true; // Unoptimized arg assert check, no type splitting
-    //  case OP_NEWOBJ: break; // Field use is like store.value use
-    //  case OP_IF: break;     // Zero check is ok
-    //  case OP_CAST:          // Cast propagates check
-    //  case OP_FRESH:         // No value change
-    //    if( bad_mem_use(use, to) ) return true;
-    //    break;
-    //  case OP_LOAD:
-    //    if( !(to instanceof TypeStruct) ||
-    //        ((LoadNode)use).find((TypeStruct)to)== null )
-    //      return true;          // Did not find field
-    //    break;
-    //  case OP_STORE:
-    //    if( ((StoreNode)use).rez()==n) break; // Storing as value is ok
-    //    if( !(to instanceof TypeStruct) ||    // Address needs to find field
-    //        ((StoreNode)use).find((TypeStruct)to)== null )
-    //      return true;          // Did not find field
-    //    break;
-    //  case OP_CALL: break; // Argument pass-thru probably needs to check formals
-    //  case OP_RET: break;  // Return pass-thru should be ok
-    //  case OP_NEWSTR:
-    //    TypeStruct formals = ((NewStrNode)use)._formals;
-    //    Type formal = formals.fld_idx(use._defs.find(n))._t;
-    //    if( !TypeMemPtr.OOP0.dual().isa(formal) )
-    //      return true;
-    //    break;
-    //  case OP_NAME: break; // Pointer to a nameable struct
-    //  case OP_PRIM:
-    //    if( use instanceof PrimNode.EQ_OOP ) break;
-    //    if( use instanceof PrimNode.NE_OOP ) break;
-    //    if( use instanceof MemPrimNode.LValueLength ) break;
-    //    if( use instanceof MemPrimNode.LValueRead )
-    //      if( ((MemPrimNode)use).idx() == n ) return true; // Use as index is broken
-    //      else break;   // Use for array base is fine
-    //    if( use instanceof MemPrimNode.LValueWrite || use instanceof MemPrimNode.LValueWriteFinal )
-    //      if( ((MemPrimNode)use).idx() == n ) return true; // Use as index is broken
-    //      else break;   // Use for array base or value is fine
-    //    if( use instanceof PrimNode.AddF64 ) return true;
-    //    if( use instanceof PrimNode.AddI64 ) return true;
-    //    if( use instanceof PrimNode.MulF64 ) return true;
-    //    if( use instanceof PrimNode.MulI64 ) return true;
-    //    if( use instanceof PrimNode.AndI64 ) return true;
-    //    if( use instanceof PrimNode.EQ_F64 ) return true;
-    //    if( use instanceof PrimNode.EQ_I64 ) return true;
-    //    throw unimpl();
-    //  default: throw unimpl();
-    //  }
-    //}
-    //return false;
-    throw unimpl();
-  }
-
-
-  // Look for type-specialization inlining.  If any ParmNode has an unresolved
-  // Call user, then we'd like to make a clone of the function body (in least
-  // up to getting all the Unresolved functions to clear out).  The specialized
-  // code uses generalized versions of the arguments, where we only specialize
-  // on arguments that help immediately.
-  //
-  // Same argument for field Loads from unspecialized values.
-  private TypeStruct type_special( ParmNode[] parms ) {
-    TypeStruct formals = find_type_split(parms);
-    if( formals == null ) return null; // No unresolved calls; no point in type-specialization
-    //// Make a new function header with new signature
-    //if( !formals.isa(_sig._formals) ) return null;    // Fails in error cases
-    //return formals == _sig._formals ? null : formals; // Must see improvement
-    throw unimpl();
   }
 
 
@@ -585,15 +427,9 @@ public class FunNode extends RegionNode {
   // for the old and one for the new body.  The new function may have a more
   // refined signature, and perhaps no unknown callers.
   //
-  // When doing type-based splitting the old and new FunPtrs are gathered into
-  // an Unresolved which replaces the old uses.  When doing path-based
-  // splitting, the one caller on the split path is wired to the new function,
-  // and all other calls keep their original FunPtr.
-  //
   // Wired calls: unwire all calls *to* this function, including self-calls.
   // Clone the function; wire calls *from* the clone same as the original.
-  // Then rewire all calls that were unwired; for a type-split wire both targets
-  // with an Unresolved.  For a path-split rewire left-or-right by path.
+  // Then rewire all calls that were unwired; for a path-split rewire left-or-right by path.
   private void split_callers( RetNode oldret, FunNode fun, Ary<Node> body, int path ) {
     // Unwire this function and collect unwired calls.  Leave a Root caller, if any.
     CallNode path_call = path < 0 ? null : (CallNode)in(path).in(0);
@@ -656,34 +492,14 @@ public class FunNode extends RegionNode {
     // Ret has a set (not 1!) of FunPtrs, one per unique Display.
     RetNode newret = (RetNode)map.get(oldret);
     newret.set_fidx(fun._fidx);
-    if( path < 0 ) {            // Type split
-      for( Node use : oldret._uses )
-        if( use instanceof FunPtrNode ) { // Old-return FunPtrs; varies by Display & by internal/external
-          // Make an Unresolved choice of the old and new functions, to be used
-          // by everything except mutually recursive calls; including
-          // external/top-level calls, storing to memory, external merges, etc.
-          Node old_funptr = use;
-          Node new_funptr = map.get(old_funptr);
-          new_funptr.insert(old_funptr);
-          new_funptr.xval(); // Build type so Unresolved can compute type
-          //UnresolvedNode new_unr = new UnresolvedNode(null,new_funptr);
-          //old_funptr.insert(new_unr);
-          //new_unr.add_def(old_funptr);
-          //new_unr._val = new_unr.value();
-          throw unimpl();
-        }
-    } else {                         // Path split
-      Node old_funptr = fptr(path_call.fdx()); // Funptr for the path split
-      Node new_funptr = map.get(old_funptr);
-      new_funptr.insert(old_funptr); // Make cloned recursive calls, call the old version not the new version
-      TypeFunPtr ofptr = (TypeFunPtr) old_funptr._val;
-      path_call.set_fdx(new_funptr); // Force new_funptr, will re-wire later
-      TypeFunPtr nfptr = ofptr.make_from(BitsFun.make0(newret._fidx));
-      path_call._val = CallNode.set_ttfp((TypeTuple) path_call._val,nfptr);
-      //for( Node use : oldret._uses ) // Check extra FunPtrs are dead
-      //  if( use instanceof FunPtrNode ) Env.GVN.add_dead(map.get(use));
-
-    } // Else other funptr/displays on unrelated path, dead, can be ignored
+    assert path >= 0;
+    Node old_funptr = fptr(path_call.fdx()); // Funptr for the path split
+    Node new_funptr = map.get(old_funptr);
+    new_funptr.insert(old_funptr); // Make cloned recursive calls, call the old version not the new version
+    TypeFunPtr ofptr = (TypeFunPtr) old_funptr._val;
+    path_call.set_fdx(new_funptr); // Force new_funptr, will re-wire later
+    TypeFunPtr nfptr = ofptr.make_from(BitsFun.make0(newret._fidx));
+    path_call.set_ttfp(nfptr);
 
     // For all aliases split in this pass, update in-node both old and new.
     // This changes their hash, and afterwards the keys cannot be looked up.
@@ -692,27 +508,8 @@ public class FunNode extends RegionNode {
         memsplit.split_alias(e.getValue(),aliases);
 
     // Wired Call Handling:
-    if( len()==2 ) {            // Called by root
-      if( path < 0 ) {          // Type Split
-    //    // Change the unknown caller parm types to match the new sig.  Default
-    //    // memory includes the other half of alias splits, which might be
-    //    // passed in from recursive calls.
-    //    for( Node p : fun._uses )
-    //      if( p instanceof ParmNode parm ) {
-    //        Node defx;
-    //        if( parm._idx==0 ) defx = Node.con(TypeRPC.ALL_CALL);
-    //        else if( parm._idx==MEM_IDX ) throw unimpl();
-    //        else {
-    //          //Type tx = fun.formal(parm._idx).simple_ptr();
-    //          //defx = Node.con(tx);
-    //          throw unimpl();
-    //        }
-    //        parm.set_def(1,defx);
-    //      }
-        throw unimpl();
-      } else                      // Path Split
-        fun.set_def(1,Env.XCTRL); // Kill Root path in clone
-    }
+    if( len()==2 )              // Called by root
+      fun.set_def(1,Env.XCTRL); // Kill Root path in clone
 
     // Put all new nodes into the GVN tables and worklist
     for( Map.Entry<Node,Node> e : map.entrySet() ) {
@@ -720,9 +517,9 @@ public class FunNode extends RegionNode {
       Node nn = e.getValue();   // New node
       Type nt = oo._val;        // Generally just copy type from original nodes
       if( nn instanceof FunPtrNode fptr && fptr.ret()==newret ) { // FunPtr(s) pick up the new fidx
-        TypeFunPtr ofptr = (TypeFunPtr)nt;
-        assert ofptr.fidx()==oldret._fidx;
-        nt = ofptr.make_from(BitsFun.make0(newret._fidx));
+        TypeFunPtr ofptr2 = (TypeFunPtr)nt;
+        assert ofptr2.fidx()==oldret._fidx;
+        nt = ofptr2.make_from(BitsFun.make0(newret._fidx));
       }
       nn._val = nt;             // Values
       nn._elock();              // In GVN table
@@ -844,11 +641,12 @@ public class FunNode extends RegionNode {
   private FunPtrNode _fptr(Node fdx) {
     fdx = FreshNode.peek(fdx);
     if( fdx instanceof FunPtrNode fptr ) return fptr;
-    assert fdx instanceof UnresolvedNode;
-    for( Node fdx2 : fdx._defs )
-      if( ((FunPtrNode)fdx2).fun()==this )
-        return (FunPtrNode)fdx2;
-    return null;
+    //assert fdx instanceof UnresolvedNode;
+    //for( Node fdx2 : fdx._defs )
+    //  if( ((FunPtrNode)fdx2).fun()==this )
+    //    return (FunPtrNode)fdx2;
+    //return null;
+    throw unimpl();
   }
 
   @Override public boolean equals(Object o) { return this==o; } // Only one

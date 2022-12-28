@@ -189,7 +189,7 @@ public abstract class PrimNode extends Node {
     // Return the result
     RetNode ret = new RetNode(zctrl,zmem,zrez,rpc,fun).init();
     // FunPtr is UNBOUND here, will be bound when loaded thru a named struct to the Clazz.
-    return new FunPtrNode(_name,ret,Env.ANY).init();
+    return new FunPtrNode(_name,ret).init();
   }
   // Make and install a primitive Clazz.
   private static ProjNode make_prim( ProjNode ptr, StructNode rec, PrimNode[][] primss ) {
@@ -437,7 +437,7 @@ public abstract class PrimNode extends Node {
   public static class OrI64 extends Prim2OpI64 {
     public OrI64() { super("_|_"); }
     // And can preserve bit-width
-    @Override long op( long l, long r ) { return l&r; }
+    @Override long op( long l, long r ) { return l|r; }
   }
 
   // 2RelOps have uniform input types, and bool output

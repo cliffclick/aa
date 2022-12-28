@@ -40,13 +40,13 @@ public class TestNodeSmall {
     //                   if FunPtr below center, flip to high and JOIN.  Also high/ignore args kept high, and low args moved high for JOIN.
     // Kinda sorta looks like: use startype on incoming, and JOIN.
 
-    UnresolvedNode uadd = (UnresolvedNode)Env.TOP.lookup("_+_"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
+    Node uadd = Env.TOP.lookup("_+_"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
     FunPtrNode aflt = (FunPtrNode)uadd.in(0);
     FunPtrNode aint = (FunPtrNode)uadd.in(1);
     FunPtrNode astr = (FunPtrNode)uadd.in(2);
     // Make a flt/int combo, drops off string.
-    //UnresolvedNode anum = (UnresolvedNode)gvn.xform(new UnresolvedNode(null,aflt,aint));
-    UnresolvedNode anum = null; // TODO
+    //Node anum = (UnresolvedNode)gvn.xform(new UnresolvedNode(null,aflt,aint));
+    Node anum = null; // TODO
 
     // All nodes have this property: START >= {ALL.dual(),value(START)} >= value(ALL.dual()) >= value(ALL) >= ALL
     // Holds for both ITER and GCP.
@@ -243,10 +243,10 @@ public class TestNodeSmall {
     // Make a Unknown/CallNode/CallEpi combo.
     // Unwired.  Validate the resolve process and monotonicity.
     ConNode ctrl = (ConNode) gvn.xform(new ConNode<>(Type.CTRL));
-    UnresolvedNode fp_mul = (UnresolvedNode)Env.TOP.lookup("*"); // {int int -> int} and {flt flt -> flt}
+    Node fp_mul = Env.TOP.lookup("*"); // {int int -> int} and {flt flt -> flt}
     FunPtrNode mflt = (FunPtrNode)fp_mul.in(0);
     FunPtrNode mint = (FunPtrNode)fp_mul.in(1);
-    UnresolvedNode fp_add = (UnresolvedNode)Env.TOP.lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
+    Node fp_add = Env.TOP.lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
     FunPtrNode aflt = (FunPtrNode)fp_add.in(0);
     FunPtrNode aint = (FunPtrNode)fp_add.in(1);
     FunPtrNode astr = (FunPtrNode)fp_add.in(2);
@@ -280,7 +280,7 @@ public class TestNodeSmall {
     TypeFunPtr tadd1 = v(fp_add,gvn), tadd1X = tadd1.dual();
 
     //UnresolvedNode anum = gvn.init(new UnresolvedNode(null,aflt,aint));
-    UnresolvedNode anum = null; // TODO
+    Node anum = null; // TODO
     TypeFunPtr tnum1 = v(anum,gvn), tnum1X = tnum1.dual();
     TypeFunPtr tflt1 = v(aflt,gvn), tflt1X = tflt1.dual();
     TypeFunPtr tint1 = v(aint,gvn), tint1X = tint1.dual();
@@ -391,7 +391,7 @@ public class TestNodeSmall {
   @Test public void testCallNodeResolve2() {
     GVNGCM gvn = Env.GVN;
 
-    UnresolvedNode fp_add = (UnresolvedNode)Env.TOP.lookup("_+_"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
+    Node fp_add = Env.TOP.lookup("_+_"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
     FunPtrNode aflt = (FunPtrNode)fp_add.in(0);
     FunPtrNode aint = (FunPtrNode)fp_add.in(1);
     FunPtrNode astr = (FunPtrNode)fp_add.in(2);
@@ -500,7 +500,7 @@ public class TestNodeSmall {
     ParmNode parm_dsp_ptr = new ParmNode(DSP_IDX,fun,null,dsp_file_ptr._val,(ConNode)Node.con(dsp_file_ptr._val)).add_def(dsp_file_ptr).init();
     // Close the function up
     RetNode ret = new RetNode(fun,parm_mem,parm_dsp_ptr,rpc,fun).init();
-    FunPtrNode fptr = new FunPtrNode(ret,dsp_file_ptr).init();
+    FunPtrNode fptr = new FunPtrNode(ret).init();
     fptr._name = "fact";
     // Close the cycle
     dsp_file.add_fld("fact",Access.Final,fptr,null);
@@ -553,7 +553,7 @@ public class TestNodeSmall {
   // formal is [2:Point:@{x,y}].  Can change memory directly here (no sharing):
   // [13:Point:@{x,y}] and leave the ptr alone.
   //
-  // Can also make a new fake alias: 14>>13, change both ptr and mem:
+  // Can also make a new fake alias: 13, change both ptr and mem:
   // *[14]->obj, [14:Point:@{x,y}].  If [13] lifts to some other refinement
   // alias, may need new fake aliases.  If [13] lifts to a refinement with a
   // valid memory, no need to change memory.
