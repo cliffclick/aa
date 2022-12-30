@@ -66,7 +66,7 @@ public class SetFieldNode extends Node {
     TVStruct objrec;
     if( !(rec instanceof TVStruct rec0) ) {
       if( test ) return true;
-      objrec = new TVStruct(new String[]{_fld},new TV3[]{new TVLeaf()},true);
+      objrec = new TVStruct(true,new String[]{_fld},new TV3[]{new TVLeaf()},true);
       progress |= rec.unify(objrec,test);
     } else objrec = rec0;
 
@@ -74,7 +74,7 @@ public class SetFieldNode extends Node {
     TVStruct objslf;
     if( !(self instanceof TVStruct self0) ) {
       if( test ) return true;
-      objslf = new TVStruct(new String[]{_fld},new TV3[]{tvf},true);
+      objslf = new TVStruct(true,new String[]{_fld},new TV3[]{tvf},true);
       progress |= self.unify(objslf,test);
     } else objslf = self0;
 

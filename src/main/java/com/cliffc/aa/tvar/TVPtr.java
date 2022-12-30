@@ -8,9 +8,9 @@ import static com.cliffc.aa.AA.unimpl;
 /** A ptr-to-struct
  *
  */
-public class TVPtr extends TVNilable {
+public class TVPtr extends TV3 {
   // This has a single pointer edge to a Struct or Leaf (or Err)
-  public TVPtr( TV3 rec ) { super(true,false,rec); }
+  public TVPtr( TV3 rec ) { super(true,rec); }
   // Get the Struct
   public TVStruct load() { return (TVStruct)arg(0); }
 

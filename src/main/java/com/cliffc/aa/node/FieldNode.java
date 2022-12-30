@@ -177,7 +177,7 @@ public class FieldNode extends Node implements Resolvable {
     TVStruct str;
     if( !(rec instanceof TVStruct str0) ) {
       if( test ) return true;
-      progress = rec.unify(str=new TVStruct(new String[0],new TV3[0],true),test);
+      progress = rec.unify(str=new TVStruct(true,new String[0],new TV3[0],true),test);
     } else {
       str = str0;
     }

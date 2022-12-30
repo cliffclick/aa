@@ -47,24 +47,34 @@ abstract public class TV3 implements Cloneable {
   // Disjoint Set Union set-leader.  Null if self is leader.  Not-null if not a
   // leader, but pointing to a chain leading to a leader.  Rolled up to point
   // to the leader in many, many places.  Classic U-F cost model.
-  TV3 _uf=null;
+  TV3 _uf;
 
   // Outgoing edges for structural recursion.
   TV3[] _args;
 
   // All uses of this type-var are value-equivalent to the def.
   // Makes a one-shot transition from true to false.
-  boolean _is_copy = true;
+  boolean _is_copy;
 
+  // Can be nil
+  boolean _may_nil;
+  
   // Nodes to put on a worklist, if this TV3 is modified.
-  UQNodes _deps = null;
+  UQNodes _deps;
 
   // Errors other than structural unify errors.
-  Ary<String> _errs = null;
+  Ary<String> _errs;
   
   //
-  TV3() { _args=null; }
-  TV3( boolean is_copy, TV3... args ) { _is_copy = is_copy; _args=args; }
+  TV3() { this(true,(TV3[])null); }
+  TV3( boolean is_copy, TV3... args ) {
+    _uf = null;
+    _args = args;
+    _deps = null;               // Dependends lazily added, and they come and go as Combo executes
+    _errs = null;               // Errors lazily added
+    _is_copy = is_copy;         // Most things are is_copy
+    _may_nil = false;           // Really only TVNil starts out may_nil
+  }
   
   // True if this a set member not leader.  Asserted for in many places.
   public boolean unified() { return _uf!=null; }
@@ -114,6 +124,13 @@ abstract public class TV3 implements Cloneable {
   private long dbl_uid(TV3 t) { return dbl_uid(t._uid); }
   private long dbl_uid(long uid) { return ((long)_uid<<32)|uid; }
 
+  // TODO: move into Nilable, which does not work on structs which means prims
+  // should use clazz and not a struct
+  TV3 strip_nil() {
+    
+    throw unimpl();
+  }
+  
   // -----------------
   // U-F union; this becomes that; returns 'that'.
   // No change if only testing, and reports progress.
@@ -161,8 +178,8 @@ abstract public class TV3 implements Cloneable {
     if( !(that instanceof TVLeaf) && this instanceof TVLeaf ) return test || this._unify_impl(that);
 
     // Nil can unify with a non-nil anything, typically
-    if( !(this instanceof TVNil) && that instanceof TVNil ) throw unimpl();
-    if( !(that instanceof TVNil) && this instanceof TVNil ) throw unimpl();
+    if( !(this instanceof TVNil) && that instanceof TVNil nil ) return nil._unify_nil(this,test);
+    if( !(that instanceof TVNil) && this instanceof TVNil nil ) return nil._unify_nil(that,test);
     
     // If 'this' and 'that' are different classes, unify both into an error
     if( getClass() != that.getClass() ) {
@@ -352,9 +369,11 @@ abstract public class TV3 implements Cloneable {
     throw unimpl();
   }
 
+  // Shallow clone of fields & args.
   TV3 copy() {
     try {
       TV3 tv3 = (TV3)clone();
+      tv3._args = _args.clone();
       tv3._uid = CNT++;
       return tv3;
     } catch(CloneNotSupportedException cnse) {throw unimpl();}

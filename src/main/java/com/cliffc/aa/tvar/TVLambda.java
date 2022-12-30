@@ -9,10 +9,10 @@ import static com.cliffc.aa.AA.DSP_IDX;
 /** A lambda, higher-order function
  *
  */
-public class TVLambda extends TVNilable {
+public class TVLambda extends TV3 {
 
   public TVLambda( int nargs, TV3 dsp, TV3 ret ) {
-    super(true,false,new TV3[nargs]);
+    super(true,new TV3[nargs]);
     // Slot 0/CTL_IDX is reserved for the return.
     // Slot 1/MEM_IDX is unused.
     // Slot 2/DSP_IDX is for the display/self/this argument

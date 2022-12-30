@@ -24,12 +24,12 @@ public class TVStruct extends TV3 {
 
   private int _max;             // Max set of in-use flds/args
   
-  public TVStruct( Ary<String> flds ) { this(flds.asAry(),new TV3[flds.len()]);  }
+  public TVStruct( Ary<String> flds ) { this(true,flds.asAry(),new TV3[flds.len()]);  }
   // Made from a StructNode; fields are known, so this is closed
-  public TVStruct( String[] flds, TV3[] tvs ) { this(flds,tvs,false); }
+  public TVStruct( boolean is_copy, String[] flds, TV3[] tvs ) { this(is_copy,flds,tvs,false); }
   // Made from a Field or SetField; fields are unknown so this is open
-  public TVStruct( String[] flds, TV3[] tvs, boolean open ) {
-    super(true,tvs);
+  public TVStruct( boolean is_copy, String[] flds, TV3[] tvs, boolean open ) {
+    super(is_copy,tvs);
     _flds = flds;
     _open = open;
     _max = flds.length;
@@ -105,12 +105,17 @@ public class TVStruct extends TV3 {
       ? that.add_fld(_flds[i],lhs)
       : this.del_fld(i);
   }
-  
+
+  // Struct as a whole
+  @Override TV3 strip_nil() {
+    _may_nil = false;
+    return this;
+  }
+
   // -------------------------------------------------------------
-  @Override void _union_impl( TV3 tv3) {
+  @Override void _union_impl( TV3 tv3 ) {
     assert _uid > tv3._uid;
-    TVStruct that = (TVStruct)tv3; // Invariant when called
-    that._open &= _open;
+    if( tv3 instanceof TVStruct ts ) ts._open &= _open;
   }
 
   @Override boolean _unify_impl( TV3 tv3 ) {

@@ -55,7 +55,7 @@ public interface Resolvable {
   // each choice.
   default void resolve_failed() {
     if( !(match_tvar() instanceof TVStruct tvs) ) throw unimpl();
-    if( ambi(tvar(),tvs) ) throw unimpl();
+    if( ambi(tvar(),tvs) ) tvar().err("Ambiguous");
     else
       tvar().err("No field resolves");
     Env.GVN.add_flow((Node)this);

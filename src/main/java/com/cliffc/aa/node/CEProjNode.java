@@ -45,8 +45,7 @@ public class CEProjNode extends CProjNode {
       if( parms[i]==null ) continue; // Unused args always good
       Type actual = CallNode.targ(tcall,i);
       Type formal = ((ParmNode)parms[i])._t;
-      //if( !actual.isa(formal) ) return false;
-      assert actual.isa(formal);
+      if( !actual.isa(formal) ) return false;
     }
     return true;
   }

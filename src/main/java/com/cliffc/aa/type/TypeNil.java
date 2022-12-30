@@ -182,6 +182,10 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
 
   @Override public Type widen() { return this; }
 
+  @Override public long getl() {
+    return this==XNIL ? 0 : super.getl();
+  }
+
   // Parser init
   public static void init0( HashMap<String,Type> types ) {
     types.put("scalar",SCALAR);

@@ -6,10 +6,10 @@ import com.cliffc.aa.util.VBitSet;
 
 import static com.cliffc.aa.AA.unimpl;
 
-public class TVBase extends TVNilable {
+public class TVBase extends TV3 {
   public Type _t;  
   private TVBase( boolean is_copy, Type t ) {
-    super(is_copy,false, (TV3[]) null);
+    super(is_copy, (TV3[]) null);
     assert t!=Type.ALL;
     _t = t;
   }

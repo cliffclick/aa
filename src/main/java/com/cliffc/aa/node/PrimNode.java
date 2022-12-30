@@ -248,10 +248,14 @@ public abstract class PrimNode extends Node {
     for( int i=DSP_IDX; i<_formals.len(); i++ ) {
       TypeNil tformal = (TypeNil)_formals.at(i);
       Type twrap = val(i-DSP_IDX);
-      Type tactual = twrap instanceof TypeStruct ts && ts.get(".")!=null ? ts.at(".") : tformal;
-      TypeNil t = TS[i-DSP_IDX] = (TypeNil)tformal.dual().meet(tactual);
+      TypeNil t = TypeNil.XNIL;
+      if( twrap != TypeNil.XNIL ) {
+        Type tactual = (twrap instanceof TypeStruct ts && ts.get(".")!=null ? ts.at(".") : twrap.oob(tformal));
+        t = (TypeNil)tformal.dual().meet(tactual);
+      }
+      TS[i-DSP_IDX] = t;
       // Expect: tformal is a expanded TypeStruct, so t is also.
-      if( tactual != TypeNil.XNIL && !t.is_con() ) {
+      if( t != TypeNil.XNIL && !t.is_con() ) {
         is_con = false;         // Some non-constant
         if( t.above_center() ) has_high=true;
       }
@@ -280,9 +284,9 @@ public abstract class PrimNode extends Node {
     if( rez==TypeNil.XNIL ) throw unimpl();
     TV3 base = TVBase.make(is_copy,rez);
     if( rez instanceof TypeInt )
-      return new TVStruct(PRIM_FLDS,new TV3[]{PINT.set_tvar(),base});
+      return new TVStruct(is_copy,PRIM_FLDS,new TV3[]{PINT.set_tvar(),base});
     if( rez instanceof TypeFlt )
-      return new TVStruct(PRIM_FLDS,new TV3[]{PFLT.set_tvar(),base});
+      return new TVStruct(is_copy,PRIM_FLDS,new TV3[]{PFLT.set_tvar(),base});
     throw unimpl();
   }
 

@@ -635,9 +635,6 @@ public abstract class Node implements Cloneable, IntSupplier {
     Node x = ideal_reduce();    // Try the general reduction
     if( x != null ) {
       assert _live.isa(x._live);
-      if(   _tvar instanceof TVBase base0 &&
-          x._tvar instanceof TVBase base1 )
-        base1._t = base0._t.join(base1._t);
       return x.add_flow();      // Graph replace with x
     }
 
