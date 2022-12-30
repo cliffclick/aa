@@ -1,6 +1,8 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.Node;
+import com.cliffc.aa.tvar.Resolvable;
+import com.cliffc.aa.tvar.TVField;
 import com.cliffc.aa.util.VBitSet;
 
 /** Combined Global Constant Propagation and Hindly-Milner with extensions.
@@ -189,58 +191,12 @@ public abstract class Combo {
     return cnt;
   }
 
-  //// Walk any escaping root functions, and claim they are called by the most
-  //// conservative callers.
-  //private static final VBitSet RVISIT = new VBitSet();
-  //private static void update_root_args(ScopeNode scope) {
-  //  // If an argument changes type, adjust the lambda arg types
-  //  Type flow = scope.rez()._val;
-  //  if( AA.DO_GCP && !flow.above_center() ) {
-  //    ADD_SIG.clear();
-  //    Type sflow = add_sig((TypeMem)scope.mem()._val,flow); // Sharpen
-  //    RVISIT.clear();
-  //    _walk_root_funs(sflow);
-  //  }
-  //}
-  //static private void _walk_root_funs(Type flow) {
-  //  if( RVISIT.tset(flow._uid) ) return;
-  //  // Find any functions
-  //  if( flow instanceof TypeFunPtr tfp && !tfp.is_full() ) {
-  //    // Walk all functions; these might be called by external callers
-  //    for( int fidx : tfp.fidxs() ) {
-  //      RetNode ret = RetNode.get(fidx);
-  //      Node[] parms = ret.fun().parms();
-  //      for( int i=AA.ARG_IDX; i<parms.length; i++ ) {
-  //        ConNode defalt = (ConNode)parms[i].in(1);
-  //        Type aflow = AA.DO_HMT ? parms[i].tvar().as_flow() : TypeNil.SCALAR;
-  //        Type bflow = aflow.meet(defalt._val);
-  //        if( bflow != defalt._val )
-  //          throw unimpl();            // fun.arg_meet(i,aflow,work);
-  //        if( AA.DO_HMT ) throw unimpl(); // targ.clr_cp()
-  //      }
-  //    }
-  //  }
-  //
-  //  // recursively walk structures for nested functions
-  //  if( flow instanceof TypeMemPtr tmp )
-  //    for( TypeFld fld : tmp._obj )
-  //      _walk_root_funs(fld._t);
-  //
-  //}
-
-  //// Expand functions to full signatures, recursively.
-  //private static final VBitSet ADD_SIG = new VBitSet();
-  //private static Type add_sig(TypeMem mem, Type t) {
-  //  if( ADD_SIG.tset(t._uid) ) return t;
-  //  if( t instanceof TypeFunPtr fun )
-  //    return fun.make_from(fun.dsp(),add_sig(mem,fun._ret));
-  //  if( t instanceof TypeMemPtr tmp )
-  //    return mem.sharpen(tmp);
-  //  return t;
-  //}
-
   private static void add_new_leaf_work() { }
-  private static void add_ambi_work()     { }
+  private static void add_ambi_work()     {
+    for( Resolvable fld : TVField.FIELDS.values() )
+      if( fld.is_resolving() )
+        fld.resolve_failed();
+  }
   private static void add_freeze_work()   { }
   
   static void reset() { HM_NEW_LEAF = HM_AMBI = HM_FREEZE=false; }

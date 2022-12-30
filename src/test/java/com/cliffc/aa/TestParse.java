@@ -33,7 +33,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    testerr("math.pi(1)", "A function is being called, but 3.141592653589793 is not a function",7);
+    test("0== !!1",  "xnil", "A?");
   }
 
   @Test public void testParse00() {
@@ -82,17 +82,17 @@ public class TestParse {
     test("1._-_._(2)", "int:-1","int:-1"); // binary version
     test("1.-_._()"  , "int:-1","int:-1"); // unary version
     // error; mismatch arg count
-    testerr("math.pi(1)", "A function is being called, but 3.141592653589793 is not a function",7);
-    testerr("1._+_(2,3)", "Passing 3 arguments to _+_ which takes 2 arguments",5);
+    testerr("math.pi(1)", "A function is being called, but flt:3.141592653589793 is not a function",7);
+    testerr("1._+_._(2,3)", "Passing 3 arguments to _+_ which takes 2 arguments",7);
 
     // Parsed as +(1,(2*3))
-    test("1._+_(2 * 3) ", "int:7", "int:7");
+    test("1._+_._(2 * 3) ", "int:7", "A:int:int64");
     // Parsed as (1+2*3)+(4*5+6)
-    test("(1 + 2 * 3)._+_(4 * 5 + 6) ", "int:33", "int:33");
+    test("(1 + 2 * 3)._+_._(4 * 5 + 6) ", "int:33", "A:int:int64");
     // Statements
     test("(1;2 )", "int:2", "int:2");
     test("(1;2;)", "int:2", "int:2"); // final semicolon is optional
-    test("1._+_(2;3)", "int:4", "int:4"); // statements in arguments
+    test("1._+_._(2;3)", "int:4", "int:4"); // statements in arguments
     // Operators squished together
     test("-1== -1",  "int:1",  "int:1");
     test("0== !!1",  "xnil", "A?");

@@ -1,11 +1,10 @@
 package com.cliffc.aa.tvar;
 
-import com.cliffc.aa.util.*;
+import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
 
-import static com.cliffc.aa.AA.MEM_IDX;
-import static com.cliffc.aa.AA.DSP_IDX;
 import static com.cliffc.aa.AA.ARG_IDX;
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.DSP_IDX;
 
 /** A lambda, higher-order function
  *
@@ -31,17 +30,18 @@ public class TVLambda extends TVNilable {
 
   // -------------------------------------------------------------
   @Override void _union_impl( TV3 tv3) {
-    assert _uid > tv3._uid;
+    //assert _uid > tv3._uid;
     // No subparts to union
   }
 
   @Override boolean _unify_impl(TV3 tv3 ) {
     TVLambda that = (TVLambda)tv3; // Invariant when called
-    if( nargs() != that.nargs() ) throw unimpl(); // Mismatched argument lengths
-    for( int i=0; i<len(); i++ ) {
-      if( i==MEM_IDX ) continue; // Unused
+    ret()._unify(that.ret(),false);
+    int nargs = nargs(), tnargs = that.nargs();
+    for( int i=DSP_IDX; i<Math.min(nargs,tnargs); i++ )
       arg(i)._unify(that.arg(i),false);
-    }
+    if( nargs != tnargs )
+      that.err("Expected "+tnargs+" but found "+nargs);
     return true;
   }
 
@@ -55,6 +55,8 @@ public class TVLambda extends TVNilable {
         return false;           // Arg failed, so trial fails
     return true;                // Unify will work
   }
+
+  @Override int eidx() { return TVErr.XFUN; }
 
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     sb.p("{ ");

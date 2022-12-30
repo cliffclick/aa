@@ -635,8 +635,11 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   }
   static boolean isDigit(char c) { return '0' <= c && c <= '9'; }
   public boolean is_tup() {
-    if( len()==0 || (len()==1 && get("^")!=null) ) return true;
-    return get("0")!=null;
+    int len = len();
+    if( len==0 || (len==1 && get("^")!=null) ) return true;
+    for( int i=0; i<len; i++ )
+      if( isDigit(_flds[i]._fld.charAt(0)) ) return true;
+    return false;
   }
 
   @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {

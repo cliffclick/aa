@@ -67,10 +67,11 @@ public class TVStruct extends TV3 {
   
   @Override public int len() { return _max; }  
 
-  public String fld( int i ) { return _flds[i]; }
+  public String fld( int i ) { assert !unified();  return _flds[i]; }
   
   // Return the TV3 for field 'fld' or null if missing
   public TV3 arg(String fld) {
+    assert !unified();
     int i = Util.find(_flds,fld);
     return i>=0 ? arg(i) : null;
   }
@@ -191,6 +192,9 @@ public class TVStruct extends TV3 {
     }
     return true;                // Unifies OK
   }
+
+  @Override int eidx() { return TVErr.XSTR; }
+  @Override public TVStruct as_struct() { return this; }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     // Find any special instance tag fields, and print shortcuts.

@@ -3,9 +3,7 @@ package com.cliffc.aa.tvar;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.node.ConNode;
 import com.cliffc.aa.node.Node;
-import com.cliffc.aa.util.NonBlockingHashMapLong;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 
 import static com.cliffc.aa.AA.unimpl;
 
@@ -42,14 +40,14 @@ import static com.cliffc.aa.AA.unimpl;
  *
  */
 
-abstract public class TV3 {
+abstract public class TV3 implements Cloneable {
   private static int CNT=1;
-  public final int _uid=CNT++; // Unique dense int, used in many graph walks for a visit bit
+  public int _uid=CNT++; // Unique dense int, used in many graph walks for a visit bit
 
   // Disjoint Set Union set-leader.  Null if self is leader.  Not-null if not a
   // leader, but pointing to a chain leading to a leader.  Rolled up to point
   // to the leader in many, many places.  Classic U-F cost model.
-  private TV3 _uf=null;
+  TV3 _uf=null;
 
   // Outgoing edges for structural recursion.
   TV3[] _args;
@@ -60,6 +58,9 @@ abstract public class TV3 {
 
   // Nodes to put on a worklist, if this TV3 is modified.
   UQNodes _deps = null;
+
+  // Errors other than structural unify errors.
+  Ary<String> _errs = null;
   
   //
   TV3() { _args=null; }
@@ -105,6 +106,11 @@ abstract public class TV3 {
 
   public int len() { return _args.length; }  
 
+  void err(String msg) {
+    if( _errs==null ) _errs = new Ary<>(new String[1],0);
+    if( _errs.find(msg)== -1 ) _errs.push(msg);
+  }
+  
   private long dbl_uid(TV3 t) { return dbl_uid(t._uid); }
   private long dbl_uid(long uid) { return ((long)_uid<<32)|uid; }
 
@@ -159,8 +165,12 @@ abstract public class TV3 {
     if( !(that instanceof TVNil) && this instanceof TVNil ) throw unimpl();
     
     // If 'this' and 'that' are different classes, unify both into an error
-    if( getClass() != that.getClass() )
-      throw unimpl();
+    if( getClass() != that.getClass() ) {
+      if( test ) return true;
+      return that instanceof TVErr
+        ? that._unify_err(this)
+        : this._unify_err(that);
+    }
 
     // Cycle check
     long luid = dbl_uid(that);    // long-unique-id formed from this and that
@@ -180,6 +190,17 @@ abstract public class TV3 {
 
   // Must always return true; used in flow-coding in many places
   abstract boolean _unify_impl(TV3 that);
+
+  // Neither side is a TVErr, so make one
+  boolean _unify_err(TV3 that) {
+    assert !(this instanceof TVErr) && !(that instanceof TVErr);
+    TVErr terr = new TVErr();
+    return terr._unify_err(this) | terr._unify_err(that);
+  }
+  
+  abstract int eidx();
+  public TVStruct as_struct() { throw unimpl(); }
+  public TVLambda as_lambda() { throw unimpl(); }
   
   // -------------------------------------------------------------
   public boolean fresh_unify( TV3 that, TV3[] nongen, boolean test ) {
@@ -239,7 +260,7 @@ abstract public class TV3 {
   }
 
   // Something changed; add the deps to the worklist and clear.
-  private void _deps_work_clear() {
+  void _deps_work_clear() {
     if( _deps == null ) return;
     Env.GVN.add_flow(_deps);
     for( Node n : _deps.values() ) if( n instanceof ConNode) n.unelock(); // hash changes
@@ -268,9 +289,9 @@ abstract public class TV3 {
   private static int VCNT;
   private static final NonBlockingHashMapLong<String> VNAMES = new NonBlockingHashMapLong<>();
   
-  @Override public String toString() { return str(new SB(), null, null, true ).toString(); }
+  @Override public final String toString() { return str(new SB(), null, null, true ).toString(); }
   
-  public SB str(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
+  public final SB str(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     if( visit==null ) {
       dups = get_dups();
       visit = new VBitSet();
@@ -287,20 +308,22 @@ abstract public class TV3 {
       vname(sb,debug,true);
       return unified() ? _uf.str(sb.p(">>"), visit, dups, debug) : sb;
     }
-
     // Dup printing for all but bases (which are short, just repeat them)
     if( dup && (debug || !(this instanceof TVBase) ) ) {
       vname(sb,debug,false);            // Leading V123
       if( visit.tset(_uid) ) return sb; // V123 and nothing else
       sb.p(':');                        // V123:followed_by_type_descr
     }
-    if( !_is_copy ) sb.p('%');
-
+    if( _errs!=null ) {
+      for( String err : _errs ) sb.p(err).p(':');
+      sb.unchar();
+    }
     return _str_impl(sb,visit,dups,debug);    
   }
 
   // Generic structural TV3
   SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
+    if( !_is_copy ) sb.p('%');
     sb.p(getClass().getSimpleName()).p("( ");
     if( _args!=null )
       for( TV3 tv3 : _args )
@@ -329,5 +352,12 @@ abstract public class TV3 {
     throw unimpl();
   }
 
+  TV3 copy() {
+    try {
+      TV3 tv3 = (TV3)clone();
+      tv3._uid = CNT++;
+      return tv3;
+    } catch(CloneNotSupportedException cnse) {throw unimpl();}
+  }
   public static void reset_to_init0() { CNT=0; TVField.reset_to_init0(); }
 }

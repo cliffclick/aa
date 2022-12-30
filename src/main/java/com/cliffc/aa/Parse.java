@@ -740,13 +740,14 @@ public class Parse implements Comparable<Parse> {
 
       } else if( peek('(') ) {  // Attempt a function-call
         oldx = _x;              // Just past paren
+        Parse err = errMsg(_x-1);// Error at the openning paren
         skipWS();               // Skip to start of 1st arg past "this"
         int first_arg_start = _x;
         int nidx = n.push();    // Keep alive across arg parse
-        Node dsp = gvn(new FP2DSPNode(n));
+        Node dsp = gvn(new FP2DSPNode(n,err));
         // Argument tuple, with "this" or display first arg
-        StructNode args = new StructNode(false,false,errMsg(oldx-1), "", Type.ALL);
-        args.add_fld("0",Access.Final,dsp,null); // TODO: get the display start for errors
+        StructNode args = new StructNode(false,false,err, "", Type.ALL);
+        args.add_fld("0",Access.Final,dsp,err); // TODO: get the display start for errors
         int aidx = args.push();
         Node arg1 = stmts();
         args = (StructNode)Node.pop(aidx);

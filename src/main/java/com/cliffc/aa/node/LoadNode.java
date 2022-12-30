@@ -2,7 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.*;
@@ -23,6 +23,7 @@ public class LoadNode extends Node {
   @Override public Type value() {
     Type tadr = adr()._val;
     Type tmem = mem()._val;       // Memory
+    if( tadr instanceof TypeStruct ts ) return ts; // Loading from Prototype is a no-op
     if( !(tadr instanceof TypeMemPtr tmp) ) return tadr.oob();
     if( !(tmem instanceof TypeMem    tm ) ) return tmem.oob(); // Nothing sane
     return tm.ld(tmp);
@@ -49,16 +50,18 @@ public class LoadNode extends Node {
 
   // Standard memory unification; the Load unifies with the loaded field.
   @Override public boolean unify( boolean test ) {
+    boolean progress = false;
     TV3 self = tvar();
-    TV3 ptr = adr().tvar();
-    //assert !ptr.is_obj() && !self.is_nil() && self.arg("*")==null;
-    //if( ptr.is_nil() )
-    //  throw unimpl();
-    //TV3 rec = ptr.arg("*");
-    //if( rec==null )
-    //  ptr.add_fld("*",rec = TV3.make_leaf("Load_unify"));
-    //return self.unify(rec,test);
-    throw unimpl();
+    TV3 adr = adr().tvar();
+    return switch (adr) {
+      case TVLeaf leaf -> {  // Wait until forced to either TVStruct or TVPtr
+        leaf.deps_add_deep(this);
+        yield false;
+      }
+      case TVPtr ptr -> throw unimpl();
+      case TVStruct tstr -> self.unify(adr, test); // Load from prototype, just pass-thru
+      default -> throw unimpl();
+    };
   }
 
   // Strictly reducing optimizations

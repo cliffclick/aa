@@ -1,13 +1,27 @@
 package com.cliffc.aa.tvar;
 
+import com.cliffc.aa.Env;
+import com.cliffc.aa.node.Node;
+
+import static com.cliffc.aa.AA.unimpl;
+
 public interface Resolvable {
-  boolean is_resolving();
-  String resolve(String lab);
   // True if this field is still resolving: the actual field being referenced
   // is not yet known.
+  boolean is_resolving();
   static boolean is_resolving(String id) { return id.charAt(0)=='&'; }
-
+  // Resolve to string 'lab'
+  String resolve(String lab);
+  // Self type var; pattern tvar
+  TV3 tvar();
+  // Match type tvar (as opposed to pattern)
+  TV3 match_tvar();
+  
   // Attempt to resolve an unresolved field.  No change if test, but reports progress.
+  // Returns:
+  // - 0  zero matching choices
+  // - 1  exactly one choice; resolvable (and resolved if not testing)
+  // - 2+ two or more choices; resolve is ambiguous
   default boolean trial_resolve( TV3 pattern, TVStruct lhs, TVStruct rhs, boolean test ) {
     assert !rhs.is_open() && is_resolving();
 
@@ -35,4 +49,25 @@ public interface Resolvable {
     } else prior.unify(pattern,test); // Merge pattern and prior label in LHS
     return true;              // Progress
   }
+
+  // Resolve failed; if ambiguous report that; if nothing present report that;
+  // otherwise force unification on all choices which will trigger an error on
+  // each choice.
+  default void resolve_failed() {
+    if( !(match_tvar() instanceof TVStruct tvs) ) throw unimpl();
+    if( ambi(tvar(),tvs) ) throw unimpl();
+    else
+      tvar().err("No field resolves");
+    Env.GVN.add_flow((Node)this);
+  }
+  // True if ambiguous (more than one match), false if no matches.
+  private boolean ambi(TV3 self, TVStruct tvs) {
+    for( int i=0; i<tvs.len(); i++ )
+      if( !is_resolving(tvs.fld(i)) &&
+          self.trial_unify_ok(tvs.arg(i),false) )
+        return true;
+    return false;
+  }
+
+  
 }

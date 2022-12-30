@@ -24,4 +24,7 @@ public class TVField extends TV3 {
   @Override boolean _unify_impl(TV3 that ) {
     throw unimpl();
   }
+
+  @Override int eidx() { throw unimpl(); }
+
 }

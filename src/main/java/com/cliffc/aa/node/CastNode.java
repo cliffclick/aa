@@ -1,7 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import org.jetbrains.annotations.NotNull;
 
@@ -51,6 +51,9 @@ public class CastNode extends Node {
     // If the cast is in-error, we cannot lift.
     Node n1 = in(1);
     if( n1 instanceof FreshNode frs ) n1 = frs.id();
+    // No-Op, should remove shortly
+    if( n1._val instanceof TypeStruct )
+      return n1._val;    
     if( !checked(in(0),n1) ) return t;
     // Lift result.
     return _t.join(t);
@@ -70,42 +73,40 @@ public class CastNode extends Node {
     // If the cast is already satisfied, then no change
     if( maynil==notnil ) return false;
 
+    // Never a nilable nor nil
+    if( maynil instanceof TVStruct )
+      return notnil.unify(maynil,test);
+    
+    // Already an expanded nilable
+    if( maynil instanceof TVNil tmaynil && tmaynil.not_nil() == notnil )
+      return false;
 
-    //// If this is a type-cast, and not a not-nil cast
-    //// just do a normal base unification.
-    //if( TypeNil.XNIL.isa(_t) ) {
-    //  boolean progress = notnil.unify(maynil,test);
-    //  TV3 tv3 = notnil.find();
-    //  if( tv3.is_base() && tv3._tflow ==_t )
-    //    return progress;
-    //  return test || tv3.unify(TV3.make(_t,"Cast_unify"),test);
-    //}
-    //
-    //
-    //// Already an expanded nilable
-    //if( maynil.is_nil() && maynil.arg("?") == notnil ) return false;
-    //
-    //// Expand nilable to either base
-    //if( maynil.is_base() && notnil.is_base() ) {
+    // Expand nilable to either base
+    if( maynil instanceof TVBase && notnil instanceof TVBase ) {
     //  assert !arg.is_open() && !ret.is_open();
     //  assert arg._flow == ret._flow.meet(Type.NIL);
     //  return false;
-    //}
-    //
-    //// Already an expanded nilable with ptr
-    //if( maynil.is_ptr() && notnil.is_ptr() )
+      throw unimpl();
+    }
+    
+    // Already an expanded nilable with ptr
+    if( maynil instanceof TVPtr && notnil instanceof TVPtr )
     //  return maynil.arg("*").unify(notnil.arg("*"),test);
-    //
-    //// All other paths may progress
-    //if( test ) return true;
-    //
-    //// Can be nilable of nilable; fold the layer
-    //if( maynil.is_nil() && notnil.is_nil() )
-    //  throw unimpl(); // return maynil.unify(notnil,work);
-    //
-    //// Unify the maynil with a nilable version of notnil
-    //return TV3.make_nil(notnil,"Cast_unify").find().unify(maynil,test);
-    throw unimpl();
+      // TODO: suspicious, thing this should be the default
+      throw unimpl();
+
+    // Can be nilable of nilable; fold the layer
+    if( maynil instanceof TVNil && notnil instanceof TVNil )
+      throw unimpl(); // return maynil.unify(notnil,work);
+
+    // Stall, until notnil becomes a TVNilable or a TVStruct
+    if( maynil instanceof TVLeaf ) {
+      maynil.deps_add_deep(this);
+      return false;
+    }
+    
+    // Unify the maynil with a nilable version of notnil
+    return maynil.unify(new TVNil(notnil),test);
   }
 
   @Override public @NotNull CastNode copy( boolean copy_edges) {

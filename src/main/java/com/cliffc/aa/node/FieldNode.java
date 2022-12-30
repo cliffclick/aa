@@ -39,13 +39,14 @@ public class FieldNode extends Node implements Resolvable {
   String  str() { return xstr(); } // Inline short name
   @Override public boolean is_resolving() { return Resolvable.is_resolving(_fld); }
   @Override public String resolve(String label) {
-    unelock();                  // Hash changes
+    unelock();                  // Hash changes since label changes
     String old = _fld;
     _fld = label;
     add_flow();
     return old;
   }
-
+  @Override public TV3 match_tvar() { return tvar(0); }
+  
   @Override public Type value() {
     Type t = val(0);
     if( is_resolving() ) {
@@ -133,7 +134,7 @@ public class FieldNode extends Node implements Resolvable {
       // Wire directly to the prototype (not doing a prototype-style lookup on
       // the prototype, just a normal lookup).  Remove the prootype edge.
       Node fld = new FieldNode(in(1),_fld,_bad).init();
-      return new BindFPNode(fld,in(0));
+      return new BindFPNode(fld,in(0)).init();
     }
     
     // Skip past a BindFP

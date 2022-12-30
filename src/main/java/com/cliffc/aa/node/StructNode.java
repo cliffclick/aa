@@ -233,7 +233,7 @@ public class StructNode extends Node {
   
 
   @Override public boolean unify( boolean test ) {
-    TVStruct rec = (TVStruct)tvar();
+    TVStruct rec = tvar().as_struct();
 
     // Unify existing fields.  Ignore extras on either side.
     boolean progress = false;

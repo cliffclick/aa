@@ -308,6 +308,7 @@ public final class CallEpiNode extends Node {
     } else {
       for( int i=0; i<nwired(); i++ ) { // For all wired calls
         RetNode ret = wired(i);
+        if( !fidxs.test_recur(ret._fidx) ) continue;
         Type tret0 = ret._val;     // Get the called function return
         TypeTuple tret = (TypeTuple)(tret0 instanceof TypeTuple ? tret0 : tret0.oob(TypeTuple.RET));
         Type rmem = tret.at(MEM_IDX);
@@ -495,10 +496,7 @@ public final class CallEpiNode extends Node {
     TV3 tv3 = fdx.tvar();       // type {dsp args -> ret}
     
     // Peek thru any error
-    if( tv3 instanceof TVErr err ) {
-      tv3 = err.as_lambda();
-      throw unimpl();           // Errors are poisonous
-    }
+    if( tv3 instanceof TVErr err ) tv3 = err.as_lambda();
 
     // If not one already, make a lambda term for the function.
     if( !(tv3 instanceof TVLambda tfun) ) {

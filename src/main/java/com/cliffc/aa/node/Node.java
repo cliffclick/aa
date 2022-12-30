@@ -872,7 +872,6 @@ public abstract class Node implements Cloneable, IntSupplier {
         continue;
       def.walkerr_def(errs,bs);
     }
-    if( is_prim() ) return;
     // Skip reporting if any input is 'all', as the input should report instead.
     for( Node def : _defs )
       if( def !=null && def._val ==Type.ALL )
