@@ -52,17 +52,16 @@ public class TVStruct extends TV3 {
     return true;
   }
   // Remove
-  boolean del_fld(int i) {
-    throw unimpl();
-  }
-  // Remove field; true if something got removed
-  boolean del_fld(String fld) {
-    int idx = Util.find(_flds,fld);
-    if( idx== -1 ) return false;
+  boolean del_fld(int idx) {
     _args[idx] = _args[_max-1];
     _flds[idx] = _flds[_max-1];
     _max--;
     return true;
+  }
+  // Remove field; true if something got removed
+  boolean del_fld(String fld) {
+    int idx = Util.find(_flds,fld);
+    return idx != -1 && del_fld(idx);
   }
   
   @Override public int len() { return _max; }  
@@ -114,7 +113,7 @@ public class TVStruct extends TV3 {
 
   // -------------------------------------------------------------
   @Override void _union_impl( TV3 tv3 ) {
-    assert _uid > tv3._uid;
+    //assert _uid > tv3._uid;
     if( tv3 instanceof TVStruct ts ) ts._open &= _open;
   }
 
@@ -154,7 +153,54 @@ public class TVStruct extends TV3 {
     assert !that.unified(); // Missing a find
     return true;
   }
+  
+  // -------------------------------------------------------------
+  @Override boolean _fresh_unify_impl(TV3 tv3, TV3[] nongen, boolean test) {
+    boolean progress = false;
+    TVStruct thsi = this;
+    TVStruct that = (TVStruct)tv3; // Invariant checked before calling
+    assert !thsi.unified() && !that.unified();
+    // Any pending field resolutions
+    progress |= this.trial_resolve_all(test);
+    progress |= that.trial_resolve_all(test);    
 
+    for( int i=0; i<_max; i++ ) {
+      TV3 lhs = thsi.arg(_flds[i]);
+      TV3 rhs = that.arg(_flds[i]);
+      if( rhs==null && Resolvable.is_resolving(_flds[i]) ) {
+        if( that._open ) continue;
+        throw unimpl();
+      }
+
+      if( rhs == null ) {
+        throw unimpl();
+      } else {
+        progress |= lhs._fresh_unify(rhs,nongen,test);
+      }
+      assert !thsi.unified() && !that.unified();       // TODO: update/find thsi,that
+      if( progress && test ) return true;
+    }
+
+    // Fields in RHS and not the LHS are also merged; if the LHS is open we'd
+    // just copy the missing fields into it, then unify the structs (shortcut:
+    // just skip the copy).  If the LHS is closed, then the extra RHS fields
+    // are removed.
+    if( _max != that._max )
+      throw unimpl();
+      
+    
+    // If LHS is closed, force RHS closed
+    if( !_open && that._open ) {
+      if( test ) return true;
+      that._open = false;
+      progress = true;
+    }
+    return progress;
+  }
+  
+  
+  // -------------------------------------------------------------
+  // TODO  move to Resolbvable?
   private boolean trial_resolve_all(boolean test) {
     boolean progress = false;
     for( int i=0; i<_max; i++ ) {
@@ -166,7 +212,13 @@ public class TVStruct extends TV3 {
         if( !is_open() ) // More fields possible, so trial_resolve cannot be tried
           progress |= res.trial_resolve(arg(i),this,this,test); // Attempt resolve
       } else {
-        throw unimpl();
+        // key is resolving, but Field is already resolved
+        if( test ) continue;
+        TV3 old = arg(i);        // Old unresolved value
+        del_fld(i);              // Remove resolving key
+        TV3 t3 = arg(res.fld()); // Get resolved label, if any
+        if( t3==null ) throw unimpl(); //_args.put(res._fld,old); // Insert resolved-label, even if this is open, since operation is a label replacement
+        else progress |= old._unify(t3,test); // Unify into existing (fold labels together)
       }
     }
     return progress;

@@ -38,8 +38,7 @@ public final class ErrNode extends Node {
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
-    if( !(o instanceof ErrNode) ) return false;
-    ErrNode err = (ErrNode)o;
+    if( !(o instanceof ErrNode err) ) return false;
     return _err.equals(err._err);
   }
 }

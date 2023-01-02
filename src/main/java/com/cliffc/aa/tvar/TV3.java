@@ -5,6 +5,8 @@ import com.cliffc.aa.node.ConNode;
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.util.*;
 
+import java.util.IdentityHashMap;
+
 import static com.cliffc.aa.AA.unimpl;
 
 /** Type variable base class
@@ -121,6 +123,11 @@ abstract public class TV3 implements Cloneable {
     if( _errs.find(msg)== -1 ) _errs.push(msg);
   }
   
+  
+  abstract int eidx();
+  public TVStruct as_struct() { throw unimpl(); }
+  public TVLambda as_lambda() { throw unimpl(); }
+  
   private long dbl_uid(TV3 t) { return dbl_uid(t._uid); }
   private long dbl_uid(long uid) { return ((long)_uid<<32)|uid; }
 
@@ -214,16 +221,146 @@ abstract public class TV3 implements Cloneable {
     TVErr terr = new TVErr();
     return terr._unify_err(this) | terr._unify_err(that);
   }
-  
-  abstract int eidx();
-  public TVStruct as_struct() { throw unimpl(); }
-  public TVLambda as_lambda() { throw unimpl(); }
-  
   // -------------------------------------------------------------
+  // Make a (lazy) fresh copy of 'this' and unify it with 'that'.  This is
+  // the same as calling 'fresh' then 'unify', without the clone of 'this'.
+  // Returns progress.
+  static private final IdentityHashMap<TV3,TV3> VARS = new IdentityHashMap<>();
+  
   public boolean fresh_unify( TV3 that, TV3[] nongen, boolean test ) {
     if( this==that ) return false;
-    throw unimpl();
+    if( this instanceof TVLeaf ) return false;
+    assert VARS.isEmpty() && DUPS.isEmpty();
+    boolean progress = _fresh_unify(that,nongen,test);
+    VARS.clear();  DUPS.clear();
+    return progress;
   }
+
+  boolean _fresh_unify( TV3 that, TV3[] nongen, boolean test ) {
+    assert !unified() && !that.unified();
+    if( this==that ) return false;
+
+    // Check for cycles
+    TV3 prior = VARS.get(this);
+    if( prior!=null )                        // Been there, done that
+      return prior.find()._unify(that,test); // Also, 'prior' needs unification with 'that'
+    
+    // Famous 'occurs-check': In the non-generative set, so do a hard unify,
+    // not a fresh-unify.
+    if( nongen_in(nongen) ) throw unimpl(); // return vput(that,_unify(that,test));
+
+    // LHS leaf, RHS is unchanged but goes in the VARS
+    if( this instanceof TVLeaf ) return vput(that,false);
+    if( that instanceof TVLeaf )  // RHS is a tvar; union with a deep copy of LHS
+      return test || vput(that,that.union(_fresh(nongen)));
+    
+    // Special handling for nilable
+    if( !(this instanceof TVNil) && that instanceof TVNil nil ) throw unimpl();
+    if( !(that instanceof TVNil) && this instanceof TVNil nil ) throw unimpl();
+
+    // Two unrelated overloads not allowed.  To equal overloads unify normally.
+    if( getClass() != that.getClass() ) {
+      if( test ) return true;
+      throw unimpl();
+    }
+
+    boolean progress = false;
+
+    // Progress on parts
+    if( !_is_copy && that._is_copy ) {
+      if( test ) return true;
+      that._is_copy = false;
+      progress = true;
+    }
+    if( _may_nil && !that._may_nil ) {
+      if( test ) return true;
+      progress = that._may_nil = true;
+    }
+    
+    // Early set, to stop cycles
+    vput(that,progress);
+
+    // Do subclass unification.
+    return _fresh_unify_impl(that,nongen,test) | progress;
+  }
+
+  // Generic field by field
+  boolean _fresh_unify_impl(TV3 that, TV3[] nongen, boolean test) {
+    boolean progress = false;
+    if( _args != null ) {
+      assert _args.length == that._args.length;
+      for( int i=0; i<_args.length; i++ ) {
+        if( _args[i]==null ) continue;
+        TV3 lhs =      arg(i);
+        TV3 rhs = that.arg(i);
+        if( rhs == null ) throw unimpl();
+        else progress |= lhs._fresh_unify(rhs,nongen,test);
+      }
+      if( progress && test ) return true;
+    } else assert that._args==null;
+    return progress;
+  }
+
+  private boolean vput(TV3 that, boolean progress) { VARS.put(this,that); return progress; }
+
+  // -----------------
+  // Return a fresh copy of 'this'
+  TV3 fresh() {
+    assert VARS.isEmpty();
+    TV3 rez = _fresh(null);
+    VARS.clear();
+    return rez;
+  }
+  
+  private TV3 _fresh(TV3[] nongen) {
+    assert !unified();
+    TV3 rez = VARS.get(this);
+    if( rez!=null ) return rez.find(); // Been there, done that
+    // Unlike the original algorithm, to handle cycles here we stop making a
+    // copy if it appears at this level in the nongen set.  Otherwise, we'd
+    // clone it down to the leaves - and keep all the nongen leaves.
+    // Stopping here preserves the cyclic structure instead of unrolling it.
+    if( nongen_in(nongen) ) {
+      VARS.put(this,this);
+      return this;
+    }
+    
+    // Structure is deep-replicated
+    TV3 t = copy();
+    VARS.put(this,t);         // Stop cyclic structure looping
+    if( _args!=null )
+      for( int i=0; i<t.len(); i++ )
+        if( _args[i]!=null )
+          t._args[i] = arg(i)._fresh(nongen);
+    assert !t.unified();
+    return t;
+  }
+
+
+  // -----------------
+  private static final VBitSet ODUPS = new VBitSet();  
+  boolean nongen_in(TV3[] vs) {
+    if( vs==null ) return false;
+    ODUPS.clear();
+    for( TV3 tv3 : vs )
+      if( _occurs_in_type(tv3) )
+        return true;
+    return false;
+  }
+
+  // Does 'this' occur anywhere inside the nested 'x' ?
+  boolean _occurs_in_type(TV3 x) {
+    assert !unified() && !x.unified();
+    if( x==this ) return true;
+    if( ODUPS.tset(x._uid) ) return false; // Been there, done that
+    for( int i=0; i<len(); i++ )
+      if( _occurs_in_type(x.arg(i)) )
+        return true;
+    return false;
+  }
+
+
+  // -------------------------------------------------------------
 
   // Do a trial unification between this and that.
   // Report back false if any error happens, or true if no error.
@@ -260,20 +397,17 @@ abstract public class TV3 implements Cloneable {
   
   // Stops when it sees 'n'; this closes cycles and short-cuts repeated adds of
   // 'n'.  Requires internal changes propagate internal _deps.
-  public Node deps_add_deep( Node n ) {
-    if( !_dep_add(n) ) return n;
+  private static final VBitSet DEPS_VISIT = new VBitSet();
+  public Node deps_add_deep( Node n ) { DEPS_VISIT.clear(); return _deps_add_deep(n); }
+  public Node _deps_add_deep( Node n ) {
+    if( DEPS_VISIT.tset(_uid) ) return n;
+    if( _deps==null ) _deps = UQNodes.make(n);
+    _deps = _deps.add(n);
     if( _args!=null )
       for( int i=0; i<len(); i++ )
         if( _args[i]!=null )
-          arg(i).deps_add_deep(n);
+          arg(i)._deps_add_deep(n);
     return n;
-  }
-  // Add n to _deps.  Returns true if added, false if already there
-  private boolean _dep_add( Node n ) {
-    if( _deps==null ) _deps = UQNodes.make(n);
-    else if( _deps.containsKey(n._uid) ) return false;
-    else _deps = _deps.add(n);
-    return true;
   }
 
   // Something changed; add the deps to the worklist and clear.
@@ -373,7 +507,7 @@ abstract public class TV3 implements Cloneable {
   TV3 copy() {
     try {
       TV3 tv3 = (TV3)clone();
-      tv3._args = _args.clone();
+      tv3._args = _args==null ? null : _args.clone();
       tv3._uid = CNT++;
       return tv3;
     } catch(CloneNotSupportedException cnse) {throw unimpl();}

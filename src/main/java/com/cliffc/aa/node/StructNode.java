@@ -1,12 +1,10 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVStruct;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeFld;
-import com.cliffc.aa.type.TypeFlds;
-import com.cliffc.aa.type.TypeStruct;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.Util;
@@ -63,7 +61,7 @@ public class StructNode extends Node {
   // Field names mapped one-to-one with inputs.  Not sorted.
   // Order is IGNORED for H-M purposes.
   // Only modify if !_closed
-  private final  Ary<String> _flds;
+  private final Ary<String> _flds;
 
   // R/W vs Read-only status of fields
   // Only modify if !_closed
@@ -153,23 +151,21 @@ public class StructNode extends Node {
 
   // Remove a field, preserving order.  For reseting primitives for multi-testing
   public void remove_fld(int idx) {
-    //set_ts(_ts.remove_fld(idx));
-    //remove(idx);
-    //_fld_starts.remove(idx+1);
-    throw unimpl();
+    remove(idx);
+    _flds.remove(idx);
+    _accesses.remove(idx);
+    _fld_starts.remove(idx);
   }
 
-  //// Set a replacement field in a Struct.  Fails if trying to replace a final
-  //// field.
-  //public boolean set_fld(String id, Access access, Node val, boolean force ) {
-  //  int idx = find(id);
-  //  TypeFld fld = _ts.get(idx);
-  //  if( !force && fld._access == Access.Final ) return false;
-  //  TypeStruct ts = _ts.replace_fld(fld.make_from(fld._t,access));
-  //  set_ts(ts);
-  //  set_def(idx,val);
-  //  return true;
-  //}
+  // Set a replacement field in a Struct.  Fails if trying to replace a final
+  // field.
+  public boolean set_fld(String id, TypeFld.Access access, Node val, boolean force ) {
+    int idx = find(id);
+    if( !force && _accesses.at(idx) == TypeFld.Access.Final ) return false;
+    set_def(idx,val);
+    _accesses.set(idx,access);
+    return true;
+  }
 
   // The current local scope ends, no more names will appear.  Forward refs
   // first found in this scope are assumed to be defined in some outer scope
@@ -178,25 +174,18 @@ public class StructNode extends Node {
   public void promote_forward( StructNode parent ) {
     assert parent != null;
     for( int i=0; i<_defs._len; i++ ) {
-      Node n = in(i);
-      if( n.is_forward_ref() ) {
-    //    // Is this Unresolved defined in this scope, or some outer scope?
-    //    if( ((UnresolvedNode)n).is_scoped() ) {
-    //      // Definitely defined here, and all stores are complete; all fcns added
-    //    //    ((UnresolvedNode)n).define();
-    //    //    Env.GVN.add_unuse(n);
-    //      throw com.cliffc.aa.AA.unimpl();        // TODO: Access input by field name
-    //    } else {
-    //      // Make field in the parent
-    //      TypeFld fld = _ts.get(i);
-    //      parent.add_fld(fld, n, _fld_starts.at(i+1));
-    //      // Stomp field locally to ANY
-    //      set_def(i,Env.ANY);
-    //      set_ts(_ts.replace_fld(TypeFld.make(fld._fld, Type.ANY, TypeFld.Access.Final)));
-    //      Env.GVN.add_flow_uses(this);
-    //    }
-    //  }
-        throw unimpl();
+      if( in(i) instanceof ForwardRefNode fref && Util.eq(fref._name,fld(i))) {
+        // Is this ForwardRef defined in this scope, or some outer scope?
+        if( fref.is_scoped() ) {
+          // Definitely defined here
+          //    fref.define();
+          throw unimpl();        // TODO: Access input by field name
+        } else {
+          // Make field in the parent
+          parent.add_fld(fref._name,TypeFld.Access.Final,fref,_fld_starts.at(i));
+          // Stomp field locally to ANY
+          set_def(i,Env.ANY);
+        }
       }
     }
   }

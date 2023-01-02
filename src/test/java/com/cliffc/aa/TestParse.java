@@ -33,7 +33,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    testerr("-1== --", "Missing term after operator '-_'",7);
+    test("1+(x=2*3)+x*x", "int:43", "int:43");
   }
 
   @Test public void testParse00() {

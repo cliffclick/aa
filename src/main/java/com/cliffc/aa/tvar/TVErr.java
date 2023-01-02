@@ -36,8 +36,7 @@ public class TVErr extends TV3 {
   }
 
   // -------------------------------------------------------------
-  @Override
-  void _union_impl(TV3 that) {
+  @Override void _union_impl(TV3 that) {
     if( !(that instanceof TVErr err) ) {
       arg(that.eidx())._union_impl(that);
     } else {
@@ -49,6 +48,7 @@ public class TVErr extends TV3 {
     throw unimpl();
   }
   
+  // -------------------------------------------------------------
   @Override int eidx() { throw unimpl(); }
 
   // Defining type, vs failed unification

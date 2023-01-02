@@ -130,10 +130,9 @@ public class StoreNode extends Node {
     if( rez instanceof StructNode st ) return st;
     SetFieldNode sfn = (SetFieldNode)rez;
     StructNode st = _fold(sfn.in(0));
-    //if( st==null || !st.set_fld(sfn._fld,sfn._fin,sfn.in(1),false) )
-    //  return null;
-    //return st;
-    throw unimpl();
+    if( st==null || !st.set_fld(sfn._fld,sfn._fin,sfn.in(1),false) )
+      return null;
+    return st;
   }
 
 

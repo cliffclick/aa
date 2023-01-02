@@ -24,7 +24,18 @@ public class TVBase extends TV3 {
   }
   
   @Override boolean _unify_impl(TV3 t ) { return union(t); }
+  
+  // -------------------------------------------------------------
+  @Override boolean _fresh_unify_impl(TV3 that, TV3[] nongen, boolean test) {
+    TVBase base = (TVBase)that;
+    Type t = _t.meet(base._t);
+    if( t==base._t ) return false;
+    if( !test ) base._t = t;
+    return true;
+  }
 
+
+  // -------------------------------------------------------------
   @Override boolean _trial_unify_ok_impl( TV3 tv3, boolean extras ) {
     TVBase that = (TVBase)tv3; // Invariant when called
     // Unifies OK if bases will unify, e.g. both ints or both floats

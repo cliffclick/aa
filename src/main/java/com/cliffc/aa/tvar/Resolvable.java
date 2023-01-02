@@ -10,6 +10,8 @@ public interface Resolvable {
   // is not yet known.
   boolean is_resolving();
   static boolean is_resolving(String id) { return id.charAt(0)=='&'; }
+  // Resolved label; error if still resolving
+  String fld();
   // Resolve to string 'lab'
   String resolve(String lab);
   // Self type var; pattern tvar

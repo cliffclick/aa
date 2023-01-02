@@ -58,7 +58,7 @@ public class LoadNode extends Node {
         leaf.deps_add_deep(this);
         yield false;
       }
-      case TVPtr ptr -> throw unimpl();
+      case TVPtr ptr -> self.unify(ptr.load(),test);
       case TVStruct tstr -> self.unify(adr, test); // Load from prototype, just pass-thru
       default -> throw unimpl();
     };

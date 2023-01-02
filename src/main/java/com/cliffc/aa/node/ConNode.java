@@ -25,22 +25,19 @@ public class ConNode<T extends Type> extends Node {
   @Override public Type value() { return _t; }
 
   @Override public boolean has_tvar() {
-    if( _t==Type.ALL ) return true;  // Specifically allowed for various unused-displays on primitives
-    if( _t.is_simple() ) return false; // No on CTRL, XCTRL, ANY
-    if( _t instanceof TypeRPC ) return false; // For now, no closures
+    if( _t==Type.ALL || _t==Type.ANY ) return true;  // Specifically allowed for various unused-displays on primitives
     if( _t.is_nil() ) return true;     // Yes on NIL, INT, FLT, MEMPTR, FUNPTR
     if( _t instanceof TypeStruct ) return true;
-    if( _t instanceof TypeAry ) throw unimpl(); // Probably yes, undecided
-    // No for TFLD, TMEM
+    // No for TFLD, TMEM, RPC
     return false;
   }
 
   @Override public TV3 _set_tvar() {
     unelock(); // Hash now depends on TVars
-    _tvar = _t==TypeNil.XNIL
-      ? new TVNil( new TVLeaf() ) // xnil gets a HM nilable instead of a base
-      // Default case, just a Base wrapper over GCP type
-      : TVBase.make(true,_t);
+    if( _t==Type.ANY ) _tvar = new TVLeaf();
+    else if( _t==TypeNil.XNIL ) _tvar = new TVNil( new TVLeaf() ); // xnil gets a HM nilable instead of a base
+    // Default case, just a Base wrapper over GCP type
+    else _tvar = TVBase.make(true,_t);
     _elock();
     return _tvar;
   }

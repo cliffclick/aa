@@ -33,6 +33,7 @@ public class TVNil extends TV3 {
     return not_nil.union(copy) | that.union(this);
   }
   
+  // -------------------------------------------------------------
   @Override int eidx() { throw unimpl(); }
 
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {

@@ -20,6 +20,7 @@ public class TVLeaf extends TV3 {
   // Leafs have no subclass specific parts to union
   @Override void _union_impl(TV3 that) { }
 
+  // -------------------------------------------------------------
   @Override int eidx() { throw unimpl(); }
 
 }

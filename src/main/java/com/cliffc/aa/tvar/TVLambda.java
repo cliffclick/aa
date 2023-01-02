@@ -44,7 +44,8 @@ public class TVLambda extends TV3 {
       that.err("Expected "+tnargs+" but found "+nargs);
     return true;
   }
-
+  
+  // -------------------------------------------------------------
   // Sub-classes specify trial_unify on sub-parts.
   // Check arguments, not return.
   @Override boolean _trial_unify_ok_impl( TV3 tv3, boolean extras ) {

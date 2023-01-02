@@ -38,6 +38,7 @@ public class FieldNode extends Node implements Resolvable {
   @Override public String xstr() { return "."+(is_resolving() ? "_" : _fld); }   // Self short name
   String  str() { return xstr(); } // Inline short name
   @Override public boolean is_resolving() { return Resolvable.is_resolving(_fld); }
+  @Override public String fld() { assert !is_resolving(); return _fld; }
   @Override public String resolve(String label) {
     unelock();                  // Hash changes since label changes
     String old = _fld;
@@ -73,6 +74,13 @@ public class FieldNode extends Node implements Resolvable {
 
       // Prototype lookup
       TypeFld proto = ts.get("!");
+      // No prototype
+      if( proto==null ) {
+        if( ts.above_center() ) return TypeNil.XSCALAR; // Too early, might get one yet
+        // Too late, so missing field
+        throw unimpl();
+      }
+
       if( !(proto._t instanceof TypeMemPtr tptr) ||
           (alias = tptr.aliases().abit()) < 0 ) {
         // No prototype field found.
@@ -109,7 +117,7 @@ public class FieldNode extends Node implements Resolvable {
     Type t = TypeNil.SCALAR;
     for( TypeFld t2 : ts )
       t = t.join( t2._t instanceof TypeFunPtr tfp2  ? tfp2.make_from(tfp2.fidxs().dual()) : t2._t );
-    return t;
+    return t.meet(TypeNil.XSCALAR);
   }
 
   // Checks is_err from HMT from StructNode.
@@ -128,11 +136,17 @@ public class FieldNode extends Node implements Resolvable {
         ? sfn.in(1)             // Same field, use same
         : set_def(0, sfn.in(0)); // Unrelated field, bypass
 
+    // Back-to-back Struct/Field
+    if( in(0) instanceof StructNode str && str.err(true)==null ) {
+      int idx = str.find(_fld);
+      if( idx >= 0 ) return str.in(idx);
+    }
+
     // Hitting in the prototype requires rewiring.  Wire directly to the
     // prototype, remove the prototype edge, and insert a BindFP.
     if( len()>1 ) {
       // Wire directly to the prototype (not doing a prototype-style lookup on
-      // the prototype, just a normal lookup).  Remove the prootype edge.
+      // the prototype, just a normal lookup).  Remove the prototype edge.
       Node fld = new FieldNode(in(1),_fld,_bad).init();
       return new BindFPNode(fld,in(0)).init();
     }
@@ -178,6 +192,7 @@ public class FieldNode extends Node implements Resolvable {
     if( !(rec instanceof TVStruct str0) ) {
       if( test ) return true;
       progress = rec.unify(str=new TVStruct(true,new String[0],new TV3[0],true),test);
+      str = (TVStruct)str.find();
     } else {
       str = str0;
     }

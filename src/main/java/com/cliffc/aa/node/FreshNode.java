@@ -5,8 +5,6 @@ import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMemPtr;
 
-import static com.cliffc.aa.AA.unimpl;
-
 // "fresh" the incoming TVar: make a fresh instance before unifying
 public class FreshNode extends Node {
   public FreshNode( FunNode fun, Node ld ) { super(OP_FRESH, fun, ld); }
@@ -33,21 +31,14 @@ public class FreshNode extends Node {
 
   @Override public boolean has_tvar() { return true; }
   
-  @Override public TV3 _set_tvar() {
-    //_tvar = new_tvar();
-    //if( id()._tvar==null ) id().walk_initype();
-    //id().tvar().push_dep(this);
-    throw unimpl();
-  }
-
   @Override public boolean unify( boolean test ) {
     TV3[] nongen = nongen();
     return id().tvar().fresh_unify(tvar(),nongen,test);
   }
   // Two FreshNodes are only equal, if they have compatible TVars
   @Override public boolean equals(Object o) {
-    if( !has_tvar() ) return this==o;
     if( !(o instanceof FreshNode frsh) ) return false;
+    if( _tvar==null ) return this==frsh; // Pre-combo, must be the same Node
     return tvar()==frsh.tvar();
   }
 }

@@ -292,7 +292,7 @@ public class Parse implements Comparable<Parse> {
     // Look for a prior type assignment, from e.g. a type annotation
 
     //// Make a forward-ref constructor, if not one already
-    //UnresolvedNode construct = (UnresolvedNode)_e.lookup(tok);
+    //ForwardRefNode construct = (ForwardRefNode)_e.lookup(tok);
     //if( construct==null ) construct = val_fref(tok,errMsg());
     //else if( !construct.is_forward_ref() )
     //  return err_ctrl2("Cannot re-assign val '"+tok+"' as a type");
@@ -448,8 +448,8 @@ public class Parse implements Comparable<Parse> {
     if( create ) {              // Token not already bound at any scope
       scope = scope();          // Create in the current scope
       StructNode stk = scope.stk();
-      stk.add_fld(tok, mutable, Env.XNIL,badf); // Create at top of scope as undefined
-      scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
+      stk.add_fld (tok,Access.RW, Env.XNIL,badf); // Create at top of scope as undefined
+      scope.def_if(tok,Access.RW, true); // Record if inside arm of if (partial def error check)
     }
     Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
     Node mem = mem();
@@ -903,8 +903,7 @@ public class Parse implements Comparable<Parse> {
       // tail-half of a balanced-op, which is parsed by term() above.
       if( isOp(tok) ) { _x = oldx; return null; }
       // Must be a forward reference
-      //return val_fref(tok,bad);
-      throw unimpl();
+      return val_fref(tok,bad);
     }
 
     // Must load against most recent display update, in case some prior store
@@ -1319,18 +1318,19 @@ public class Parse implements Comparable<Parse> {
     throw unimpl();
   }
 
-  //// Create a value forward-reference.  Must turn into a function call later.
-  //// Called when seeing a name for the first time, in a function-call context,
-  //// OR when defining a type constructor.  Not allowed to forward-ref normal
-  //// variables, so this is a function variable, not yet defined.  Use an
-  //// Unresolved until it gets defined.
-  //private UnresolvedNode val_fref(String tok, Parse bad) {
-  //  UnresolvedNode fref = init(UnresolvedNode.forward_ref(tok,bad));
-  //  // Place in nearest enclosing closure scope, this will keep promoting until we find the actual scope
-  //  StructNode stk = scope().stk();
-  //  stk.add_fld(tok,Access.Final,fref,null);
-  //  return fref;
-  //}
+  // Create a value forward-reference.  Must turn into a function call later.
+  // Called when seeing a name for the first time, in a function-call context,
+  // OR when defining a type constructor.  Not allowed to forward-ref normal
+  // variables, so this is a function variable, not yet defined.  Use an
+  // ForwardRef until it gets defined.
+  private ForwardRefNode val_fref(String tok, Parse bad) {
+    ForwardRefNode fref = init(new ForwardRefNode(tok,bad));
+    // Place in nearest enclosing closure scope, this will keep promoting until we find the actual scope
+    StructNode stk = scope().stk();
+    stk.add_fld(tok,Access.Final,fref,null);
+    return fref;
+  }
+  
   // Create a type forward-reference.  Must be type-defined later.  Called when
   // seeing a name in a type context for the first time.  Builds an empty type
   // NewNode and returns it.

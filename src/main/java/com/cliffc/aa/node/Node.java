@@ -26,30 +26,31 @@ public abstract class Node implements Cloneable, IntSupplier {
   static final byte OP_FIELD  = 9;
   static final byte OP_FRESH  =10;
   static final byte OP_FP2DSP =11;
-  static final byte OP_FUN    =12;
-  static final byte OP_FUNPTR =13;
-  static final byte OP_IF     =14;
-  static final byte OP_JOIN   =15;
-  static final byte OP_KEEP   =16;
-  static final byte OP_LOAD   =17;
-  static final byte OP_NEW    =18; // Allocate a new struct
-  static final byte OP_PARM   =19;
-  static final byte OP_PHI    =20;
-  static final byte OP_PRIM   =21;
-  static final byte OP_PROJ   =22;
-  static final byte OP_REGION =23;
-  static final byte OP_RET    =24;
-  static final byte OP_ROOT   =25;
-  static final byte OP_SCOPE  =26;
-  static final byte OP_SETFLD =27;
-  static final byte OP_SPLIT  =28;
-  static final byte OP_STORE  =29;
-  static final byte OP_STRUCT =30;
-  static final byte OP_TYPE   =31;
-  static final byte OP_VAL    =32;
-  static final byte OP_MAX    =33;
+  static final byte OP_FREF   =12;
+  static final byte OP_FUN    =13;
+  static final byte OP_FUNPTR =14;
+  static final byte OP_IF     =15;
+  static final byte OP_JOIN   =16;
+  static final byte OP_KEEP   =17;
+  static final byte OP_LOAD   =18;
+  static final byte OP_NEW    =19; // Allocate a new struct
+  static final byte OP_PARM   =20;
+  static final byte OP_PHI    =21;
+  static final byte OP_PRIM   =22;
+  static final byte OP_PROJ   =23;
+  static final byte OP_REGION =24;
+  static final byte OP_RET    =25;
+  static final byte OP_ROOT   =26;
+  static final byte OP_SCOPE  =27;
+  static final byte OP_SETFLD =28;
+  static final byte OP_SPLIT  =29;
+  static final byte OP_STORE  =30;
+  static final byte OP_STRUCT =31;
+  static final byte OP_TYPE   =32;
+  static final byte OP_VAL    =33;
+  static final byte OP_MAX    =34;
 
-  private static final String[] STRS = new String[] { null, "BindFP", "Call", "CallEpi", "Cast", "Con", "ConType", "CProj", "Err", "Field", "Fresh", "FP2DSP", "Fun", "FunPtr", "If", "Join", "Keep", "Load", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Root", "Scope","SetFld","Split", "Store", "Struct", "Type", "Val" };
+  private static final String[] STRS = new String[] { null, "BindFP", "Call", "CallEpi", "Cast", "Con", "ConType", "CProj", "Err", "Field", "Fresh", "FP2DSP", "ForwardRef", "Fun", "FunPtr", "If", "Join", "Keep", "Load", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Root", "Scope","SetFld","Split", "Store", "Struct", "Type", "Val" };
   static { assert STRS.length==OP_MAX; }
 
   // Unique dense node-numbering
