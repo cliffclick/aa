@@ -578,18 +578,20 @@ public class Parse implements Comparable<Parse> {
       int lhsidx = lhs.push();
       Parse err = errMsg(opx);
       // Get the overloaded operator field
-      Node over = gvn(new FieldNode(lhs,binop._name,err));
+      Node over = gvn(new FieldNode(lhs,FieldNode.PROTO,binop._name,err));
       // Get the resolved operator from the overload
-      Node unbound_fun = gvn(new FieldNode(over,null,err));
-      int fidx = unbound_fun.push();
+      Node unbound_fun = gvn(new FieldNode(over,FieldNode.LOCAL,"_",err));
+      // Bind to the lhs
+      Node bind = gvn(new BindFPNode(unbound_fun,Node.peek(lhsidx)));
+      int fidx = bind.push();
       // Parse the RHS operand
       Node rhs = binop._lazy
         ? _lazy_expr(binop)
         : _expr_higher_require(binop);
       // Emit the call to both terms
-      unbound_fun = Node.pop(fidx);
+      bind = Node.pop(fidx);
       // LHS in unhooked prior to optimizing/replacing.
-      lhs = do_call(errMsgs(opx,lhsx,rhsx), args(Node.pop(lhsidx),rhs,unbound_fun));
+      lhs = do_call(errMsgs(opx,lhsx,rhsx), args(Node.pop(lhsidx),rhs,bind));
       // Invariant: LHS is unhooked
     }
   }
@@ -691,11 +693,13 @@ public class Parse implements Comparable<Parse> {
       // Load field e0.op2_ as an overload, load again to resolve to a TFP,
       // bind, and instance call.  Returns an overload from the clazz, typed as
       // a TypeStruct tuple where the fields hold the function choices.
-      Node over = gvn(new FieldNode(e0,op._name,err));
+      Node over = gvn(new FieldNode(e0,FieldNode.PROTO,op._name,err));
       // Selects the correct function from the TypeStruct tuple.
-      Node unbound_fun = gvn(new FieldNode(over,null,err));
-      //
-      n = do_call(errMsgs(oldx,oldx),args(Node.pop(e0idx),unbound_fun));
+      Node unbound_fun = gvn(new FieldNode(over,FieldNode.LOCAL,"_",err));
+      // Bind to the original
+      Node bind = gvn(new BindFPNode(unbound_fun,Node.peek(e0idx)));
+      // Call the operator
+      n = do_call(errMsgs(oldx,oldx),args(Node.pop(e0idx),bind));
     } else {
       // Normal leading term
       _x=oldx;
@@ -733,9 +737,15 @@ public class Parse implements Comparable<Parse> {
           throw unimpl();       // SetField before Store
         } else {
           Parse bad = errMsg(fld_start);
+          int cidx = castnn.push();
           Node st = gvn(new LoadNode(mem(),castnn,bad));
+          // This field can resolve against a prototype field or a self field.
           // Using a plain underscore for the field name is a Resolving field.
-          n = gvn(new FieldNode(st,Util.eq(fld,"_") ? null : fld,bad));
+          n = gvn(new FieldNode(st,FieldNode.UNKNOWN,fld,bad));
+          // resolving fields already bound; resolved fields bind.
+          castnn = Node.pop(cidx);
+          if( !Util.eq("_",fld) )
+            n = gvn(new BindFPNode(n,castnn));
         }
 
       } else if( peek('(') ) {  // Attempt a function-call
@@ -815,14 +825,15 @@ public class Parse implements Comparable<Parse> {
     Node ptr = get_display_ptr(scope);
     Node ld = gvn(new LoadNode(mem(),ptr,bad));
     int ld_x = ld.push();
-    Node n = gvn(new FieldNode(ld,tok,bad));
+    Node n = gvn(new FieldNode(ld,FieldNode.LOCAL,tok,bad));
     if( n.is_forward_ref() )    // Prior is actually a forward-ref
       return err_ctrl1(ErrMsg.forward_ref(this,((FunPtrNode)n)));
     // Do a full lookup on "+", and execute the function
     int nidx = n.push();
-    Node plus = gvn(new FieldNode(n,"_+_",bad));
-    Node inc = con(TypeInt.con(d),"int:");
-    Node sum = do_call(errMsgs(_x-2,_x,_x), args(plus,inc));
+    Node overplus = gvn(new FieldNode(n,FieldNode.PROTO,"_+_",bad)); // Plus operator overload
+    Node plus = gvn(new FieldNode(overplus,FieldNode.LOCAL,"_",bad)); // Resolve overload
+    Node inc = con(TypeInt.con(d));
+    Node sum = do_call0(false,errMsgs(_x-2,_x,_x), args(n,inc,plus));
     Node stf = gvn(new SetFieldNode(tok,Access.RW,Node.peek(ld_x),sum,bad));
     // Active memory for the chosen scope, after the call to plus
     scope().replace_mem(new StoreNode(mem(),ptr,stf,bad));
@@ -909,15 +920,23 @@ public class Parse implements Comparable<Parse> {
     // Must load against most recent display update, in case some prior store
     // is in-error.  Directly loading against the display would bypass the
     // (otherwise alive) error store.
-    
-    Node ld = gvn(new LoadNode(mem(),get_display_ptr(scope),bad));
-    Node fd = gvn(new FieldNode(ld,tok,bad));
+
+    // Display/struct/scope containing the field
+    Node dsp = get_display_ptr(scope);
+    // Load the display/scope structure
+    Node ld = gvn(new LoadNode(mem(),dsp,bad));
+    // Load the field from the struct.  This field name is resolved and is a
+    // local field (not prototype field) load.
+    Node fd = gvn(new FieldNode(ld,FieldNode.LOCAL,tok,bad));
+    // Bind display of loaded functions
+    Node bind = gvn(new BindFPNode(fd,dsp));
     // If in the middle of a definition (e.g. a HM Let, or recursive assign)
     // then no Fresh per normal HM rules.  If loading from a struct or from
     // normal Lambda arguments, again no Fresh per normal HM rules.
-    return fd.is_forward_ref() || scope.stk()._is_closure
-      ? fd
-      : gvn(new FreshNode(_e._fun,fd));
+    Node frsh = fd.is_forward_ref() || scope.stk()._is_closure
+      ? bind
+      : gvn(new FreshNode(_e._fun,bind));
+    return frsh;
   }
 
 
@@ -1169,9 +1188,9 @@ public class Parse implements Comparable<Parse> {
     if( n instanceof Long   ) {
       if( _buf[_x-1]=='.' ) _x--; // Java default parser allows "1." as an integer; pushback the '.'
       long l = n.longValue();
-      return l==0 ? Env.XNIL : con(TypeInt.con(l),"int:");
+      return l==0 ? Env.XNIL : con(TypeInt.con(l));
     }
-    if( n instanceof Double ) return con(TypeFlt.con(n.doubleValue()),"flt:");
+    if( n instanceof Double ) return con(TypeFlt.con(n.doubleValue()));
     throw new RuntimeException(n.getClass().toString()); // Should not happen
   }
   // Parse a small positive integer; WS already skipped and sitting at a digit.
@@ -1314,8 +1333,7 @@ public class Parse implements Comparable<Parse> {
       clz = type_fref(tname,false); // None, so create
     }
     // Clazzes have a canonical worse-case instance
-    //return clz.ts().make_canonical();
-    throw unimpl();
+    return clz.instance_type();
   }
 
   // Create a value forward-reference.  Must turn into a function call later.
@@ -1440,13 +1458,7 @@ public class Parse implements Comparable<Parse> {
   private Node mem() { return scope().mem(); }
   private void set_mem( Node n) { scope().set_mem(n); }
 
-  private Node con( TypeNil t, String intflt ) {
-    StructNode proto = _e.lookup_type(intflt);
-    for( Node n : proto._uses )
-      if( n instanceof NewNode nnn )
-        return gvn(nnn.make_con(TypeStruct.make(TypeFld.make(".",t))));
-    throw unimpl();
-  }
+  private Node con( TypeNil t ) { return Node.con(t); }
 
   // Lookup & extend scopes
   public  Node lookup( String tok ) { return _e.lookup(tok); }
@@ -1468,7 +1480,7 @@ public class Parse implements Comparable<Parse> {
       Node dsp = gvn(new LoadNode(mmem,ptr,null)); // Gen linked-list walk code, walking display slot
       while( dsp instanceof SetFieldNode ) // Bypass partial frame updates
         dsp = dsp.in(0); // Never set the display, so bypass
-      ptr = gvn(new FieldNode(dsp,"^",null));
+      ptr = gvn(new FieldNode(dsp,FieldNode.LOCAL,"^",null));
       e = e._par;                                 // Walk linked-list in parser also
     }
   }

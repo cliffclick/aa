@@ -2,11 +2,11 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.*;
+import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.TVLambda;
+import com.cliffc.aa.tvar.TVLeaf;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFunPtr;
-
-import static com.cliffc.aa.AA.unimpl;
 
 // Strip out the display argument from a bound function.
 // Inverse of BindFP.
@@ -42,10 +42,7 @@ public class FP2DSPNode extends Node {
 
   @Override public ErrMsg err( boolean fast ) {
     Type fdx = fp()._val;
-    if( fdx instanceof TypeFunPtr tfp ) {
-      throw unimpl();
-    } else {
-      return fast ? ErrMsg.FAST : ErrMsg.unresolved(_bad,"A function is being called, but "+fp()._val+" is not a function");
-    }
+    if( fdx instanceof TypeFunPtr ) return null;
+    return fast ? ErrMsg.FAST : ErrMsg.unresolved(_bad,"A function is being called, but "+fdx+" is not a function");
   }
 }

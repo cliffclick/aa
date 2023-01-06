@@ -14,7 +14,9 @@ public class TVErr extends TV3 {
 
   static final int XSTR=0;
   static final int XFUN=1;
-  static final int XMAX=2;
+  static final int XINT=2;
+  static final int XFLT=3;
+  static final int XMAX=4;
 
   TVErr() { super(false,new TV3[XMAX]); }
 

@@ -3,7 +3,7 @@ package com.cliffc.aa;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.NonBlockingHashMapLong;
+import com.cliffc.aa.util.NonBlockingHashMap;
 import com.cliffc.aa.util.VBitSet;
 
 import java.util.ArrayList;
@@ -52,6 +52,7 @@ public class Env implements AutoCloseable {
   public static final ConNode ALL;   // Common ALL / used for errors
   public static final ConNode XCTRL; // Always dead control
   public static final ConNode XNIL;  // Default 0
+  public static final ConNode SCALAR;// Default scalar
   public static final ConNode THUNK; // Default thunk parameter
   public static final ConNode UNUSED;// Dead alias
   public static final ConNode ALLMEM;//   Used whole memory
@@ -69,7 +70,7 @@ public class Env implements AutoCloseable {
   // (dictates visibility of a name).  During semantic analysis a named type
   // can be Loaded from as a class obj, requiring Loads reverse the type name
   // to the prototype obj.
-  public static final NonBlockingHashMapLong<NewNode> PROTOS;
+  public static final NonBlockingHashMap<String,StructNode> PROTOS;
 
   // Add a permanent edge use to all these Nodes, keeping them alive forever.
   @SuppressWarnings("unchecked")
@@ -87,6 +88,7 @@ public class Env implements AutoCloseable {
     ALL   = keep(new ConNode<>(Type.ALL   ));
     XCTRL = keep(new ConNode<>(Type.XCTRL ));
     XNIL  = keep(new ConNode<>(TypeNil.XNIL));
+    SCALAR= keep(new ConNode<>(TypeNil.SCALAR));
     THUNK = keep(new ConNode<>(TypeFunPtr.THUNK));
     UNUSED= keep(new ConNode<>(TypeStruct.UNUSED));
     ALLMEM= keep(new ConNode<>(TypeMem.ALLMEM));
@@ -101,7 +103,7 @@ public class Env implements AutoCloseable {
     // All the Calls in the Universe, which might call somebody.
     ALL_CALL=keep(new ProjNode(ROOT,2));
 
-    PROTOS = new NonBlockingHashMapLong<>();
+    PROTOS = new NonBlockingHashMap<>();
 
     // The Top-Level environment; holds the primitives.
     TOP = new Env();

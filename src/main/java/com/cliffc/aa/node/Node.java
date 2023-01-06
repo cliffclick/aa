@@ -94,7 +94,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   abstract public boolean has_tvar();
   public TV3 tvar(int x) { return in(x).tvar(); } // nth TV2
   // Initial set of type variables; lazy; handles cycles.
-  public final TV3 set_tvar() { assert has_tvar();  return _tvar==null ? (_tvar = _set_tvar()) : _tvar; }
+  public final TV3 set_tvar() { assert has_tvar();  return _tvar==null ? (_tvar = _set_tvar()) : tvar(); }
   // Initial compute of type variables.  No set, no smarts.  Overridden.
   TV3 _set_tvar() { return new TVLeaf(); }
 
@@ -575,9 +575,9 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Do One Step of Hindley-Milner unification.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
   public void combo_unify() {
-    if( _val == Type.ANY ) return; // No HM progress on untyped code
     TV3 old = _tvar;
     if( old==null ) return;
+    if( _val == Type.ANY ) { _tvar.deps_add_deep(this); return; } // No HM progress on untyped code
     if( _live== Type.ANY && !has_call_use() ) // No HM progress on dead code
       return;
     if( unify(false) ) {
@@ -620,11 +620,6 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( should_con(_val) )
       return con(_val);
 
-    // Replace with a prototyped constant, if possible
-    Node pcon = should_proto(_val);
-    if( pcon!=null )
-      return pcon.add_flow();
-    
     // Try CSE
     if( !_elock ) {             // Not in VALS and can still replace
       Node x = VALS.get(this);  // Try VALS
@@ -692,19 +687,17 @@ public abstract class Node implements Cloneable, IntSupplier {
   // - Not an ErrNode AND
   // - Type.is_con()
   public boolean should_con(Type t) {
-    if( this instanceof ConNode || // Already a constant
-        (this instanceof FunPtrNode && _val.is_con()) || // Already a constant
-        this instanceof ErrNode || // Never touch an ErrNode
-        this instanceof FreshNode ||// These modify the TVars but not the constant flows
+    if( !t.is_con() ) return false; // Not a constant
+    if( this instanceof ConNode    || // Already a constant
+        this instanceof FunPtrNode || // Already a constant
+        this instanceof ErrNode    || // Never touch an ErrNode
+        this instanceof FreshNode  || // These modify the TVars but not the constant flows
         (this instanceof StructNode st && !st.is_closed()) || // Struct is in-progress
         is_prim() )                 // Never touch a Primitive
       return false; // Already a constant, or never touch an ErrNode
-    // Constant argument to call: keep for call resolution.
-    // Call can always inline to fold constant.
-    if( this instanceof ProjNode prj && in(0) instanceof CallNode && prj._idx>0 )
-      return false;
-    // Is a constant and not in error?  Do not remove the error.
-    return t.is_con() && err(true) == null;
+    if( t instanceof TypeFunPtr tfp && tfp.dsp()!=Type.ANY )
+      return false; // Even if whole TFP is a constant, need to construct with display
+    return true;
   }
 
   // Make globally shared common ConNode for this type.
@@ -726,27 +719,6 @@ public abstract class Node implements Cloneable, IntSupplier {
     }
     return Env.GVN.add_flow(con); // Updated live flows
   }
-
-  // Inline a prototype constant
-  public Node should_proto( Type t ) {
-    if( this instanceof ProjNode && in(0) instanceof CallNode )
-      return null;
-    // Prototype constants are always a TypeStruct, with a prototype "!" field
-    // and some extra constant fields.
-    TypeFld pproto;
-    if( !(t instanceof TypeStruct ts) || (pproto=ts.get("!"))==null ) return null;
-    if( this instanceof StructNode sn && sn.find("!")==0 )
-      return null;              // Already a canonical prototype constant
-    if( !(pproto._t instanceof TypeMemPtr tptr) ) return null;
-    int alias = tptr.aliases().abit();
-    if( alias <= 0 ) return null;
-    for( int i=1; i<ts.len(); i++ )
-      if( !ts.get(i).is_con() )
-        return null;
-    NewNode nnn = Env.PROTOS.get(alias);
-    return nnn.make_con(ts);
-  }
-
   
   // Forward reachable walk, setting types to ANY and making all dead.
   public final void walk_initype(  ) {
@@ -798,6 +770,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     }
     _elock();                   // Install in GVN
     _val = _live = Type.ANY;    // Super optimistic types
+    if( has_tvar() ) set_tvar();
     return Env.GVN.add_flow(this);
   }
 

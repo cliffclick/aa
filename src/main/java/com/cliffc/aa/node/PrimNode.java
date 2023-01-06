@@ -48,30 +48,11 @@ public abstract class PrimNode extends Node {
   }
 
   // Int/Float primitives.  
-  public static final StructNode  INT,  FLT; // Prototype; has all the primitive operators
-  public static final    NewNode NINT, NFLT; // Allocation of prototype object
-  public static final  MProjNode MINT, MFLT; // Prototype memory 
-  public static final   ProjNode PINT, PFLT; // Pointer to prototype
-  public static final StructNode XINT, XFLT; // Worse-case instances
-
-  static {
-    // Requires Env be initialized first.  Uses standard Env.TOP scope memory
-    Node mem = Env.SCP_0.mem();
-    
-     FLT = new StructNode(false,false,null, "flt:", Type.ALL).init();
-    NFLT = new    NewNode(mem,FLT).init();
-    MFLT = new  MProjNode(NFLT).init();
-    PFLT = new   ProjNode(NFLT,REZ_IDX).init();
-    XFLT = NFLT.make_con(TypeStruct.make_flt(PFLT._val,TypeFlt.FLT64));
-    
-     INT = new StructNode(false,false,null,"int:", Type.ALL).init();
-    NINT = new    NewNode(MFLT,INT).init();
-    MINT = new  MProjNode(NINT).init();
-    PINT = new   ProjNode(NINT,REZ_IDX).init();
-    XINT = NINT.make_con(TypeStruct.make_int(PINT._val,TypeInt.INT64));
-
-    Env.SCP_0.set_mem(MINT);
-  }
+  public static final StructNode ZINT = new StructNode(false,false,null,"int:", Type.ALL).set_proto_instance(TypeInt.INT64);
+  public static final StructNode ZFLT = new StructNode(false,false,null,"flt:", Type.ALL).set_proto_instance(TypeFlt.FLT64);
+  public static final ConNode  INT = new ConNode(TypeInt. INT64).init();
+  public static final ConNode  FLT = new ConNode(TypeFlt. FLT64).init();
+  public static final ConNode NFLT = new ConNode(TypeFlt.NFLT64).init();
   
   private static PrimNode[] PRIMS = null; // All primitives
 
@@ -133,12 +114,14 @@ public abstract class PrimNode extends Node {
     for( PrimNode[] prims : INTS   ) for( PrimNode prim : prims ) allprims.push(prim);
     PRIMS = allprims.asAry();
 
-    // Build the int and float types and prototypes
-    Env.STK_0.add_fld("flt",Access.Final,make_prim(PFLT,FLT,FLTS),null);
-    Env.STK_0.add_fld("int",Access.Final,make_prim(PINT,INT,INTS),null);
+    // Build the int and float prototypes
+    make_prim(ZFLT,FLTS);
+    make_prim(ZINT,INTS);
     
-    Env.KEEP_ALIVE.add_def(XINT);
-    Env.KEEP_ALIVE.add_def(XFLT);
+    Env.KEEP_ALIVE.add_def(ZINT);
+    Env.KEEP_ALIVE.add_def(ZFLT);
+    Env.KEEP_ALIVE.add_def( INT);
+    Env.KEEP_ALIVE.add_def( FLT);
     Env.GVN.iter();
     
     // Math package
@@ -147,18 +130,11 @@ public abstract class PrimNode extends Node {
     return PRIMS;
   }
 
-  // Make a wrapped primitive
-  public static TypeStruct make_int(TypeInt ti) { return PINT._val==Type.ALL ? TypeStruct.ISUSED : TypeStruct.make_int(PINT._val,ti); }
-  public static TypeStruct make_flt(TypeFlt td) { return PFLT._val==Type.ALL ? TypeStruct.ISUSED : TypeStruct.make_flt(PFLT._val,td); }
-  public static Type make_wrap(TypeNil rez) {
-    if( rez==TypeNil.XNIL ) return rez;
-    return rez instanceof TypeInt ti ? make_int(ti) : make_flt((TypeFlt)rez);
-  }
-
   // Primitive wrapped as a simple function.
   // Fun Parm_dsp [Parm_y] prim Ret
   // No memory, no RPC.  Display is first arg.
   private FunPtrNode as_fun( ) {
+    // Lazily discover operators
     if( is_oper() ) Oper.make(_name,_is_lazy);
 
     FunNode fun = new FunNode(this,_name);
@@ -170,16 +146,16 @@ public abstract class PrimNode extends Node {
       // Make a Parm for every formal
       Type tformal = _formals.at(i);
       Node nformal;
-      if(      tformal==TypeInt.INT64   ) nformal = XINT;
-      else if( tformal==TypeFlt.FLT64   ) nformal = XFLT;
+      if(      tformal==TypeInt.INT64   ) nformal =  INT;
+      else if( tformal==TypeFlt.FLT64   ) nformal =  FLT;
+      else if( tformal==TypeFlt.NFLT64  ) nformal = NFLT;
+      else if( tformal==TypeNil.SCALAR  ) nformal = Env.ALL;
       else if( tformal==Type.ALL        ) nformal = Env.ALL;
       else if( tformal==TypeFunPtr.THUNK) nformal = Env.THUNK;
       else if( tformal==TypeMem.ALLMEM  ) nformal = Env.ALLMEM;
       else throw unimpl();
       add_def(new ParmNode(i,fun,null,TypeNil.SCALAR,nformal).init());
     }
-    add_def(PINT);
-    add_def(PFLT);
     // The primitive, working on and producing wrapped prims
     init();
     // If lazy, need control and memory results
@@ -191,9 +167,14 @@ public abstract class PrimNode extends Node {
     // FunPtr is UNBOUND here, will be bound when loaded thru a named struct to the Clazz.
     return new FunPtrNode(_name,ret).init();
   }
+  
   // Make and install a primitive Clazz.
-  private static ProjNode make_prim( ProjNode ptr, StructNode rec, PrimNode[][] primss ) {
+  private static void make_prim( StructNode clz, PrimNode[][] primss ) {
     for( PrimNode[] prims : primss ) {
+      // Primitives are grouped into overload groups, where the 'this' or
+      // display argument is always of the primitive type, and the other
+      // arguments may vary, and the correct primitive is picked using overload
+      // resolution.
       StructNode over = new StructNode(false,false,null,"",Type.ALL);
       int cnt=0;
       for( PrimNode prim : prims ) {
@@ -202,27 +183,21 @@ public abstract class PrimNode extends Node {
       }
       over.init();
       over.close();
-      rec.add_fld(prims[0]._name,Access.Final,over,null);
+      clz.add_fld(prims[0]._name,Access.Final,over,null);
     }
-    Env.GVN.add_work_new(rec);
-    rec._val = rec.value();
-    rec.close();
-    Env.SCP_0.add_type(rec._clz,rec); // type  String -> clazz Struct mapping, for types
-    NewNode nnn = (NewNode)ptr.in(0);
-    Env.PROTOS.put(nnn._alias,nnn); // alias mapping for instance lookup
-    return ptr;
+    clz.close().init();
+    Env.SCP_0.add_type(clz._clz,clz); // type String -> clazz Struct mapping, for scope-based type lookups
+    Env.PROTOS.put(clz._clz,clz); // global mapping
   }
 
   // Build and install match package
   private static ProjNode make_math(PrimNode rand) {
-    StructNode rec = new StructNode(false,false,null,"",Type.ALL);
-    var pi = NFLT.make_con(TypeStruct.make_flt(PFLT._val,TypeFlt.PI));
-    rec.add_fld("pi",Access.Final,pi,null);
-    rec.add_fld(rand._name,Access.Final,rand.as_fun(),null);
-    rec.init();
-    rec.close();
+    StructNode clz = new StructNode(false,false,null,"",Type.ALL);
+    clz.add_fld("pi",Access.Final,con(TypeFlt.PI),null);
+    clz.add_fld(rand._name,Access.Final,rand.as_fun(),null);
+    clz.close().init();
     Node mem = Env.SCP_0.mem();
-    NewNode nnn = new NewNode(mem,rec).init();
+    NewNode nnn = new NewNode(mem,clz).init();
     MProjNode mprj = new MProjNode(nnn).init();
     ProjNode ptr = new ProjNode(nnn,REZ_IDX).init();
     Env.SCP_0.set_mem(mprj);
@@ -247,20 +222,16 @@ public abstract class PrimNode extends Node {
     boolean is_con = true, has_high = false;
     for( int i=DSP_IDX; i<_formals.len(); i++ ) {
       TypeNil tformal = (TypeNil)_formals.at(i);
-      Type twrap = val(i-DSP_IDX);
-      TypeNil t = TypeNil.XNIL;
-      if( twrap != TypeNil.XNIL ) {
-        Type tactual = (twrap instanceof TypeStruct ts && ts.get(".")!=null ? ts.at(".") : twrap.oob(tformal));
-        t = (TypeNil)tformal.dual().meet(tactual);
-      }
-      TS[i-DSP_IDX] = t;
+      Type actual = val(i-DSP_IDX);
+      if( actual==Type.ALL ) return Type.ALL;
+      TypeNil t = TS[i-DSP_IDX] = actual==TypeNil.XNIL ? TypeNil.XNIL : (TypeNil)tformal.dual().meet(actual);
       // Expect: tformal is a expanded TypeStruct, so t is also.
       if( t != TypeNil.XNIL && !t.is_con() ) {
         is_con = false;         // Some non-constant
         if( t.above_center() ) has_high=true;
       }
     }
-    return make_wrap(is_con ? apply(TS) : (has_high ? (TypeNil)_ret.dual() : _ret));
+    return is_con ? apply(TS) : (has_high ? (TypeNil)_ret.dual() : _ret);
   }
   boolean is_oper() { return true; }
 
@@ -277,17 +248,12 @@ public abstract class PrimNode extends Node {
     // Return is some primitive, and is typically never a copy
     return make_tvar(false,_ret);
   }
-  
+
   // Make a wrapped TV3
-  private static final String[] PRIM_FLDS = new String[]{"!","."};
+
   static TV3 make_tvar(boolean is_copy, TypeNil rez) {
     if( rez==TypeNil.XNIL ) throw unimpl();
-    TV3 base = TVBase.make(is_copy,rez);
-    if( rez instanceof TypeInt )
-      return new TVStruct(is_copy,PRIM_FLDS,new TV3[]{PINT.set_tvar(),base});
-    if( rez instanceof TypeFlt )
-      return new TVStruct(is_copy,PRIM_FLDS,new TV3[]{PFLT.set_tvar(),base});
-    throw unimpl();
+    return TVBase.make(is_copy,rez);
   }
 
   // All work done in set_tvar, no need to unify
@@ -297,7 +263,7 @@ public abstract class PrimNode extends Node {
     for( int i=DSP_IDX; i<_formals.len(); i++ ) {
       Type tactual = val(i-DSP_IDX);
       TypeNil tformal = (TypeNil)_formals.at(i);
-      if( !tactual.isa(make_wrap(tformal)) )
+      if( !tactual.isa(tformal) )
         return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[i],tactual, tformal);
     }
     return null;
@@ -413,7 +379,7 @@ public abstract class PrimNode extends Node {
   static class ModI64 extends Prim2OpI64 { ModI64() { super("_%_"); } long op( long l, long r ) { return r==0 ? 0 : l%r; } }
 
   abstract static class Prim2OpIF64 extends PrimNode {
-    Prim2OpIF64( String name ) { super(name,TypeTuple.INT64_FLT64,TypeFlt.FLT64); }
+    Prim2OpIF64( String name ) { super(name,TypeTuple.INT64_NFLT64,TypeFlt.FLT64); }
     @Override public TypeFlt apply( TypeNil[] args ) { return TypeFlt.con(op(args[0].getl(),args[1].getd())); }
     abstract double op( long x, double y );
   }
@@ -459,7 +425,7 @@ public abstract class PrimNode extends Node {
   public static class NE_I64 extends Prim2RelOpI64 { public NE_I64() { super("_!=_"); } boolean op( long l, long r ) { return l!=r; } }
 
   abstract static class Prim2RelOpIF64 extends PrimNode {
-    Prim2RelOpIF64( String name ) { super(name,TypeTuple.INT64_FLT64,TypeInt.BOOL); }
+    Prim2RelOpIF64( String name ) { super(name,TypeTuple.INT64_NFLT64,TypeInt.BOOL); }
     @Override public TypeNil apply( TypeNil[] args ) { return op(args[0].getl(),args[1].getd()) ? TypeInt.TRUE : TypeNil.XNIL; }
     abstract boolean op( long x, double y );
   }
@@ -538,7 +504,7 @@ public abstract class PrimNode extends Node {
 
 
   public static class RandI64 extends PrimNode {
-    public RandI64() { super("rand",TypeTuple.INT64,TypeInt.INT64); }
+    public RandI64() { super("rand",TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, TypeNil.SCALAR, TypeInt.INT64),TypeInt.INT64); }
     @Override boolean is_oper() { return false; }
     @Override public TypeNil apply( TypeNil[] args ) { throw AA.unimpl(); }
     // Rands have hidden internal state; 2 Rands are never equal

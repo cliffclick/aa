@@ -36,4 +36,7 @@ public class MProjNode extends ProjNode {
     } else in(0).deps_add(this);
     return null;
   }
+  
+  @Override boolean assert_live(Type live) { return live instanceof TypeMem; }
+  
 }

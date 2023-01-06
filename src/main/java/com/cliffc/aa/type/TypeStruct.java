@@ -250,10 +250,6 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   public static TypeStruct make( TypeFld[] flds ) { return make(false,"",ALL,flds); }
   public static TypeStruct make( TypeFld fld0 ) { return make(TypeFlds.make(fld0)); }
 
-  // Starting from the int/flt prototype, make a concrete instance
-  public static TypeStruct make_int(Type proto, TypeInt ti) { return make_test("int:",ALL,TypeFld.make("!",proto),TypeFld.make(".",ti));  }
-  public static TypeStruct make_flt(Type proto, TypeFlt tf) { return make_test("flt:",ALL,TypeFld.make("!",proto),TypeFld.make(".",tf));  }
-  
   // The TypeFld[] is not interned.
   public static TypeStruct make_flds(String clz, Type def, TypeFld[] flds) { return make(false,clz,def,TypeFlds.hash_cons(remove_dups(def,flds))); }
 
@@ -669,14 +665,10 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     //       int:1234
     //       flt:3.14
     if( _clz.isEmpty() && dups.get(_uid)!=null )  sb.p(':');
-    // Shortcut print for 'int:1234" and 'flt:3.14'
-    TypeFld tf;
-    if( Util.eq("int:",_clz) && (tf=get("."))!=null ) return tf._t._str(visit,dups,sb,debug,indent);
-    if( Util.eq("flt:",_clz) && (tf=get("."))!=null ) return tf._t._str(visit,dups,sb,debug,indent);
     // Shortcut print for the full int and flt prototypes.
-    if( Util.eq("int:",_clz) && (tf=get("_+_"))!=null && sb.len() > 4 ) // Longer than 'int:' already printed
+    if( Util.eq("int:",_clz) && get("_+_")!=null && sb.len() > 4 ) // Longer than 'int:' already printed
       return sb.unchar(4).p("@{INT}");
-    if( Util.eq("flt:",_clz) && (tf=get("_+_"))!=null && sb.len() > 4 ) // Longer than 'flt:' already printed
+    if( Util.eq("flt:",_clz) && get("_+_")!=null && sb.len() > 4 ) // Longer than 'flt:' already printed
       return sb.unchar(4).p("@{FLT}");
     
     boolean is_tup = is_tup();
@@ -689,6 +681,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     if( ind ) sb.ii(1);
     boolean sep=false;
     for( TypeFld fld : _flds ) {
+      if( !debug && Util.eq(fld._fld,"^") ) continue;
       if( fld==TypeFld.ANY_DSP ) sb.p('_'); // Short-cut the ever-present display
       else {
         if( ind ) sb.nl().i();

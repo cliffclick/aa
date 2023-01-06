@@ -23,10 +23,11 @@ public class BindFPNode extends Node {
       return ts.make_from(tfs);
     }
     if( fun instanceof TypeFunPtr tfp ) {
+      if( tfp==TypeFunPtr.GENERIC_FUNPTR ) return tfp; // Forward ref, do not touch
       assert tfp.dsp()==Type.ANY;
       return tfp.make_from(dsp);
     }
-    return fun.oob();
+    return fun;
   }
   
   @Override public Type live_use(Node def) {
@@ -44,7 +45,10 @@ public class BindFPNode extends Node {
 
   @Override public boolean unify( boolean test ) {
     TV3 tv = tvar();
-    if( !(tv instanceof TVLambda lam) ) return false;
+    if( !(tv instanceof TVLambda lam) ) {
+      if( !test ) tv.deps_add_deep(this);
+      return false;
+    }
     // Unify display on a bound function
     return lam.dsp().unify(dsp().tvar(),test);
   }

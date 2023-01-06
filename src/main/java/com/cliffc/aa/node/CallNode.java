@@ -234,7 +234,7 @@ public class CallNode extends Node {
       Node progress = null;
       for( int i=ARG_IDX; i<nargs(); i++ )
         if( ProjNode.proj(this,i)==null &&
-            !(arg(i) instanceof ConNode) ) // Not already folded
+            !(should_con(val(i))) )        // Not already foldable
           progress = set_arg(i,Env.ANY);   // Kill dead arg
       if( progress != null ) return this;
     }
@@ -255,8 +255,7 @@ public class CallNode extends Node {
     ProjNode cepim = ProjNode.proj(cepi,MEM_IDX); // Memory projection from CEPI
     ProjNode cepid = ProjNode.proj(cepi,REZ_IDX); // Return projection from CEPI
     if( cepim == null ) return null;
-    if( !(cepim._val instanceof TypeMem) ) return null;
-    TypeMem tmcepi = (TypeMem) cepim._val;
+    if( !(cepim._val instanceof TypeMem tmcepi) ) return null;
     if( !mem._val.isa(tmcepi) ) return null; // Call entry stale relative to exit
     //BitsAlias escs = escapees();
     //// Check for prior      MrgProj/New
@@ -360,7 +359,7 @@ public class CallNode extends Node {
     CallEpiNode cepi = cepi();
     boolean all_wired = _is_copy || cepi.is_all_wired();
     if( all_wired ) deps_add(def);
-    else return Type.ALL;
+    else return Type.ANY;
     // All wired, the arg is dead if the matching projection is dead
     int argn = _defs.find(def);
     ProjNode proj = ProjNode.proj(this, argn);

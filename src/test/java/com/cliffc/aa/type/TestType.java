@@ -43,7 +43,6 @@ public class TestType {
   @Test public void testToString() {
     Ary<Type> ts = Type.ALL_TYPES();
     Object dummy = Env.TOP;
-    Type.Parse.set_proto((TypeMemPtr)PrimNode.PINT._val,(TypeMemPtr)PrimNode.PFLT._val);
     String[] ss = new String[ts.len()];
     for( int i=0; i<ts.len(); i++ )
       ss[i] = ts.at(i).str(new SB(), true, false).toString();
@@ -55,7 +54,6 @@ public class TestType {
   // Test for a collection of Strings, that toString and valueOf are a bijection
   @Test public void testValueOf() {
     PrimNode.PRIMS();
-    Type.Parse.set_proto((TypeMemPtr)PrimNode.PINT._val,(TypeMemPtr)PrimNode.PFLT._val);
     String[] ss = new String[] {
       "Scalar",                 // The Scalars and Nils
       "nScalar",
@@ -67,12 +65,12 @@ public class TestType {
       "~_0Scalar",
       "3",                      // Simple primitive int
       "int64",                  // Simple primitive range
-      "int:123",                // Class integer
-      "int:nint8",              // Class integer range
+      "123",                    // Class integer
+      "nint8",                  // Class integer range
       "3.14",                   // Simple primitive flt
       "flt32",                  // Simple primitive range
-      "flt:3.14",               // Class Float
-      "flt:flt64",              // Class Float range
+      "3.14",                   // Class Float
+      "flt64",                  // Class Float range
       "*[17](_, 1, ~Scalar)",   // Bare ~type as a field
       "[23]{any,3 -> *[7](3, Scalar) }", // Function returning a struct
       "*[3](_, 0=PA:*[3]@{_; _*_=*[nALL]over35:(); f=flt64}, *[](), 2=PA)", // Struct with self-references
@@ -80,7 +78,7 @@ public class TestType {
       "PA:*[18]@{_; n1=*[17]@{_; n1=PA; FB:v1=7}; FB}", // DUP Field
       "*[18](_, 0=PA:*[17](_, *[4,5]@{_; x=nScalar}, nScalar), 1=PA)",
       "@{FA:head=*[17]@{_; FA}?}", // Shared field in unrelated structs
-      "{Ctrl,[[_all_]],SB:int:int64,SB}", // Label on a wrapped int
+      "{Ctrl,[[_all_]],int64,int64}", // Label on a wrapped int
     };
     for( String s : ss ) {
       Type t0 = Type.valueOf(s);
@@ -198,15 +196,15 @@ public class TestType {
 
   @Test public void testNamesInts() {
 
-    // Lattice around int8 and 0 is well formed; exactly 3 edges, 3 nodes
+    // Lattice around int8 and 0 is well-formed; exactly 3 edges, 3 nodes
     // Confirm lattice: {~i16 -> ~i8 -> 0 -> i8 -> i16 }
     // Confirm lattice: {        ~i8 -> 1 -> i8        }
-    TypeStruct  i16= PrimNode.make_int(TypeInt.INT16);
-    TypeStruct  i8 = PrimNode.make_int(TypeInt.INT8 );
-    TypeStruct xi8 = i8.dual();
-    TypeStruct xi16= i16.dual();
-    TypeStruct z   = PrimNode.make_int(TypeInt.con(0));
-    TypeStruct o   = PrimNode.make_int(TypeInt.TRUE );
+    TypeStruct  i16= TypeStruct.make(false,"int:",TypeInt.INT16 , TypeFlds.EMPTY);
+    TypeStruct  i8 = TypeStruct.make(false,"int:",TypeInt.INT8  , TypeFlds.EMPTY);
+    TypeStruct xi8 = TypeStruct.make( true,"~int:",TypeInt.INT8.dual(), TypeFlds.EMPTY);
+    TypeStruct xi16= TypeStruct.make( true,"~int:",TypeInt.INT16.dual(), TypeFlds.EMPTY);
+    TypeStruct z   = TypeStruct.make(false,"int:",TypeInt.con(0), TypeFlds.EMPTY);
+    TypeStruct o   = TypeStruct.make(false,"int:",TypeInt.TRUE  , TypeFlds.EMPTY);
     assertEquals(xi8,xi8.meet(xi16)); // ~i16-> ~i8
     //assertEquals( z ,z  .meet(xi8 )); // ~i8 ->  0 // No longer applies single redoing nil
     assertEquals(i8 ,i8 .meet(xi8 )); //  ~i8 -> i8

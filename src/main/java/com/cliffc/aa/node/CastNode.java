@@ -82,11 +82,9 @@ public class CastNode extends Node {
       return false;
 
     // Expand nilable to either base
-    if( maynil instanceof TVBase && notnil instanceof TVBase ) {
-    //  assert !arg.is_open() && !ret.is_open();
-    //  assert arg._flow == ret._flow.meet(Type.NIL);
-    //  return false;
-      throw unimpl();
+    if( maynil instanceof TVBase maybase && notnil instanceof TVBase notbase ) {
+      assert maybase._t == notbase._t.meet(TypeNil.XNIL);
+      return false;
     }
     
     // Already an expanded nilable with ptr

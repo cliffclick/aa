@@ -47,6 +47,10 @@ public class StructNode extends Node {
   // Only modify if !_closed
   private boolean _forward_ref;
 
+  // Worse-case instance type for prototypes; e.g. TypeInt.INT64.
+  // NULL for non-prototypes.
+  private TypeNil _instance_type;
+  
   // A collection of fields which *almost* make up a TypeStruct.  Almost,
   // because missing the field Types, which come from the Node inputs are not
   // otherwise part of a StructNode.
@@ -135,6 +139,10 @@ public class StructNode extends Node {
   public void define() { assert _forward_ref && _closed; _forward_ref=false; }
   @Override public boolean is_forward_type() { return _forward_ref; }
 
+  // One-time transition to make this a prototype
+  public StructNode set_proto_instance(TypeNil t) { assert _instance_type==null; _instance_type = t; return this; }
+  public TypeNil instance_type() { return _instance_type; }
+  
   // Simple parser helpers
   public Parse[] fld_starts() { return _fld_starts.asAry(); }
 

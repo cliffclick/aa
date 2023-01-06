@@ -73,6 +73,7 @@ public class GVNGCM {
   public void add_flow( Ary<Node> ary ) { for( Node n : ary ) add_flow(n); }
   
   public Node pop_flow() { return _work_flow.pop(); }
+  public int flow_len() { return _work_flow.len(); }
 
   // Initial state after loading e.g. primitives.
   void init0() {

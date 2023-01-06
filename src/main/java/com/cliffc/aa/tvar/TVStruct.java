@@ -82,6 +82,12 @@ public class TVStruct extends TV3 {
   }
 
   public boolean is_open() { return _open; }
+  // Close if open
+  public void close() {
+    if( !_open ) return;
+    _open=false;
+    _deps_work_clear();
+  }
   
   // Partial unify two structs.  Unify matching fields in this with that.  If
   // field is missing in that and that is closed, remove the field from 'this'.

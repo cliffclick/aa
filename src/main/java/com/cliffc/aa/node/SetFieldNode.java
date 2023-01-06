@@ -1,16 +1,17 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.*;
+import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.TVLeaf;
+import com.cliffc.aa.tvar.TVStruct;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFld;
 import com.cliffc.aa.type.TypeStruct;
 import com.cliffc.aa.util.Util;
 
-import static com.cliffc.aa.type.TypeFld.Access;
 import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.type.TypeFld.Access;
 
 // Takes a static field name, a TypeStruct, a field value and produces a new
 // TypeStruct.  This is an incremental TypeStruct producer, and does not update
@@ -53,48 +54,25 @@ public class SetFieldNode extends Node {
 
 
   @Override public boolean has_tvar() { return true; }
+  
+  @Override public TV3 _set_tvar() {
+    TV3 rec  = new TVStruct(true,new String[]{_fld},new TV3[]{new TVLeaf()    },true);
+    TV3 self = new TVStruct(true,new String[]{_fld},new TV3[]{in(1).set_tvar()},true);
+    in(0).set_tvar().unify(rec,false);
+    return self;
+  }
 
-  // Unify the named field against a TV3.is_obj same named field.
-  // Other fields are just passed through.
+  // Already unified a self-struct with the set field.
+  // Need to unify matching other fields, same as TVStruct unification,
+  // minus the one set field.
   @Override public boolean unify( boolean test ) {
-    boolean progress = false;
-    TV3 self = tvar();
-    TV3 rec = tvar(0);
-    TV3 tvf = tvar(1);
-
-    // Add struct-ness as needed
-    TVStruct objrec;
-    if( !(rec instanceof TVStruct rec0) ) {
-      if( test ) return true;
-      objrec = new TVStruct(true,new String[]{_fld},new TV3[]{new TVLeaf()},true);
-      progress |= rec.unify(objrec,test);
-    } else objrec = rec0;
-
-    // Add struct-ness as needed
-    TVStruct objslf;
-    if( !(self instanceof TVStruct self0) ) {
-      if( test ) return true;
-      objslf = new TVStruct(true,new String[]{_fld},new TV3[]{tvf},true);
-      progress |= self.unify(objslf,test);
-    } else objslf = self0;
-
-    // Add the field to both
-    if( objrec.is_open() && objrec.arg(_fld)==null )
-      progress |= test || objrec.add_fld(_fld,new TVLeaf());
-    
-    if( objslf.is_open() && objslf.arg(_fld)==null )
-      progress |= test || objslf.add_fld(_fld,tvf);
-
-    // Check for missing field, or unify
-    TV3 tvfld = objslf.arg(_fld);    
-    if( tvfld==null ) throw unimpl();
-    progress |= tvfld.unify(tvf,test);
-    if( test && progress ) return true;
+    TVStruct self = tvar( ).as_struct();
+    TVStruct rec  = tvar(0).as_struct();
 
     // Unify all other common fields, same as normal struct unification
-    progress |= objrec.half_unify(objslf,_fld,test);
-    progress |= objslf.half_unify(objrec,_fld,test);
-    return progress;
+    return 
+      self.half_unify(rec ,_fld,test) |
+      rec .half_unify(self,_fld,test);
   }
 
   @Override public ErrMsg err( boolean fast ) {

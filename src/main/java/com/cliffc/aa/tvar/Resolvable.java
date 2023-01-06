@@ -3,8 +3,6 @@ package com.cliffc.aa.tvar;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.node.Node;
 
-import static com.cliffc.aa.AA.unimpl;
-
 public interface Resolvable {
   // True if this field is still resolving: the actual field being referenced
   // is not yet known.
@@ -56,10 +54,10 @@ public interface Resolvable {
   // otherwise force unification on all choices which will trigger an error on
   // each choice.
   default void resolve_failed() {
-    if( !(match_tvar() instanceof TVStruct tvs) ) throw unimpl();
-    if( ambi(tvar(),tvs) ) tvar().err("Ambiguous");
-    else
-      tvar().err("No field resolves");
+    String err = match_tvar() instanceof TVStruct tvs && ambi(tvar(),tvs)
+      ? "Ambiguous"
+      : "No field resolves";
+    tvar().err(err);
     Env.GVN.add_flow((Node)this);
   }
   // True if ambiguous (more than one match), false if no matches.

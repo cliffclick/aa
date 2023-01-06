@@ -51,14 +51,14 @@ public class ScopeNode extends Node {
     assert n._val instanceof TypeMem || n._val ==Type.ANY || n._val ==Type.ALL;
     Node old = mem();
     set_def(MEM_IDX,n);
-    if( old!=null ) {
-      Env.GVN.add_work_new(old);
-      if( old._uses._len == 1 && // Only a MemSplit
-          old._uses.at(0) instanceof MemSplitNode )
-        Env.GVN.add_mono(((MemSplitNode)old._uses.at(0)).join());
-      //old.add_flow_def_extra(n); // old loses a use, triggers extra
-      //Env.GVN.add_work_new(n);
-    }
+    //if( old!=null ) {
+    //  Env.GVN.add_work_new(old);
+    //  if( old._uses._len == 1 && // Only a MemSplit
+    //      old._uses.at(0) instanceof MemSplitNode split )
+    //    Env.GVN.add_mono(split.join());
+    //  //old.add_flow_def_extra(n); // old loses a use, triggers extra
+    //  //Env.GVN.add_work_new(n);
+    //}
     return this;
   }
   public void replace_mem(Node st) {

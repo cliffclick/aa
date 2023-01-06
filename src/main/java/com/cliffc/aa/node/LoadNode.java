@@ -23,10 +23,14 @@ public class LoadNode extends Node {
   @Override public Type value() {
     Type tadr = adr()._val;
     Type tmem = mem()._val;       // Memory
-    if( tadr instanceof TypeStruct ts ) return ts; // Loading from Prototype is a no-op
-    if( !(tadr instanceof TypeMemPtr tmp) ) return tadr.oob();
-    if( !(tmem instanceof TypeMem    tm ) ) return tmem.oob(); // Nothing sane
-    return tm.ld(tmp);
+    return switch(tadr ) {
+    case TypeStruct ts -> ts; // Loading from Prototype is a no-op
+    case TypeInt    ti -> ti; // Loading from Prototype is a no-op
+    case TypeFlt    tf -> tf; // Loading from Prototype is a no-op
+    case TypeMemPtr tmp ->    // Loading from a pointer
+      tmem instanceof TypeMem tm ? tm.ld(tmp) : tmem.oob();
+    default -> tadr.oob();      // Nothing sane
+    };
   }
 
   // The only memory required here is what is needed to support the Load.
@@ -60,6 +64,7 @@ public class LoadNode extends Node {
       }
       case TVPtr ptr -> self.unify(ptr.load(),test);
       case TVStruct tstr -> self.unify(adr, test); // Load from prototype, just pass-thru
+      case TVBase base   -> self.unify(adr, test); //
       default -> throw unimpl();
     };
   }

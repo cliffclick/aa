@@ -42,7 +42,18 @@ public class TVBase extends TV3 {
     return _t.getClass() == that._t.getClass();
   }
 
-  @Override int eidx() { throw unimpl(); }
+  @Override int eidx() {
+    if( _t instanceof TypeInt ) return TVErr.XINT;
+    if( _t instanceof TypeFlt ) return TVErr.XFLT;
+    throw unimpl(); // 
+  }
 
+  TV3 strip_nil() {
+    _t = _t.join(TypeNil.NSCALR);
+    _may_nil = false;
+    return this;
+  }
+
+  
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) { return sb.p(_t); }  
 }

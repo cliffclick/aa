@@ -128,6 +128,7 @@ public class StoreNode extends Node {
   // Recursively collapse a set of SetFields into a single-use StructNode
   static StructNode _fold(Node rez) {
     if( rez instanceof StructNode st ) return st;
+    if( rez instanceof LoadNode ) return null;
     SetFieldNode sfn = (SetFieldNode)rez;
     StructNode st = _fold(sfn.in(0));
     if( st==null || !st.set_fld(sfn._fld,sfn._fin,sfn.in(1),false) )

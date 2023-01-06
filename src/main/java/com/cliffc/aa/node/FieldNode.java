@@ -10,28 +10,34 @@ import static com.cliffc.aa.AA.unimpl;
 // Takes a static field name, a TypeStruct and returns the field value.
 // Basically a ProjNode except it does lookups by field name in TypeStruct
 // instead of by index in TypeTuple.
-
-// Lookups that miss the field name will try again in a prototype.  A 2nd
-// lookup for field "!" (the prototype field) will be tried.  If this works and
-// produces a pointer with a single PROTOS alias, the field will be looked up
-// in the prototype and if found, the result will be bound to the original.
 //
-// Example: a lookup of "_+_" in the wrapped struct for 1, "@{!=int:clazz,.=1}".
-// The field "_+_" is not found in the wrapped 1; so the lookup goes again on
-// the int clazz.  This hits, and returns an overload of integer-add functions:
-// "( { int   int -> int}; { int   flt -> flt})".  This value is then bound:
-// "( { int:1 int -> int}; { int:1 flt -> flt})".
+// Fields with a fixed name either lookup in the incoming self record or in the
+// prototype.  The Field is unresolved until the lookup is successful in one or
+// the other; error if found in both.  Once resolved, the Field is marked.
+//
+// Fields with the "_" name resolve locally only via H-M matching to one choice
+// field.  Once resolved the Field name changes to match.
 
 public class FieldNode extends Node implements Resolvable {
   
-  // Field being loaded from a TypeStruct.  If null, the field name is inferred
-  // from amongst the field choices.  If not-null and not present, then an error.
+  // Field being loaded from a TypeStruct.  If "_", the field name is inferred
+  // from amongst the field choices.  If not-"_" and not present, then the
+  // lookup tries again in the prototype, and if that fields, then error.
   public       String _fld;
   public final Parse _bad;
+  
+  public static final byte UNKNOWN=0; // Unknown if the field loads from self or prototype
+  public static final byte LOCAL  =1; // Loads from self, not prototype
+  public static final byte PROTO  =2; // Loads from prototype, but the prototype is not known yet
+  // Fields from known prototype are rewritten in Iter to local-on-prototype fields.
+  // Fields can find their prototype in Combo and not rewritten until after Combo.
+  private byte _mode;
 
-  public FieldNode(Node struct, String fld, Parse bad) {
+  public FieldNode(Node struct, byte mode, String fld, Parse bad) {
     super(OP_FIELD,struct);
-    _fld = fld==null ? ("&"+_uid).intern() : fld;
+    _mode = mode;               // Local or prototype
+    // A plain "_" field is a resolving field
+    _fld = Util.eq(fld,"_") ? ("&"+_uid).intern() : fld;
     _bad = bad;
   }
 
@@ -58,58 +64,16 @@ public class FieldNode extends Node implements Resolvable {
         return lo ? meet(ts) : join(ts);
       return TypeNil.SCALAR.oob(!lo);
     }
-    
-    int alias;
-    if( t==TypeNil.XNIL ) {
-      // TODO: proper semantics?  For now, mimic int
-      alias = PrimNode.NINT._alias;
-    } else {
-      // Input is not a struct, so error return
-      if( !(t instanceof TypeStruct ts) )
-        return t.oob();
-      // Normal field lookup
-      TypeFld fld = ts.get(_fld);
-      // Hit with field name
-      if( fld!=null ) return fld._t;
 
-      // Prototype lookup
-      TypeFld proto = ts.get("!");
-      // No prototype
-      if( proto==null ) {
-        if( ts.above_center() ) return TypeNil.XSCALAR; // Too early, might get one yet
-        // Too late, so missing field
-        throw unimpl();
-      }
-
-      if( !(proto._t instanceof TypeMemPtr tptr) ||
-          (alias = tptr.aliases().abit()) < 0 ) {
-        // No prototype field found.
-        // If ts is low  and lifting, one might yet appear.
-        // If ts is high and falling, one might yet appear.
-        return proto._t.oob();
-      }
-
+    TypeFld fld;
+    Node n = resolve_local_clz(); // self or clz or null
+    if( n==null ) return t.oob(); // No resolve yet
+    if( !((n==this ? t : n._val) instanceof TypeStruct ts) ||
+        (fld = ts.get(_fld))==null ) {
+      if( _mode==UNKNOWN ) throw unimpl(); // True missing
+      else return t.oob();
     }
-
-    // Try the prototype lookup
-    NewNode nnn = Env.PROTOS.get(alias);
-    StructNode proto = (StructNode)nnn.rec();
-    if( !(proto._val instanceof TypeStruct ts) )
-      return proto._val.oob();
-
-    // Proto field lookup
-    TypeFld fld = ts.get(_fld);
-    // Hit with field name in prototype
-    if( fld!=null ) {
-      // Add an edge, so prototype updates trigger updates here
-      if( len()==1 ) add_def(proto);
-      else assert in(1)==proto;
-      // Bind the result.
-      return BindFPNode.bind(fld._t,t);
-    }
-    
-    // True missing field
-    throw unimpl();
+    return fld._t;
   }
 
   private static Type meet(TypeStruct ts) { Type t = TypeNil.XSCALAR; for( TypeFld t2 : ts )  t = t.meet(t2._t); return t; }
@@ -129,6 +93,15 @@ public class FieldNode extends Node implements Resolvable {
 
   @Override public Node ideal_reduce() {
     if( is_resolving() ) return null;
+
+    if( _mode==UNKNOWN || _mode==PROTO ) {
+      Node n = resolve_local_clz();
+      if( n!=null ) {
+        if( n==this ) { _mode=LOCAL; return this; }
+        set_def(0,n);
+        _mode=LOCAL;
+      }
+    }
     
     // Back-to-back SetField/Field
     if( in(0) instanceof SetFieldNode sfn && sfn.err(true)==null )
@@ -141,25 +114,49 @@ public class FieldNode extends Node implements Resolvable {
       int idx = str.find(_fld);
       if( idx >= 0 ) return str.in(idx);
     }
-
-    // Hitting in the prototype requires rewiring.  Wire directly to the
-    // prototype, remove the prototype edge, and insert a BindFP.
-    if( len()>1 ) {
-      // Wire directly to the prototype (not doing a prototype-style lookup on
-      // the prototype, just a normal lookup).  Remove the prototype edge.
-      Node fld = new FieldNode(in(1),_fld,_bad).init();
-      return new BindFPNode(fld,in(0)).init();
-    }
     
-    // Skip past a BindFP
+    // Skip past a BindFP (or delay the bind)
     if( in(0) instanceof BindFPNode bind ) {
-      FieldNode fld2 = new FieldNode(bind.fp(),_fld,_bad).init();
+      FieldNode fld2 = new FieldNode(bind.fp(),_mode,_fld,_bad).init();
       return new BindFPNode(fld2,bind.dsp()).init();
     }
 
     return null;
   }
 
+  // If LOCAL, return self.
+  // If PROTO, return clz.
+  // If UNKNOWN, return either self, clz or null.
+  Node resolve_local_clz() {
+    if( _mode==LOCAL ) return this;
+    if( _mode==PROTO && len()>1 ) return in(1);
+    String clz;
+    Type t = val(0);
+    // TODO: proper semantics?  For now, mimic int
+    if( t==TypeNil.XNIL ) clz = "int:"; // Nil class
+    else if( t instanceof TypeInt ) clz="int:";
+    else if( t instanceof TypeFlt ) clz="flt:";
+    else if( t instanceof TypeStruct ts ) {
+      // Normal field lookup
+      TypeFld fld = ts.get(_fld);
+      // Hit with field name
+      if( fld!=null ) return this; 
+      // Prototype lookup
+      clz = ts._clz;
+    } else return null;         // No resolve yet
+    
+    // Try the prototype lookup
+    StructNode proto = Env.PROTOS.get(clz);
+    if( proto==null || !(proto._val instanceof TypeStruct ts) )
+      return null;              // No resolve yet
+
+    // Proto field lookup
+    TypeFld fld = ts.get(_fld);
+    // Hit with field name in prototype
+    return fld==null ? null : proto;
+  }
+
+    
   @Override public Node ideal_grow() {
     // Load from a memory Phi; split through in an effort to sharpen the memory.
     // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
@@ -171,7 +168,7 @@ public class FieldNode extends Node implements Resolvable {
       if( fcnt>0 ) {
         Node lphi = new PhiNode(TypeNil.SCALAR,phi._badgc,phi.in(0));
         for( int i=1; i<phi.len(); i++ )
-          lphi.add_def(Env.GVN.add_work_new(new FieldNode(phi.in(i),_fld,_bad)));
+          lphi.add_def(Env.GVN.add_work_new(new FieldNode(phi.in(i),FieldNode.LOCAL,_fld,_bad)));
         subsume(lphi);
         return lphi;
       }
@@ -184,66 +181,75 @@ public class FieldNode extends Node implements Resolvable {
 
   @Override public boolean unify( boolean test ) {
     boolean progress = false;
-    TV3 rec = tvar(0);
-    assert !(rec instanceof TVPtr); // No ptrs here, just structs
-
-    // Add struct-ness if needed
-    TVStruct str;
-    if( !(rec instanceof TVStruct str0) ) {
-      if( test ) return true;
-      progress = rec.unify(str=new TVStruct(true,new String[0],new TV3[0],true),test);
-      str = (TVStruct)str.find();
-    } else {
+    TVStruct str = null;
+    TV3 proto = null;
+    switch( tvar(0) ) {
+    // Stall if leaf, since might become either a struct, or something with
+    // prototype struct
+    case TVLeaf leaf -> {
+      if( !test ) leaf.deps_add_deep(this); // If this changes, we might not be direct user
+      return false;
+    }
+    case TVNil nil -> { proto = Env.PROTOS.get("int:").tvar(); }
+    case TVBase base -> {
+      if( base._t == TypeNil.XNIL )         proto = Env.PROTOS.get("int:").tvar();
+      else if( base._t instanceof TypeInt ) proto = Env.PROTOS.get("int:").tvar();
+      else if( base._t instanceof TypeFlt ) proto = Env.PROTOS.get("flt:").tvar();
+      else throw unimpl();
+    }
+    case TVStruct str0 -> {
       str = str0;
-    }
 
-    // Attempt resolve
-    if( is_resolving() ) {
-      if( str.is_open() ) str.deps_add_deep(this);
-      else {
-        progress = trial_resolve(tvar(), str, str, test);
-        if( test ) { if( progress ) return true; }
-        // Revisit if parts change to allow unification
-        else tvar().deps_add_deep(str.deps_add_deep(this));
+      // If resolving, cannot do a field lookup.  Attempt resolve first.
+      if( is_resolving() ) {
+        progress = try_resolve(str,test);
+        if( !progress || test ) return progress;
       }
-    }
-
-    // Look up field
-    TV3 fld = str.arg(_fld);
-    TV3 self = tvar();
-    if( fld!=null )           // Unify against a pre-existing field
-      return fld.unify(self, test) | progress;
-
-    // Try again in a prototype
-    TV3 proto = str.arg("!");
-    if( proto instanceof TVPtr pptr ) {
-      fld = pptr.load().arg(_fld);
+      
+      // Look up field normally (not in prototype)
+      TV3 fld = str.arg(_fld);
       if( fld!=null )           // Unify against a pre-existing field
-        return fld.unify(self, test) | progress;
+        return fld.unify(tvar(), test) | progress;
+      
+      // Try again in a prototype
+      proto = str.arg("!");
+      if( proto==null )
+        throw unimpl();         // Might pick up proto field on open structs
+    }
+    default -> throw unimpl();
+    }
+    assert !is_resolving();
+
+    // Proto might become a struct; stall
+    if( proto instanceof TVLeaf ) throw unimpl();
+    TV3 fld = ((TVStruct)proto).arg(_fld);
+    if( fld!=null )           // Unify against a pre-existing field
+      return fld.unify(tvar(), test) | progress;
+
+    // If the field is resolved, and not in struct and not in proto and the
+    // struct is closed, then the field is missing.
+    if( str==null || !str.is_open() ) {
+      throw unimpl();           // Missing field
     }
 
-    // If field is doing overload resolution, inject even if rec is closed
-    if( is_resolving() ) {
-      if( test ) return true;
-      str.add_fld(_fld,self);
-      return true;
-    }
-
-    // If the field is not there and the struct is closed, then the field is
-    // missing.
-    if( !str.is_open() ) {
-      // Might yet get a prototype and find field
-      if( proto instanceof TVLeaf ) {
-        proto.deps_add_deep(this);
-        return false;
-      }
-      throw unimpl();
-    }
-
-    // Add the field
-    if( test ) return true;
-    str.add_fld(_fld,self);
+    // Add the field, make progress
+    if( !test ) str.add_fld(_fld,tvar());
     return true;
+  }
+
+  private boolean try_resolve( TVStruct str, boolean test ) {
+    // If struct is open, more fields might appear and cannot do a resolve.
+    TV3 self = tvar();
+    if( !str.is_open() ) {
+      if( trial_resolve(self, str, str, test) ) return true;
+      // No progress, try again if self changes
+      if( !test ) self.deps_add_deep(this);
+    }
+    // Progress if field is missing
+    if( test ) return str.arg(_fld)==null;
+    str.deps_add_deep(this);    // Try again if str closes
+    // Add unresolved field if not already there (even if closed)
+    return str.arg(_fld)==null && str.add_fld(_fld,self); 
   }
 
   @Override public int hashCode() { return super.hashCode()+_fld.hashCode(); }

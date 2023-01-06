@@ -3,6 +3,7 @@ package com.cliffc.aa.tvar;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.node.ConNode;
 import com.cliffc.aa.node.Node;
+import com.cliffc.aa.type.TypeNil;
 import com.cliffc.aa.util.*;
 
 import java.util.IdentityHashMap;
@@ -131,10 +132,8 @@ abstract public class TV3 implements Cloneable {
   private long dbl_uid(TV3 t) { return dbl_uid(t._uid); }
   private long dbl_uid(long uid) { return ((long)_uid<<32)|uid; }
 
-  // TODO: move into Nilable, which does not work on structs which means prims
-  // should use clazz and not a struct
   TV3 strip_nil() {
-    
+    _may_nil = false;
     throw unimpl();
   }
   
@@ -229,7 +228,6 @@ abstract public class TV3 implements Cloneable {
   
   public boolean fresh_unify( TV3 that, TV3[] nongen, boolean test ) {
     if( this==that ) return false;
-    if( this instanceof TVLeaf ) return false;
     assert VARS.isEmpty() && DUPS.isEmpty();
     boolean progress = _fresh_unify(that,nongen,test);
     VARS.clear();  DUPS.clear();
@@ -256,9 +254,13 @@ abstract public class TV3 implements Cloneable {
     
     // Special handling for nilable
     if( !(this instanceof TVNil) && that instanceof TVNil nil ) throw unimpl();
-    if( !(that instanceof TVNil) && this instanceof TVNil nil ) throw unimpl();
+    if( !(that instanceof TVNil) && this instanceof TVNil nil ) return nil._fresh_unify_nil(that,test);
 
-    // Two unrelated overloads not allowed.  To equal overloads unify normally.
+    // Special handling for Base SCALAR, which can "forget" pointers
+    if( that instanceof TVBase base && base._t==TypeNil.SCALAR && this instanceof TVPtr ptr )
+      return false;             // No change to 'that'
+    
+    // Two unrelated classes make an error
     if( getClass() != that.getClass() ) {
       if( test ) return true;
       throw unimpl();
@@ -378,15 +380,18 @@ abstract public class TV3 implements Cloneable {
     if( this==that )             return true; // No error
     if( this instanceof TVLeaf ) return true; // No error
     if( that instanceof TVLeaf ) return true; // No error
+    // Nil can unify with ints,flts,ptrs
+    if( this instanceof TVNil ) return this._trial_unify_ok_impl(that,extras);
+    if( that instanceof TVNil ) return that._trial_unify_ok_impl(this,extras);
     
     // Different classes always fail
     if( getClass() != that.getClass() )
       throw unimpl();
-    // Subclasses check subparts
+    // Subclasses check sub-parts
     return _trial_unify_ok_impl(that, extras);
   }
 
-  // Sub-classes specify on sub-parts
+  // Subclasses specify on sub-parts
   boolean _trial_unify_ok_impl( TV3 that, boolean extras ) {
     throw unimpl();
   }
@@ -398,16 +403,15 @@ abstract public class TV3 implements Cloneable {
   // Stops when it sees 'n'; this closes cycles and short-cuts repeated adds of
   // 'n'.  Requires internal changes propagate internal _deps.
   private static final VBitSet DEPS_VISIT = new VBitSet();
-  public Node deps_add_deep( Node n ) { DEPS_VISIT.clear(); return _deps_add_deep(n); }
-  public Node _deps_add_deep( Node n ) {
-    if( DEPS_VISIT.tset(_uid) ) return n;
+  public void deps_add_deep(Node n ) { DEPS_VISIT.clear(); _deps_add_deep(n); }
+  public void _deps_add_deep(Node n ) {
+    if( DEPS_VISIT.tset(_uid) ) return;
     if( _deps==null ) _deps = UQNodes.make(n);
     _deps = _deps.add(n);
     if( _args!=null )
       for( int i=0; i<len(); i++ )
         if( _args[i]!=null )
           arg(i)._deps_add_deep(n);
-    return n;
   }
 
   // Something changed; add the deps to the worklist and clear.

@@ -1,6 +1,8 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.Node;
+import com.cliffc.aa.node.CallEpiNode;
+import com.cliffc.aa.type.Type;
 import com.cliffc.aa.tvar.Resolvable;
 import com.cliffc.aa.tvar.TVField;
 import com.cliffc.aa.util.VBitSet;
@@ -175,6 +177,7 @@ public abstract class Combo {
     Node n;
     while( (n=Env.GVN.pop_flow()) != null ) {
       cnt++; assert cnt < 100000; // Infinite loop check
+      Type told = n._val;
 
       // Forwards flow
       n.combo_forwards();
@@ -185,6 +188,15 @@ public abstract class Combo {
       // H-M unification
       n.combo_unify();
 
+
+      // During Combo value flow, exact fcn pointers appear
+      // and we require wiring to make these edges explicit.
+      if( told != n._val ) {
+        for( Node use : n._uses )
+          if( use instanceof CallEpiNode cepi ) cepi.check_and_wire(true);
+        if( n instanceof CallEpiNode cepi ) cepi.check_and_wire(true);
+      }
+      
       // Very expensive assert: everything that can make progress is on worklist
       //assert Env.ROOT.more_work(false)==0;
     }

@@ -154,22 +154,20 @@ public final class CallEpiNode extends Node {
       return unwire(call,ret).set_is_copy(cctl,cmem,Node.con(trez));
 
     // Check for a 1-op body using only constants or parameters and no memory effects.
-    // Ok to wrap and unwrap primitives.
     boolean can_inline=!(rrez instanceof ParmNode) && rmem==cmem && inline;
     for( Node parm : rrez._defs )
       if( parm != null && parm != fun &&
-          !(parm instanceof ParmNode && parm.in(0) == fun) &&
-          !(parm instanceof ConNode) &&
-          !(parm==PrimNode.PINT) &&
-          !(parm==PrimNode.PFLT) 
+          !(parm instanceof ParmNode && parm.in(CTL_IDX) == fun) &&
+          !(parm instanceof ConNode)
           )
         can_inline=false;       // Not trivial
     if( can_inline ) {
       Node irez = rrez.copy(false); // Copy the entire function body
       ProjNode proj = ProjNode.proj(this,REZ_IDX);
+      int path=1; while( fun.in(path).in(0)!=call ) path++;
       irez._live = proj==null ? Type.ALL : proj._live; // sharpen liveness to the call-site liveness
       for( Node in : rrez._defs )
-        irez.add_def((in instanceof ParmNode parm && parm.in(CTL_IDX) == fun) ? ProjNode.proj(call,parm._idx) : in);
+        irez.add_def((in instanceof ParmNode parm && parm.in(CTL_IDX) == fun) ? in.in(path) : in);
       if( irez instanceof PrimNode prim ) prim._badargs = call._badargs;
       GVN.add_work_new(irez);
       return unwire(call,ret).set_is_copy(cctl,cmem,irez);

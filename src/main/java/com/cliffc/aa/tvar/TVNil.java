@@ -1,11 +1,14 @@
 package com.cliffc.aa.tvar;
 
-import com.cliffc.aa.util.*;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeNil;
+import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
 
 import static com.cliffc.aa.AA.unimpl;
 
 /** Polymorphic nil.
- *
+ * <p>
  *  TVNils are nilable versions of other, not-nil things.  Used after nil guard
  *  tests to assert nilable properties.  This is similar to the GCP not-nil
  *  flow property, except its on H-M typing and thus survives e.g. polymorphic
@@ -20,7 +23,7 @@ public class TVNil extends TV3 {
   public TV3 find_nil() { throw unimpl(); }
 
   // -------------------------------------------------------------
-  @Override void _union_impl(TV3 that) { throw unimpl(); }
+  @Override void _union_impl(TV3 that) { }
 
   @Override boolean _unify_impl(TV3 that ) { throw unimpl(); }
 
@@ -30,7 +33,39 @@ public class TVNil extends TV3 {
     not_nil._deps_work_clear();
     TV3 copy = that.copy().strip_nil();
     _is_copy &= that._is_copy;
-    return not_nil.union(copy) | that.union(this);
+    not_nil.union(copy);
+    if( that instanceof TVBase ) this.union(that); // Can reverse and turn into a Base
+    else that.union(this);      // Force 'that' to be nil-able version
+    return true;
+  }
+
+  boolean _fresh_unify_nil( TV3 that, boolean test ) {
+    assert !(that instanceof TVNil);
+    if( that instanceof TVBase base ) {
+      Type t = base._t.meet(TypeNil.XNIL);
+      if( base._t == t ) return false;
+      if( !test ) base._t = t;
+      return true;
+    }
+    //TVLeaf not_nil = not_nil();
+    //not_nil._deps_work_clear();
+    //TV3 copy = that.copy().strip_nil();
+    //_is_copy &= that._is_copy;
+    //not_nil.union(copy);
+    //if( that instanceof TVBase ) this.union(that); // Can reverse and turn into a Base
+    //else that.union(this);      // Force 'that' to be nil-able version
+    //return true;
+    throw unimpl();
+  }
+
+  // -------------------------------------------------------------
+  @Override boolean _trial_unify_ok_impl( TV3 that, boolean extras ) {
+    if( that instanceof TVNil ) return true;
+    if( that instanceof TVBase base &&
+        base._t instanceof TypeNil tnil &&
+        tnil.must_nil() )
+      return true;
+    return false;
   }
   
   // -------------------------------------------------------------
