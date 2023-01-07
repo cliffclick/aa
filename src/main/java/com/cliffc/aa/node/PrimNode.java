@@ -149,7 +149,7 @@ public abstract class PrimNode extends Node {
       if(      tformal==TypeInt.INT64   ) nformal =  INT;
       else if( tformal==TypeFlt.FLT64   ) nformal =  FLT;
       else if( tformal==TypeFlt.NFLT64  ) nformal = NFLT;
-      else if( tformal==TypeNil.SCALAR  ) nformal = Env.ALL;
+      else if( tformal==TypeNil.XSCALAR ) nformal = Env.XSCALAR;
       else if( tformal==Type.ALL        ) nformal = Env.ALL;
       else if( tformal==TypeFunPtr.THUNK) nformal = Env.THUNK;
       else if( tformal==TypeMem.ALLMEM  ) nformal = Env.ALLMEM;
@@ -165,6 +165,7 @@ public abstract class PrimNode extends Node {
     // Return the result
     RetNode ret = new RetNode(zctrl,zmem,zrez,rpc,fun).init();
     // FunPtr is UNBOUND here, will be bound when loaded thru a named struct to the Clazz.
+    // Primitives all late-bind by default, so no BindFP here.
     return new FunPtrNode(_name,ret).init();
   }
   
@@ -194,7 +195,9 @@ public abstract class PrimNode extends Node {
   private static ProjNode make_math(PrimNode rand) {
     StructNode clz = new StructNode(false,false,null,"",Type.ALL);
     clz.add_fld("pi",Access.Final,con(TypeFlt.PI),null);
-    clz.add_fld(rand._name,Access.Final,rand.as_fun(),null);
+    FunPtrNode fp = rand.as_fun();
+    Node randnode = new BindFPNode(fp,Env.XSCALAR).init();
+    clz.add_fld(rand._name,Access.Final,randnode,null);
     clz.close().init();
     Node mem = Env.SCP_0.mem();
     NewNode nnn = new NewNode(mem,clz).init();
@@ -523,7 +526,7 @@ public abstract class PrimNode extends Node {
 
 
   public static class RandI64 extends PrimNode {
-    public RandI64() { super("rand",TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, TypeNil.SCALAR, TypeInt.INT64),TypeInt.INT64); }
+    public RandI64() { super("rand",TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, TypeNil.XSCALAR, TypeInt.INT64),TypeInt.INT64); }
     @Override boolean is_oper() { return false; }
     @Override public TypeNil apply( TypeNil[] args ) { throw AA.unimpl(); }
     // Rands have hidden internal state; 2 Rands are never equal

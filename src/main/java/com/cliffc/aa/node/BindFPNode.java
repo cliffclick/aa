@@ -24,12 +24,12 @@ public class BindFPNode extends Node {
     }
     if( fun instanceof TypeFunPtr tfp ) {
       if( tfp==TypeFunPtr.GENERIC_FUNPTR ) return tfp; // Forward ref, do not touch
-      assert tfp.dsp()==Type.ANY;
+      if( tfp.dsp()!=Type.ANY ) return tfp;
       return tfp.make_from(dsp);
     }
     return fun;
   }
-  
+
   @Override public Type live_use(Node def) {
     // GENERIC_FUNPTR indicates the display is dead.
     if( _live==TypeFunPtr.GENERIC_FUNPTR )
@@ -39,10 +39,12 @@ public class BindFPNode extends Node {
   @Override boolean assert_live(Type live) { return live instanceof TypeTuple tt && tt.len()==2; }
 
   @Override public Node ideal_reduce() {
-    // If can never be a function or an overload of functions, collapse away
-    Type fpt = fp()._val;
-    if( !fpt.dual().isa(TypeFunPtr.GENERIC_FUNPTR) &&
-        !fpt.dual().isa(TypeStruct.ISUSED) ) 
+    // If can never be a function nor an overload of functions, remove extra bind
+    if( !_val.dual().isa(TypeFunPtr.GENERIC_FUNPTR) &&
+        !_val.dual().isa(TypeStruct.ISUSED) )
+      return fp();
+    // Pre-bound fcn pointer, happens because double-bind on overloads
+    if( fp()._val instanceof TypeFunPtr tfp && tfp.has_dsp() )
       return fp();
     return null;
   }

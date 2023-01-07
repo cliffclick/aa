@@ -577,7 +577,7 @@ public class Parse implements Comparable<Parse> {
       int rhsx = _x;            // Invariant: WS already skipped
       int lhsidx = lhs.push();
       Parse err = errMsg(opx);
-      // Get the overloaded operator field
+      // Get the overloaded operator field, always late binding
       Node over = gvn(new FieldNode(lhs,FieldNode.PROTO,binop._name,err));
       // Get the resolved operator from the overload
       Node unbound_fun = gvn(new FieldNode(over,FieldNode.LOCAL,"_",err));
@@ -713,16 +713,16 @@ public class Parse implements Comparable<Parse> {
       if( peek('.') ) {         // Field?
         if( peek('(') ) throw unimpl(); // Start of e0.( e1 ) syntax, TODO: bind instance fcn e1 with 'self' e0, producing a bound TFP
         int fld_start=_x;       // Get field start
-        String fld = token0();  // Field name
-        if( fld == null ) {     // Not a token, check for a field number
+        tok = token0();         // Field name
+        if( tok == null ) {     // Not a token, check for a field number
           int fldnum = field_number();
           if( fldnum == -1 ) {
             if( n._uses._len==0 ) n.kill();
             return err_ctrl2("Missing field name after '.'");
           }
-          fld = ""+fldnum;      // Convert to a field name
+          tok = ""+fldnum;      // Convert to a field name
         }
-        fld=fld.intern();
+        tok=tok.intern();
 
         Node castnn = gvn(new CastNode(ctrl(),n,TypeMemPtr.ISUSED)); // Remove nil choice
 
@@ -730,22 +730,25 @@ public class Parse implements Comparable<Parse> {
         if( peek(":=") || peek_not('=','=')) {
           Access fin = _buf[_x-2]==':' ? Access.RW : Access.Final;
           Node stmt = stmt(false);
-          if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
-          //else scope().replace_mem( new StoreNode(mem(),castnn,n=stmt.keep(),fin,fld ,errMsg(fld_start)));
+          if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+tok+"'");
+          //else scope().replace_mem( new StoreNode(mem(),castnn,n=stmt.keep(),fin,tok ,errMsg(tok_start)));
           //skipWS();
           //return n.unkeep();
           throw unimpl();       // SetField before Store
         } else {
+          boolean resolve = Util.eq("_",tok);
           Parse bad = errMsg(fld_start);
           int cidx = castnn.push();
-          Node st = gvn(new LoadNode(mem(),castnn,bad));
+          Node ld = gvn(new LoadNode(mem(),castnn,bad));
           // This field can resolve against a prototype field or a self field.
-          // Using a plain underscore for the field name is a Resolving field.
-          n = gvn(new FieldNode(st,FieldNode.UNKNOWN,fld,bad));
-          // resolving fields already bound; resolved fields bind.
+          // Using a plain underscore for the field name is a Resolving field.          
+          Node fd = gvn(new FieldNode(ld, resolve ? FieldNode.LOCAL : FieldNode.UNKNOWN,tok,bad));
+          
+          // For late-bind optimized fields (all primitive op/over loads, all user
+          // clz/proto loads of final functions) the Struct MUST be visible here,
+          // in the parser, and the bind is added here.
           castnn = Node.pop(cidx);
-          if( !Util.eq("_",fld) )
-            n = gvn(new BindFPNode(n,castnn));
+          n = resolve ? fd : gvn(new BindFPNode(fd,castnn));
         }
 
       } else if( peek('(') ) {  // Attempt a function-call
@@ -920,22 +923,22 @@ public class Parse implements Comparable<Parse> {
     // Must load against most recent display update, in case some prior store
     // is in-error.  Directly loading against the display would bypass the
     // (otherwise alive) error store.
+    boolean closure = scope.stk()._is_closure;
 
     // Display/struct/scope containing the field
     Node dsp = get_display_ptr(scope);
+    
     // Load the display/scope structure
     Node ld = gvn(new LoadNode(mem(),dsp,bad));
+
     // Load the field from the struct.  This field name is resolved and is a
     // local field (not prototype field) load.
     Node fd = gvn(new FieldNode(ld,FieldNode.LOCAL,tok,bad));
-    // Bind display of loaded functions
-    Node bind = gvn(new BindFPNode(fd,dsp));
+
     // If in the middle of a definition (e.g. a HM Let, or recursive assign)
     // then no Fresh per normal HM rules.  If loading from a struct or from
     // normal Lambda arguments, again no Fresh per normal HM rules.
-    Node frsh = fd.is_forward_ref() || scope.stk()._is_closure
-      ? bind
-      : gvn(new FreshNode(_e._fun,bind));
+    Node frsh = fd.is_forward_ref() || closure ? fd : gvn(new FreshNode(_e._fun,fd));
     return frsh;
   }
 

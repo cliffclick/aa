@@ -52,7 +52,7 @@ public class Env implements AutoCloseable {
   public static final ConNode ALL;   // Common ALL / used for errors
   public static final ConNode XCTRL; // Always dead control
   public static final ConNode XNIL;  // Default 0
-  public static final ConNode SCALAR;// Default scalar
+  public static final ConNode XSCALAR;// Default scalar
   public static final ConNode THUNK; // Default thunk parameter
   public static final ConNode UNUSED;// Dead alias
   public static final ConNode ALLMEM;//   Used whole memory
@@ -88,7 +88,7 @@ public class Env implements AutoCloseable {
     ALL   = keep(new ConNode<>(Type.ALL   ));
     XCTRL = keep(new ConNode<>(Type.XCTRL ));
     XNIL  = keep(new ConNode<>(TypeNil.XNIL));
-    SCALAR= keep(new ConNode<>(TypeNil.SCALAR));
+    XSCALAR=keep(new ConNode<>(TypeNil.XSCALAR));
     THUNK = keep(new ConNode<>(TypeFunPtr.THUNK));
     UNUSED= keep(new ConNode<>(TypeStruct.UNUSED));
     ALLMEM= keep(new ConNode<>(TypeMem.ALLMEM));

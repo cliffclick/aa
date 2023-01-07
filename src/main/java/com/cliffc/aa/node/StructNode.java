@@ -111,22 +111,12 @@ public class StructNode extends Node {
       _flds.equals(rec._flds) && _accesses.equals(rec._accesses) &&
       _def==rec._def && Util.eq(_clz,rec._clz);
   }
-  //private StructNode set_ts(TypeStruct ts) {
-  //  if( _elock ) unelock();    // Unlock before changing hash
-  //  _ts=ts;
-  //  return this;
-  //}
-  //StructNode name(String name) {
-  //  assert _ts._clz.length()==0;
-  //  return set_ts(_ts.set_name(name));
-  //}
-  //public TypeStruct ts() { return _ts; }
 
   // String-to-node-index
   public int find(String name) { return _flds.find(name); }
   // String-to-Node
   public Node in(String name) { return in(find(name)); } // Error if not found
-  //
+  // String-to-field access enum
   public TypeFld.Access access(String name) { return _accesses.at(find(name)); }
 
   public String fld(int idx) { return _flds.at(idx); }

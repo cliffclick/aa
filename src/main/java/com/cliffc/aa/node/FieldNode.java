@@ -52,6 +52,7 @@ public class FieldNode extends Node implements Resolvable {
     add_flow();
     return old;
   }
+  
   @Override public TV3 match_tvar() { return tvar(0); }
   
   @Override public Type value() {
@@ -97,9 +98,9 @@ public class FieldNode extends Node implements Resolvable {
     if( _mode==UNKNOWN || _mode==PROTO ) {
       Node n = resolve_local_clz();
       if( n!=null ) {
-        if( n==this ) { _mode=LOCAL; return this; }
-        set_def(0,n);
-        _mode=LOCAL;
+        _mode = LOCAL;
+        if( n==this ) return this;
+        return Env.GVN.add_reduce(set_def(0,n));
       }
     }
     
@@ -115,12 +116,6 @@ public class FieldNode extends Node implements Resolvable {
       if( idx >= 0 ) return str.in(idx);
     }
     
-    // Skip past a BindFP (or delay the bind)
-    if( in(0) instanceof BindFPNode bind ) {
-      FieldNode fld2 = new FieldNode(bind.fp(),_mode,_fld,_bad).init();
-      return new BindFPNode(fld2,bind.dsp()).init();
-    }
-
     return null;
   }
 
