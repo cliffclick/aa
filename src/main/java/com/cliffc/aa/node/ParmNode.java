@@ -26,20 +26,6 @@ public class ParmNode extends PhiNode {
       pop(); // Kill wired primitive inputs
   }
 
-  @Override public Node ideal_reduce() {
-    if( !(in(0) instanceof FunNode) )
-      return in(0).is_copy(_idx); // Dying, or thunks
-    FunNode fun = fun();
-    if( fun._val == Type.XCTRL ) return null; // All dead, c-prop will fold up
-    if( fun._defs._len!=_defs._len ) return null;
-    if( fun.is_copy(0)!=null )       // FunNode is a Copy
-      return in(1)==this ? Env.ANY : in(1);             // So return the copy
-    // Do not otherwise fold away, as this lets Nodes in *this* function depend
-    // on values in some other function... which, if code-split, gets confused
-    // (would have to re-insert the Parm).
-    return null;
-  }
-
   @Override public Type value() {
     // Not executing?
     Type ctl = val(0);
@@ -54,10 +40,24 @@ public class ParmNode extends PhiNode {
       if( fun.val(i)==Type.CTRL ) { // Only meet alive paths
         Type ti = val(i);
         if( fun.in(i) instanceof CRProjNode )
-          return _t;            // Default input allows more callers; return the default type
+          return ti;            // Default input allows more callers; return the default type
         t = t.meet(ti);
       }
     return t.join(_t);
+  }
+
+  @Override public Node ideal_reduce() {
+    if( !(in(0) instanceof FunNode) )
+      return in(0).is_copy(_idx); // Dying, or thunks
+    FunNode fun = fun();
+    if( fun._val == Type.XCTRL ) return null; // All dead, c-prop will fold up
+    if( fun._defs._len!=_defs._len ) return null;
+    if( fun.is_copy(0)!=null )       // FunNode is a Copy
+      return in(1)==this ? Env.ANY : in(1);             // So return the copy
+    // Do not otherwise fold away, as this lets Nodes in *this* function depend
+    // on values in some other function... which, if code-split, gets confused
+    // (would have to re-insert the Parm).
+    return null;
   }
 
   // While Parms are mostly Phis (and yes for value flows), during unification

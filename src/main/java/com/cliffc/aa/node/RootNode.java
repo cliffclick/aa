@@ -1,7 +1,6 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.VBitSet;
 
@@ -83,36 +82,9 @@ public class RootNode extends Node {
       // Walk all escaped function args, and call them (like an external
       // Apply might) with the most conservative flow arguments possible.
       for( int fidx : tfp.fidxs() ) {
-        if( fidx==0 ) continue;
-        RetNode ret = RetNode.FUNS.at(fidx);
-        if( ret!=null && !EXT_FIDXS.test(fidx) ) {
-          FunPtrNode fptr = ret.funptr();
-          if( fptr !=null && fptr.has_tvar() ) {
-            TV3 tfun = ret.funptr().tvar();
-            //tfun.add_deps_work();
-            //tfun.arg(" ret").clr_cp();
-            throw unimpl();
-          }
-        }
+        if( fidx==0 || ESCF.tset(fidx) ) continue;
+        // TODO: Lambda.apply_push
         EXT_FIDXS = EXT_FIDXS.set(fidx);
-        //for( int i=0; i<fun.nargs(); i++ ) {
-        //  // One-time make compatible external func/struct for this argument
-        //  Type cflow;
-        //  if( fun instanceof Lambda lam ) {
-        //    Ident[] ids = lam._refs[i];
-        //    if( ids!=null ) {
-        //      EXT_DEPS.add(ids); // Add to external deps; when HM_FREEZE flips these all need to be visited
-        //      for( Ident id : lam._refs[i] ) EXT_DEPS.add(id._par);
-        //    }
-        //    T2 t2 = lam.targ(i); // Get HM constraints on the arg
-        //    if( t2.is_fun() && !lam.extsetf(i) ) new EXTLambda(t2); // Make a canonical external function to call
-        //    if( t2.is_ptr() && !lam.extsetp(i) ) new EXTStruct(t2); // Make a canonical external struct for args
-        //    cflow = t2.as_flow(false);
-        //  } else {
-        //    cflow = TypeNil.SCALAR; // Most conservative args
-        //  }
-        //  fun.arg_meet(i,cflow,work); // Root / external-world calls this function with this arg
-        //}
       }
       // The flow return also escapes
       _escapes(tfp._ret);

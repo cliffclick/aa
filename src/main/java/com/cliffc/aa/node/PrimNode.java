@@ -401,7 +401,26 @@ public abstract class PrimNode extends Node {
   public static class AndI64 extends Prim2OpI64 {
     public AndI64() { super("_&_"); }
     // And can preserve bit-width
-    @Override long op( long l, long r ) { return l&r; }
+    @Override public TypeNil value() {
+      Type t0 = val(0), t1 = val(1);
+      // 0 AND anything is 0
+      if( t0 == TypeNil.XNIL || t1 == TypeNil.XNIL ) return TypeNil.XNIL;      
+      if( t0==Type.ALL || t1==Type.ALL ) return TypeInt.INT64;      
+      // If either is high - results might fall to something reasonable
+      if( t0.above_center() || t1.above_center() )
+        return TypeInt.INT64.dual();
+      // Both are low-or-constant, and one is not valid - return bottom result
+      if( !(t0 instanceof TypeInt t0i) || !(t1 instanceof TypeInt t1i) )
+        return TypeInt.INT64;
+      // If both are constant ints, return the constant math.
+      if( t0.is_con() && t1.is_con() ) {
+        long i2 = t0.getl() & t1.getl();
+        return i2==0 ? TypeNil.XNIL : TypeInt.con(i2);
+      }
+      // Preserve width
+      return t0i.minsize(t1i);
+    }    
+    @Override long op( long l, long r ) { throw unimpl(); }
   }
 
   public static class OrI64 extends Prim2OpI64 {

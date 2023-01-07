@@ -1046,7 +1046,7 @@ public class Parse implements Comparable<Parse> {
     //fun.set_nongens(_e._nongen.compact());
     // Build Parms for system incoming values
     int rpc_idx = init(new ParmNode(CTL_IDX,fun,null,TypeRPC.ALL_CALL   ,Env.ALL_CALL)).push();
-    int clo_idx = init(new ParmNode(DSP_IDX,fun,null,formals.at(DSP_IDX),scope().ptr())).push();
+    //int clo_idx = init(new ParmNode(DSP_IDX,fun,null,formals.at(DSP_IDX),scope().ptr())).push();
     Node mem    = init(new ParmNode(MEM_IDX,fun,null,formals.at(MEM_IDX),mem() ));
 
     // Increase scope depth for function body.
@@ -1056,41 +1056,38 @@ public class Parse implements Comparable<Parse> {
       // Display is special: the default is simply the outer lexical scope.
       // But here, in a function, the display is actually passed in as a hidden
       // extra argument and replaces the default.
-      StructNode stk = e._scope.stk();
-      // TODO: Make a new StructNode for the local display.
-      // TODO: Fold more together with 'lazy_expr'
-      //// Parms for all arguments
-      //Parse errmsg = errMsg();  // Lazy error message
-      //assert fun==_e._fun && fun==_e._scope.ctrl();
-      //for( int i=ARG_IDX; i<formals.len(); i++ ) { // User parms start
-      //  Node parm = gvn(new ParmNode(i,fun,errmsg,Type.ALL,Env.ALL));
-      //  if( formals.at(i)!=TypeNil.SCALAR )
-      //    parm = gvn(new CastNode(fun,parm,formals.at(i)));
-      //  scope().stk().add_fld(TypeFld.make(ids.at(i),formals.at(i),args_are_mutable),parm,bads.at(i-ARG_IDX));
-      //}
-      //
-      //// Parse function body
-      //Node rez = stmts();       // Parse function body
-      //if( rez == null ) rez = err_ctrl2("Missing function body");
-      //require('}',oldx-1);      // Matched with opening {}
-      //stk.close();
-      //
-      //// Merge normal exit into all early-exit paths
-      //assert e._scope.is_closure();
-      //rez = merge_exits(rez);
-      //// Standard return; function control, memory, result, RPC.  Plus a hook
-      //// to the function for faster access.
-      //Node xrpc = Node.pop(rpc_idx);
-      //Node xfun = Node.pop(fun_idx); assert xfun == fun;
-      //RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,xrpc,fun));
-      //
-      //_e = e._par;            // Pop nested environment; pops nongen also
-      //// The FunPtr builds a real display; any up-scope references are passed in now.
-      //Node fptr = gvn(new FunPtrNode(ret,_e._scope.ptr()));
-      //fptr_idx = fptr.push();   // Return function; close-out and DCE 'e'
+      StructNode dsp = e._scope.stk();
+      // Parms for all arguments
+      Parse errmsg = errMsg();  // Lazy error message
+      assert fun==_e._fun && fun==_e._scope.ctrl();
+      for( int i=ARG_IDX; i<formals.len(); i++ ) { // User parms start
+        TypeNil formal = (TypeNil)formals.at(i);
+        Node parm = gvn(new ParmNode(i,fun,errmsg,Type.ALL,con(formal)));
+        if( formal!=TypeNil.SCALAR )
+          parm = gvn(new CastNode(fun,parm,formal));
+        dsp.add_fld(ids.at(i),args_are_mutable,parm,bads.at(i));
+      }
+
+      // Parse function body
+      Node rez = stmts();       // Parse function body
+      if( rez == null ) rez = err_ctrl2("Missing function body");
+      require('}',oldx-1);      // Matched with opening {}
+      dsp.close();
+
+      // Merge normal exit into all early-exit paths
+      assert dsp._is_closure;
+      rez = merge_exits(rez);
+      // Standard return; function control, memory, result, RPC.  Plus a hook
+      // to the function for faster access.
+      Node xrpc = Node.pop(rpc_idx);
+      Node xfun = Node.pop(fun_idx); assert xfun == fun;
+      RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,xrpc,fun));
+      
+      _e = e._par;            // Pop nested environment; pops nongen also
+      Node fptr = gvn(new FunPtrNode(ret));
+      fptr_idx = fptr.push();   // Return function; close-out and DCE 'e'
     }
-    //return Node.pop(fptr_idx);
-    throw unimpl();
+    return Node.pop(fptr_idx);
   }
 
   private Node merge_exits(Node rez) {

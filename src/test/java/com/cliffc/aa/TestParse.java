@@ -31,7 +31,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    test   ("math.rand(1)?1:int:2:int","nint8", "int64"); // no ambiguity between conditionals and type annotations
+    test("{5}()", "int:5", "int:5"); // No args nor -> required; this is simply a function returning 5, being executed
   }
 
   @Test public void testParse00() {
@@ -161,10 +161,8 @@ public class TestParse {
   }
 
   @Test public void testParse02() {
-    // Anonymous function definition.  Note: { x -> x&1 }; 'x' can be either an
-    // int or any struct with an operator '_&_', which needs to be nil-checked
-    // before loading the operator field.
-    _test2("{x:int -> x&1}","[54]{any,4 -> int:int1 }","{A int:int64 -> int:int64}",null,null,null,"[54]",null,0);
+    // Anonymous function definition.  Note: { x -> x&1 }; 'x' can be any struct with an operator '_&_'.
+    _test2("{x:int -> x&1}","[54]{any,4 -> int1 }","{A int64 -> int64}",null,null,null,"[54]",null,0);
     test("{5}()", "int:5", "int:5"); // No args nor -> required; this is simply a function returning 5, being executed
     testerr("{x:flt y -> x+y}", "Unable to resolve _+_",13); // {Scalar Scalar -> Scalar}
 

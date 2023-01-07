@@ -37,6 +37,15 @@ public class BindFPNode extends Node {
     return _live;
   }
   @Override boolean assert_live(Type live) { return live instanceof TypeTuple tt && tt.len()==2; }
+
+  @Override public Node ideal_reduce() {
+    // If can never be a function or an overload of functions, collapse away
+    Type fpt = fp()._val;
+    if( !fpt.dual().isa(TypeFunPtr.GENERIC_FUNPTR) &&
+        !fpt.dual().isa(TypeStruct.ISUSED) ) 
+      return fp();
+    return null;
+  }
   
   @Override public boolean has_tvar() { return true; }
   @Override TV3 _set_tvar() {
