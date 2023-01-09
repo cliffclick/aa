@@ -545,6 +545,7 @@ public class FunNode extends RegionNode {
       } else {                  // Non-type split, wire left or right
         if( call==path_call ) cepi.wire1(call, fun,newret,false);
         else                  cepi.wire1(call,this,oldret,false);
+        call.xval();
         if( cepi2!=null && cepi2.call()!=path_call ) {
           CallNode call2 = cepi2.call();
           // Found an unwired call in original: musta been a recursive
@@ -578,8 +579,9 @@ public class FunNode extends RegionNode {
     }
 
     // Retype memory, so we can everywhere lift the split-alias parents "up and out".
-    //GVNGCM.retype_mem(aliases,this.parm(MEM_IDX), oldret, true);
-    //GVNGCM.retype_mem(aliases,fun .parm(MEM_IDX), newret, true);
+    GVNGCM.retype_mem(aliases,this.parm(MEM_IDX), oldret, true);
+    GVNGCM.retype_mem(aliases,fun .parm(MEM_IDX), newret, true);
+    for( CallEpiNode cepi : unwireds ) cepi.xval();
 
     // Unhook the hooked FunPtrs
     for( Node use : oldret._uses )

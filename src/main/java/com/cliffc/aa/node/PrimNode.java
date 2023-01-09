@@ -40,7 +40,7 @@ public abstract class PrimNode extends Node {
     _name = name;
     _is_lazy = is_lazy;
     int fidx = BitsFun.new_fidx();
-    for( int i=DSP_IDX; i<formals._ts.length; i++ ) assert formals._ts[i] instanceof TypeNil; // Formals are unwrapped
+    for( int i=DSP_IDX; i<formals._ts.length; i++ ) assert formals._ts[i] instanceof TypeNil || formals._ts[i]==Type.ANY;
     _formals = formals;
     _ret = ret;
     _tfp=TypeFunPtr.make(fidx,formals.len(),TypeMemPtr.NO_DISP,ret);
@@ -149,7 +149,7 @@ public abstract class PrimNode extends Node {
       if(      tformal==TypeInt.INT64   ) nformal =  INT;
       else if( tformal==TypeFlt.FLT64   ) nformal =  FLT;
       else if( tformal==TypeFlt.NFLT64  ) nformal = NFLT;
-      else if( tformal==TypeNil.XSCALAR ) nformal = Env.XSCALAR;
+      else if( tformal==Type.ANY        ) nformal = Env.ANY;
       else if( tformal==Type.ALL        ) nformal = Env.ALL;
       else if( tformal==TypeFunPtr.THUNK) nformal = Env.THUNK;
       else if( tformal==TypeMem.ALLMEM  ) nformal = Env.ALLMEM;
@@ -195,9 +195,7 @@ public abstract class PrimNode extends Node {
   private static ProjNode make_math(PrimNode rand) {
     StructNode clz = new StructNode(false,false,null,"",Type.ALL);
     clz.add_fld("pi",Access.Final,con(TypeFlt.PI),null);
-    FunPtrNode fp = rand.as_fun();
-    Node randnode = new BindFPNode(fp,Env.XSCALAR).init();
-    clz.add_fld(rand._name,Access.Final,randnode,null);
+    clz.add_fld(rand._name,Access.Final,rand.as_fun(),null);
     clz.close().init();
     Node mem = Env.SCP_0.mem();
     NewNode nnn = new NewNode(mem,clz).init();
@@ -224,6 +222,10 @@ public abstract class PrimNode extends Node {
     // return high otherwise we return low.
     boolean is_con = true, has_high = false;
     for( int i=DSP_IDX; i<_formals.len(); i++ ) {
+      if( _formals.at(i)==Type.ANY ) { // Formal is dead
+        TS[i-DSP_IDX] = null;
+        continue;
+      }
       TypeNil tformal = (TypeNil)_formals.at(i);
       Type actual = val(i-DSP_IDX);
       if( actual==Type.ALL ) return Type.ALL;
@@ -247,7 +249,8 @@ public abstract class PrimNode extends Node {
     // All arguments are pre-unified to unique copy bases, wrapped in a
     // primitive with a clazz reference
     for( int i=DSP_IDX; i<_formals.len(); i++ )
-      in(i-DSP_IDX).set_tvar().unify(make_tvar(true,(TypeNil)_formals.at(i)),false);
+      if( _formals.at(i)!=Type.ANY )
+        in(i-DSP_IDX).set_tvar().unify(make_tvar(true,(TypeNil)_formals.at(i)),false);
     // Return is some primitive, and is typically never a copy
     return make_tvar(false,_ret);
   }
@@ -264,6 +267,7 @@ public abstract class PrimNode extends Node {
 
   @Override public ErrMsg err( boolean fast ) {
     for( int i=DSP_IDX; i<_formals.len(); i++ ) {
+      if( _formals.at(i) == Type.ANY ) continue;
       Type tactual = val(i-DSP_IDX);
       TypeNil tformal = (TypeNil)_formals.at(i);
       if( !tactual.isa(tformal) )
@@ -526,9 +530,9 @@ public abstract class PrimNode extends Node {
 
 
   public static class RandI64 extends PrimNode {
-    public RandI64() { super("rand",TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, TypeNil.XSCALAR, TypeInt.INT64),TypeInt.INT64); }
+    public RandI64() { super("rand",TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, Type.ANY, TypeInt.INT64),TypeInt.INT64); }
     @Override boolean is_oper() { return false; }
-    @Override public TypeNil apply( TypeNil[] args ) { throw AA.unimpl(); }
+    @Override public TypeNil apply( TypeNil[] args ) { return TypeInt.INT64;  }
     // Rands have hidden internal state; 2 Rands are never equal
     @Override public boolean equals(Object o) { return this==o; }
   }

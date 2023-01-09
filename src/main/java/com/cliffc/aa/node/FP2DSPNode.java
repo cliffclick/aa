@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV3;
@@ -18,12 +19,12 @@ public class FP2DSPNode extends Node {
   Node fp() { return in(0); }
   @Override public Type value() {
     if( !(fp()._val instanceof TypeFunPtr tfp) ) return fp()._val.oob();
-    assert tfp.has_dsp();
     return tfp.dsp();
   }
   
   @Override public Node ideal_reduce() {
     if( fp() instanceof BindFPNode bind ) return bind.dsp();
+    if( _val==Type.ANY ) return Env.ANY;
     return null;
   }
   

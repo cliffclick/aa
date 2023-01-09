@@ -651,6 +651,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       assert nliv.isa(oliv);    // Monotonically improving
       _live = nliv;             // Record progress
       add_flow_defs();          // Classic reverse flow
+      deps_work_clear();        // Any extras
     }
 
     // Compute best value.  If progressing, push uses on the flow worklist.
@@ -662,6 +663,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       assert nval.isa(oval);    // Monotonically improving
       _val = nval;
       add_flow_uses();          // Classic forwards flow
+      deps_work_clear();        // Any extras
       if( nval.is_con() ) Env.GVN.add_reduce(this);// Replace a constant
     }
     return progress;

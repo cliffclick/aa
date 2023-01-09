@@ -11,7 +11,6 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static com.cliffc.aa.AA.unimpl;
-import static org.junit.Assert.*;
 
 public class TestParse {
   private static final BitsFun TEST_FUNBITS = BitsFun.make0(43);
@@ -31,7 +30,22 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    test("{5}()", "int:5", "int:5"); // No args nor -> required; this is simply a function returning 5, being executed
+    test("mul3={x -> y=3; x*y}; mul3(2)", "6","6"); // multiple statements in func body
+  }
+  static private void assertTrue(boolean t) {
+    if( t ) return;
+    System.err.println("False");
+    org.junit.Assert.assertTrue(t);
+  }
+  static private void assertNull(Object t) {
+    if( t==null ) return;
+    System.err.println("NotNull "+(t));
+    org.junit.Assert.assertNull(t);
+  }
+  static private void assertEquals(Object x, Object y) {
+    if( x==y || x.equals(y) ) return;
+    System.err.println("Not Equals "+x+" != "+y);
+    org.junit.Assert.assertEquals(x,y);
   }
 
   @Test public void testParse00() {
@@ -163,16 +177,16 @@ public class TestParse {
   @Test public void testParse02() {
     // Anonymous function definition.  Note: { x -> x&1 }; 'x' can be any struct with an operator '_&_'.
     _test2("{x:int -> x&1}","[54]{any,4 -> int1 }","{A int64 -> int64}",null,null,null,"[54]",null,0);
-    test("{5}()", "int:5", "int:5"); // No args nor -> required; this is simply a function returning 5, being executed
-    testerr("{x:flt y -> x+y}", "Unable to resolve _+_",13); // {Scalar Scalar -> Scalar}
+    test("{5}()", "5", "5"); // No args nor -> required; this is simply a function returning 5, being executed
+    testerr("{x:flt y -> x+y}", "Ambiguous, unable to resolve { flt64 flt64 -> flt64 } and { flt64 int64 -> flt64 }",13); // {Scalar Scalar -> Scalar}
 
     // Function execution and result typing
-    test("x=3; andx={y -> x & y}; andx(2)", "int:2", "int:2"); // trivially inlined; capture external variable
-    test("x=3; and2={x -> x & 2}; and2(x)", "int:2", "int:int64", "int:2", "int:2"); // trivially inlined; shadow  external variable
+    test("x=3; andx={y -> x & y}; andx(2)", "2", "2"); // trivially inlined; capture external variable
+    test("x=3; and2={x -> x & 2}; and2(x)", "2", "2"); // trivially inlined; shadow  external variable
     testerr("plus2={x -> x+2}; x", "Unknown ref 'x'",18); // Scope exit ends lifetime
     testerr("fun={x -> }; fun(0)", "Missing function body",10);
     testerr("fun(2)", "Unknown ref 'fun'", 0);
-    test("mul3={x -> y=3; x*y}; mul3(2)", "int:6","A", "int:6","int:6"); // multiple statements in func body
+    test("mul3={x -> y=3; x*y}; mul3(2)", "6","6"); // multiple statements in func body
     _test2("x=3; addx={y -> x+y}; addx(2)", "int:5","int:5","int:5","int:5",null,null,"Unable to resolve _+_",-1); // must inline to resolve overload {+}:Int
     test("x=3; mul2={x -> x*2}; mul2(2.1)", "flt:4.2","flt:4.2"); // must inline to resolve overload {*}:Flt with I->F conversion
     //test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
@@ -950,8 +964,6 @@ HashTable = {@{
     _test2(program,gcp,hmt,gcp_both,hmt_both,null,null,null,0);
   }
 
-
-  
   // Run a program in all 3 modes, yes function returns, no errors
   private void test( String program, Function<Type,Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect ) {
     //_test2(program,gcp_maker,formals_maker,hmt_expect,null,0);

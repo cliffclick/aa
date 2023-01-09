@@ -1,10 +1,14 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
-import com.cliffc.aa.tvar.*;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.TVLambda;
+import com.cliffc.aa.tvar.TVLeaf;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeFunPtr;
+import com.cliffc.aa.type.TypeTuple;
 
-import static com.cliffc.aa.AA.*;
+import static com.cliffc.aa.AA.DSP_IDX;
+import static com.cliffc.aa.AA.REZ_IDX;
 
 // See CallNode and FunNode comments. The FunPtrNode converts a RetNode into a
 // TypeFunPtr with a constant fidx.  Used to allow first class functions to be
@@ -29,6 +33,11 @@ public final class FunPtrNode extends Node {
   public  FunPtrNode( String name, RetNode ret ) {
     super(OP_FUNPTR,ret);
     _name = name;
+    ParmNode pdsp = ret.fun().parm(DSP_IDX);
+    if( pdsp != null ) {
+      pdsp.deps_add(this);
+      pdsp.deps_mark();
+    }
   }
   // Display (already fresh-loaded) but no name.
   public  FunPtrNode( RetNode ret ) { this(ret.fun()._name,ret); }
@@ -68,8 +77,12 @@ public final class FunPtrNode extends Node {
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;
     RetNode ret = ret();
+    // If no display pointer needed, we are pre-bound to ANY, otherwise not
+    // bound so ALL.
+    FunNode fun = ret.in(4) instanceof FunNode fun2 ? fun2 : null;
+    Type dsp = fun==null || fun.parm(DSP_IDX)==null ? Type.ANY : Type.ALL;
     TypeTuple tret = (TypeTuple)(ret._val instanceof TypeTuple ? ret._val : ret._val.oob(TypeTuple.RET));
-    return TypeFunPtr.make(ret._fidx,nargs(),Type.ANY,tret.at(REZ_IDX));
+    return TypeFunPtr.make(ret._fidx,nargs(),dsp,tret.at(REZ_IDX));
   }
 
   @Override public boolean has_tvar() { return true; }

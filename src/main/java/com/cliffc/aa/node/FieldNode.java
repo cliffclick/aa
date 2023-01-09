@@ -1,8 +1,12 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
+import com.cliffc.aa.Combo;
+import com.cliffc.aa.Env;
+import com.cliffc.aa.ErrMsg;
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.unimpl;
@@ -245,6 +249,14 @@ public class FieldNode extends Node implements Resolvable {
     str.deps_add_deep(this);    // Try again if str closes
     // Add unresolved field if not already there (even if closed)
     return str.arg(_fld)==null && str.add_fld(_fld,self); 
+  }
+
+  @Override public ErrMsg err( boolean fast ) {
+    Ary<String> errs = tvar()._errs;
+    if( errs==null ) return null;
+    if( fast ) return ErrMsg.FAST;
+    if( errs.len()>1 ) throw unimpl();
+    return tvar(0).as_struct().err_resolve(_bad, errs.at(0));
   }
 
   @Override public int hashCode() { return super.hashCode()+_fld.hashCode(); }

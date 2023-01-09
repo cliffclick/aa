@@ -24,7 +24,7 @@ public class BindFPNode extends Node {
     }
     if( fun instanceof TypeFunPtr tfp ) {
       if( tfp==TypeFunPtr.GENERIC_FUNPTR ) return tfp; // Forward ref, do not touch
-      if( tfp.dsp()!=Type.ANY ) return tfp;
+      if( tfp.dsp()!=Type.ALL ) return tfp;
       return tfp.make_from(dsp);
     }
     return fun;

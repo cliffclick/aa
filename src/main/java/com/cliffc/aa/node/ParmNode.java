@@ -38,6 +38,7 @@ public class ParmNode extends PhiNode {
     Type t = Type.ANY;
     for( int i=1; i<_defs._len; i++ )
       if( fun.val(i)==Type.CTRL ) { // Only meet alive paths
+        fun.in(i).deps_add(this);   // Lift to XCTRL changes self type
         Type ti = val(i);
         if( fun.in(i) instanceof CRProjNode )
           return ti;            // Default input allows more callers; return the default type

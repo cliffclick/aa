@@ -85,8 +85,10 @@ public class PhiNode extends Node {
     if( r.len() != len() ) return _live; // Error, pass live thru
     // The same def can appear on several inputs; check them all.
     for( int i=1; i<_defs._len; i++ )
-      if( in(i)==def && !r.val(i).above_center() )
+      if( in(i)==def && !r.val(i).above_center() ) {
+        r.in(i).deps_add(def);
         return _live;           // This input is as live as i am
+      }
     // If the control changes, recompute live
     for( int i=1; i<_defs._len; i++ ) if( in(i)==def )  r.in(i).deps_add(def);
     return Type.ANY;            // All matching defs are not live on any path

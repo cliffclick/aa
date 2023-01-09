@@ -219,7 +219,7 @@ public class GVNGCM {
       Type twrk = wrk._val;
       Type tmem0 = twrk instanceof TypeTuple ? ((TypeTuple)twrk).at(1) : twrk;
       if( !(tmem0 instanceof TypeMem tmem1) ) continue; // Node does have a memory type?
-      if( aliases!=null && !tmem1.has_used(aliases) ) continue; // Does not use the listed memory?
+      //if( aliases!=null && !tmem1.has_used(aliases) ) continue; // Does not use the listed memory?
       if( wrk instanceof CallNode call) { // Do the CEPI for a Call, skipping in-between
         CallEpiNode cepi = call.cepi();
         if( cepi != null ) WORK_RETYPE.add(cepi);

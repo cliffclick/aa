@@ -105,8 +105,8 @@ public class StructNode extends Node {
     return super.hashCode() ^ _flds.hashCode() ^ _accesses.hashCode() ^ (int)_def._hash ^ _clz.hashCode();
   }
   @Override public boolean equals(Object o) {
-    assert _closed;             // V-N only for closed structs
     if( this==o ) return true;
+    if( _closed ) return false; // V-N only for closed structs
     return super.equals(o) && o instanceof StructNode rec &&
       _flds.equals(rec._flds) && _accesses.equals(rec._accesses) &&
       _def==rec._def && Util.eq(_clz,rec._clz);

@@ -353,62 +353,6 @@ public final class CallEpiNode extends Node {
     throw unimpl();
   }
 
-
-  static BitsAlias esc_out( TypeMem tmem, Type trez ) {
-  //  if( trez == Type.XNIL || trez == Type.NIL ) return BitsAlias.EMPTY;
-  //  if( trez instanceof TypeFunPtr ) trez = ((TypeFunPtr)trez)._dsp;
-  //  if( trez instanceof TypeMemPtr )
-  //    return tmem.all_reaching_aliases(((TypeMemPtr)trez)._aliases);
-  //  return TypeMemPtr.OOP0.dual().isa(trez) ? BitsAlias.NZERO : BitsAlias.EMPTY;
-    throw unimpl();
-  }
-  //
-  //// Approximate "live out of call", includes things that are alive before
-  //// the call but not flowing in.  Catches all the "new in call" returns.
-  //
-  //// A little profiling on some simple test cases (so the stats are suspect on
-  //// larger programs) shows:
-  //// - About 80% of the time, the esc_in and esc_out are full, and about 20%
-  ////   they are empty and about 1% they are sorta reasonable.
-  //// - About 50% of the time, the caller_mem and post_call mem are the same.
-  ////   The actual memory contents are all over the map.
-  //// - The length hits the largest alias pretty quick.
-  //static TypeMem live_out(TypeMem caller_mem, TypeMem post_call, Type trez, BitsAlias esc_in, TypeMem defmem) {
-  //  // Fast cutout for same memory
-  //  if( caller_mem == post_call )
-  //    return caller_mem;        // Not joining with DEFMEM
-  //  BitsAlias esc_out = esc_out(post_call,trez);
-  //  int len = Math.max(Math.max(caller_mem.len(),post_call.len()),esc_out.max()+1);
-  //  if( defmem!=null ) len = Math.max(len,defmem.len());
-  //
-  //  // Fast cutout for full aliases
-  //  if( esc_in ==BitsAlias.FULL || esc_in ==BitsAlias.NZERO ||
-  //      esc_out==BitsAlias.FULL || esc_out==BitsAlias.NZERO ) {
-  //    TypeMem mt = (TypeMem)caller_mem.meet(post_call);
-  //    return defmem==null ? mt : (TypeMem)mt.join(defmem);
-  //  }
-  //
-  //  // Fast cutout for empty aliases
-  //  if( esc_in ==BitsAlias.EMPTY && esc_out==BitsAlias.EMPTY )
-  //    return defmem==null ? caller_mem : (TypeMem)caller_mem.join(defmem);
-  //
-  //  // TODO: Wildly inefficient, but perhaps not all that common
-  //  TypeObj[] pubs = new TypeObj[len];
-  //  for( int i=1; i<pubs.length; i++ ) {
-  //    boolean ein  = esc_in .test_recur(i);
-  //    boolean eout = esc_out.test_recur(i);
-  //    TypeObj pre = caller_mem.at(i);
-  //    TypeObj obj = ein || eout ? (TypeObj)(pre.meet(post_call.at(i))) : pre;
-  //    // Before GCP, must use DefMem to keeps types strong as the Parser
-  //    // During GCP, can lift default actual memories.
-  //    if( defmem!=null ) // Before GCP, must use DefMem to keeps types strong as the Parser
-  //      obj = (TypeObj)obj.join(defmem.at(i));
-  //    pubs[i] = obj;
-  //  }
-  //  TypeMem tmem3 = TypeMem.make0(pubs);
-  //  return tmem3;
-  //}
-
   // Sanity check
   boolean sane_wiring() {
     CallNode call = call();

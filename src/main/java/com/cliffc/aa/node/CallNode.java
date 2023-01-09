@@ -359,7 +359,12 @@ public class CallNode extends Node {
     CallEpiNode cepi = cepi();
     boolean all_wired = _is_copy || cepi.is_all_wired();
     if( all_wired ) deps_add(def);
-    else return Type.ANY;
+    else
+      // not-all-wired means: cannot ask about projections being alive
+      // pre-combo, lifting, must assume alive.
+      // in -combo, falling, must assume dead .
+      // post-combo, all is wired, never get here.
+      return LIFTING ? Type.ALL : Type.ANY;
     // All wired, the arg is dead if the matching projection is dead
     int argn = _defs.find(def);
     ProjNode proj = ProjNode.proj(this, argn);

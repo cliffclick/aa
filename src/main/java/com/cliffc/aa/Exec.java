@@ -26,6 +26,7 @@ public abstract class Exec {
     AA.RSEED = rseed;
     AA.DO_GCP = do_gcp;
     AA.DO_HMT = do_hmt;
+    AA.LIFTING = true;
     Env e = Env.FILE = new Env(top,null,false,top._scope.ctrl(),top._scope.mem(),top._scope.ptr(), null);
     // Parse a program
     ErrMsg err = new Parse(src,false,e,str).prog();
@@ -37,6 +38,7 @@ public abstract class Exec {
     Env.GVN.add_flow(Env.ROOT);
     e.close();      // No more fields added to the parse scope
 
+    AA.LIFTING = false;
     Combo.opto(); // Global Constant Propagation and Hindley-Milner Typing
 
     Env.GVN.iter(); // Re-check all ideal calls now that types have been maximally lifted

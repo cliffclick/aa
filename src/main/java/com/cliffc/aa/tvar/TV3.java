@@ -66,7 +66,7 @@ abstract public class TV3 implements Cloneable {
   UQNodes _deps;
 
   // Errors other than structural unify errors.
-  Ary<String> _errs;
+  public Ary<String> _errs;
   
   //
   TV3() { this(true,(TV3[])null); }

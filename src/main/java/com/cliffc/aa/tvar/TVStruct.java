@@ -1,5 +1,7 @@
 package com.cliffc.aa.tvar;
 
+import com.cliffc.aa.ErrMsg;
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.Util;
@@ -258,6 +260,16 @@ public class TVStruct extends TV3 {
 
   @Override int eidx() { return TVErr.XSTR; }
   @Override public TVStruct as_struct() { return this; }
+
+  public ErrMsg err_resolve(Parse loc, String msg) {
+    SB sb = new SB().p(msg).p(", unable to resolve ");
+    VBitSet dups = get_dups();
+    VBitSet visit = new VBitSet();
+    for( int i=0; i<len(); i++ )
+      if( !Resolvable.is_resolving(_flds[i]) )
+        arg(i)._str(sb,visit,dups,false).p(" and ");
+    return ErrMsg.unresolved(loc,sb.unchar(5).toString());
+  }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     // Find any special instance tag fields, and print shortcuts.

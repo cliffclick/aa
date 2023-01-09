@@ -24,7 +24,7 @@ public final class RetNode extends Node {
   // Short self name
   @Override public String xstr() {
     if( is_dead() ) return "Ret!";
-    FunNode fun = fun();
+    FunNode fun = in(4) instanceof FunNode fun2 ? fun2 : null;
     return "Ret"+(is_copy() ? "!copy!" : (fun==null ? "["+_fidx+"]" : fun.name()));
   }
   @Override boolean is_CFG() { return !is_copy(); }
