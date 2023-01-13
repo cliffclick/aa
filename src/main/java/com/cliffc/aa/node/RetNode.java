@@ -87,10 +87,13 @@ public final class RetNode extends Node {
     // If control is dead, but the Ret is alive, we're probably only using the
     // FunPtr as a 'gensym'.  Nuke the function body.
     Node progress = null;
-    if( !is_copy() && ctl()._val == Type.XCTRL && !is_prim() && fun()._val ==Type.XCTRL ) {
-      set_def(4,null);          // We're a copy now!
-      progress=this;
-      Env.GVN.add_reduce_uses(this); // Following FunPtrs do not need their displays
+    if( !is_copy() ) {
+      if( ctl()._val == Type.XCTRL && !is_prim() && fun()._val ==Type.XCTRL ) {
+        set_def(4,null);          // We're a copy now!
+        progress=this;
+        Env.GVN.add_reduce_uses(this); // Following FunPtrs do not need their displays
+      } else
+        fun().deps_add(this);
     }
 
     // If no users inlining, wipe out all edges
@@ -112,6 +115,8 @@ public final class RetNode extends Node {
     Node mem = mem();
     if( mem instanceof ParmNode && mem.in(0)==fun() )
       return set_def(1,null);
+    else if( mem!=null )
+      mem.deps_add(this);
 
     // Collapsed to a constant?  Remove any control interior.
     Node ctl = ctl();

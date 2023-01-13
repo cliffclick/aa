@@ -146,7 +146,6 @@ public abstract class Combo {
     work_cnt += main_work_loop(1);
 
     // Pass 2: Potential new Leafs quit lifting GCP in Apply
-    HM_NEW_LEAF = true;
     add_new_leaf_work();
     assert Env.ROOT.more_work(false)==0;
     work_cnt += main_work_loop(2);

@@ -1,6 +1,5 @@
 package com.cliffc.aa.tvar;
 
-import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeNil;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
@@ -39,10 +38,26 @@ public class TVNil extends TV3 {
     return true;
   }
 
+  // same as HM w/nongten, except this & that reversed
+  boolean _unify_nil( TV3 that, TV3[] nongen, boolean test ) {
+    assert !(that instanceof TVNil);
+    if( test ) return true;     // Will make progress in all situations
+    TVLeaf not_nil = not_nil();
+    not_nil._deps_work_clear();
+    // A shallow copy and fresh-unify fails if 'this' is cyclic, because the
+    // shallow copy peels one part of the loop.
+    TV3 copy = that._fresh(nongen).strip_nil();
+    _is_copy &= that._is_copy;
+    not_nil.union(copy);
+    if( that instanceof TVBase ) this.union(that); // Can reverse and turn into a Base
+    else that.union(this);      // Force 'that' to be nil-able version
+    return true;
+  }
+
   boolean _fresh_unify_nil( TV3 that, boolean test ) {
     assert !(that instanceof TVNil);
     if( that instanceof TVBase base ) {
-      Type t = base._t.meet(TypeNil.XNIL);
+      TypeNil t = (TypeNil)base._t.meet(TypeNil.XNIL);
       if( base._t == t ) return false;
       if( !test ) base._t = t;
       return true;
@@ -58,12 +73,12 @@ public class TVNil extends TV3 {
     throw unimpl();
   }
 
+  
   // -------------------------------------------------------------
   @Override boolean _trial_unify_ok_impl( TV3 that, boolean extras ) {
     if( that instanceof TVNil ) return true;
     if( that instanceof TVBase base &&
-        base._t instanceof TypeNil tnil &&
-        tnil.must_nil() )
+        base._t.must_nil() )
       return true;
     return false;
   }

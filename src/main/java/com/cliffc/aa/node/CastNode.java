@@ -22,8 +22,13 @@ public class CastNode extends Node {
     // Cast is useless?  Remove same as a TypeNode
     Node ctrl = in(0), addr = in(1);
     Type c = ctrl._val, t = addr._val;
-    // Cast when Load/Field from a Struct?  Never nil, can be removed.
-    if( t instanceof TypeStruct ) return addr;
+    // Cast when Load/Field from a int/flt?  This is an oper Load, pulls from
+    // the CLZ and cannot be nil; remove.
+    if( _t instanceof TypeMemPtr ) {
+      if( t instanceof TypeInt ) return addr;
+      if( t instanceof TypeFlt ) return addr;
+      if( t instanceof TypeStruct ) return addr;
+    }
     if( c != Type.CTRL ) return null;
     if( t.isa(_t) ) return in(1);
     return null;

@@ -29,10 +29,15 @@ public final class ErrNode extends Node {
     // errors we want to report in preference to this one.  If any user
     // has ANOTHER ALL/Err input, return null instead.
     for( Node use : _uses )
-      for( Node def : use._defs )
-        if( def != null && def != this && def._val ==Type.ALL )
-          return null;
-    return _err;
+      if( !use_error(use) )
+        return _err;
+    return null;
+  }
+  private boolean use_error(Node use) {
+    for( Node def : use._defs )
+      if( def != null && def != this && def._val == Type.ALL )
+        return true;
+    return false;
   }
   @Override public int hashCode() { return super.hashCode()+_err.hashCode(); }
   @Override public boolean equals(Object o) {

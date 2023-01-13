@@ -454,6 +454,8 @@ public class Parse implements Comparable<Parse> {
     Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
     Node mem = mem();
     Node stk = gvn(new LoadNode(mem,ptr,badf));
+    boolean closure = scope.stk()._is_closure;
+    if( closure ) throw unimpl(); // No fresh on setfield?
     Node stk2 = gvn(new SetFieldNode(tok,mutable,stk,Node.peek(iidx),badf));
     Node st = new StoreNode(mem,ptr,stk2,badf);
     scope.replace_mem(st);
@@ -578,20 +580,18 @@ public class Parse implements Comparable<Parse> {
       int lhsidx = lhs.push();
       Parse err = errMsg(opx);
       // Get the overloaded operator field, always late binding
-      Node over = gvn(new FieldNode(lhs,FieldNode.PROTO,binop._name,err));
+      Node over = gvn(new FieldNode(lhs,binop._name,err));
       // Get the resolved operator from the overload
-      Node unbound_fun = gvn(new FieldNode(over,FieldNode.LOCAL,"_",err));
-      // Bind to the lhs
-      Node bind = gvn(new BindFPNode(unbound_fun,Node.peek(lhsidx)));
-      int fidx = bind.push();
+      Node fun = gvn(new FieldNode(over,"_",err));
+      int fidx = fun.push();
       // Parse the RHS operand
       Node rhs = binop._lazy
         ? _lazy_expr(binop)
         : _expr_higher_require(binop);
       // Emit the call to both terms
-      bind = Node.pop(fidx);
+      fun = Node.pop(fidx);
       // LHS in unhooked prior to optimizing/replacing.
-      lhs = do_call(errMsgs(opx,lhsx,rhsx), args(Node.pop(lhsidx),rhs,bind));
+      lhs = do_call(errMsgs(opx,lhsx,rhsx), args(Node.pop(lhsidx),rhs,fun));
       // Invariant: LHS is unhooked
     }
   }
@@ -690,16 +690,14 @@ public class Parse implements Comparable<Parse> {
       if( op._nargs!=1 ) throw unimpl(); // No binary/trinary allowed here
       int e0idx = e0.push();
       Parse err = errMsg(oldx);
-      // Load field e0.op2_ as an overload, load again to resolve to a TFP,
-      // bind, and instance call.  Returns an overload from the clazz, typed as
-      // a TypeStruct tuple where the fields hold the function choices.
-      Node over = gvn(new FieldNode(e0,FieldNode.PROTO,op._name,err));
+      // Load field e0.op2_ as an overload, load again to resolve to a TFP, and
+      // instance call.  Returns an overload from the clazz, typed as a
+      // TypeStruct tuple where the fields hold the function choices.
+      Node over = gvn(new FieldNode(e0,op._name,err));
       // Selects the correct function from the TypeStruct tuple.
-      Node unbound_fun = gvn(new FieldNode(over,FieldNode.LOCAL,"_",err));
-      // Bind to the original
-      Node bind = gvn(new BindFPNode(unbound_fun,Node.peek(e0idx)));
+      Node fun = gvn(new FieldNode(over,"_",err));
       // Call the operator
-      n = do_call(errMsgs(oldx,oldx),args(Node.pop(e0idx),bind));
+      n = do_call(errMsgs(oldx,oldx),args(Node.pop(e0idx),fun));
     } else {
       // Normal leading term
       _x=oldx;
@@ -736,19 +734,19 @@ public class Parse implements Comparable<Parse> {
           //return n.unkeep();
           throw unimpl();       // SetField before Store
         } else {
-          boolean resolve = Util.eq("_",tok);
           Parse bad = errMsg(fld_start);
           int cidx = castnn.push();
           Node ld = gvn(new LoadNode(mem(),castnn,bad));
           // This field can resolve against a prototype field or a self field.
           // Using a plain underscore for the field name is a Resolving field.          
-          Node fd = gvn(new FieldNode(ld, resolve ? FieldNode.LOCAL : FieldNode.UNKNOWN,tok,bad));
-          
-          // For late-bind optimized fields (all primitive op/over loads, all user
-          // clz/proto loads of final functions) the Struct MUST be visible here,
-          // in the parser, and the bind is added here.
-          castnn = Node.pop(cidx);
-          n = resolve ? fd : gvn(new BindFPNode(fd,castnn));
+          Node fd = gvn(new FieldNode(ld,tok,bad));
+
+          // If the loaded value is an unbound function, bind it now.  Since we
+          // cannot tell in general, always bind.  This requires Combo to sort
+          // out the general case.  There are a number of special cases we can
+          // remove or force the Bind: Oper loads must be bound, only functions
+          // are (except for structs, which recursively bind all fields).
+          n = gvn(new BindFPNode(fd,Node.pop(cidx)));
         }
 
       } else if( peek('(') ) {  // Attempt a function-call
@@ -828,13 +826,14 @@ public class Parse implements Comparable<Parse> {
     Node ptr = get_display_ptr(scope);
     Node ld = gvn(new LoadNode(mem(),ptr,bad));
     int ld_x = ld.push();
-    Node n = gvn(new FieldNode(ld,FieldNode.LOCAL,tok,bad));
-    if( n.is_forward_ref() )    // Prior is actually a forward-ref
-      return err_ctrl1(ErrMsg.forward_ref(this,((FunPtrNode)n)));
+    Node fd = gvn(new FieldNode(ld,tok,bad));
+    if( fd.is_forward_ref() )    // Prior is actually a forward-ref
+      return err_ctrl1(ErrMsg.forward_ref(this,((FunPtrNode)fd)));
+    Node n = gvn(new FreshNode(_e._fun,fd));
     // Do a full lookup on "+", and execute the function
     int nidx = n.push();
-    Node overplus = gvn(new FieldNode(n,FieldNode.PROTO,"_+_",bad)); // Plus operator overload
-    Node plus = gvn(new FieldNode(overplus,FieldNode.LOCAL,"_",bad)); // Resolve overload
+    Node overplus = gvn(new FieldNode(n,"_+_",bad)); // Plus operator overload
+    Node plus = gvn(new FieldNode(overplus,"_",bad)); // Resolve overload
     Node inc = con(TypeInt.con(d));
     Node sum = do_call0(false,errMsgs(_x-2,_x,_x), args(n,inc,plus));
     Node stf = gvn(new SetFieldNode(tok,Access.RW,Node.peek(ld_x),sum,bad));
@@ -933,7 +932,7 @@ public class Parse implements Comparable<Parse> {
 
     // Load the field from the struct.  This field name is resolved and is a
     // local field (not prototype field) load.
-    Node fd = gvn(new FieldNode(ld,FieldNode.LOCAL,tok,bad));
+    Node fd = gvn(new FieldNode(ld,tok,bad));
 
     // If in the middle of a definition (e.g. a HM Let, or recursive assign)
     // then no Fresh per normal HM rules.  If loading from a struct or from
@@ -1090,8 +1089,12 @@ public class Parse implements Comparable<Parse> {
       Node fptr = gvn(new FunPtrNode(ret));
       fptr_idx = fptr.push();   // Return function; close-out and DCE 'e'
     }
-     Node bind = gvn(new BindFPNode(Node.pop(fptr_idx),scope().ptr()));
-     return bind;
+    Node fptr = Node.pop(fptr_idx);
+    return scope().is_closure()
+      // Closures early-bind
+      ? gvn(new BindFPNode(Node.pop(fptr_idx),scope().ptr()))
+      // Structs late-bind
+      : fptr;
   }
 
   private Node merge_exits(Node rez) {
@@ -1481,7 +1484,7 @@ public class Parse implements Comparable<Parse> {
       Node dsp = gvn(new LoadNode(mmem,ptr,null)); // Gen linked-list walk code, walking display slot
       while( dsp instanceof SetFieldNode ) // Bypass partial frame updates
         dsp = dsp.in(0); // Never set the display, so bypass
-      ptr = gvn(new FieldNode(dsp,FieldNode.LOCAL,"^",null));
+      ptr = gvn(new FieldNode(dsp,"^",null));
       e = e._par;                                 // Walk linked-list in parser also
     }
   }

@@ -48,8 +48,8 @@ public abstract class PrimNode extends Node {
   }
 
   // Int/Float primitives.  
-  public static final StructNode ZINT = new StructNode(false,false,null,"int:", Type.ALL).set_proto_instance(TypeInt.INT64);
-  public static final StructNode ZFLT = new StructNode(false,false,null,"flt:", Type.ALL).set_proto_instance(TypeFlt.FLT64);
+  public static final StructNode ZINT = new StructNode(false,false,null,"int:", Type.ALL).set_proto_instance(TypeInt.INT64).init();
+  public static final StructNode ZFLT = new StructNode(false,false,null,"flt:", Type.ALL).set_proto_instance(TypeFlt.FLT64).init();
   public static final ConNode  INT = new ConNode(TypeInt. INT64).init();
   public static final ConNode  FLT = new ConNode(TypeFlt. FLT64).init();
   public static final ConNode NFLT = new ConNode(TypeFlt.NFLT64).init();
@@ -107,6 +107,12 @@ public abstract class PrimNode extends Node {
       //new MemPrimNode.ReadPrimNode.LValueLength(), // The other array ops are "balanced ops" and use term() for precedence
     };
 
+    Env.KEEP_ALIVE.add_def(ZINT);
+    Env.KEEP_ALIVE.add_def(ZFLT);
+    Env.KEEP_ALIVE.add_def( INT);
+    Env.KEEP_ALIVE.add_def( FLT);
+    Env.KEEP_ALIVE.add_def(NFLT);
+
     // Gather
     Ary<PrimNode> allprims = new Ary<>(others);
     for( PrimNode prim : others ) allprims.push(prim);
@@ -114,18 +120,14 @@ public abstract class PrimNode extends Node {
     for( PrimNode[] prims : INTS   ) for( PrimNode prim : prims ) allprims.push(prim);
     PRIMS = allprims.asAry();
 
+    // Math package
+    Env.STK_0.add_fld("math",Access.Final,make_math(rand),null).xval();
+
     // Build the int and float prototypes
     make_prim(ZFLT,FLTS);
     make_prim(ZINT,INTS);
-    
-    Env.KEEP_ALIVE.add_def(ZINT);
-    Env.KEEP_ALIVE.add_def(ZFLT);
-    Env.KEEP_ALIVE.add_def( INT);
-    Env.KEEP_ALIVE.add_def( FLT);
+
     Env.GVN.iter();
-    
-    // Math package
-    Env.STK_0.add_fld("math",Access.Final,make_math(rand),null);
 
     return PRIMS;
   }
@@ -186,7 +188,7 @@ public abstract class PrimNode extends Node {
       over.close();
       clz.add_fld(prims[0]._name,Access.Final,over,null);
     }
-    clz.close().init();
+    clz.close();
     Env.SCP_0.add_type(clz._clz,clz); // type String -> clazz Struct mapping, for scope-based type lookups
     Env.PROTOS.put(clz._clz,clz); // global mapping
   }

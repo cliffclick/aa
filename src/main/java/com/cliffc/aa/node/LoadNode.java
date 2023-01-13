@@ -58,14 +58,14 @@ public class LoadNode extends Node {
     TV3 self = tvar();
     TV3 adr = adr().tvar();
     return switch (adr) {
-      case TVLeaf leaf -> {  // Wait until forced to either TVStruct or TVPtr
-        leaf.deps_add_deep(this);
-        yield false;
-      }
-      case TVPtr ptr -> self.unify(ptr.load(),test);
-      case TVStruct tstr -> self.unify(adr, test); // Load from prototype, just pass-thru
-      case TVBase base   -> self.unify(adr, test); //
-      default -> throw unimpl();
+    case TVLeaf leaf -> {  // Wait until forced to either TVStruct or TVPtr
+      leaf.deps_add_deep(this);
+      yield false;
+    }
+    case TVPtr ptr -> self.unify(ptr.load(),test);
+    case TVStruct tstr -> self.unify(adr, test); // Load from prototype, just pass-thru
+    case TVBase   base -> self.unify(FieldNode.tv_clz(base._t), test); // Unify against primitive CLZ
+    default -> throw unimpl();
     };
   }
 

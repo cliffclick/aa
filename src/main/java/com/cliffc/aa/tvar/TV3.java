@@ -253,8 +253,8 @@ abstract public class TV3 implements Cloneable {
       return test || vput(that,that.union(_fresh(nongen)));
     
     // Special handling for nilable
-    if( !(this instanceof TVNil) && that instanceof TVNil nil ) throw unimpl();
-    if( !(that instanceof TVNil) && this instanceof TVNil nil ) return nil._fresh_unify_nil(that,test);
+    if( !(that instanceof TVNil) && this instanceof TVNil nil ) return vput(that,nil._fresh_unify_nil(that,test));
+    if( !(this instanceof TVNil) && that instanceof TVNil nil ) return nil._unify_nil(this,nongen,test);
 
     // Special handling for Base SCALAR, which can "forget" pointers
     if( that instanceof TVBase base && base._t==TypeNil.SCALAR && this instanceof TVPtr ptr )
@@ -314,7 +314,7 @@ abstract public class TV3 implements Cloneable {
     return rez;
   }
   
-  private TV3 _fresh(TV3[] nongen) {
+  TV3 _fresh(TV3[] nongen) {
     assert !unified();
     TV3 rez = VARS.get(this);
     if( rez!=null ) return rez.find(); // Been there, done that

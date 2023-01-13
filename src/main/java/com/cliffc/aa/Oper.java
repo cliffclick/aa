@@ -101,6 +101,7 @@ public class Oper {
   }
 
   @Override public String toString() { return _name; }
+  public static boolean is_oper(String oper) { return OPERS.containsKey(oper); }
 
   // Opers added to the OPERS table when a final field store is made.
   // This filters the string for non-opers, and publishes Opers.

@@ -27,10 +27,11 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_GCP=true;
-    DO_HMT=false;
+    DO_GCP=false;
+    DO_HMT=true;
     RSEED=0;
-    test("mul3={x -> y=3; x*y}; mul3(2)", "6","6"); // multiple statements in func body
+    test("1+(x=2*3)+x*x", "43", "43");
+    test("x++","xnil", "A?");
   }
   static private void assertTrue(boolean t) {
     if( t ) return;

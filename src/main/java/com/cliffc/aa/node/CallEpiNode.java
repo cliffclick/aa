@@ -170,6 +170,7 @@ public final class CallEpiNode extends Node {
         irez.add_def((in instanceof ParmNode parm && parm.in(CTL_IDX) == fun) ? in.in(path) : in);
       if( irez instanceof PrimNode prim ) prim._badargs = call._badargs;
       GVN.add_work_new(irez);
+      GVN.add_reduce(fun);
       return unwire(call,ret).set_is_copy(cctl,cmem,irez);
     }
 

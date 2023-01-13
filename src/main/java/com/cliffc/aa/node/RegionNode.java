@@ -23,10 +23,11 @@ public class RegionNode extends Node {
 
     // Look for dead paths.  If found, cut dead path out of all Phis and this
     // Node, and return-for-progress.
-    for( int i=1; i<_defs._len; i++ )
-      if( val(i)==Type.XCTRL && // Dead control flow input
+    for( int i=1; i<_defs._len; i++ ) {
+      Node cin = in(i);
+      if( cin._val==Type.XCTRL && // Dead control flow input
         // Keep dead input for primitives from Root, so prim is alive for next test
-        !(in(i) instanceof CRProjNode && is_prim()) ) {
+        !(cin instanceof CRProjNode && is_prim()) ) {
         for( Node phi : _uses )
           if( phi instanceof PhiNode )
             Env.GVN.add_flow(phi.remove(i));
@@ -36,7 +37,9 @@ public class RegionNode extends Node {
             len()==2 && in(1).in(0) instanceof CallNode call )
           Env.GVN.add_reduce(call.cepi());
         return this; // Progress
-      }
+      } else
+        cin.deps_add(this);   // Revisit if becomes XCTRL
+    }
 
     if( _defs._len == 1 ) return null; // No live inputs; dead in value() call
     if( _defs._len==2 ) {              // Exactly 1 live path

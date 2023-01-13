@@ -577,7 +577,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   public void combo_unify() {
     TV3 old = _tvar;
     if( old==null ) return;
-    if( _val == Type.ANY ) { _tvar.deps_add_deep(this); return; } // No HM progress on untyped code
+    if( _val == Type.ANY ) { tvar().deps_add_deep(this); return; } // No HM progress on untyped code
     if( _live== Type.ANY && !has_call_use() ) // No HM progress on dead code
       return;
     if( unify(false) ) {
@@ -779,7 +779,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Assert all ideal, value and liveness calls are done
   public final boolean more_ideal(VBitSet bs) {
     if( bs.tset(_uid) ) return false; // Been there, done that
-    if( !is_keep() ) { // Only non-keeps, which is just top-level scope and prims
+    if( !is_keep() && !Env.GVN.on_dead(this)) { // Only non-keeps, which is just top-level scope and prims
       Node x;
       if( !Env.GVN.on_reduce(this) ) { x = do_reduce(); if( x != null )
                                                          return true; } // Found an ideal call

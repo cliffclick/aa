@@ -1,12 +1,15 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.type.*;
-import com.cliffc.aa.tvar.*;
+import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.TVBase;
+import com.cliffc.aa.tvar.TVLeaf;
+import com.cliffc.aa.tvar.TVNil;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeFlt;
+import com.cliffc.aa.type.TypeNil;
 
 import java.util.function.Predicate;
-
-import static com.cliffc.aa.AA.unimpl;
 
 // Constant value nodes; no computation needed.  Hashconsed for unique
 // constants, except for XNIL.  XNIL allows for a TV3 typevar Nilable-Leaf with
@@ -26,8 +29,8 @@ public class ConNode<T extends Type> extends Node {
 
   @Override public boolean has_tvar() {
     if( _t==Type.ALL || _t==Type.ANY ) return true;  // Specifically allowed for various unused-displays on primitives
-    if( _t.is_nil() ) return true;     // Yes on NIL, INT, FLT, MEMPTR, FUNPTR
-    if( _t instanceof TypeStruct ) return true;
+    if( _t instanceof TypeNil /*_t.is_nil()*/ ) return true;     // Yes on NIL, INT, FLT, MEMPTR, FUNPTR
+    //if( _t instanceof TypeStruct ) return true;
     // No for TFLD, TMEM, RPC
     return false;
   }

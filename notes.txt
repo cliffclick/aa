@@ -1,4 +1,124 @@
 =======================================
+1/11/2023
+
+Late-Bind vs Early-Bind
+-----------------------
+
+Every lambda is bound *once* (the `self` or `this` argument is curried).
+
+Requires H-M unification to decide to bind-on-load or not.
+  Parser in general cannot tell, except for opers.
+  Means we insert Binds-after-Fields, but some Binds are removed by Combo.
+  Means TypeFunPtrs need a way to distinguish:
+  - unknown bound: ALL
+  -   known bound: Anything else
+  -          dead: ANY
+
+
+Example non-obvious late-bind usage:
+    pred = e1; @{ fld = e0; fun = pred ? { x -> x+fld } : { x -> x*fld }; }  
+Here we are selecting between 2 fcns, directly inside the Struct lexical scope.
+Since inside the struct scope, both are late-bound, and in the end `fun` field
+late-binds-on-load.  If `pred` is a constant, `fun` field can move to the CLZ.
+Similarly, if `e0` is a constant, `fld` can move to the CLZ.
+
+Example non-obvious early-bind usage:
+    var = e0; fun = { x -> x+var };  @{ fld = fun; }  
+`fun` is early bound in the closure; `fld` holds an early-bind non-local
+function, and does not bind-on-load, and stays in the instance.
+
+Example wrong-bind usage:
+  bad:=0;     // Types as an unbound_inner_function
+  @{ fun = (  // Assigned an inner unbound function
+       // Inner struct
+       @{ inner=e0;
+          dummy = {unbound_inner -> bad:=unbound_inner}( {e->e+inner} )
+       };
+       bad
+     )
+   }; 
+
+
+Opers always late-bind directly, perfectly.
+- bind after uni/bin ops, and before the overload.
+
+Fields late-bind directly, approximately.
+- bind after normal field loads (drop bind if field is not an unbound function).
+- Can be pre-bound if anon fcn rule triggers.  Combo sorts this out.
+
+Anon Fcn:
+- if enclosing lex scope is a struct, LATE BIND else EARLY BIND.
+
+Error to:
+- FP2DSP an unbound fcn.
+- Example @{ f0=...; f1 = ...map( { e -> e+f0} ) }
+- - map call passes anon fcn, which expects to be late-bound because enclosing lex scope is struct.
+- - internal to map, late-bound fcn is called without binding.
+- - Can add syntax to anon fcns in struct scope to early bind.
+
+H-M knows unbound from bound TVLambdas.  Use null display arg for NOT YET BOUND
+- BindFP expects unbound display in, makes a new TVLambda out with same args, but with display
+- FP2DSP expects bound display in.  Can be dead.
+- Call dont care on either fcn arg or display arg.
+- Error to unify bound & unbound fcns.
+- Need to print the null display, handle NPEs as needed
+
+
+
+
+CLZs for H-M, especially INT/FLT CLZ:
+-------------------------------------
+- TVBase INT/FLT supports TVField uses, indirects to CLZ.
+- Oper Fields indirect to "." CLZ field.
+- Constant final fields move to the CLZ, post-Combo.
+- Unbound functions are constants, so are "abc", 17, 3.14, etc.
+- Structs and tuples of constants are constants, e.g. overloads of unbound functions.
+- Pretty sure this is a FLOW property, so fully determined e.g. after Combo.
+
+- Later, can loosen this to include "invariant not constant".
+- Example invariant:
+    "pred = e1 ; for {idx} { ary[idx] = @{ fld=e0; fun = pred ? {x->x+fld} : {x->x*fld}}; }"
+  Since pred does not vary in program, all `fun` fields are the same, so can move to CLZ.
+- Example varying:
+    "for {idx} {pred=f(idx); ary[idx] = @{ fld=e0; fun = pred ? {x->x+fld} : {x->x*fld}}; }"
+  Since `pred` varies by index, the `fun` field varies by index, so cannot move to the CLZ.
+
+
+
+Lazy Fresh:
+-----------
+- Theory sez every "use" is a Id in the pure H-M, which requires a Fresh of its input.
+- "using" the INT CLZ therefore requires a Fresh, for every int, of the entire INT CLZ.
+- Can delay Fresh past "projections" or "refinements", i.e. Field loads.  Since the
+  projection/field slices its input, only need the Fresh on the slice.
+- Rule: push down Fresh as much as possible, shrinks the amount of "fresh" TVars.  
+
+
+New NEW Simplify:
+-----------------
+- Old NEW: Struct/New(old mem)/MProj(makes newmem)/DProj(makes ptr)
+- New NEW: Struct/New(makes ptr)/Store(old mem)(makes newmem)
+- New takes in only a Struct, produces a Ptr & Alias
+- Store can store the New & Struct.
+
+
+
+
+--- Should not need to do this optimization / bulk xform:
+Use a large XFORM to move early-bind to late-bind.
+Has to wait until the Parser quits making Loads.
+Probably waits until Combo finalizes Aliases.
+- This optimization shrinks object size (can move late-bind fcns in final fields to a CLAZZ)
+- Need to be able to find all Loads of a particular alias/New/Struct (label)/Bind/FPtr in constant time.
+- - From Struct(label), forwards find Bind/Fptr.
+- - Backwards find New(ptr) alias;
+- - find all Loads using this alias
+- - If Loads have more aliases, must repeat across all aliases
+- - find Field with label
+- - Bind-after-Field, and remove Bind-after-Fptr
+
+
+=======================================
 12/27/2022
 
 A little more on field/bindfp/clz handling.
