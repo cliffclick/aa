@@ -28,10 +28,12 @@ public class TestHM {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_HMT=false;
-    DO_GCP=true;
-    RSEED=0;
-    f_gcp_hmt_02();
+    DO_HMT=true;
+    DO_GCP=false;
+    RSEED=1;
+    // T/F/5
+    // F/T/0
+    f_gcp_hmt_03();
   }
 
   private void _run0s( String prog, String rprog, String rez_hm, Type gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -154,7 +156,7 @@ public class TestHM {
 
   @Test public void a_basic_err_01() {
     run("(+ \"abc\" 0)",
-        "%[Cannot unify int64 and *str:(97)?]",
+        "%[Cannot unify int64 and *str:(97)]",
         "int64");
   }
 
@@ -262,7 +264,7 @@ public class TestHM {
         "m = {x -> (l x)}; "+
         "n = {x -> (m x)}; "+
         "(if (rand 2) (n 1) (n \"abc\"))",
-        "%[Cannot unify int64 and *str:(97)?]", "nScalar" );
+        "%[Cannot unify int64 and *str:(97)]", "nScalar" );
   }
 
 
@@ -540,6 +542,12 @@ map ={fun parg -> (fun (cdr parg))};
         "}",
         "*[21]@{_; f=[30]{any,4 -> PA:*[5,6,17,18,19,20](_) }; res1=PA; res2=PA}",
         "[5,6,17,18,19,20,21]","[30]");
+  }
+
+  @Test public void d_struct_err_08() {
+    run( "foo={ ptr -> ptr.fld }; (foo 0)",
+         "May be nil",
+         "~Scalar");
   }
 
 
@@ -888,7 +896,7 @@ loop = { name cnt ->
   )
 }
 """,
-         "{ A? -> *( 3, May be nil when loading field x: 5 ) }",
+         "{ A? -> May be nil:*( 3, May be nil when loading field x: 5 ) }",
          "[36]{any,3 ->*[17](_, nint8, nint8) }",
          "[17]","[36]");
   }
@@ -1028,7 +1036,7 @@ loop = { name cnt ->
     run("{ ptr -> (ptr.x._ ptr.x._) }",
         "{ ptr -> (ptr.x._ ptr.x._) }",
         "{*@{x=*@{&18=%Unresolvedfield&18:{A:%Unresolvedfield&21->B:Unresolvedfield&18};&21=A;...};...}->B}",
-        "[29]{any,3 -> Scalar }",
+        "[29]{any,3 -> ~Scalar }",
         "[5]","[29]");
   }
 
@@ -1297,7 +1305,7 @@ fy = (pair { z -> "def" } { a -> 4     });
 fz = (if (rand 2) fx fy);
 (isempty (fz._ 1.2f))
 """,
-         "%Unresolved field &37 [Cannot unify int64 and *str:(int8)? ]",
+         "%Unresolved field &37 [Cannot unify int64 and *str:(int8) ]",
          "int1",
          null,null);
   }

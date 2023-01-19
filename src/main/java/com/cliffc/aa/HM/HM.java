@@ -242,7 +242,7 @@ public class HM {
       }
 
       // VERY EXPENSIVE ASSERT: O(n^2).  Every Syntax that makes progress is on the worklist
-      assert prog.more_work(work);
+      //assert prog.more_work(work);
       //if( !work.on(prog) && prog._flow instanceof TypeTuple tt ) {
       //  BitsAlias aliases = Root.EXT_ALIASES;
       //  BitsFun   fidxs   = Root.EXT_FIDXS  ;
@@ -272,13 +272,6 @@ public class HM {
             if( miss2 )  rec._args.put(fld._id,bad); // Put it back after printing
           }
         }
-
-        if( self.is_err2() && self.has_nil() )
-          // If any contain nil, then we may have folded in a not-nil.
-          // To preserve monotonicity, we make them all nil.
-          // Example: (3.unify(notnil)).unify("abc" ) ==       int8     .unify("abc")  == (Error int8,"abc" ) <<-- Should be "abc"?
-          // Example: (3.unify("abc" )).unify(notnil) == (Error 3,"abc").unify(notnil) == (Error int8,"abc"?)
-          self.add_nil();
         return null;
       }, (a,b)->null);
   }
@@ -953,6 +946,8 @@ public class HM {
           progress |= formal==null && !tfun.is_err()
             ? find().unify_errs("Bad arg count ",work) // more args than the lambda takes
             : actual.unify(formal,work);
+          (actual=actual.find()).push_update(this); // If actual picks up an error
+          progress |= find().unify_errs(actual._err,work);
           if( formal==null ) miss++;                //
           if( progress && work==null ) return true; // Will-progress & just-testing early exit
           tfun = tfun.find();
@@ -1524,6 +1519,7 @@ public class HM {
         ptr._args.put("*", rec = T2.make_leaf());
         rec._deps = ptr._deps.deepCopy();
       }
+      boolean progress = ptr.add_use_nil(true,work);
 
       // Add struct-ness
       if( !rec.is_obj() ) {
@@ -1535,7 +1531,6 @@ public class HM {
       assert rec.is_obj();
 
       // Attempt resolve
-      boolean progress=false;
       if( is_resolving() && !rec.is_open() ) {
         progress = trial_resolve(find(), rec, rec, work);
         if( progress && work==null ) return true;
@@ -1650,7 +1645,7 @@ public class HM {
       String lab = null;
       for( String id : rhs._args.keySet() ) {
         if( is_resolving(id) ) continue;
-        if( pat.trial_unify_ok(rhs.arg(id),false) ) {
+        if( pat.trial_unify_ok(rhs.arg(id),true) ) {
           if( lab==null ) lab=id;   // No choices yet, so take this one
           else {                    // Ambiguous (yet)
             pat.push_update(this);  // Revisit if changes
@@ -2170,8 +2165,10 @@ public class HM {
     Type _tflow;
     Type _eflow;                // Error flow; incompatible with _flow
 
-    // Can be nil
+    // Might be a nil (e.g. mixed in with a 0 or some unknown ptr)
     boolean _may_nil;
+    // Cannot NOT be a nil (e.g. used as ptr.fld)
+    boolean _use_nil;
 
     // True for any primitive which might widen its result or
     // root args.  Otherwise, in cases like:
@@ -2203,6 +2200,7 @@ public class HM {
       t._tflow = _tflow;
       t._eflow = _eflow;
       t._may_nil = _may_nil;
+      t._use_nil = _use_nil;
       t._is_obj = _is_obj;
       t._open = _open;
       t._is_copy = _is_copy;
@@ -2261,7 +2259,6 @@ public class HM {
       T2 last = t2s[t2s.length-1];
       args.put(RET,last);
       T2 t2 = new T2(args);
-      t2._may_nil = false;
       assert t2.is_fun();
       return t2;
     }
@@ -2273,7 +2270,6 @@ public class HM {
           args.put(ids[i],flds[i]);
       T2 t2 = new T2(args);
       t2._is_obj = true;
-      t2._may_nil = false;
       t2._open = false;
       assert t2.is_obj();
       return t2;
@@ -2294,7 +2290,7 @@ public class HM {
     void free() {
       if( _args!=null ) _args.clear();
       _tflow = _eflow = null;
-      _is_obj = _may_nil =_open = false;
+      _is_obj = _may_nil = _use_nil =_open = false;
       _is_copy = true;
       _err  = null;
       _deps = null;
@@ -2331,10 +2327,8 @@ public class HM {
       T2 n = arg("?");
       if( n.is_leaf() ) return this;
       _args.remove("?");  // No longer have the "?" key, not a nilable anymore
-      if( n._is_copy ) _args.put("??",n);  // For hm_apply_lift, keep around the prior mapping
       // Nested nilable-and-not-leaf, need to fixup the nilable
       if( n.is_base() ) {
-        _may_nil=false;
         _tflow = n._tflow.meet(TypeNil.XNIL);
         if( !_is_copy ) _tflow = _tflow.widen();
         if( n._eflow!=null ) _eflow = n._eflow.meet(TypeNil.XNIL);
@@ -2360,12 +2354,7 @@ public class HM {
     private long dbl_uid(long uid) { return ((long)_uid<<32)|uid; }
 
     // True if any portion allows for nil
-    boolean has_nil() {
-      if( _tflow instanceof TypeNil tn && tn.must_nil() ) return true;
-      if( _eflow instanceof TypeNil tn && tn.must_nil() ) return true;
-      if( _may_nil                                      ) return true;
-      return false;
-    }
+    boolean has_nil() { return _may_nil; }
     // Add nil
     void add_nil() {
       if( _tflow!=null ) _tflow = _tflow.meet(TypeNil.XNIL);
@@ -2380,6 +2369,23 @@ public class HM {
       return this;
     }
 
+    // Set may_nil flag.  Return progress flag.
+    // Set an error if both may_nil and use-nil.
+    boolean add_may_nil(boolean may, Work work) {
+      if( !may || _may_nil ) return false; // No change
+      if( work==null ) return true; // Will be progress
+      if(_use_nil ) unify_errs("May be nil",work);
+      return (_may_nil=true);   // Progress
+    }
+    // Set use_nil flag.  Return progress flag.
+    // Set an error if both may_nil and use-nil.
+    boolean add_use_nil(boolean use, Work work) {
+      if( !use || _use_nil ) return false; // No change
+      if( work==null ) return true; // Will be progress
+      if(_may_nil ) unify_errs("May be nil",work);
+      return (_use_nil=true);   // Progress
+    }
+    
     // Varies as unification happens; not suitable for a HashMap/HashSet unless
     // unchanging (e.g. defensive clone)
     @Override public int hashCode() {
@@ -2387,6 +2393,7 @@ public class HM {
       if( _tflow!=null ) hash+= _tflow._hash;
       if( _eflow!=null ) hash+= _eflow._hash;
       if( _may_nil) hash = (hash+13)*23;
+      if( _use_nil) hash = (hash+17)*27;
       if( _is_obj ) hash = (hash+23)*29;
       if( _args!=null )
         for( String key : _args.keySet() )
@@ -2436,6 +2443,7 @@ public class HM {
         // all escaping fidxs that are compatible
         BitsFun fidxs = Root.matching_escaped_fidxs(this);
         if( _may_nil ) fidxs = fidxs.set(0);
+        if( _use_nil ) throw unimpl();
         Type tfun = ADUPS.get(_uid);
         if( tfun != null ) return tfun;  // TODO: Returning recursive flow-type functions
         ADUPS.put(_uid, TypeNil.XSCALAR);
@@ -2479,8 +2487,10 @@ public class HM {
       if( work==null ) return true; // Report progress without changing
 
       // Merge all the hard bits
-      that._may_nil  |= _may_nil ;
+      that.add_may_nil(_may_nil,work);
+      that.add_use_nil(_use_nil,work);
       if( _is_obj ) {
+        assert !that._use_nil && !that._may_nil; // Structs care not for nil-ness
         that._open = that._is_obj ? (that._open & _open) : _open;
         that._is_obj = true;
       }
@@ -2514,7 +2524,7 @@ public class HM {
       // Kill extra information, to prevent accidentally using it
       _args = new NonBlockingHashMap<>() {{put(">>", that);}};
       _tflow = _eflow = null;
-      _is_obj = _may_nil = _open = false;
+      _is_obj = _may_nil = _use_nil = _open = false;
       _is_copy = true;
       _err  = null;
       _deps = null;
@@ -2527,7 +2537,11 @@ public class HM {
     boolean unify_errs(String err, Work<Syntax> work) {
       assert !unified();
       if( err==null || err.equals(_err) ) return false;
-      if( _err!=null ) return false; // TODO: Combine single errors, right now 1st one wins
+      if( _err!=null ) {
+        if( _err.compareTo(err) < 0 ) return false;
+        _err = err;             // Pick lexigraphically smallest error
+        return true;
+      }
       if( work==null ) return true;  // Would be progress
       _err = err;                    // Propagate errors
       add_deps_work(work);
@@ -2735,13 +2749,14 @@ public class HM {
       if( nongen_in(nongen) ) return vput(that,_unify(that,work));
 
       // LHS leaf, RHS is unchanged but goes in the VARS
-      if( this.is_leaf() ) return vput(that,false);
+      if( this.is_leaf() ) return vput(that,that.unify_errs(_err,work));
       if( that.is_leaf() )  // RHS is a tvar; union with a deep copy of LHS
         return work==null || vput(that,that.union(_fresh(nongen),work));
 
       // Special handling for nilable
       if( this.is_nil() && !that.is_nil() )
-        return vput(that,that.unify_nil_this(work));
+        // Since arg("?") is always a leaf, no structure change to RHS.
+        return vput(that,false);
       // That is nilable and this is not
       if( that.is_nil() && !this.is_nil() )
         return unify_nil(that,work,nongen);
@@ -2760,12 +2775,14 @@ public class HM {
       // Check for mismatched LHS and RHS
       if( work==null ) {
         if( _may_nil && !that._may_nil ) return true;
+        if( _use_nil && !that._use_nil ) return true;
         if( is_ptr() && !that.is_ptr() ) return true;
         if( is_fun() && !that.is_fun() ) return true;
         if( is_obj() && !that.is_obj() ) return true;
         if( _err!=null && !Util.eq(_err,that._err) ) return true;
       } else {
-        if( _may_nil && !that._may_nil ) { progress = that._may_nil = true; }
+        if( _may_nil && !that._may_nil ) { progress = that.add_may_nil(true,work); }
+        if( _use_nil && !that._use_nil ) { progress = that.add_use_nil(true,work); }
         if( is_ptr() && !that.is_ptr() ) // Error, fresh_unify a ptr into a non-ptr non-leaf
           { return that._unify(_fresh(nongen),work); }
         if( is_fun() && !that.is_fun() ) // Error, fresh_unify a fun into a non-fun non-leaf
@@ -2854,23 +2871,6 @@ public class HM {
       return progress;
     }
 
-    private boolean unify_nil_this( Work<Syntax> work ) {
-      if( work==null ) return unify_nil_this_test();
-      boolean progress = false;
-      Type tmt = meet_nil(_tflow); if( progress |= (tmt!=_tflow) ) _tflow = tmt;
-      Type emt = meet_nil(_eflow); if( progress |= (emt!=_eflow) ) _eflow = emt;
-      if( !_may_nil && !is_base() ) { progress = _may_nil = true; }
-      if( progress ) add_deps_work(work);
-      return progress;
-    }
-    private boolean unify_nil_this_test( ) {
-      if( meet_nil(_tflow)!=_tflow ) return true;
-      if( meet_nil(_eflow)!=_eflow ) return true;
-      if( !_may_nil && !is_base() ) return true;
-      return vput(this,false);
-    }
-    private static Type meet_nil(Type t) { return t==null ? null : t.meet(TypeNil.XNIL); }
-
     // Return a fresh copy of 'this'
     T2 fresh() {
       assert VARS.isEmpty();
@@ -2944,7 +2944,7 @@ public class HM {
 
     // True if 'this' has extra children and 'that' does not allow extras
     private boolean mismatched_child( T2 that ) {
-      if( !that.is_open() && _args!=null )   // If RHS is closed
+      if( _args!=null )   // If RHS is closed
         for( String id : _args.keySet() )
           if( that.arg(id)==null ) // And missing key in RHS
             return false;          // Trial unification failed
@@ -3003,9 +3003,6 @@ public class HM {
       if( is_ptr() ) {
         if( t.isa(TypeNil.XNIL) && _may_nil ) make_map = false;
         arg("*").walk_types_in(t instanceof TypeMemPtr tmp ? tmp._obj : t, make_map);
-        T2 nptr = arg("??");
-        if( nptr != null && make_map ) // Also map the not-nilable version
-          T2MAP.merge(nptr,t.join(TypeNil.NSCALR),Type::meet);
       }
 
       // Nilable, recurse on the not-nil.  If t isa XNIL, the T2 structure will
@@ -3014,9 +3011,6 @@ public class HM {
         if( t.isa(TypeNil.XNIL) ) make_map = false;
         Type tn = t.join(TypeNil.NSCALR);
         arg("?").walk_types_in(tn, make_map );
-        T2 nptr = arg("??");
-        if( nptr != null && make_map ) // Also map the not-nilable version
-          T2MAP.merge(nptr,tn,Type::meet);
       }
 
       // Walk return not arguments
@@ -3197,8 +3191,7 @@ public class HM {
       } else {
         if( _args!=null )
           for( String key : _args.keySet() )
-            if( !key.equals("??") )
-              _args.get(key)._get_dups(visit,dups);
+            _args.get(key)._get_dups(visit,dups);
       }
       return dups;
     }
@@ -3249,7 +3242,8 @@ public class HM {
       if( is_nil () ) {         // Weird print for inside part being unified
         T2 nn = _args.get("?");
         if( nn.unified() ) { vname(sb,debug); sb.p(":?"); }
-        return str0(sb,visit,nn,dups,debug).p('?');
+        str0(sb,visit,nn,dups,debug);
+        return nn.unified() ? sb : sb.p('?');
       }
 
       // Generic structural T2
@@ -3265,8 +3259,7 @@ public class HM {
     private SB str_ptr(SB sb, VBitSet visit, VBitSet dups, boolean debug, Type flow) {
       T2 obj = _args==null ? null : _args.get("*");
       str0(sb.p('*'),visit,obj,dups,debug);
-      if( _may_nil ) sb.p('?');
-      return sb;
+      return str_post_nil(sb);
     }
     private SB str_fun(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
       sb.p("{ ");
@@ -3303,8 +3296,10 @@ public class HM {
       if( is_open() ) sb.p(" ...,");
       if( sep ) sb.unchar();
       sb.p(!is_tup ? "}" : ")");
-      if( _may_nil ) sb.p("?");
       return sb;
+    }
+    private SB str_post_nil(SB sb) {
+      return _may_nil ? sb.p(_use_nil ? "!?" : "?") : sb;
     }
 
     // Pick a nice tvar name.  Generally: "A" or "B" or "V123" for leafs,
