@@ -45,9 +45,7 @@ public class ConNode<T extends Type> extends Node {
     return _tvar;
   }
   
-  @Override public boolean unify( boolean test ) {
-    return false;
-  }
+  @Override public boolean unify( boolean test ) { return false; }
 
   @Override public String toString() { return str(); }
   @Override public int hashCode() {
@@ -59,7 +57,13 @@ public class ConNode<T extends Type> extends Node {
     if( this==o ) return true;
     if( !(o instanceof ConNode con) ) return false;
     if( _t!=con._t ) return false;
-    // Check TVars, if they exist.
+    // Prior to Combo we must assume two XNILs will unify to different TV3
+    // types and thus must remain seperate.  After Combo they can fold together
+    // if they have the same TVars.
+    if( _t==TypeNil.XNIL && _tvar==null ) return false;
+    
+    // Check TVars, if they exist.  This allows combining ConNodes with TVars
+    // pre-Combo, except for XNIL.  E.g. all ints (or floats) are alike to TV3.
     if( _tvar==null ) { assert con._tvar==null; return true; }
     return tvar()==con.tvar();
   }

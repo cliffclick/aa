@@ -77,7 +77,7 @@ public final class CallEpiNode extends Node {
           // Post-GCP all CG edges are manifest, but types can keep lifting
           // and so CG edges can still be killed.
           unwire(call,ret);
-          return this; // Return with progress
+          return Env.GVN.add_reduce(this); // Return with progress and go again
         }
       }
     }
@@ -292,7 +292,6 @@ public final class CallEpiNode extends Node {
     if( ctl != Type.CTRL && ctl != Type.ALL )
       return TypeTuple.CALLE.dual();
     TypeFunPtr tfptr= CallNode.ttfp(tcall);  // Peel apart Call tuple
-    //TypeMemPtr tescs= CallNode.tesc(tcall);  // Peel apart Call tuple
 
     // If above_center (not resolved) or not all wired, can bail conservative
     BitsFun fidxs = tfptr.fidxs();
@@ -315,8 +314,6 @@ public final class CallEpiNode extends Node {
           rmem = CallNode.emem(tcall);
         tmem = tmem.meet(rmem);
         trez = trez.meet(tret.at(REZ_IDX));
-        // TODO: HM had neighbor-issues here, when using meet-of-returns instead
-        // of tfptr._ret
       }
     }
 
@@ -450,7 +447,7 @@ public final class CallEpiNode extends Node {
     
     // Check for progress amongst args
     int nargs = Math.min(call.nargs(),tfun.nargs());
-    for( int i=ARG_IDX; i<nargs; i++ ) {
+    for( int i=DSP_IDX; i<nargs; i++ ) {
       TV3 formal = tfun.arg(i);
       TV3 actual = call.tvar(i);
       progress |= actual.unify(formal,test);

@@ -18,13 +18,26 @@ public class TVErr extends TV3 {
   static final int XFLT=3;
   static final int XMAX=4;
 
-  TVErr() { super(false,new TV3[XMAX]); }
+  public TVErr() { super(false,new TV3[XMAX]); }
 
   @Override public TVStruct as_struct() { return (TVStruct)arg(XSTR); }
   @Override public TVLambda as_lambda() { return (TVLambda)arg(XFUN); }
+
+  public void set_struct( TVStruct st ) { assert _args[XSTR]==null; _args[XSTR] = st; }
   
+  // This is Fresh, that is TVErr and missing index i.
+  // Fresh copy LHS into RHS.
+  @Override boolean _fresh_missing_rhs(TV3 that, TV3[] nongen, int i, boolean test) {
+    if( test ) return true;
+    assert that instanceof TVErr;
+    assert that._args[i]==null;
+    that._args[i]= _args[i]._fresh(nongen);
+    return true;
+  }
+
   @Override boolean _unify_err(TV3 that) {
     assert !unified() && !that.unified(); // Do not unify twice
+    assert !(that instanceof TVErr);
     int x = that.eidx();                  // Which part unifies
     that._deps_work_clear();              // 
     TV3 ecp = that.copy();                // Make a shallow clone of that
@@ -34,7 +47,23 @@ public class TVErr extends TV3 {
     return true;
   }
 
-  void err_msg(String msg) {
+  // This is fresh and an Err and that is not.
+  @Override boolean _fresh_unify_err(TV3 that, TV3[] nongen) {
+    assert !unified() && !that.unified(); // Do not unify twice
+    assert !(that instanceof TVErr);
+    TVErr terr = new TVErr();
+    terr._unify_err(that);
+    _fresh_unify(terr,nongen,false);
+    return true;    
+  }
+  // This is an Err and that is fresh and not an error
+  boolean _fresh_unify_err_fresh(TV3 that) {
+    assert !unified() && !that.unified(); // Do not unify twice
+    assert !(that instanceof TVErr);
+    throw unimpl();
+  }
+
+  public void err_msg(String msg) {
   }
 
   // -------------------------------------------------------------

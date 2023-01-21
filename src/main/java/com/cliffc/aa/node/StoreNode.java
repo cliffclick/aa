@@ -1,10 +1,12 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV3;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.TypeMemPtr;
+import com.cliffc.aa.type.TypeStruct;
 
 import static com.cliffc.aa.AA.unimpl;
 
@@ -32,15 +34,16 @@ public class StoreNode extends Node {
     if( !(tmem instanceof TypeMem    tm ) ) return tmem .oob(TypeMem.ALLMEM);
     if( !(tadr instanceof TypeMemPtr tmp) ) return tadr .oob(TypeMem.ALLMEM);
     TypeStruct tvs = tval instanceof TypeStruct ? (TypeStruct)tval : tval.oob(TypeStruct.ISUSED);
-
-    Node str = LoadNode.find_previous_struct(mem, adr, tmp._aliases, false );
-    boolean precise = adr.in(0) instanceof NewNode nnn && (nnn.rec()==str); // Precise is replace, imprecise is MEET
+    
+    //Node str = LoadNode.find_previous_struct(this, adr, tmp._aliases);
+    //boolean precise = adr instanceof NewNode nnn && (nnn.rec()==str); // Precise is replace, imprecise is MEET
+    // TODO: THIS IS A LIE
+    boolean precise=true;
+    if( tmp.above_center() && precise ) {
+      tmp = tmp.dual();
+      tvs = TypeStruct.UNUSED;
+    }
     return tm.update(tmp._aliases,tvs,precise);
-  }
-  // For most memory-producing Nodes, exactly 1 memory producer follows.
-  private Node get_mem_writer() {
-    for( Node use : _uses ) if( use.is_mem() ) return use;
-    return null;
   }
 
   // Compute the liveness local contribution to def's liveness.  Turns around
@@ -48,6 +51,7 @@ public class StoreNode extends Node {
   @Override public Type live_use( Node def ) {
     if( _live== Type.ANY ) return Type.ANY;
     if( _live== Type.ALL ) return Type.ALL;
+    mem().deps_add(def);        // Changes to mem()'s value changes def's liveness
     Type mval = mem()._val;
     Type aval = adr()._val;
     if( mval == Type.ANY ) return Type.ANY;
@@ -65,6 +69,7 @@ public class StoreNode extends Node {
     if( def==adr() ) return ts.oob(); // Live-use for the adr(), which is a Type.ANY/ALL
     return ts;                  // Live-use for the rez() which is a TypeStruct liveness    
   }
+  @Override boolean assert_live(Type live) { return live instanceof TypeMem; }
 
   @Override public Node ideal_reduce() {
     if( _live == Type.ANY ) return null; // Dead from below; nothing fancy just await removal
@@ -75,17 +80,29 @@ public class StoreNode extends Node {
 
     // Is this Store dead from below?
     if( mem==this ) return null; // Dead self-cycle
-    if( ta.above_center() ) return mem; // All memory is high, so dead
     if( tmp!=null && mem._val instanceof TypeMem ) {
+      if( tmp.above_center() && mem._val == _val )
+        return mem; // Address is high, and memory is unchanged; we can be ignored
+      
       TypeStruct ts0 = (_live instanceof TypeMem tm ? tm : _live.oob(TypeMem.ALLMEM)).ld(tmp);
       if( ts0.above_center() )  // Dead from below
         return mem;
     }
 
     // No need for 'Fresh' address, as Stores have no TVar (produce memory not a scalar)
-    if( adr() instanceof FreshNode fsh )
+    if( adr instanceof FreshNode fsh )
       return set_def(2,fsh.id());
-
+    
+    // Store of a Store, same address
+    if( mem instanceof StoreNode st && st.adr() == adr &&
+        // Do not bypass a parallel writer
+        st.check_solo_mem_writer(this) &&
+        // And liveness aligns
+        _live.isa(mem._live) ) {
+      set_def(1,st.mem());
+      return this;
+    }
+    
     // Escape a dead MemSplit
     if( mem instanceof MProjNode && mem.in(0) instanceof MemSplitNode msp &&
         msp.join()==null ) {
@@ -94,21 +111,6 @@ public class StoreNode extends Node {
       return this;
     }
 
-    //// If Store is into a value New, fold into the New.
-    //// Happens inside value constructors.
-    //if( adr instanceof NewNode nnn && nnn._is_val && _fold(nnn) )
-    //  return mem;
-
-    // Store into a NewNode, same memory and address
-    if( mem instanceof MProjNode && adr instanceof ProjNode && mem.in(0) == adr.in(0) && mem.in(0) instanceof NewNode nnn &&
-        // Do not bypass a parallel writer
-        mem.check_solo_mem_writer(this) &&
-        // And liveness aligns
-        _live.isa(mem._live) ) {
-      StructNode st = _fold(rez());
-      Env.GVN.revalive(st,mem.in(0),mem);
-      return st==null ? null : mem;
-    }
     //
     //// If Store is of a MemJoin and it can enter the split region, do so.
     //// Requires no other memory *reader* (or writer), as the reader will
@@ -162,6 +164,21 @@ public class StoreNode extends Node {
     return null;
   }
 
+  @Override public boolean has_tvar() { return false; }
+
+  @Override public boolean unify( boolean test ) {
+    TV3 ptr = adr().tvar();     // Should be leaf, nilable, or ptr
+    TV3 rez = rez().tvar();     // Should be leaf, or struct
+    //assert !ptr.is_obj() && !rez.is_nil() && rez.arg("*")==null;
+    //if( ptr.is_nil() ) throw unimpl();
+    //TV3 obj = ptr.arg("*");
+    //if( obj!=null )
+    //  return obj.unify(rez,test);
+    //ptr.add_fld("*",rez);
+    //return true;
+    throw unimpl();
+  }
+  
   @Override public ErrMsg err( boolean fast ) {
     Type tadr = adr()._val;
     Type tmem = mem()._val;
@@ -177,21 +194,6 @@ public class StoreNode extends Node {
     if( fast ) return ErrMsg.FAST;
     //boolean is_closure = adr() instanceof NewNode nnn && nnn._is_closure;
     //return ErrMsg.field(_bad,msg,_fld,is_closure,to);
-    throw unimpl();
-  }
-
-  @Override public boolean has_tvar() { return false; }
-
-  @Override public boolean unify( boolean test ) {
-    TV3 ptr = adr().tvar();     // Should be leaf, nilable, or ptr
-    TV3 rez = rez().tvar();     // Should be leaf, or struct
-    //assert !ptr.is_obj() && !rez.is_nil() && rez.arg("*")==null;
-    //if( ptr.is_nil() ) throw unimpl();
-    //TV3 obj = ptr.arg("*");
-    //if( obj!=null )
-    //  return obj.unify(rez,test);
-    //ptr.add_fld("*",rez);
-    //return true;
     throw unimpl();
   }
 

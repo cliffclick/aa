@@ -34,17 +34,12 @@ public final class RetNode extends Node {
   public Node rpc() { return in(3); }
   public FunNode fun() { return (FunNode)in(4); }
   @Override public boolean is_mem() { return true; }
-  // If this function is not using any displays, then there is a single unique
-  // FunPtr.  Otherwise, this call is ambiguous, as each execution of the
-  // FunPtrNode makes a new display.
+  
   public FunPtrNode funptr() {
-    FunPtrNode fpn=null;
     for( Node use : _uses )
-      if( use instanceof FunPtrNode ) {
-        if( fpn!=null ) return null; // Ambiguous; several displays from the same function
-        fpn = (FunPtrNode)use;
-      }
-    return fpn;                 // Zero (null) or 1 display.
+      if( use instanceof FunPtrNode fptr )
+        return fptr;
+    return null;
   }
   public int fidx() { return _fidx; }
   void set_fidx(int fidx) { unelock(); assert FUNS.at(_fidx)!=this; _fidx = fidx; FUNS.setX(fidx,this); } // Unlock before changing hash

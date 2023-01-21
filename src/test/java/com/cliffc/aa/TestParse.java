@@ -27,11 +27,10 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_GCP=false;
-    DO_HMT=true;
+    DO_GCP=true;
+    DO_HMT=false;
     RSEED=0;
     test("1+(x=2*3)+x*x", "43", "43");
-    test("x++","xnil", "A?");
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -128,10 +127,10 @@ public class TestParse {
     test("1+(x=2*3)+x*x", "43", "43");
     testerr("x=(1+(x=2)+x); x", "Cannot re-assign final field '.x' in @{x=2}",0);
     test("x:=1;x++"  ,"1", "int64");
-    test("x:=1;x++;x","2", "int64");
+    test("x:=1;x++;x","2", "2");
     test("x:=1;x++ + x--","3", "3");
     test("x++","xnil", "A?");
-    test("x++;x","1", "int64");
+    test("x++;x","1", "1");
 
     // Conditional:
     test   ("0 ?    2  : 3", "3", "3"); // false

@@ -10,17 +10,15 @@ import static org.junit.Assert.assertTrue;
 
 public class TestLive {
   @Test public void testBasic() {
-    // Liveness is a backwards flow.  Scope always demands all return results.
-    ScopeNode scope = new ScopeNode(false);
-
     Node fullmem = new ConNode<>(TypeMem.ALLMEM);
     fullmem._val = TypeMem.ALLMEM;
-    scope.set_mem(fullmem);
 
     // Return the number '5' - should be alive with no special memory.
     Node rez = new ConNode<>(TypeInt.con(5));
     rez._val = TypeInt.con(5);
-    scope.set_rez(rez);
+
+    // Liveness is a backwards flow.  Scope always demands all return results.
+    ScopeNode scope = new ScopeNode(false,null,null,fullmem,null,rez,null);
 
     // Check liveness base case
     scope._live = scope.live();
@@ -47,12 +45,11 @@ public class TestLive {
     obj.add_fld("y",TypeFld.Access.Final,fdy,null);
     obj.close().init();
 
-    NewNode nnn = new NewNode(mmm,obj).init();
-    Node mem = new MProjNode(nnn).init();
-    Node ptr = new  ProjNode(nnn,REZ_IDX).init();
+    NewNode ptr = new NewNode().init();
+    Node mem = new StoreNode(mmm,ptr,obj,null).init();
 
     // Use the object for scope exit
-    ScopeNode scope = new ScopeNode(false);
+    ScopeNode scope = new ScopeNode(false,null,null,mem,null,ptr,null);
     scope.set_mem(mem);
     scope.set_rez(ptr);
     scope.init();
@@ -60,7 +57,7 @@ public class TestLive {
     // Check 'live' is stable on creation, except for mem & scope
     // which are 'turning around' liveness.
     // Value was computed in a forwards flow.
-    for( Node n : new Node[]{mmm,fdx,fdy,obj,nnn,mem,ptr,scope} ) {
+    for( Node n : new Node[]{mmm,fdx,fdy,obj,ptr,mem,scope} ) {
       if( n != mem && n != scope )
         assertTrue(n.live().isa(n._live));
       assertEquals(n._val,n.value());
@@ -78,8 +75,6 @@ public class TestLive {
     assertEquals(mem._live,expected_live); // Object demands of OProj, but OProj passes along request to NewObj
     ptr.xliv();
     assertEquals(TypeMem.ALL,ptr._live);
-    nnn.xliv();
-    assertEquals(expected_live,nnn._live); // New supplies object, needs what its input needs
     mmm.xliv();
     assertEquals(expected_live,mmm._live); // Since ptr is scalar, all memory is alive
     fdx.xliv();

@@ -10,9 +10,8 @@ Requires H-M unification to decide to bind-on-load or not.
   Parser in general cannot tell, except for opers.
   Means we insert Binds-after-Fields, but some Binds are removed by Combo.
   Means TypeFunPtrs need a way to distinguish:
-  - unknown bound: ALL
+  - unknown bound: ANY
   -   known bound: Anything else
-  -          dead: ANY
 
 
 Example non-obvious late-bind usage:
@@ -23,9 +22,20 @@ late-binds-on-load.  If `pred` is a constant, `fun` field can move to the CLZ.
 Similarly, if `e0` is a constant, `fld` can move to the CLZ.
 
 Example non-obvious early-bind usage:
-    var = e0; fun = { x -> x+var };  @{ fld = fun; }  
+  { var -> 
+    fun = { x -> x+var };
+    @{ fld = fun; }
+  }
 `fun` is early bound in the closure; `fld` holds an early-bind non-local
 function, and does not bind-on-load, and stays in the instance.
+
+Example:
+@{ // Outermost top-most display frame
+  var=e0;
+  fun = { x -> x+var }  // late bind to top-most struct
+  @{ fld = fun; }  // usage bind-on-load
+}
+
 
 Example wrong-bind usage:
   bad:=0;     // Types as an unbound_inner_function
@@ -55,6 +65,19 @@ Error to:
 - - map call passes anon fcn, which expects to be late-bound because enclosing lex scope is struct.
 - - internal to map, late-bound fcn is called without binding.
 - - Can add syntax to anon fcns in struct scope to early bind.
+BindFP must be monotonic
+- if input has a display, then this is noop, flow passes display thru, and unifies straight thru
+- if input has  !display, then this binds, flow sets display, and unifies display with the TFP display.
+- Always unifies self with TFP.
+- Since unify cannot be undone, must delay unification until we can tell has-vs-hasnot display.
+  - TFP.DISPLAY  DISPLAY
+  -   NO_DSP      ANY    - UNKN Pass along no-dsp .
+  -   NO_DSP      XXX    - BIND Pass along XXX dsp.  Unify TFP.DSP and DSP.
+  -  HAS_DSP      ANY    - NOOP Pass along has-dsp.
+  -  HAS_DSP      XXX    - NOOP Pass along meetdsp.  Assert never NO_DSP/XXX -> HAS_DSP/XXX
+- Requires unbound TFPs to use ANY display.
+- Phis merging bound and unbound can report an error.
+
 
 H-M knows unbound from bound TVLambdas.  Use null display arg for NOT YET BOUND
 - BindFP expects unbound display in, makes a new TVLambda out with same args, but with display

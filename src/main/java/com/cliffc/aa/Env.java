@@ -6,9 +6,7 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.NonBlockingHashMap;
 import com.cliffc.aa.util.VBitSet;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
+import java.util.*;
 
 import static com.cliffc.aa.AA.*;
 
@@ -124,9 +122,8 @@ public class Env implements AutoCloseable {
     _fun = fun;
     StructNode dsp = fref==null ? new StructNode(is_closure,false,null, "", Type.ALL).init() : fref;
     dsp.add_fld("^",TypeFld.Access.Final,dsp_ptr,null);
-    NewNode nnn = new NewNode(mem,dsp).init();
-    mem = new MProjNode(nnn).init();
-    Node ptr = new ProjNode(nnn,REZ_IDX).init();
+    NewNode ptr = new NewNode();  GVN.add_flow(ptr);
+    mem = new StoreNode(mem,ptr,dsp,null).init();
     // Install a top-level prototype mapping
     if( fref!=null ) {          // Forward ref?
       //String fname = fref._ts._name;
@@ -134,11 +131,7 @@ public class Env implements AutoCloseable {
       //PROTOS.put(fname,dsp);
       throw unimpl();
     }
-    _scope = GVN.init(new ScopeNode(is_closure));
-    _scope.set_ctrl(ctrl);
-    _scope.set_mem (mem);  // Memory includes local stack frame
-    _scope.set_ptr (ptr);  // Address for 'nnn', the local stack frame
-    _scope.set_rez (XNIL);
+    _scope = new ScopeNode(is_closure,new HashMap<>(),ctrl,mem,XNIL,ptr,dsp).init();
     KEEP_ALIVE.add_def(_scope);
     GVN.do_iter();
   }

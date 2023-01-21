@@ -1,21 +1,28 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVLeaf;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeNil;
 
 // "fresh" the incoming TVar: make a fresh instance before unifying
 public class FreshNode extends Node {
   public FreshNode( FunNode fun, Node ld ) { super(OP_FRESH, fun, ld); }
 
-  // The lexical scope, or null for top-level
-  FunNode fun() {
-    return in(0)==Env.CTL_0 ? null : (FunNode)in(0);
-  }
+  public FunNode fun() { return (FunNode)in(0); } // Enclosing function for the VStack.
   public Node id() { return in(1); } // The HM identifier
   public static Node peek(Node f) { return f instanceof FreshNode fsh ? fsh.id() : f; }
-  TV3[] nongen() { return fun()==null ? null : fun()._nongen; }
+
+  // The "non-generative" set is the variables which are NOT type polymorphic.
+  // This includes all lambda arguments inside of the lambda, plus any
+  // variables used mid-definition.  The only variables used mid-definition are
+  // forward-refs.
+  TV3[] nongen() {
+    // TODO: Handle vars mid-def.  Eg. "fact = ...fact...; fact(3)".
+    // The first `fact` usage is mid-def, so non-gen.
+    // The 2nd `fact` is post-def so IS polymorphic.
+    return fun()==null ? null : fun()._nongen;
+  }
 
   @Override public Type value() { return id()._val; }
 
@@ -24,6 +31,12 @@ public class FreshNode extends Node {
     return Type.ALL;              // Basic aliveness for control
   }
 
+  @Override public Node ideal_reduce() {
+    if( _val.is_con() )
+      return _val==TypeNil.XNIL ? new ConNode(_val) : id();
+    return null;
+  }
+  
   @Override public boolean has_tvar() { return true; }
   
   @Override public boolean unify( boolean test ) {
@@ -36,8 +49,9 @@ public class FreshNode extends Node {
   }
   // Two FreshNodes are only equal, if they have compatible TVars
   @Override public boolean equals(Object o) {
+    if( this==o ) return true;
     if( !(o instanceof FreshNode frsh) ) return false;
-    if( _tvar==null ) return this==frsh; // Pre-combo, must be the same Node
-    return tvar()==frsh.tvar();
+    return _tvar==frsh._tvar ||
+       (_tvar!=null && frsh._tvar!=null && tvar()==frsh.tvar()); // Pre-combo, must be the same Node
   }
 }

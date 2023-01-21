@@ -22,44 +22,26 @@ public class ScopeNode extends Node {
   private Ary<IfScope> _ifs;                 // Nested set of IF-exprs used to track balanced new-refs
   private final boolean _closure;
 
-  public ScopeNode(boolean closure) {
-    super(OP_SCOPE,null,null,null,null);
-    add_def(null); add_def(null); add_def(null); // Wire up an early-function-exit path
-    _closure = closure;
-    _types = new HashMap<>();
-    _ifs = null;
-  }
-  public ScopeNode(HashMap<String,StructNode> types,  Node ctl, Node mem, Node ptr, Node rez) {
-    super(OP_SCOPE,ctl,mem,ptr,rez);
+  public ScopeNode(boolean is_closure, HashMap<String,StructNode> types,  Node ctl, Node mem, Node rez, Node ptr, StructNode dsp) {
+    super(OP_SCOPE,ctl,mem,rez,ptr,dsp);
     _types = types;
-    _closure = false;
+    _closure = is_closure;
   }
   @Override boolean is_CFG() { return true; }
 
   public       Node ctrl() { return in(CTL_IDX); }
   public       Node mem () { return in(MEM_IDX); }
-  public StructNode stk () { return (StructNode)dsp().rec(); }
-  public    NewNode dsp () { return (NewNode)ptr().in(0); }
-  public   ProjNode ptr () { return (ProjNode)in(DSP_IDX); }
-  public       Node rez () { return in(ARG_IDX); }
+  public       Node rez () { return in(REZ_IDX); }
+  public    NewNode ptr () { return (   NewNode)in(ARG_IDX  ); }
+  public StructNode stk () { return (StructNode)in(ARG_IDX+1); }
   public <N extends Node> N set_ctrl( N    n) { set_def(CTL_IDX,n); return n; }
-  public void               set_ptr ( Node n) { set_def(DSP_IDX,n);           }
-  public void               set_rez ( Node n) { set_def(ARG_IDX,n);           }
+  public void               set_rez ( Node n) { set_def(REZ_IDX,n);           }
+  public void               set_ptr ( Node n) { set_def(ARG_IDX,n);           }
 
   // Set a new deactive GVNd memory, ready for nested Node.ideal() calls.
-  public Node set_mem( Node n) {
+  public void set_mem(Node n) {
     assert n._val instanceof TypeMem || n._val ==Type.ANY || n._val ==Type.ALL;
-    Node old = mem();
     set_def(MEM_IDX,n);
-    //if( old!=null ) {
-    //  Env.GVN.add_work_new(old);
-    //  if( old._uses._len == 1 && // Only a MemSplit
-    //      old._uses.at(0) instanceof MemSplitNode split )
-    //    Env.GVN.add_mono(split.join());
-    //  //old.add_flow_def_extra(n); // old loses a use, triggers extra
-    //  //Env.GVN.add_work_new(n);
-    //}
-    return this;
   }
   public void replace_mem(Node st) {
     // Remove the scope use of old memory, so the store becomes the ONLY use of
@@ -72,11 +54,17 @@ public class ScopeNode extends Node {
   public Node get(String name) { return stk().in(name); }
   public boolean is_mutable(String name) { return stk().access(name)==Access.RW; }
 
-  public RegionNode early_ctrl() { return (RegionNode)in(4); }
-  public    PhiNode early_mem () { return (   PhiNode)in(5); }
-  public    PhiNode early_val () { return (   PhiNode)in(6); }
-  public void       early_kill() { set_def(4,null); set_def(5,null); set_def(6,null); }
-  public static final int RET_IDX = 7;
+  public static final int RET_IDX = ARG_IDX+5;
+  public boolean has_early_exit() { return len()==RET_IDX; }
+  public RegionNode early_ctrl() { return (RegionNode)in(ARG_IDX+2); }
+  public    PhiNode early_mem () { return (   PhiNode)in(ARG_IDX+3); }
+  public    PhiNode early_val () { return (   PhiNode)in(ARG_IDX+4); }
+  public void       early_kill() { set_def(ARG_IDX+2,null); set_def(ARG_IDX+3,null); set_def(ARG_IDX+4,null); }
+  public void make_early_exit_merge() {
+    set_def(ARG_IDX+2, new RegionNode((Node)null))._val = Type.CTRL;
+    set_def(ARG_IDX+3, new PhiNode(TypeMem.ALLMEM, null,(Node)null));
+    set_def(ARG_IDX+4, new PhiNode(TypeNil.SCALAR, null,(Node)null));    
+  }
 
   // Name to type lookup, or null
   public StructNode get_type(String name) { return _types.get(name);  }

@@ -2,9 +2,9 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeRPC;
+import com.cliffc.aa.type.*;
+
+import static com.cliffc.aa.AA.unimpl;
 
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
@@ -95,10 +95,21 @@ public class PhiNode extends Node {
   }
 
   @Override public ErrMsg err( boolean fast ) {
+    // TODO:
     //if( _val.contains(TypeNil.SCALAR) ||
     //    _val.contains(TypeNil.NSCALR) ) // Cannot have code that deals with unknown-GC-state
     //  return ErrMsg.badGC(_badgc);
+
+    // Cannot mix TFPs with and without displays, because we do not know if we
+    // should early-bind or late-bind.
+    boolean has_dsp=false, no_dsp=false;
+    for( Node def : _defs )
+      if( def._val instanceof TypeFunPtr tfp )
+        if( tfp.has_dsp() ) has_dsp = true;
+        else                 no_dsp = true;
+    if( has_dsp && no_dsp )
+      throw unimpl();
+    
     return null;
-    //throw unimpl();
   }
 }

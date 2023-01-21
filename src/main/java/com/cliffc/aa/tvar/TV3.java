@@ -110,7 +110,9 @@ abstract public class TV3 implements Cloneable {
   // Fetch a specific arg index, with rollups
   public TV3 arg( int i ) {
     assert !unified();          // No body nor outgoing edges in non-leaders
-    TV3 arg = _args[i], u = arg.find();
+    TV3 arg = _args[i];
+    if( arg==null ) return null;
+    TV3 u = arg.find();
     return u==arg ? u : (_args[i]=u);
   }
 
@@ -175,7 +177,7 @@ abstract public class TV3 implements Cloneable {
   // Structural unification, 'this' into 'that'.  No change if just testing and
   // returns a progress flag.  If updating, both 'this' and 'that' are the same
   // afterwards.
-  boolean _unify(TV3 that, boolean test) {
+  final boolean _unify(TV3 that, boolean test) {
     assert !unified() && !that.unified();
     if( this==that ) return false;
     
@@ -220,6 +222,7 @@ abstract public class TV3 implements Cloneable {
     TVErr terr = new TVErr();
     return terr._unify_err(this) | terr._unify_err(that);
   }
+  
   // -------------------------------------------------------------
   // Make a (lazy) fresh copy of 'this' and unify it with 'that'.  This is
   // the same as calling 'fresh' then 'unify', without the clone of 'this'.
@@ -263,7 +266,9 @@ abstract public class TV3 implements Cloneable {
     // Two unrelated classes make an error
     if( getClass() != that.getClass() ) {
       if( test ) return true;
-      throw unimpl();
+      return that instanceof TVErr terr
+        ? terr._fresh_unify_err_fresh(this)
+        : this._fresh_unify_err      (that,nongen);
     }
 
     boolean progress = false;
@@ -292,11 +297,12 @@ abstract public class TV3 implements Cloneable {
     if( _args != null ) {
       assert _args.length == that._args.length;
       for( int i=0; i<_args.length; i++ ) {
-        if( _args[i]==null ) continue;
+        if( _args[i]==null ) continue; // Missing LHS is no impact on RHS
         TV3 lhs =      arg(i);
         TV3 rhs = that.arg(i);
-        if( rhs == null ) throw unimpl();
-        else progress |= lhs._fresh_unify(rhs,nongen,test);
+        progress |= rhs == null // Missing RHS?
+          ? _fresh_missing_rhs(that,nongen,i,test)
+          : lhs._fresh_unify(rhs,nongen,test);
       }
       if( progress && test ) return true;
     } else assert that._args==null;
@@ -304,7 +310,19 @@ abstract public class TV3 implements Cloneable {
   }
 
   private boolean vput(TV3 that, boolean progress) { VARS.put(this,that); return progress; }
+  
+  // This is fresh, and neither is a TVErr.
+  boolean _fresh_unify_err(TV3 that, TV3[] nongen) {
+    assert !(this instanceof TVErr) && !(that instanceof TVErr);
+    TVErr terr = new TVErr();
+    //return terr._unify_err(this) | terr._unify_err(that);
+    throw unimpl();
+  }
 
+  boolean _fresh_missing_rhs(TV3 that, TV3[] nongen, int i, boolean test) {
+    throw unimpl();
+  }
+  
   // -----------------
   // Return a fresh copy of 'this'
   TV3 fresh() {
@@ -468,6 +486,8 @@ abstract public class TV3 implements Cloneable {
       vname(sb,debug,false);            // Leading V123
       if( visit.tset(_uid) ) return sb; // V123 and nothing else
       sb.p(':');                        // V123:followed_by_type_descr
+    } else {
+      if( visit.tset(_uid) ) return sb;  // Internal missing dup bug?
     }
     if( _errs!=null ) {
       for( String err : _errs ) sb.p(err).p(':');

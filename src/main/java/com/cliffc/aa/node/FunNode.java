@@ -209,11 +209,7 @@ public class FunNode extends RegionNode {
     int path = split_size(body,parms); // Forcible size-splitting first path
     if( path == -1 ) return null;
     CallNode call = (CallNode)in(path).in(0);
-    assert CallNode.ttfp(call._val).fidx()!=-1; // called by a single-target call
-    Node fdx = call.fdx();
-    if( fdx instanceof FreshNode fsh ) fdx = fsh.id();
-    assert fdx instanceof FunPtrNode; // Shoulda cleared out
-    body.add(fdx);
+    body.add(fptr());
 
     assert _must_inline==0; // Failed to inline a prior inline?
     if( path > 0 ) _must_inline = call._uid;
@@ -455,7 +451,7 @@ public class FunNode extends RegionNode {
     map.put(this,fun);
     for( Node n : body ) {
       if( n==this ) continue;   // Already cloned the FunNode
-      int old_alias = n instanceof NewNode ? ((NewNode)n)._alias : -1;
+      int old_alias = n instanceof NewNode nnn ? nnn._alias : -1;
       Node c = n.copy(false);     // Make a blank copy with no edges
       map.put(n,c);               // Map from old to new
       if( old_alias != -1 )       // Was a NewNode?
@@ -470,18 +466,9 @@ public class FunNode extends RegionNode {
     for( Node n : map.keySet() ) {
       Node c = map.get(n);
       assert c._defs._len==0;
-      // FunPtr clones for path calls: always use the original Code, as the
-      // path clone will be going away.
-      if( n instanceof FunPtrNode && path >= 0 && FreshNode.peek(path_call.fdx())!= n ) {
-        c.add_def(n.in(0)); //
-        Node dsp = map.get(n.in(1));
-        c.add_def(dsp==null ? n.in(1) : dsp );
-
-      } else {
-        for( Node def : n._defs ) {
-          Node newdef = map.get(def);// Map old to new
-          c.add_def(newdef==null ? def : newdef);
-        }
+      for( Node def : n._defs ) {
+        Node newdef = map.get(def);// Map old to new
+        c.add_def(newdef==null ? def : newdef);
       }
     }
 
@@ -493,7 +480,7 @@ public class FunNode extends RegionNode {
     RetNode newret = (RetNode)map.get(oldret);
     newret.set_fidx(fun._fidx);
     assert path >= 0;
-    Node old_funptr = fptr(path_call.fdx()); // Funptr for the path split
+    Node old_funptr = fptr();
     Node new_funptr = map.get(old_funptr);
     new_funptr.insert(old_funptr); // Make cloned recursive calls, call the old version not the new version
     TypeFunPtr ofptr = (TypeFunPtr) old_funptr._val;
@@ -621,34 +608,20 @@ public class FunNode extends RegionNode {
   public RetNode ret() {
     if( is_dead() ) return null;
     for( Node use : _uses )
-      if( use instanceof RetNode && use._defs._len==5 && !((RetNode)use).is_copy() && ((RetNode)use).fun()==this )
-        return (RetNode)use;
+      if( use instanceof RetNode ret ) {
+        assert !ret.is_copy() && ret.len()==5;
+        return ret;
+      }
     return null;
   }
-  // Returns first - not ALL - FunPtrs
+  // Returns FunPtr
   public FunPtrNode fptr() {
     RetNode ret = ret();
     if( ret==null ) return null;
-    for( Node fptr : ret._uses )
-      if( fptr instanceof FunPtrNode )
-        return (FunPtrNode)fptr;
+    for( Node ruse : ret._uses )
+      if( ruse instanceof FunPtrNode fptr )
+        return fptr;
     return null;
-  }
-  // Returns matching FunPtr for a Calls FDX
-  public FunPtrNode fptr(Node fdx) {
-    FunPtrNode fptr = _fptr(fdx);
-    assert fptr.fun()==this;
-    return fptr;
-  }
-  private FunPtrNode _fptr(Node fdx) {
-    fdx = FreshNode.peek(fdx);
-    if( fdx instanceof FunPtrNode fptr ) return fptr;
-    //assert fdx instanceof UnresolvedNode;
-    //for( Node fdx2 : fdx._defs )
-    //  if( ((FunPtrNode)fdx2).fun()==this )
-    //    return (FunPtrNode)fdx2;
-    //return null;
-    throw unimpl();
   }
 
   @Override public boolean equals(Object o) { return this==o; } // Only one

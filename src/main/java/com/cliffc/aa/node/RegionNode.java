@@ -36,7 +36,7 @@ public class RegionNode extends Node {
         if( this instanceof FunNode &&   // Trigger inline single caller
             len()==2 && in(1).in(0) instanceof CallNode call )
           Env.GVN.add_reduce(call.cepi());
-        return this; // Progress
+        return Env.GVN.add_reduce(this); // Progress
       } else
         cin.deps_add(this);   // Revisit if becomes XCTRL
     }

@@ -272,20 +272,6 @@ public class TVStruct extends TV3 {
   }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
-    // Find any special instance tag fields, and print shortcuts.
-    TV3 bang = debug_arg("!");
-    if( bang instanceof TVPtr ptr ) {
-      TVStruct proto = ptr.load();
-      String clz=null;
-      if( proto.arg("_&&_") != null ) clz = "int:";
-      if( proto.arg("sin" ) != null ) clz = "flt:";
-      if( clz!=null ) {
-        sb.p(clz);
-        TV3 prim = debug_arg(".");
-        if( prim instanceof TVBase base ) return sb.p(base._t);
-      }
-    }
-
     boolean is_tup = _max==0 || Character.isDigit(_flds[0].charAt(0));
     sb.p(is_tup ? "(" : "@{");
     if( _args==null ) sb.p(", ");

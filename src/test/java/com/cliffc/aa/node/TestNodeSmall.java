@@ -489,9 +489,8 @@ public class TestNodeSmall {
     // yet built.
     ConNode dsp_prims = new ConNode<>(TypeMemPtr.DISP_SIMPLE).init();
     StructNode dsp_file = new StructNode(true,false,null,"",Type.ALL).add_fld("^",Access.Final,dsp_prims,null).init();
-    NewNode dsp_file_new = new NewNode(mem,dsp_file).init();
-    ProjNode dsp_file_mem = new MProjNode(dsp_file_new).init();
-    ProjNode dsp_file_ptr = new ProjNode(REZ_IDX,dsp_file_new).init();
+    NewNode dsp_file_ptr = new NewNode().init();
+    Node dsp_file_mem = new StoreNode(mem,dsp_file_ptr,dsp_file,null).init();
     // Function header with nargs
     FunNode fun = new FunNode("fact",ARG_IDX).add_def(ctl).add_def(ctl).init();
     // Parms for the Fun.  Note that the default type is "weak" because the
@@ -506,14 +505,9 @@ public class TestNodeSmall {
     dsp_file.add_fld("fact",Access.Final,fptr,null);
     dsp_file.close();
     // Return the fptr to keep all alive
-    ScopeNode env = new ScopeNode(true);
-    env.set_ctrl(ctl);
-    env.set_ptr (dsp_file_ptr);
-    env.set_mem (mem);
-    env.set_rez (fptr);
-    env.init();
+    ScopeNode env = new ScopeNode(true,null,ctl,mem,fptr,dsp_file_ptr,dsp_file).init();
 
-    Node[] nodes = new Node[]{ctl,mem,rpc,dsp_prims,dsp_file,dsp_file_new,dsp_file_ptr,dsp_file_mem,fun,parm_mem,parm_dsp_ptr,ret,fptr,env};
+    Node[] nodes = new Node[]{ctl,mem,rpc,dsp_prims,dsp_file,dsp_file_ptr,dsp_file_mem,fun,parm_mem,parm_dsp_ptr,ret,fptr,env};
 
     // Validate graph initial conditions.  No optimizations, as this
     // pile-o-bits is all dead and will vaporize if the optimizer is turned

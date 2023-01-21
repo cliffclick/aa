@@ -92,6 +92,13 @@ public class TypeTuple extends Type<TypeTuple> {
   public static TypeTuple make( Type t0, Type t1, Type t2, Type t3, Type t4 ) { return make0(false,Types.ts(t0,t1,t2,t3,t4)); }
   public static TypeTuple make( Type t0, Type t1, Type t2, Type t3, Type t4, Type t5 ) { return make0(false,Types.ts(t0,t1,t2,t3,t4,t5)); }
 
+  public TypeTuple make_from( int idx, Type t ) {
+    if( _ts[idx]==t ) return this;
+    Type[] ts = Types.clone(_ts);
+    ts[idx] = t;
+    return make0(_any,ts);
+  }
+
   public  static final TypeTuple IF_ALL  = make(CTRL ,CTRL );
   public  static final TypeTuple IF_ANY  = IF_ALL.dual();
   public  static final TypeTuple IF_TRUE = make(XCTRL,CTRL );
@@ -100,6 +107,7 @@ public class TypeTuple extends Type<TypeTuple> {
   // This is the starting state of the program; CTRL is active and memory is empty.
   public  static final TypeTuple  RET = make(CTRL, TypeMem.ALLMEM, ALL); // Type of RetNodes
   public  static final TypeTuple CALLE= make(CTRL, TypeMem.ALLMEM, ALL); // Type of CallEpiNodes
+  public  static final TypeTuple ROOT = make(CTRL, TypeMem.ALLMEM, TypeRPC.ALL_CALL, TypeFunPtr.GENERIC_FUNPTR,TypeMemPtr.ISUSED); // Type of Root  
   public  static final TypeTuple TEST0= make(CTRL, TypeMem.ALLMEM, TypeFunPtr.GENERIC_FUNPTR, TypeNil.SCALAR); // Call with 1 arg
   public  static final TypeTuple TEST1= make(CTRL, TypeMem.ANYMEM, TypeFunPtr.GENERIC_FUNPTR, TypeNil.SCALAR); // Call with 1 arg
   // Arguments

@@ -13,24 +13,21 @@ import static com.cliffc.aa.AA.*;
 public class RootNode extends Node {
   // Inputs are:
   // [program exit control, program exit memory, program exit value, escaping RetNodes... ]
-  public RootNode() { super(OP_ROOT, null, null, null); _def_mem = TypeMem.ALLMEM; }
-
-  private TypeMem _def_mem;
-  private Type _cache_key;
-  private TypeTuple _cache_val;
+  public RootNode() { super(OP_ROOT, null, null, null); }
 
   @Override boolean is_CFG() { return true; }
 
   // Output value is:
   // [Ctrl,All_Mem_Minus_Dead,TypeRPC.ALL_CALL,escaped_fidxs, escaped_aliases,]
   @Override public TypeTuple value() {
+    Node mem = in(MEM_IDX);
     Node rez = in(REZ_IDX);
-    if( in(MEM_IDX) == null || rez == null )
-      // No top-level return yet, so return most conservative answer
-      rez = Env.ALL;
-    // Check the cache
-    if( rez._val==_cache_key && _def_mem == _cache_val.at(MEM_IDX) )
-      return _cache_val;
+    // No top-level return yet, so return most conservative answer
+    if( mem == null || rez == null )
+      return TypeTuple.ROOT;
+    // Not sane memory
+    if( !(mem._val instanceof TypeMem tmem) )
+      return (TypeTuple)mem._val.oob(TypeTuple.ROOT);
 
     // Reset for walking
     ESCF.clear();
@@ -38,18 +35,20 @@ public class RootNode extends Node {
     EXT_FIDXS = BitsFun.EMPTY;
     // Walk
     _escapes(rez._val);
-    // Fill cache after walking
-    _cache_key = rez._val;
-    return (_cache_val = TypeTuple.make(Type.CTRL,
-                                        _def_mem,
-                                        TypeRPC.ALL_CALL,
-                                        TypeFunPtr.make(EXT_FIDXS,1),
-                                        TypeMemPtr.make(false,false,EXT_ALIASES,TypeStruct.ISUSED)));
-  }
 
-  public void kill_alias( int alias ) {
-    _def_mem = _def_mem.make_from_unused(alias,TypeStruct.UNUSED);
-    Env.GVN.add_flow(this);
+    // All external aliases already escaped
+    TypeMem tmem2 = TypeMem.ANYMEM;
+    // All other aliases also escape
+    for( int alias : EXT_ALIASES )
+      tmem2 = tmem2.set(alias,tmem.at(alias));
+    for( int alias : KILL_ALIASES )
+      tmem2 = tmem2.set(alias,TypeStruct.UNUSED);    
+    
+    return TypeTuple.make(Type.CTRL,
+                          tmem2,
+                          TypeRPC.ALL_CALL,
+                          TypeFunPtr.make(EXT_FIDXS,1),
+                          TypeMemPtr.make(false,false,EXT_ALIASES,TypeStruct.ISUSED));
   }
 
   // Escape all Root results.  Escaping functions are called with the most
@@ -58,6 +57,7 @@ public class RootNode extends Node {
   private static final VBitSet ESCF = new VBitSet();
   private static BitsAlias EXT_ALIASES;
   private static BitsFun EXT_FIDXS;
+  private static BitsAlias KILL_ALIASES = BitsAlias.EMPTY;
 
   private static void _escapes(Type t) {
     if( t == Type.ALL ) {
@@ -91,18 +91,24 @@ public class RootNode extends Node {
     }
   }
 
+  static void kill_alias( int alias ) {
+    if( KILL_ALIASES.test(alias) ) return;
+    KILL_ALIASES = KILL_ALIASES.set(alias);
+    Env.GVN.add_flow(Env.ROOT);
+    CACHE_DEF_MEM = null;
+  }
+  private static TypeMem CACHE_DEF_MEM;
+  static TypeMem def_mem() {
+    if( KILL_ALIASES == BitsAlias.EMPTY ) return TypeMem.ALLMEM;
+    if( CACHE_DEF_MEM!=null ) return CACHE_DEF_MEM;
+    TypeMem mem = TypeMem.ALLMEM;
+    for( int alias : KILL_ALIASES )
+      mem = mem.set(alias,TypeStruct.UNUSED);
+    return (CACHE_DEF_MEM = mem);
+
+  }
 
   @Override public Type live() { return Type.ALL; }
-  @Override public int hashCode() { return 123456789+1; }
-  @Override public boolean equals(Object o) { return this==o; }
-  @Override Node walk_dom_last( Predicate<Node> P) { return null; }
-  @Override public boolean has_tvar() { return false; }
-
-  // Unify trailing result ProjNode with RootNode results; but no unification
-  // with anything from Root, all results are independent.
-  @Override public boolean unify_proj( ProjNode proj, boolean test ) {
-    return false;
-  }
 
   @Override public Node ideal_reduce() {
     Node rez = in(REZ_IDX);
@@ -111,6 +117,19 @@ public class RootNode extends Node {
     return null;
   }
 
+  @Override Node walk_dom_last( Predicate<Node> P) { return null; }
+
+  @Override public boolean has_tvar() { return false; }
+
+  // Unify trailing result ProjNode with RootNode results; but no unification
+  // with anything from Root, all results are independent.
+  @Override public boolean unify_proj( ProjNode proj, boolean test ) {
+    return false;
+  }
+
+  @Override public int hashCode() { return 123456789+1; }
+  @Override public boolean equals(Object o) { return this==o; }
+
   // Reset for next test
   public void reset() {
     set_def(CTL_IDX,null);
@@ -118,6 +137,6 @@ public class RootNode extends Node {
     set_def(REZ_IDX,null);
     while( len() > REZ_IDX+1 )
       pop();
-    _def_mem = TypeMem.ALLMEM;
+    KILL_ALIASES = BitsAlias.EMPTY;
   }
 }

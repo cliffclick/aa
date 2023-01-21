@@ -573,6 +573,11 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   }
   // Field type by name.  NPE if field-not-found
   public Type at( String name ) { return get(name)._t; }
+  // Field type by name, or the default.
+  public Type at_def( String name ) {
+    int idx = find(name);
+    return idx==-1 ? _def : _flds[idx];    
+  }
 
   // Field by index, null after end
   public TypeFld fld( int idx ) { return idx < _flds.length ? _flds[idx] : null; }
@@ -748,6 +753,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   // Replace an existing field in the current struct.
   public TypeStruct replace_fld( TypeFld fld ) {
     int idx = find(fld._fld);
+    if( idx==-1 ) return add_fldx(fld);
     if( get(idx)==fld ) return this;
     return make_from(TypeFlds.make_from(_flds,idx,fld));
   }

@@ -257,67 +257,14 @@ public class CallNode extends Node {
     if( cepim == null ) return null;
     if( !(cepim._val instanceof TypeMem tmcepi) ) return null;
     if( !mem._val.isa(tmcepi) ) return null; // Call entry stale relative to exit
-    //BitsAlias escs = escapees();
-    //// Check for prior      MrgProj/New
-    //if( mem instanceof MrgProjNode )
-    //  return _ideal_grow((MrgProjNode)mem,cepim,cepid,escs,-1);
-    //// Check for prior Join/MrgProj/New
+    //// Check for prior Join
     if( mem instanceof MemJoinNode ) {
       if( !mem.check_solo_mem_writer(this) )
         return null;
-      //for( int i=1; i<mem._defs._len; i++ )
-      //  if( mem.in(i) instanceof MrgProjNode ) {
-      //    // TODO: Renable this.  Requires escs-into-calls
-      //    //Node x = _ideal_grow((MrgProjNode)mem.in(i),cepim,cepid,escs,i);
-      //    //if( x!=null ) return x;
-      //    return null;
-      //  }
       throw unimpl();
     }
     return null;
   }
-
-  //// Check for a Call/New that can either bypass or be placed in parallel
-  //private Node _ideal_grow(MrgProjNode mem, ProjNode cepim, ProjNode cepid, BitsAlias escs, int i) {
-  //  // No alias overlaps
-  //  int alias = mem.nnn()._alias;
-  //  if( escs.test_recur(alias) ) return null;
-  //  // No other readers or writers.  Expect the Call (or Join)
-  //  if( mem._uses._len>2 ) return null;
-  //  // If call returns same as new (via recursion), cannot split, but CAN swap.
-  //  TypeMem tmcepi = (TypeMem) cepim._val;
-  //  BitsAlias esc_out = CallEpiNode.esc_out(tmcepi,cepid==null ? Type.XNIL : cepid._val);
-  //  BitsAlias escs2 = escs.meet(esc_out);
-  //  Node jn = mem();
-  //  if( !escs2.is_empty() && !esc_out.test_recur(alias) ) { // No return conflict, so parallelize memory
-  //    if( jn==mem )             // Bare Call/New; add a Split/Join.
-  //      return MemSplitNode.insert_split(cepim,escs2,this,mem,mem);
-  //    return null; // TODO: allow Call to move into existing JOIN
-  //  } else {                    // Else move New below Call.
-  //    if( jn!=mem ) {           // Move New below Join
-  //      Node pre = mem.mem();
-  //      jn.set_def(i,pre);
-  //      mem.set_def(MEM_IDX,jn);
-  //      set_mem(mem);
-  //      Env.GVN.add_unuse(jn);
-  //      Env.GVN.add_unuse(mem);
-  //    }
-  //    return swap_new(cepim,mem); // Move New below Call
-  //  }
-  //}
-
-  //// Swap a New and a Call, when we cannot use a Split/Join.
-  //private Node swap_new(Node cepim, MrgProjNode mrg ) {
-  //  cepim.keep();
-  //  cepim.insert(mrg);
-  //  set_def(1,mrg.mem());
-  //  mrg.set_def(1,cepim.unkeep());
-  //  Env.GVN.revalive(mrg);
-  //  Env.GVN.add_flow_uses(mrg);
-  //  Env.GVN.add_flow(this);
-  //  Env.GVN.add_flow(cepim.in(0));
-  //  return this;
-  //}
 
   // Pass thru all inputs directly - just a direct gather/scatter.  The gather
   // enforces SESE which in turn allows more precise memory and aliasing.  The
@@ -369,8 +316,16 @@ public class CallNode extends Node {
     int argn = _defs.find(def);
     ProjNode proj = ProjNode.proj(this, argn);
     if( proj == null ) return Type.ANY;
-    proj.deps_add(def); // Re-check function input if projection change liveness
-    return proj._live;  // Pass through live
+    else proj.deps_add(def);    // If proj disappears, so does use of def
+
+    // Unresolved calls need their inputs alive, so those now-live inputs unify
+    // and can be used to resolve.  This gets to a key observation: cannot use
+    // dead inputs to resolve a call!  The call input *must* have some uses
+    // which distinguish which function to call.
+    
+    //proj.deps_add(def); // Re-check function input if projection change liveness
+    //return proj._live;  // Pass through live
+    return _live;
   }
   @Override boolean assert_live(Type live) { return live instanceof TypeMem; }
 

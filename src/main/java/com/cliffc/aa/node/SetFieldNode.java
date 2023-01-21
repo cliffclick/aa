@@ -10,7 +10,6 @@ import com.cliffc.aa.type.TypeFld;
 import com.cliffc.aa.type.TypeStruct;
 import com.cliffc.aa.util.Util;
 
-import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.type.TypeFld.Access;
 
 // Takes a static field name, a TypeStruct, a field value and produces a new
@@ -38,19 +37,41 @@ public class SetFieldNode extends Node {
     return ts.update(_fin,_fld,val(1));
   }
 
+  
+  @Override public Node ideal_reduce() {
+    Node in0 = in(0);
+    // SetField directly against a Struct; just use the Struct.
+    if( in0 instanceof StructNode st ) {
+      int idx = st.find(_fld);
+      Access access = st._accesses.at(idx);
+      if( in(1) == st.in(idx) && access == _fin )
+        return st; // Storing same over same, no change
+
+      if( access==Access.RW ) {
+        if( st._uses.len()==1 ) {
+          st.set_fld(_fld,_fin,in(1),false);
+          st.xval();            // Since moved field sideways, force type
+          return st;
+        } else {
+          // Track when uses drop to 1
+          for( Node use : st._uses ) use.deps_add(this);
+        }
+      } 
+    }
+
+    return null;
+  }
 
   @Override public Type live_use( Node def ) {
     // If this node is not alive, neither input is
     if( !(_live instanceof TypeStruct ts) )
       { assert _live==Type.ANY || _live==Type.ALL; return _live; }
-    TypeFld livefld = ts.get(_fld);
-    if( livefld==null ) {
-      if( ts._def == Type.ANY ) return ts;
-      return ts.add_fldx(TypeFld.make(_fld,Type.ANY));
-    }
-    if( livefld._t==Type.ANY ) return ts;
-    throw unimpl();
+    if( def==in(0) ) // Pass thru liveness of all fields except this one
+      return ts.at_def(_fld)!=Type.ANY ? ts.replace_fld(TypeFld.make(_fld,Type.ANY)) : ts;
+    // For this field, pass liveness thru directly
+    return ts.at_def(_fld);
   }
+  @Override boolean assert_live(Type live) { return live instanceof TypeStruct; }
 
 
   @Override public boolean has_tvar() { return true; }
@@ -86,43 +107,14 @@ public class SetFieldNode extends Node {
     Access access = fld._access;
     if( access!=Access.RW )
       return bad("Cannot re-assign "+access,fast,ts);
+    if( in(1) instanceof ForwardRefNode fref )
+      return fast ? ErrMsg.FAST : fref.err(fast);
     return null;
   }
   private ErrMsg bad( String msg, boolean fast, TypeStruct to ) {
     if( fast ) return ErrMsg.FAST;
     // TODO: Detect closures
     return ErrMsg.field(_badf,msg,_fld,false,to);
-  }
-
-  @Override public Node ideal_reduce() {
-    Node in0 = in(0);
-    // SetField directly against a Struct; just use the Struct.
-    if( in0 instanceof StructNode st ) {
-      int idx = st.find(_fld);
-      if( in(1) == st.in(idx) && st._accesses.at(idx) == _fin )
-        return st; // Storing same over same, no change
-
-      // TODO: When profitable to replicate a StructNode ?
-    }
-
-    //// Find the field being updated
-    //StructNode rec = nnn.rec();
-    //TypeFld tfld = rec.get(_fld);
-    //if( tfld== null ) return false;
-    //// Folding unambiguous functions?
-    //if( rez() instanceof FunPtrNode ) {
-    //  if( rez().is_forward_ref() ) return false;
-    //  nnn.add_fun(_fld, _fin, (FunPtrNode) rez(), _bad); // Stacked FunPtrs into an overload
-    //  // Field is modifiable; update New directly.
-    //} else if( tfld._access==Access.RW )
-    //  //nnn.set_fld(tfld.make_from(tfld._t,_fin),rez()); // Update the value, and perhaps the final field
-    //  throw unimpl();
-    //else  return false;      // Cannot fold
-    //nnn.xval();
-    //Env.GVN.add_flow_uses(this);
-    //add_reduce_extra();     // Folding in allows store followers to fold in
-    //return true;            // Folded.
-    return null;
   }
 
 

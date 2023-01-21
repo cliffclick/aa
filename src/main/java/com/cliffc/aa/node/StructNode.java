@@ -182,7 +182,7 @@ public class StructNode extends Node {
           // Make field in the parent
           parent.add_fld(fref._name,TypeFld.Access.Final,fref,_fld_starts.at(i));
           // Stomp field locally to ANY
-          set_def(i,Env.ANY);
+          set_def(i,Env.ANY).xval();
         }
       }
     }

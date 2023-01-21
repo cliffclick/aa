@@ -194,16 +194,14 @@ public abstract class PrimNode extends Node {
   }
 
   // Build and install match package
-  private static ProjNode make_math(PrimNode rand) {
+  private static NewNode make_math(PrimNode rand) {
     StructNode clz = new StructNode(false,false,null,"",Type.ALL);
     clz.add_fld("pi",Access.Final,con(TypeFlt.PI),null);
     clz.add_fld(rand._name,Access.Final,rand.as_fun(),null);
     clz.close().init();
-    Node mem = Env.SCP_0.mem();
-    NewNode nnn = new NewNode(mem,clz).init();
-    MProjNode mprj = new MProjNode(nnn).init();
-    ProjNode ptr = new ProjNode(nnn,REZ_IDX).init();
-    Env.SCP_0.set_mem(mprj);
+    NewNode ptr = new NewNode(); Env.GVN.add_flow(ptr); // Type depends on uses
+    StoreNode mem = new StoreNode(Env.SCP_0.mem(),ptr,clz,null).init();
+    Env.SCP_0.set_mem(mem);
     return ptr;
   }
   

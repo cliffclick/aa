@@ -93,13 +93,15 @@ public class FieldNode extends Node implements Resolvable {
     // Back-to-back SetField/Field
     if( in(0) instanceof SetFieldNode sfn && sfn.err(true)==null )
       return Util.eq(_fld, sfn._fld)
-        ? sfn.in(1)             // Same field, use same
-        : set_def(0, sfn.in(0)); // Unrelated field, bypass
+        ? sfn.in(1)              // Same field, use same
+        : Env.GVN.add_reduce(set_def(0, sfn.in(0))); // Unrelated field, bypass
 
     // Back-to-back Struct/Field
     if( in(0) instanceof StructNode str && str.err(true)==null ) {
       int idx = str.find(_fld);
       if( idx >= 0 ) return str.in(idx);
+    } else {
+      in(0).deps_add(this); // Revisit if input changes
     }
 
     // Back-to-back clz:Struct/Field.  Only for primitives; other clazz
@@ -109,10 +111,10 @@ public class FieldNode extends Node implements Resolvable {
       return proto.in(_fld);
     
     // Sink BindFP, lift Field
-    if( in(0) instanceof BindFPNode bind ) {
-      Node fld = new FieldNode(bind.fp(),_fld,_bad).init();
-      return new BindFPNode(fld,bind.dsp()).init();
-    }
+    //if( in(0) instanceof BindFPNode bind ) {
+    //  Node fld = new FieldNode(bind.fp(),_fld,_bad).init();
+    //  return new BindFPNode(fld,bind.dsp()).init();
+    //}
     
     return null;
   }
@@ -160,17 +162,14 @@ public class FieldNode extends Node implements Resolvable {
       // Leaf is forced to be a struct with this field.  If the field is an
       // oper, the field is further forced to be an overload.  However, I have
       // no way to force a Lambda with the 'this' and unknown args.
-      if (test) return true;
-      leaf.unify(new TVStruct(true, new String[]{_fld}, new TV3[]{tvar()}, true), test);
+      if( test ) return true;
+      tvar(0).unify(fresh_struct(), test);
       //if( Oper.is_oper(_fld) )
       //  throw unimpl();
       return true;
     }
-    case TVNil nil -> {
-      throw unimpl();
-    }
-    case TVBase base -> 
-      str = tv_clz(base._t);
+    case TVNil nil -> throw unimpl();
+    case TVBase base -> str = tv_clz(base._t);
     
     case TVStruct str0 -> {
       // If resolving, cannot do a field lookup.  Attempt resolve first.
@@ -179,6 +178,15 @@ public class FieldNode extends Node implements Resolvable {
         if( is_resolving() || test ) return progress;
       }
       str = str0;
+    }
+    case TVErr te -> {
+      str = te.as_struct();
+      if( str==null ) te.set_struct(str = fresh_struct());
+      // If resolving, cannot do a field lookup.  Attempt resolve first.
+      if( is_resolving() ) {
+        progress = try_resolve(str,test);
+        if( is_resolving() || test ) return progress;
+      }      
     }
     default -> throw unimpl();
     };
@@ -197,8 +205,7 @@ public class FieldNode extends Node implements Resolvable {
 
     // Add the field, make progress
     if( !test ) str.add_fld(_fld,tvar());
-    //return true;
-    throw unimpl();
+    return true;
   }
 
   public static TVStruct tv_clz(Type t) {
@@ -210,6 +217,8 @@ public class FieldNode extends Node implements Resolvable {
     };
     return (TVStruct)Env.PROTOS.get(clz).tvar();
   }
+  
+  private TVStruct fresh_struct() { return new TVStruct(true, new String[]{_fld}, new TV3[]{tvar()}, true); }
   
   private boolean try_resolve( TVStruct str, boolean test ) {
     // If struct is open, more fields might appear and cannot do a resolve.

@@ -448,7 +448,7 @@ public class Parse implements Comparable<Parse> {
     if( create ) {              // Token not already bound at any scope
       scope = scope();          // Create in the current scope
       StructNode stk = scope.stk();
-      stk.add_fld (tok,Access.RW, Env.XNIL,badf); // Create at top of scope as undefined
+      stk.add_fld (tok,Access.RW, con(TypeNil.XNIL),badf); // Create at top of scope as undefined
       scope.def_if(tok,Access.RW, true); // Record if inside arm of if (partial def error check)
     }
     Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
@@ -491,7 +491,7 @@ public class Parse implements Comparable<Parse> {
     scope().flip_if();       // Flip side of tracking new defs
     set_mem(omem);           // Reset memory to before the IF for the other arm
     set_ctrl(gvn(new CProjNode(ifex,0))); // Control for false branch
-    Node f_exp = peek(':') ? stmt(false) : Env.XNIL;
+    Node f_exp = peek(':') ? stmt(false) : con(TypeNil.XNIL);
     if( f_exp == null ) f_exp = err_ctrl2("missing expr after ':'");
 
     Node ptr = get_display_ptr(scope()); // Pointer, possibly loaded up the display-display
@@ -518,6 +518,8 @@ public class Parse implements Comparable<Parse> {
 
     Env.GVN.add_work_new(f_exp);
     Env.GVN.add_work_new(t_exp);
+    Env.GVN.add_flow(f_mem);
+    Env.GVN.add_flow(t_mem);
     return rez;
   }
 
@@ -612,7 +614,7 @@ public class Parse implements Comparable<Parse> {
     FunNode fun = new FunNode(ARG_IDX); // ctrl, mem, display
     init(fun.add_def(init(new CRProjNode(fun._fidx))));
     int fun_idx = fun.push();
-    NewNode nnn = scope().dsp();
+    NewNode nnn = scope().ptr();
     // Build Parms for system incoming values
     int rpc_idx = init(new ParmNode(CTL_IDX,fun,null,TypeRPC.ALL_CALL,Env.ALL_CALL)).push();
     int clo_idx = init(new ParmNode(DSP_IDX,fun,null,nnn._tptr       ,scope().ptr())).push();
@@ -806,13 +808,19 @@ public class Parse implements Comparable<Parse> {
 
   // Handle post-increment/post-decrement operator.
   // Does not define a field in structs: "@{ x++; y=2 }" - syntax error, no such field x
-  // Skips trailing WS
+  // Skips trailing WS.
   private Node inc(String tok, int d) {
+    // More-or-less expands as:
+    // If x not defined yet
+    //    x0 := 0;  // define x as mutable XNIL
+    // x1 = x0 + 1; // add
+    // newmem = oldmem.put("x",x1);
+    // x0           // Fresh ref of 'x' is returned
     skipWS();
     ScopeNode scope = lookup_scope(tok=tok.intern(),false); // Find prior scope of token
     // Need a load/call/store sensible options
     if( scope==null ) {         // Token not already bound to a value
-      do_store(null,Env.XNIL,Access.RW,tok,null,TypeNil.SCALAR,null);
+      do_store(null,con(TypeNil.XNIL),Access.RW,tok,null,TypeNil.SCALAR,null);
       scope = scope();
     } else {                    // Check existing token for mutable
       if( !scope.is_mutable(tok) )
@@ -828,21 +836,22 @@ public class Parse implements Comparable<Parse> {
     int ld_x = ld.push();
     Node fd = gvn(new FieldNode(ld,tok,bad));
     if( fd.is_forward_ref() )    // Prior is actually a forward-ref
-      return err_ctrl1(ErrMsg.forward_ref(this,((FunPtrNode)fd)));
+      return err_ctrl1(ErrMsg.forward_ref(this,(FunPtrNode)fd));
+    int fdidx = fd.push();
     Node n = gvn(new FreshNode(_e._fun,fd));
-    // Do a full lookup on "+", and execute the function
     int nidx = n.push();
+    // Do a full lookup on "+", and execute the function
     Node overplus = gvn(new FieldNode(n,"_+_",bad)); // Plus operator overload
     Node plus = gvn(new FieldNode(overplus,"_",bad)); // Resolve overload
     Node inc = con(TypeInt.con(d));
-    Node sum = do_call0(false,errMsgs(_x-2,_x,_x), args(n,inc,plus));
+    Node sum = do_call0(false,errMsgs(_x-2,_x,_x), args(Node.pop(nidx),inc,plus));
     Node stf = gvn(new SetFieldNode(tok,Access.RW,Node.peek(ld_x),sum,bad));
     // Active memory for the chosen scope, after the call to plus
     scope().replace_mem(new StoreNode(mem(),ptr,stf,bad));
-    n = Node.pop(nidx); // Pre-increment value
-    Env.GVN.add_reduce(n);
-    Node.pop(ld_x);     // No longer need
-    return n;      // Return pre-increment value
+    // Fresh-again the 
+    Node n2 = gvn(new FreshNode(_e._fun,Node.pop(fdidx)));
+    Node.pop(ld_x);             // No longer need
+    return n2;                  // Return pre-increment value
   }
 
 
@@ -922,7 +931,6 @@ public class Parse implements Comparable<Parse> {
     // Must load against most recent display update, in case some prior store
     // is in-error.  Directly loading against the display would bypass the
     // (otherwise alive) error store.
-    boolean closure = scope.stk()._is_closure;
 
     // Display/struct/scope containing the field
     Node dsp = get_display_ptr(scope);
@@ -935,10 +943,15 @@ public class Parse implements Comparable<Parse> {
     Node fd = gvn(new FieldNode(ld,tok,bad));
 
     // If in the middle of a definition (e.g. a HM Let, or recursive assign)
-    // then no Fresh per normal HM rules.  If loading from a struct or from
-    // normal Lambda arguments, again no Fresh per normal HM rules.
+    // then no Fresh per normal HM rules.  If loading from normal Lambda
+    // arguments, again no Fresh per normal HM rules.
+    boolean closure = scope.stk()._is_closure;
     Node frsh = fd.is_forward_ref() || closure ? fd : gvn(new FreshNode(_e._fun,fd));
-    return frsh;
+
+    //
+    Node bind = closure ? frsh : gvn(new BindFPNode(frsh,dsp));
+    
+    return bind;
   }
 
 
@@ -1000,7 +1013,7 @@ public class Parse implements Comparable<Parse> {
     int oldx = _x;              // Past opening '{'
 
     // Incrementally build up the formals, starting with the display
-    Ary<Type> formals = new Ary<>(new Type[]{Type.CTRL,TypeMem.ALLMEM,scope().dsp()._tptr});
+    Ary<Type> formals = new Ary<>(new Type[]{Type.CTRL,TypeMem.ALLMEM,scope().ptr()._tptr});
     Ary<Parse> bads= new Ary<>(new Parse [ARG_IDX]);
     Ary<String> ids= new Ary<>(new String[]{null,null,"^"});
 
@@ -1098,13 +1111,12 @@ public class Parse implements Comparable<Parse> {
   }
 
   private Node merge_exits(Node rez) {
-    int ridx = rez.push();
     ScopeNode s = scope();
+    if( !s.has_early_exit() ) return rez;
     Node ctrl = s.early_ctrl();
     Node mem  = s.early_mem ();
     Node val  = s.early_val ();
     s.early_kill();
-    if( ctrl == null ) return Node.pop(ridx); // No other exits to merge into
     try(GVNGCM.Build<Node> X = _gvn.new Build<>()) {
       ctrl = ctrl.add_def(ctrl());
       ctrl._val = Type.CTRL;
@@ -1121,17 +1133,10 @@ public class Parse implements Comparable<Parse> {
   // Merge this early exit path into all early exit paths being recorded in the
   // current Env/Scope.
   Node do_exit( ScopeNode s, Node rez ) {
-    Node ctrl = s.early_ctrl();
-    Node mem  = s.early_mem ();
-    Node val  = s.early_val ();
-    if( ctrl == null ) {
-      s.set_def(4,ctrl=new RegionNode((Node)null)); ctrl._val=Type.CTRL;
-      s.set_def(5,mem =new PhiNode(TypeMem.ALLMEM, null,(Node)null));
-      s.set_def(6,val =new PhiNode(TypeNil.SCALAR, null,(Node)null));
-    }
-    ctrl.add_def(ctrl());
-    mem .add_def(mem ());
-    val .add_def(rez   );
+    if( !s.has_early_exit() ) s.make_early_exit_merge();
+    s.early_ctrl().add_def(ctrl());
+    s.early_mem ().add_def(mem ());
+    s.early_val ().add_def(rez   );
     set_ctrl(Env.XCTRL);
     set_mem (Node.con(TypeMem.ANYMEM));
     return Env.XNIL;
@@ -1192,7 +1197,7 @@ public class Parse implements Comparable<Parse> {
     if( n instanceof Long   ) {
       if( _buf[_x-1]=='.' ) _x--; // Java default parser allows "1." as an integer; pushback the '.'
       long l = n.longValue();
-      return l==0 ? Env.XNIL : con(TypeInt.con(l));
+      return l==0 ? con(TypeNil.XNIL) : con(TypeInt.con(l));
     }
     if( n instanceof Double ) return con(TypeFlt.con(n.doubleValue()));
     throw new RuntimeException(n.getClass().toString()); // Should not happen
@@ -1225,7 +1230,6 @@ public class Parse implements Comparable<Parse> {
     String str = new String(_buf,oldx,_x-oldx-1).intern();
     // Convert to ptr-to-constant-memory-string
     //NewNode nnn = (NewNode)gvn( new NewStrNode.ConStr(str) );
-    //set_mem(gvn(new MrgProjNode(nnn,mem())));
     //return gvn( new ProjNode(nnn,REZ_IDX));
     throw unimpl();
   }

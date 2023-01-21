@@ -74,18 +74,18 @@ public class LoadNode extends Node {
     Node adr = adr();
     Type tadr = adr._val;
     // We allow Loads against structs to allow for nested (inlined) structs.
-    if( tadr instanceof TypeStruct ts )
-      return adr();
+    if( tadr instanceof TypeStruct ) return adr();
     if( !(tadr instanceof TypeMemPtr tmp) ) return null;
+    if( adr instanceof FreshNode frsh ) adr = frsh.id();
     // If we can find an exact previous store, fold immediately to the value.
-    Node ps = find_previous_struct(mem(),adr,tmp._aliases,true);
+    Node ps = find_previous_struct(mem(),adr,tmp._aliases);
     if( ps!=null ) {
       Node rez = switch(ps) {
-      case StoreNode st -> st.rez();
-      case StructNode st -> st;
+      case StoreNode st ->  st.rez().err(true) == null ? st.rez() : null;
+      case SetFieldNode sfn -> throw unimpl();
       default -> throw unimpl();
       };
-      if( !_live.isa(rez._live) ) return null; // Stall until liveness matches
+      if( rez!=null && !_live.isa(rez._live) ) return null; // Stall until liveness matches
       return rez;
     }
     return null;
@@ -115,20 +115,6 @@ public class LoadNode extends Node {
     //  return set_mem(((CallNode)mem.in(0)).mem());
       throw unimpl();
 
-    // Load can bypass a New or Store if the address does not depend on the New/St.
-    if( mem instanceof MProjNode mprj && mem.in(0) instanceof NewNode nnn && aliases != null ) {
-      // Bypass if aliases do not overlap
-      if( !aliases.test_recur(nnn._alias) )
-        return set_mem(nnn.mem());
-      // Also bypass if address predates the allocation.  Here we just see that
-      // the address comes from the function Parm, and the New is made in the
-      // function.
-      Node adr2 = adr instanceof CastNode ? adr.in(1) : adr;
-      if( adr2 instanceof ParmNode )
-        //return set_mem(mem.in(1));
-        throw unimpl();
-    }
-
     return null;
   }
 
@@ -138,10 +124,10 @@ public class LoadNode extends Node {
     // Load from a memory Phi; split through in an effort to sharpen the memory.
     // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
     // TODO: Hoist out of loops.
-    if( mem!=null && mem._op == OP_PHI && adr.in(0) instanceof NewNode ) {
-      Node lphi = new PhiNode(TypeNil.SCALAR,((PhiNode)mem)._badgc,mem.in(0));
-      for( int i=1; i<mem._defs._len; i++ )
-        lphi.add_def(Env.GVN.add_work_new(new LoadNode(mem.in(i),adr,_bad)));
+    if( mem instanceof PhiNode mphi && adr instanceof NewNode ) {
+      Node lphi = new PhiNode(TypeNil.SCALAR,mphi._badgc,mphi.in(0));
+      for( int i=1; i<mphi._defs._len; i++ )
+        lphi.add_def(Env.GVN.add_work_new(new LoadNode(mphi.in(i),adr,_bad)));
       subsume(lphi);
       return lphi;
     }
@@ -151,40 +137,37 @@ public class LoadNode extends Node {
 
   // Find a matching prior Store - matching address.
   // Returns null if highest available memory does not match address.
-  static Node find_previous_struct(Node mem, Node adr, BitsAlias aliases, boolean is_load ) {
+  static Node find_previous_struct(Node mem, Node adr, BitsAlias aliases ) {
     if( mem==null ) return null;
-    Type tmem = mem._val;
-    if( !(tmem instanceof TypeMem) || aliases==null ) return null;
     // Walk up the memory chain looking for an exact matching Store or New
     int cnt=0;
     while(true) {
       cnt++; assert cnt < 100; // Infinite loop?
       if( mem instanceof StoreNode st ) {
         if( st.adr()==adr ) return st.err(true)== null ? st : null; // Exact matching store
+        if( mem == st.mem() ) return null; // Parallel unrelated stores
         // Wrong address.  Look for no-overlap in aliases
         Type tst = st.adr()._val;
         if( !(tst instanceof TypeMemPtr tmp) ) return null; // Store has weird address
         BitsAlias st_alias = tmp._aliases;
-          if( aliases.join(st_alias) != BitsAlias.EMPTY )
-            return null;        // Aliases not disjoint, might overlap but wrong address
-        if( mem == st.mem() ) return null;
+        if( aliases.join(st_alias) != BitsAlias.EMPTY )
+          return null;        // Aliases not disjoint, might overlap but wrong address
+        // Disjoint unrelated store.
         mem = st.mem(); // Advance past
 
       //} else if( mem instanceof MemPrimNode.LValueWrite ) {
       //  // Array stores and field loads never alias
       //  mem = ((MemPrimNode)mem).mem();
+      } else if( mem instanceof SetFieldNode sfn ) {
+        throw unimpl();
 
       } else if( mem instanceof MProjNode ) {
         Node mem0 = mem.in(0);
         switch( mem0 ) {
-        case NewNode nnn -> {
-          if( adr.in(0) == nnn ) return nnn.rec();
-          if( aliases.test_recur(nnn._alias) ) return null; // Overlapping, but wrong address - dunno, so must fail
-          mem = nnn.mem(); // Advance past
-        }
         case CallEpiNode  node -> { return null; } // TODO: Bypass entire function call
         case MemSplitNode node -> mem = node.mem(); // Lifting out of a split/join region
         case CallNode     node -> mem = node.mem(); // Lifting out of a Call
+        case RootNode     node -> { return null; }
 
         case null, default -> throw unimpl(); // decide cannot be equal, and advance, or maybe-equal and return null
         }

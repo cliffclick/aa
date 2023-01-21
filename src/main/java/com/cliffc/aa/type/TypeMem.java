@@ -237,12 +237,13 @@ public class TypeMem extends Type<TypeMem> {
 
   public static TypeMem make_live(TypeStruct live) { return make0(new TypeStruct[]{live}); }
 
-  public static final TypeMem ANYMEM,ALLMEM; // Every alias is unused (so above XOBJ or below OBJ)
+  public static final TypeMem ANYMEM,ALLMEM,EXTMEM; // Every alias is unused (so above XOBJ or below OBJ)
 
   static {
     // Every alias is used in the worst way
     ALLMEM = make0(new TypeStruct[]{null,TypeStruct.ISUSED});
     ANYMEM = ALLMEM.dual();
+    EXTMEM = make(BitsAlias.EXTX,TypeStruct.ISUSED);
   }
   static final TypeMem[] TYPES = new TypeMem[]{ALLMEM};
 
@@ -496,6 +497,7 @@ public class TypeMem extends Type<TypeMem> {
   // 'precise' is replace, imprecise is MEET.
   public TypeMem update( BitsAlias aliases, TypeStruct tvs, boolean precise ) {
     assert !precise || aliases.abit()!=-1;
+    assert !precise || aliases.getbit() > 0; // No precise high memory
     // If precise, just replace whole struct
     if( precise ) return set(aliases.getbit(),tvs);
     // Must do struct-by-struct updates

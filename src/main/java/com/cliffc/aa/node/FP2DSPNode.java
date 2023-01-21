@@ -9,8 +9,6 @@ import com.cliffc.aa.tvar.TVLeaf;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFunPtr;
 
-import static com.cliffc.aa.AA.unimpl;
-
 // Strip out the display argument from a bound function.
 // Inverse of BindFP.
 public class FP2DSPNode extends Node {
@@ -22,12 +20,6 @@ public class FP2DSPNode extends Node {
   @Override public Type value() {
     if( !(fp()._val instanceof TypeFunPtr tfp) ) return fp()._val.oob();
     return tfp.dsp();
-  }
-  
-  @Override public Node ideal_reduce() {
-    //if( fp() instanceof BindFPNode bind ) return bind.dsp();
-    //if( _val==Type.ANY ) return Env.ANY;
-    return null;
   }
   
   @Override public boolean has_tvar() { return true; }
@@ -45,12 +37,8 @@ public class FP2DSPNode extends Node {
 
   @Override public ErrMsg err( boolean fast ) {
     Type fdx = fp()._val;
-    if( fdx instanceof TypeFunPtr tfp ) {
-      //return null;
-      // TODO: error if unbound.
-      // If display is dead, this will go dead also
-      throw unimpl();
-    }
+    if( fdx instanceof TypeFunPtr tfp && tfp.has_dsp())
+      return null;
     return fast ? ErrMsg.FAST : ErrMsg.unresolved(_bad,"A function is being called, but "+fdx+" is not a function");
   }
 }

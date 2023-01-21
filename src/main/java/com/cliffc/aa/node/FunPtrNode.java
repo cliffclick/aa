@@ -77,12 +77,8 @@ public final class FunPtrNode extends Node {
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;
     RetNode ret = ret();
-    // If no display pointer needed, we are pre-bound to ANY, otherwise not
-    // bound so ALL.
-    FunNode fun = ret.in(4) instanceof FunNode fun2 ? fun2 : null;
-    Type dsp = fun==null || fun.parm(DSP_IDX)==null ? Type.ANY : Type.ALL;
     TypeTuple tret = (TypeTuple)(ret._val instanceof TypeTuple ? ret._val : ret._val.oob(TypeTuple.RET));
-    return TypeFunPtr.make(ret._fidx,nargs(),dsp,tret.at(REZ_IDX));
+    return TypeFunPtr.make(ret._fidx,nargs(),Type.ANY,tret.at(REZ_IDX));
   }
 
   @Override public boolean has_tvar() { return true; }

@@ -128,7 +128,6 @@ public abstract class Node implements Cloneable, IntSupplier {
       _elock=false;             // Unlock
       Node x = VALS.remove(this);
       assert x==this;           // Got the right node out
-      //Env.GVN.add_reduce(add_flow());
     }
   }
   public Node _elock() {        // No assert version, used for new nodes
@@ -726,6 +725,8 @@ public abstract class Node implements Cloneable, IntSupplier {
   public final void walk_initype(  ) {
     if( Env.GVN.on_flow(this) ) return; // Been there, done that
     Env.GVN.add_flow(this);             // On worklist and mark visited
+    if( this instanceof FreshNode frsh )
+      frsh.unelock();           // Remove from VALS; Fresh hits in VALs depends on tvar
     if( has_tvar() ) set_tvar();
 
     _val = _live = Type.ANY;  // Highest value
