@@ -324,11 +324,11 @@ public class FunNode extends RegionNode {
     int[] cnts = new int[OP_MAX];
     for( Node n : body ) {
       int op = n._op;           // opcode
-      if( op == OP_CALL ) {     // Call-of-primitive?
-        Node n1 = ((CallNode)n).fdx();
-        if( !(n1._val instanceof TypeFunPtr tfp) ) return -1; // Calling an unknown function, await GCP
+      if( n instanceof CallNode call ) {     // Call-of-primitive?
+        Node fdx = call.fdx();
+        if( !(fdx._val instanceof TypeFunPtr tfp) ) return -1; // Calling an unknown function, await GCP
         if( tfp.test(_fidx) ) self_recursive = true; // May be self-recursive
-        if( n1 instanceof FunPtrNode fpn ) {
+        if( fdx instanceof FunPtrNode fpn ) {
           if( fpn.ret().rez() instanceof PrimNode )
             op = OP_PRIM;       // Treat as primitive for inlining purposes
         } else

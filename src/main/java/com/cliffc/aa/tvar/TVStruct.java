@@ -2,10 +2,8 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.Util;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.type.TypeStruct;
+import com.cliffc.aa.util.*;
 
 import java.util.Arrays;
 
@@ -25,6 +23,11 @@ public class TVStruct extends TV3 {
   private String[] _flds;       // Field labels
 
   private int _max;             // Max set of in-use flds/args
+
+  // This TVStruct is used Fresh against another TVStruct.
+  // If it ever changes fields, we need to Fresh-unify again.
+  Ary<TVStruct> _delay_fresh_deps;
+  Ary<TV3[]   > _delay_fresh_nongen;
   
   public TVStruct( Ary<String> flds ) { this(true,flds.asAry(),new TV3[flds.len()]);  }
   // Made from a StructNode; fields are known, so this is closed
@@ -51,13 +54,16 @@ public class TVStruct extends TV3 {
     _flds[_max] = fld;
     _args[_max] = tvf;
     _max++;
+    if( _delay_fresh_deps != null ) _do_delay_fresh();
     return true;
   }
+
   // Remove
   boolean del_fld(int idx) {
     _args[idx] = _args[_max-1];
     _flds[idx] = _flds[_max-1];
     _max--;
+    if( _delay_fresh_deps != null ) _do_delay_fresh();
     return true;
   }
   // Remove field; true if something got removed
@@ -119,6 +125,30 @@ public class TVStruct extends TV3 {
     return this;
   }
 
+  // Record t on the delayed fresh list, and return that.  If `this` every
+  // unifies to something, we need to Fresh-unify the something with `that`.
+  void delay_fresh(TVStruct that, TV3[] nongen) {
+    if( _delay_fresh_deps==null ) {
+      _delay_fresh_deps   = new Ary<>(new TVStruct[]{that  });
+      _delay_fresh_nongen = new Ary<>(new TV3   [][]{nongen});
+    }
+    if( _delay_fresh_deps.find(that)==-1 ) {
+      _delay_fresh_deps  .push(that  );
+      _delay_fresh_nongen.push(nongen);
+    }
+    assert _delay_fresh_deps.len()<=10; // Switch to worklist format
+  }
+
+  private void _do_delay_fresh() {
+    for( int i=0; i<_delay_fresh_deps._len; i++ ) {
+      TVStruct that = _delay_fresh_deps.at(i);
+      if( that.unified() ) throw unimpl(); // Compact
+      DELAY_FRESH_THIS.push(this);
+      DELAY_FRESH_THAT.push(that);
+      DELAY_FRESH_NONGEN.push(_delay_fresh_nongen.at(i));
+    }
+  }
+
   // -------------------------------------------------------------
   @Override void _union_impl( TV3 tv3 ) {
     //assert _uid > tv3._uid;
@@ -164,28 +194,38 @@ public class TVStruct extends TV3 {
   
   // -------------------------------------------------------------
   @Override boolean _fresh_unify_impl(TV3 tv3, TV3[] nongen, boolean test) {
-    boolean progress = false;
-    TVStruct thsi = this;
+    boolean progress = false, missing = false;
     TVStruct that = (TVStruct)tv3; // Invariant checked before calling
-    assert !thsi.unified() && !that.unified();
+    assert !unified() && !that.unified();
+
+    // Record that the LHS is Fresh'd against the RHS.  If the LHS changes in
+    // the future, we'll need to re-Fresh agains the RHS.
+    delay_fresh(that, nongen);
+    
     // Any pending field resolutions
     progress |= this.trial_resolve_all(test);
     progress |= that.trial_resolve_all(test);    
 
     for( int i=0; i<_max; i++ ) {
-      TV3 lhs = thsi.arg(_flds[i]);
-      TV3 rhs = that.arg(_flds[i]);
+      TV3 lhs = arg(i);
+      TV3 rhs = that.arg(_flds[i]); // Lookup via field name
       if( rhs==null && Resolvable.is_resolving(_flds[i]) ) {
         if( that._open ) continue;
         throw unimpl();
       }
 
       if( rhs == null ) {
-        throw unimpl();
+        if( is_open() || that.is_open() ) {
+          if( test ) return true; // Will definitely make progress
+          TV3 nrhs = lhs._fresh(nongen);
+          if( !that.is_open() ) // RHS not open, put copy of LHS into RHS with miss_fld error
+            throw unimpl();
+          progress |= that.add_fld(_flds[i],nrhs);
+        } else missing = true; // Else neither side is open, field is not needed in RHS
       } else {
         progress |= lhs._fresh_unify(rhs,nongen,test);
       }
-      assert !thsi.unified() && !that.unified();       // TODO: update/find thsi,that
+      assert !unified() && !that.unified();       // TODO: update/find thsi,that
       if( progress && test ) return true;
     }
 
@@ -193,9 +233,15 @@ public class TVStruct extends TV3 {
     // just copy the missing fields into it, then unify the structs (shortcut:
     // just skip the copy).  If the LHS is closed, then the extra RHS fields
     // are removed.
-    if( _max != that._max )
-      throw unimpl();
-      
+    if( _max != that._max || missing )
+      for( int i=0; i<that._max; i++ ) {
+        if( Resolvable.is_resolving(that._flds[i]) ) continue;
+        TV3 lhs = arg(that._flds[i]); // Lookup vis field name
+        if( lhs==null ) {
+          if( test ) return true;
+          progress |= that.del_fld(i--);
+        }
+      }
     
     // If LHS is closed, force RHS closed
     if( !_open && that._open ) {
@@ -233,31 +279,28 @@ public class TVStruct extends TV3 {
   }
 
   @Override boolean _trial_unify_ok_impl( TV3 tv3, boolean extras ) {
+    if( this==tv3 ) return true;
     TVStruct that = (TVStruct)tv3; // Invariant when called
     for( int i=0; i<_max; i++ ) {
       TV3 lhs = arg(i);
       TV3 rhs = that.arg(_flds[i]); // RHS lookup by field name
-      if( rhs==null ) {
-        throw unimpl();         // Missing RHS, check for extras
-      } else {
-        if( !lhs._trial_unify_ok(rhs,extras) )
-          return false;         // Child fails to unify
-      }      
+      if( lhs!=rhs && rhs!=null && !lhs._trial_unify_ok(rhs,extras) )
+        return false;           // Child fails to unify
     }
 
-    // Check for extras
-    if( !is_open() ) {
-      for( int i=0; i<that._max; i++ ) {
-        TV3 lhs = that.arg(i);
-        TV3 rhs = arg(that._flds[i]); // LHS lookup by field name
-        if( rhs==null ) {
-          throw unimpl();       // Extra on LHS
-        }
-      }
-    }
-    return true;                // Unifies OK
+    // Allow unification with extra fields.  The normal unification path
+    // will not declare an error, it will just remove the extra fields.
+    return (extras || this.mismatched_child(that)) && (that.mismatched_child(this));
   }
 
+  private boolean mismatched_child(TVStruct that ) {
+    for( int i=0; i<_max; i++ )
+      if( !Resolvable.is_resolving(_flds[i]) &&
+          that.arg(_flds[i])==null ) // And missing key in RHS
+        return false;          // Trial unification failed
+    return true;
+  }
+  
   @Override int eidx() { return TVErr.XSTR; }
   @Override public TVStruct as_struct() { return this; }
 
@@ -272,6 +315,13 @@ public class TVStruct extends TV3 {
   }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
+    TV3 prim = arg(TypeStruct.SELF);
+    TV3 nclz = arg(TypeStruct.CLAZZ);
+    if( prim!=null && nclz instanceof TVPtr pclz && pclz.load() instanceof TVStruct clz ) {
+      if( clz.arg("!_")!=null) return prim._str(sb.p("int:"),visit,dups,debug);
+      if( clz.arg("-_")!=null) return prim._str(sb.p("flt:"),visit,dups,debug);
+    }
+    
     boolean is_tup = _max==0 || Character.isDigit(_flds[0].charAt(0));
     sb.p(is_tup ? "(" : "@{");
     if( _args==null ) sb.p(", ");

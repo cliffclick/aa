@@ -2,9 +2,6 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.TV3;
-import com.cliffc.aa.tvar.TVBase;
-import com.cliffc.aa.tvar.TVLeaf;
-import com.cliffc.aa.tvar.TVNil;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFlt;
 import com.cliffc.aa.type.TypeNil;
@@ -29,20 +26,14 @@ public class ConNode<T extends Type> extends Node {
 
   @Override public boolean has_tvar() {
     if( _t==Type.ALL || _t==Type.ANY ) return true;  // Specifically allowed for various unused-displays on primitives
-    if( _t instanceof TypeNil /*_t.is_nil()*/ ) return true;     // Yes on NIL, INT, FLT, MEMPTR, FUNPTR
-    //if( _t instanceof TypeStruct ) return true;
+    if( _t instanceof TypeNil ) return true; // Yes on NIL, INT, FLT, MEMPTR, FUNPTR, STRUCT
     // No for TFLD, TMEM, RPC
     return false;
   }
 
   @Override public TV3 _set_tvar() {
     unelock(); // Hash now depends on TVars
-    if( _t==Type.ANY ) _tvar = new TVLeaf();
-    else if( _t==TypeNil.XNIL ) _tvar = new TVNil( new TVLeaf() ); // xnil gets a HM nilable instead of a base
-    // Default case, just a Base wrapper over GCP type
-    else _tvar = TVBase.make(true,_t);
-    _elock();
-    return _tvar;
+    return TV3.from_flow(_t);
   }
   
   @Override public boolean unify( boolean test ) { return false; }

@@ -3,7 +3,7 @@ package com.cliffc.aa.tvar;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.node.ConNode;
 import com.cliffc.aa.node.Node;
-import com.cliffc.aa.type.TypeNil;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 
 import java.util.IdentityHashMap;
@@ -47,6 +47,12 @@ abstract public class TV3 implements Cloneable {
   private static int CNT=1;
   public int _uid=CNT++; // Unique dense int, used in many graph walks for a visit bit
 
+  // This is used Fresh against that.
+  // If it ever changes (add_fld to TVStruct, or TVLeaf unify), we need to re-Fresh the deps.
+  static Ary<TV3  > DELAY_FRESH_THIS  = new Ary<>(new TV3[1],0);
+  static Ary<TV3  > DELAY_FRESH_THAT  = new Ary<>(new TV3[1],0);
+  static Ary<TV3[]> DELAY_FRESH_NONGEN= new Ary<>(new TV3[1][],0);
+  
   // Disjoint Set Union set-leader.  Null if self is leader.  Not-null if not a
   // leader, but pointing to a chain leading to a leader.  Rolled up to point
   // to the leader in many, many places.  Classic U-F cost model.
@@ -93,11 +99,14 @@ abstract public class TV3 implements Cloneable {
 
   // Find the leader, with rollup.  Used in many, many places.
   public TV3 find() {
+    TV3 leader = _find0();
+    // Additional read-barrier for TVNil to collapse nil-of-something
+    return leader instanceof TVNil tnil ? tnil.arg(0).find_nil(tnil) : leader;
+  }
+  public TV3 _find0() {
     if( _uf    ==null ) return this;// Shortcut, no rollup
     if( _uf._uf==null ) return _uf; // Unrolled once shortcut, no rollup
-    TV3 leader = _find();           // No shortcut
-    // Additional read-barrier for TVNil to collapse nil-of-something
-    return leader instanceof TVNil tnil ? tnil.find_nil() : leader;
+    return _find();                 // No shortcut
   }
   // Long-hand lookup of leader, with rollups
   private TV3 _find() {
@@ -106,6 +115,10 @@ abstract public class TV3 implements Cloneable {
     while( u!=leader ) { TV3 next = u._uf; u._uf=leader; u=next; }
     return leader;
   }
+
+  // Bases return the not-nil base; pointers return the not-nil pointer.
+  // Nested nils collapse.
+  TV3 find_nil(TVNil nil) { throw unimpl(); }
 
   // Fetch a specific arg index, with rollups
   public TV3 arg( int i ) {
@@ -228,7 +241,7 @@ abstract public class TV3 implements Cloneable {
   // the same as calling 'fresh' then 'unify', without the clone of 'this'.
   // Returns progress.
   static private final IdentityHashMap<TV3,TV3> VARS = new IdentityHashMap<>();
-  
+
   public boolean fresh_unify( TV3 that, TV3[] nongen, boolean test ) {
     if( this==that ) return false;
     assert VARS.isEmpty() && DUPS.isEmpty();
@@ -251,8 +264,8 @@ abstract public class TV3 implements Cloneable {
     if( nongen_in(nongen) ) throw unimpl(); // return vput(that,_unify(that,test));
 
     // LHS leaf, RHS is unchanged but goes in the VARS
-    if( this instanceof TVLeaf ) return vput(that,false);
-    if( that instanceof TVLeaf )  // RHS is a tvar; union with a deep copy of LHS
+    if( this instanceof TVLeaf leaf ) return vput(leaf.delay_fresh(that,nongen),false);
+    if( that instanceof TVLeaf      )  // RHS is a tvar; union with a deep copy of LHS
       return test || vput(that,that.union(_fresh(nongen)));
     
     // Special handling for nilable
@@ -438,6 +451,52 @@ abstract public class TV3 implements Cloneable {
     Env.GVN.add_flow(_deps);
     for( Node n : _deps.values() ) if( n instanceof ConNode) n.unelock(); // hash changes
     _deps = null;
+  }
+  
+  // -----------------
+  public static void do_delay_fresh() {
+    while( DELAY_FRESH_THIS.len() > 0 ) {
+      TV3 thsi = DELAY_FRESH_THIS.pop().find();
+      TV3 that = DELAY_FRESH_THAT.pop().find();
+      TV3[] nongen = DELAY_FRESH_NONGEN.pop();
+      thsi.fresh_unify(that,nongen,false);
+    }
+  }
+  
+  // -----------------
+  public static TV3 from_flow(Type t) {
+    if( t == Type.ANY || t == Type.ALL ) return new TVLeaf();
+    if( t instanceof TypeNil tn ) {
+      if( tn == TypeNil.XNIL ) return new TVNil( new TVLeaf() );
+      if( tn instanceof TypeMemPtr tmp ) {
+        TVPtr ptr = new TVPtr(from_flow(tmp._obj));
+        if( tmp.must_nil() ) ptr._may_nil = true;
+        return ptr;
+      }
+      if( tn instanceof TypeFunPtr tfp ) {
+        if( tfp.is_full() ) return new TVLeaf(); // Generic Function Ptr
+        throw unimpl(); //return new TVLeaf(); // TODO
+      }
+      if( t instanceof TypeStruct ts ) {
+        if( ts.len()==0 ) return new TVLeaf();
+        String[] ss = new String[ts.len()];
+        TV3[] tvs = new TV3[ts.len()];
+        for( int i=0; i<ts.len(); i++ ) {
+          TypeFld fld = ts.fld(i);
+          ss [i] = fld._fld;
+          tvs[i] = from_flow(fld._t);
+          if( Util.eq(fld._fld,TypeStruct.CLAZZ) ) {
+            // TODO: needs to be set_tvar vs tvar
+            TV3 tvclz = Env.PROTOS.get(ts._clz).tvar();
+            // invariant: CLAZZ/!clz fields need to be pointers to clazzes
+            ((TVPtr)tvs[i]).load().unify(tvclz,false);
+          }
+        }        
+        return new TVStruct(true,ss,tvs,false);
+      }
+      return TVBase.make(true,tn);
+    }
+    throw unimpl();
   }
   
   // -----------------

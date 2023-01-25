@@ -252,11 +252,22 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
 
   // The TypeFld[] is not interned.
   public static TypeStruct make_flds(String clz, Type def, TypeFld[] flds) { return make(false,clz,def,TypeFlds.hash_cons(remove_dups(def,flds))); }
+  public static TypeStruct make_flds(String clz, Type def, TypeFld fld0, TypeFld fld1) { return make_flds(clz,def,TypeFlds.ts(fld0,fld1)); }
 
   // Used to make a few testing constants
   public static TypeStruct make_test( TypeFld fld0, TypeFld fld1 ) { return make(TypeFlds.make(fld0,fld1)); }
   public static TypeStruct make_test( String clz, Type def, TypeFld fld0, TypeFld fld1 ) { return make(false,clz,def,TypeFlds.make(fld0,fld1)); }
   public static TypeStruct make_test( String fld_name, Type t, Access a ) { return make(TypeFld.make(fld_name,t,a)); }
+
+  // Names for wrapped primitive fields
+  public static final String SELF  =".self";
+  public static final String CLAZZ ="!clz";
+  public static final String[] PRIM_FLDS = new String[]{CLAZZ,SELF};
+  //// Wrapping type varies by current CLZ type
+  //public static TypeStruct wrapt(TypeInt ti, Type proto) { return TypeStruct.make_flds("int:",Type.ANY,TypeFld.make(CLAZZ,proto),TypeFld.make(SELF,ti)); }
+  //public static TypeStruct wrapt(TypeFlt tf, Type proto) { return TypeStruct.make_flds("flt:",Type.ANY,TypeFld.make(CLAZZ,proto),TypeFld.make(SELF,tf)); }
+  //public static TypeStruct wrapt0(Type proto) { return TypeStruct.make_flds("int:",Type.ANY,TypeFld.make(CLAZZ,proto),TypeFld.make(SELF,TypeNil.XNIL)); }
+
 
   // Add a field to an under construction TypeStruct; _flds is not interned.
   public TypeStruct add_fld( TypeFld fld ) {
@@ -365,10 +376,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     // Common name prefix
     String clz = clz_meet(_clz,that._clz);
     Type def = _def.meet(that._def);
-
-    // See if we fall hard
     boolean any = _any & that._any;
-    if( !def.above_center() && above_center() && that.above_center() ) any = false;
 
     // If both are cyclic, we have to do the complicated cyclic-aware meet
     return cyclic()!=null && that.cyclic()!=null
@@ -634,6 +642,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     for( int i=0; i<len(); i++ )
       _flds[i] = (TypeFld)map.map(_flds[i]);
   }
+
   static boolean isDigit(char c) { return '0' <= c && c <= '9'; }
   public boolean is_tup() {
     int len = len();
@@ -670,6 +679,10 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     //       int:1234
     //       flt:3.14
     if( _clz.isEmpty() && dups.get(_uid)!=null )  sb.p(':');
+    // Shortcut print for 'int:1234" and 'flt:3.14'
+    TypeFld tf;
+    if( Util.eq("int:",_clz) && (tf=get(SELF))!=null ) return tf._t._str(visit,dups,sb,debug,indent);
+    if( Util.eq("flt:",_clz) && (tf=get(SELF))!=null ) return tf._t._str(visit,dups,sb,debug,indent);
     // Shortcut print for the full int and flt prototypes.
     if( Util.eq("int:",_clz) && get("_+_")!=null && sb.len() > 4 ) // Longer than 'int:' already printed
       return sb.unchar(4).p("@{INT}");
@@ -793,7 +806,6 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     return make_from(flds);
   }
 
-  @Override public boolean above_center() { return _def.above_center(); }
   @Override public boolean is_con() {
     if( !_def.is_con() ) return false;
     for( TypeFld fld : _flds )

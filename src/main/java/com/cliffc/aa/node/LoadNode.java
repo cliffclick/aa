@@ -80,13 +80,10 @@ public class LoadNode extends Node {
     // If we can find an exact previous store, fold immediately to the value.
     Node ps = find_previous_struct(mem(),adr,tmp._aliases);
     if( ps!=null ) {
-      Node rez = switch(ps) {
-      case StoreNode st ->  st.rez().err(true) == null ? st.rez() : null;
-      case SetFieldNode sfn -> throw unimpl();
-      default -> throw unimpl();
-      };
-      if( rez!=null && !_live.isa(rez._live) ) return null; // Stall until liveness matches
-      return rez;
+      if( ps instanceof StoreNode st ) {
+        Node rez = st.rez();
+        return rez!=null && !_live.isa(rez._live) ? null : rez; // Stall until liveness matches
+      } else throw unimpl();
     }
     return null;
   }

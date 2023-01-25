@@ -2,11 +2,8 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.TV3;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeMemPtr;
-import com.cliffc.aa.type.TypeStruct;
+import com.cliffc.aa.tvar.*;
+import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.unimpl;
 
@@ -81,17 +78,17 @@ public class StoreNode extends Node {
     // Is this Store dead from below?
     if( mem==this ) return null; // Dead self-cycle
     if( tmp!=null && mem._val instanceof TypeMem ) {
-      if( tmp.above_center() && mem._val == _val )
-        return mem; // Address is high, and memory is unchanged; we can be ignored
-      
+      if( tmp.above_center() )
+        if( mem._val == _val ) return mem; // Address is high, and memory is unchanged; we can be ignored
+        else {
+          mem.deps_add(this);   // Input address changes, check reduce
+          deps_add(this);       // Our   address changes, check reduce
+        }
+
       TypeStruct ts0 = (_live instanceof TypeMem tm ? tm : _live.oob(TypeMem.ALLMEM)).ld(tmp);
       if( ts0.above_center() )  // Dead from below
         return mem;
     }
-
-    // No need for 'Fresh' address, as Stores have no TVar (produce memory not a scalar)
-    if( adr instanceof FreshNode fsh )
-      return set_def(2,fsh.id());
     
     // Store of a Store, same address
     if( mem instanceof StoreNode st && st.adr() == adr &&
@@ -103,13 +100,13 @@ public class StoreNode extends Node {
       return this;
     }
     
-    // Escape a dead MemSplit
-    if( mem instanceof MProjNode && mem.in(0) instanceof MemSplitNode msp &&
-        msp.join()==null ) {
-      set_def(1,msp.mem());
-      xval();                   // Update memory state to include all the default memory
-      return this;
-    }
+    //// Escape a dead MemSplit
+    //if( mem instanceof MProjNode && mem.in(0) instanceof MemSplitNode msp &&
+    //    msp.join()==null ) {
+    //  set_def(1,msp.mem());
+    //  xval();                   // Update memory state to include all the default memory
+    //  return this;
+    //}
 
     //
     //// If Store is of a MemJoin and it can enter the split region, do so.
@@ -164,20 +161,19 @@ public class StoreNode extends Node {
     return null;
   }
 
-  @Override public boolean has_tvar() { return false; }
-
-  @Override public boolean unify( boolean test ) {
-    TV3 ptr = adr().tvar();     // Should be leaf, nilable, or ptr
-    TV3 rez = rez().tvar();     // Should be leaf, or struct
-    //assert !ptr.is_obj() && !rez.is_nil() && rez.arg("*")==null;
-    //if( ptr.is_nil() ) throw unimpl();
-    //TV3 obj = ptr.arg("*");
-    //if( obj!=null )
-    //  return obj.unify(rez,test);
-    //ptr.add_fld("*",rez);
-    //return true;
-    throw unimpl();
+  // Store unifies the contents of address and value, but does not itself have
+  // a real tvar.  Give it a leaf to it participates in unification but its
+  // leaf is never expected to unify with anything.
+  @Override public boolean has_tvar() { return true; }
+  @Override public TV3 _set_tvar() {
+    TV3 rez = rez().set_tvar();
+    TV3 ptr = adr().set_tvar();
+    if( ptr instanceof TVPtr pv3 ) rez.unify(pv3.load(),false);
+    else ptr.unify(new TVPtr(rez),false);
+    return new TVLeaf();
   }
+
+  @Override public boolean unify( boolean test ) { return false; }
   
   @Override public ErrMsg err( boolean fast ) {
     Type tadr = adr()._val;

@@ -13,30 +13,9 @@ import static org.junit.Assert.*;
 public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
-    Type t0 = Type.valueOf("SZ:*[8]~@{ AND = SZ;... }");
-    Type t1 = Type.valueOf("SZ:*[8]~@{ OR_ = SZ;... }");
-    Type mt = t0.meet(t1);
-    System.out.println(mt);
-
-    //Type foo = Type.valueOf("SZ::@{ AND= @{OR_= SZ} }");
-    //
-    //Type mfoo = mt.join((TypeStruct)foo);
-    //System.out.println(mfoo);
-    
-    //Type t0 = Type.valueOf("SZ::~@{ AND !=! [-4]{SI::~@{base!=!int64; clz!=!SZ;... },4 -> SI };... }");
-    //Type t1 = Type.valueOf("SZ::~@{ OR_ !=! [-5]{SI::~@{base!=!int64; clz!=!SZ;... },4 -> SI };... }");
-    //Type mt = t0.meet(t1);
-    //System.out.println(mt);
-    //
-    //((TypeStruct)t0).at("AND")
-    //
-    //
-    //Type trez = Type.valueOf("SZ::~@{"+
-    //                         "  AND!=![-4]{SA:~@{FB:base!=!int64; clz !=! SZ; ...},4 -> SA };"+
-    //                         "  OR_!=![-5]{SA                                     ,4 -> SA };"+
-    //                         "  ..."+
-    //                         "}");
-    //System.out.println(trez);
+    Object dummy = Env.TOP;
+    Type t0 = Type.valueOf("123");
+    System.out.println(t0);
   }
 
   // Test for a collection of Types, that toString and valueOf are a bijection

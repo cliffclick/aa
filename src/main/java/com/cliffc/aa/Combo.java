@@ -175,7 +175,7 @@ public abstract class Combo {
     // Work down list until all reachable nodes types quit falling
     Node n;
     while( (n=Env.GVN.pop_flow()) != null ) {
-      cnt++; assert cnt < 100000; // Infinite loop check
+      cnt++; assert cnt < 10000; // Infinite loop check
       Type told = n._val;
 
       // Forwards flow
@@ -187,8 +187,7 @@ public abstract class Combo {
       // H-M unification
       n.combo_unify();
 
-
-      // During Combo value flow, exact fcn pointers appear
+      // During Combo value flow, the exact fcn pointers appear,
       // and we require wiring to make these edges explicit.
       if( told != n._val ) {
         for( Node use : n._uses )

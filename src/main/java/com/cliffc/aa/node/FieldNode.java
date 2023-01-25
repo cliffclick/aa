@@ -13,8 +13,7 @@ import static com.cliffc.aa.AA.unimpl;
 // instead of by index in TypeTuple.
 //
 // Fields with a fixed name either lookup in the incoming self record or in the
-// prototype.  The Field is unresolved until the lookup is successful in one or
-// the other; error if found in both.  Once resolved, the Field is marked.
+// prototype, based on a Parser flag.
 //
 // Fields with the "_" name resolve locally only via H-M matching to one choice
 // field.  Once resolved the Field name changes to match.
@@ -22,22 +21,27 @@ import static com.cliffc.aa.AA.unimpl;
 public class FieldNode extends Node implements Resolvable {
   
   // Field being loaded from a TypeStruct.  If "_", the field name is inferred
-  // from amongst the field choices.  If not-"_" and not present, then the
-  // lookup tries again in the prototype, and if that fields, then error.
+  // from amongst the field choices.  If not present, then error.
   public       String _fld;
+  // Field lookup is strictly in the clazz and not locally.
+  public final boolean _clz;
+  // Where to report errors
   public final Parse _bad;
 
-  public FieldNode(Node struct, String fld, Parse bad) {
+  public FieldNode(Node struct, String fld, boolean clz, Parse bad) {
     super(OP_FIELD,struct);
     // A plain "_" field is a resolving field
     _fld = Util.eq(fld,"_") ? ("&"+_uid).intern() : fld;
     _bad = bad;
+    _clz = clz;
+    assert !(clz && is_resolving()); // One or the other for now
   }
 
   @Override public String xstr() { return "."+(is_resolving() ? "_" : _fld); }   // Self short name
   String  str() { return xstr(); } // Inline short name
   @Override public boolean is_resolving() { return Resolvable.is_resolving(_fld); }
   @Override public String fld() { assert !is_resolving(); return _fld; }
+  // Set the resolved field label
   @Override public String resolve(String label) {
     unelock();                  // Hash changes since label changes
     String old = _fld;
@@ -60,16 +64,23 @@ public class FieldNode extends Node implements Resolvable {
       return Type.ALL.oob(!lo);
     }
 
-    // Hit on a field
-    if( t instanceof TypeStruct ts && ts.find(_fld)!= -1 )
-      return ts.at(_fld);    
-
-    Node proto = clzz(t);
-    if( proto!=null && proto._val instanceof TypeStruct clz ) {
-      TypeFld fld = clz.get(_fld);
-      if( fld !=null ) return fld._t; // Find in CLZ
+    // Clazz or local struct ?
+    Type tstr = null;
+    if( _clz ) {
+      StructNode clazz = clzz(t);
+      if( clazz !=null ) {
+        tstr = clazz._val;
+        // Add a dep edge to the clazz, so value changes propagate permanently
+        if( len()==2 ) assert in(1)==clazz;
+        else add_def(clazz);
+      }
+    } else {
+      tstr = val(0);
     }
-    return (proto==null ? t : proto._val).oob();
+    // Hit on a field
+    if( tstr instanceof TypeStruct ts && ts.find(_fld)!= -1 )
+      return ts.at(_fld);    
+    return (tstr==null ? t : tstr).oob();
   }
 
   private static Type meet(TypeStruct ts) { Type t = TypeNil.XSCALAR; for( TypeFld t2 : ts )  t = t.meet(t2._t); return t; }
@@ -104,29 +115,18 @@ public class FieldNode extends Node implements Resolvable {
       in(0).deps_add(this); // Revisit if input changes
     }
 
-    // Back-to-back clz:Struct/Field.  Only for primitives; other clazz
-    // references lazily discovered after Combo.
-    StructNode proto = clzz(val(0));
-    if( proto!=null )
-      return proto.in(_fld);
-    
-    // Sink BindFP, lift Field
-    //if( in(0) instanceof BindFPNode bind ) {
-    //  Node fld = new FieldNode(bind.fp(),_fld,_bad).init();
-    //  return new BindFPNode(fld,bind.dsp()).init();
-    //}
-    
     return null;
   }
 
+  // Prototype or null
   private static StructNode clzz(Type t) {
     return switch( t ) {
     case TypeInt ti -> PrimNode.ZINT;
     case TypeFlt tf -> PrimNode.ZFLT;
     case TypeStruct ts -> Env.PROTOS.get(ts._clz);  // CLZ from instance
     // TODO: XNIL uses the INT clazz.
-    // Other, like SCALAR, does not have a known CLZ
     case TypeNil xnil -> xnil.isa(TypeNil.XNIL) ? PrimNode.ZINT : null;
+    // Other, like SCALAR, does not have a known CLZ
     default -> null;
     };
   }
@@ -143,7 +143,7 @@ public class FieldNode extends Node implements Resolvable {
       if( fcnt>0 ) {
         Node lphi = new PhiNode(TypeNil.SCALAR,phi._badgc,phi.in(0));
         for( int i=1; i<phi.len(); i++ )
-          lphi.add_def(Env.GVN.add_work_new(new FieldNode(phi.in(i),_fld,_bad)));
+          lphi.add_def(Env.GVN.add_work_new(new FieldNode(phi.in(i),_fld,_clz,_bad)));
         subsume(lphi);
         return lphi;
       }
@@ -156,46 +156,37 @@ public class FieldNode extends Node implements Resolvable {
 
   @Override public boolean unify( boolean test ) {
     boolean progress = false;
-    TVStruct str;
-    switch( tvar(0) ) {
-    case TVLeaf leaf -> {
-      // Leaf is forced to be a struct with this field.  If the field is an
-      // oper, the field is further forced to be an overload.  However, I have
-      // no way to force a Lambda with the 'this' and unknown args.
-      if( test ) return true;
-      tvar(0).unify(fresh_struct(), test);
-      //if( Oper.is_oper(_fld) )
-      //  throw unimpl();
-      return true;
+
+    TV3 tv0;
+    if( _clz ) {
+      StructNode proto = clzz(val(0));
+      if( proto==null ) return false;
+      tv0 = proto.tvar();
+    } else {
+      tv0 = tvar(0);
     }
-    case TVNil nil -> throw unimpl();
-    case TVBase base -> str = tv_clz(base._t);
     
-    case TVStruct str0 -> {
-      // If resolving, cannot do a field lookup.  Attempt resolve first.
-      if( is_resolving() ) {
-        progress = try_resolve(str0,test);
-        if( is_resolving() || test ) return progress;
-      }
-      str = str0;
+    if( tv0 instanceof TVErr terr )
+      tv0 = terr.as_struct();
+
+    TVStruct str;
+    if( tv0 instanceof TVStruct str0 ) str = str0;
+    else {
+      if( test ) return true;
+      progress |= tv0.unify(str=fresh_struct(),test);
     }
-    case TVErr te -> {
-      str = te.as_struct();
-      if( str==null ) te.set_struct(str = fresh_struct());
-      // If resolving, cannot do a field lookup.  Attempt resolve first.
-      if( is_resolving() ) {
-        progress = try_resolve(str,test);
-        if( is_resolving() || test ) return progress;
-      }      
+    
+    // If resolving, cannot do a field lookup.  Attempt resolve first.
+    if( is_resolving() ) {
+      progress = try_resolve(str,test);
+      if( is_resolving() || test ) return progress;
     }
-    default -> throw unimpl();
-    };
     assert !is_resolving();
 
     // Look up field normally
     TV3 fld = str.arg(_fld);
     if( fld!=null )           // Unify against a pre-existing field
-      return fld.unify(tvar(), test) | progress;
+      return tvar().unify(fld, test) | progress;
 
     // If the field is resolved, and not in struct and not in proto and the
     // struct is closed, then the field is missing.
@@ -203,9 +194,10 @@ public class FieldNode extends Node implements Resolvable {
       throw unimpl();           // Missing field
     }
 
-    // Add the field, make progress
-    if( !test ) str.add_fld(_fld,tvar());
-    return true;
+    //// Add the field, make progress
+    //if( !test ) str.add_fld(_fld,tvar());
+    //return true;
+    throw unimpl();
   }
 
   public static TVStruct tv_clz(Type t) {

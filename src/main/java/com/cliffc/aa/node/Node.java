@@ -581,6 +581,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       return;
     if( unify(false) ) {
       assert !_tvar.debug_find().unify(old.debug_find(),true);// monotonic: unifying with the result is no-progress
+      TV3.do_delay_fresh();
       // HM changes; push related neighbors
       for( Node def : _defs ) if( def!=null && def.has_tvar() ) def.add_flow();
       for( Node use : _uses ) if(              use.has_tvar() ) use.add_flow();
@@ -703,12 +704,12 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Make globally shared common ConNode for this type.
   public static @NotNull Node con( Type t ) {
-    Node con = t instanceof TypeFunPtr tfp && tfp.is_fidx() && tfp.fidx()!=BitsFun.ALLX
-      ? new FunPtrNode(RetNode.get(tfp.fidx()))
-      : new ConNode<>(t);
+    if( t instanceof TypeFunPtr tfp && tfp.is_fidx() && tfp.fidx()!=BitsFun.ALLX )
+      return RetNode.get(tfp.fidx()).funptr();
+    Node con = new ConNode<>(t);
     Node con2 = VALS.get(con);
     if( con2 != null ) {        // Found a prior constant
-      if( Combo.HM_FREEZE && con2.tvar() instanceof TVBase base && base._t != t )
+      if( Combo.HM_FREEZE && con2._tvar != con._tvar )
         throw unimpl();
       con.kill();               // Kill the just-made one
       con = con2;

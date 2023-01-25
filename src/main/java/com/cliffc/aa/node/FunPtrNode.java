@@ -1,14 +1,11 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.tvar.TV3;
-import com.cliffc.aa.tvar.TVLambda;
-import com.cliffc.aa.tvar.TVLeaf;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFunPtr;
 import com.cliffc.aa.type.TypeTuple;
 
-import static com.cliffc.aa.AA.DSP_IDX;
-import static com.cliffc.aa.AA.REZ_IDX;
+import static com.cliffc.aa.AA.*;
 
 // See CallNode and FunNode comments. The FunPtrNode converts a RetNode into a
 // TypeFunPtr with a constant fidx.  Used to allow first class functions to be

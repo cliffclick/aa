@@ -21,6 +21,7 @@ public class TypeFlds extends AryI<TypeFld> {
   public static void free(TypeFld[] ts) { TYPEFLDS._free(ts); }
   public static TypeFld[] make(TypeFld t0) { return hash_cons(TYPEFLDS._ts(t0)); }
   public static TypeFld[] make(TypeFld t0, TypeFld t1) { return hash_cons(TYPEFLDS._ts(t0,t1)); }
+  public static TypeFld[] ts(TypeFld t0, TypeFld t1) { return TYPEFLDS._ts(t0,t1); }
   public static TypeFld[] clone(TypeFld[] ts) { return TYPEFLDS._clone(ts); }
   public static TypeFld[] copyOf(TypeFld[] ts, int len) { return TYPEFLDS._copyOf(ts,len); }
 

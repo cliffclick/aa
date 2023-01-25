@@ -20,6 +20,7 @@ public class CRProjNode extends CEProjNode {
     // Compute liveness from Root value
     TypeTuple tt = (TypeTuple)val(0);
     TypeFunPtr tfp = (TypeFunPtr)tt.at(3);
+    if( tfp.fidxs().above_center() ) return Type.XCTRL;
     // On or off, according to if the fidx escaped.
     return Type.XCTRL.oob(tfp.test(_idx));
   }

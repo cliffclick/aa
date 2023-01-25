@@ -29,7 +29,7 @@ import static com.cliffc.aa.type.TypeFld.Access;
 
 public abstract class PrimNode extends Node {
   public final String _name;    // Unique name (and program bits)
-  public final TypeFunPtr _tfp; // FIDX, nargs, display argument, WRAPPED primitive return type
+  public final TypeFunPtr _tfp; // FIDX, nargs, display argument, UNWRAPPED primitive return type
   public final TypeTuple _formals; // Formals are indexed by order NOT name and are unwrapped prims.
   public final TypeNil _ret;    // unrapped primitive return
   public final boolean _is_lazy;// 2nd arg is lazy (thunked by parser)
@@ -50,6 +50,9 @@ public abstract class PrimNode extends Node {
   // Int/Float primitives.  
   public static final StructNode ZINT = new StructNode(false,false,null,"int:", Type.ALL).set_proto_instance(TypeInt.INT64).init();
   public static final StructNode ZFLT = new StructNode(false,false,null,"flt:", Type.ALL).set_proto_instance(TypeFlt.FLT64).init();
+  public static final NewNode PINT = new NewNode();
+  public static final NewNode PFLT = new NewNode();
+
   public static final ConNode  INT = new ConNode(TypeInt. INT64).init();
   public static final ConNode  FLT = new ConNode(TypeFlt. FLT64).init();
   public static final ConNode NFLT = new ConNode(TypeFlt.NFLT64).init();
@@ -124,8 +127,8 @@ public abstract class PrimNode extends Node {
     Env.STK_0.add_fld("math",Access.Final,make_math(rand),null).xval();
 
     // Build the int and float prototypes
-    make_prim(ZFLT,FLTS);
-    make_prim(ZINT,INTS);
+    make_prim(ZFLT,PFLT,FLTS);
+    make_prim(ZINT,PINT,INTS);
 
     Env.GVN.iter();
 
@@ -172,7 +175,7 @@ public abstract class PrimNode extends Node {
   }
   
   // Make and install a primitive Clazz.
-  private static void make_prim( StructNode clz, PrimNode[][] primss ) {
+  private static void make_prim( StructNode clz, NewNode ptr, PrimNode[][] primss ) {
     for( PrimNode[] prims : primss ) {
       // Primitives are grouped into overload groups, where the 'this' or
       // display argument is always of the primitive type, and the other
@@ -191,16 +194,17 @@ public abstract class PrimNode extends Node {
     clz.close();
     Env.SCP_0.add_type(clz._clz,clz); // type String -> clazz Struct mapping, for scope-based type lookups
     Env.PROTOS.put(clz._clz,clz); // global mapping
+    Env.SCP_0.set_mem(new StoreNode(Env.SCP_0.mem(),ptr.add_flow(),clz,null).init());
   }
 
   // Build and install match package
   private static NewNode make_math(PrimNode rand) {
-    StructNode clz = new StructNode(false,false,null,"",Type.ALL);
-    clz.add_fld("pi",Access.Final,con(TypeFlt.PI),null);
-    clz.add_fld(rand._name,Access.Final,rand.as_fun(),null);
-    clz.close().init();
+    StructNode math = new StructNode(false,false,null,"",Type.ALL);
+    math.add_fld("pi",Access.Final,con(TypeFlt.PI),null);
+    math.add_fld(rand._name,Access.Final,rand.as_fun(),null);
+    math.close().init();
     NewNode ptr = new NewNode(); Env.GVN.add_flow(ptr); // Type depends on uses
-    StoreNode mem = new StoreNode(Env.SCP_0.mem(),ptr,clz,null).init();
+    StoreNode mem = new StoreNode(Env.SCP_0.mem(),ptr,math,null).init();
     Env.SCP_0.set_mem(mem);
     return ptr;
   }
@@ -410,18 +414,17 @@ public abstract class PrimNode extends Node {
     // And can preserve bit-width
     @Override public TypeNil value() {
       Type t0 = val(0), t1 = val(1);
-      // 0 AND anything is 0
-      if( t0 == TypeNil.XNIL || t1 == TypeNil.XNIL ) return TypeNil.XNIL;      
-      if( t0==Type.ALL || t1==Type.ALL ) return TypeInt.INT64;      
       // If either is high - results might fall to something reasonable
       if( t0.above_center() || t1.above_center() )
         return TypeInt.INT64.dual();
-      // Both are low-or-constant, and one is not valid - return bottom result
+      if( t0==Type.ALL || t1==Type.ALL ) return TypeInt.INT64;
+      // 0 AND anything is 0
+      if( t0 == TypeNil.XNIL || t1 == TypeNil.XNIL ) return TypeNil.XNIL;
       if( !(t0 instanceof TypeInt t0i) || !(t1 instanceof TypeInt t1i) )
         return TypeInt.INT64;
       // If both are constant ints, return the constant math.
-      if( t0.is_con() && t1.is_con() ) {
-        long i2 = t0.getl() & t1.getl();
+      if( t0i.is_con() && t1i.is_con() ) {
+        long i2 = t0i.getl() & t1i.getl();
         return i2==0 ? TypeNil.XNIL : TypeInt.con(i2);
       }
       // Preserve width

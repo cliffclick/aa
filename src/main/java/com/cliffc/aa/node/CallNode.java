@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
@@ -300,32 +301,28 @@ public class CallNode extends Node {
     if( def==ctl() ) return Type.ALL;
     if( def==mem() ) return _live;
     if( def==fdx() ) return Type.ALL;
+
+
+    // Unresolved calls need their inputs alive, so those now-live inputs unify
+    // and can be used to resolve.  This gets to a key observation: cannot use
+    // dead inputs to resolve a call!  The call input *must* have some uses
+    // which distinguish which function to call.
+    if( !Combo.HM_FREEZE ) return _live;
+    assert !LIFTING;
+    
     // Check that all fidxs are wired; an unwired fidx might be in-error,
     // and we want the argument alive for errors.  This is a value turn
     // around point (high fidxs need to fall)
     CallEpiNode cepi = cepi();
     boolean all_wired = _is_copy || cepi.is_all_wired();
     if( all_wired ) deps_add(def);
-    else
-      // not-all-wired means: cannot ask about projections being alive
-      // pre-combo, lifting, must assume alive.
-      // in -combo, falling, must assume dead .
-      // post-combo, all is wired, never get here.
-      return LIFTING ? Type.ALL : Type.ANY;
+    else return Type.ALL;
     // All wired, the arg is dead if the matching projection is dead
     int argn = _defs.find(def);
     ProjNode proj = ProjNode.proj(this, argn);
     if( proj == null ) return Type.ANY;
-    else proj.deps_add(def);    // If proj disappears, so does use of def
-
-    // Unresolved calls need their inputs alive, so those now-live inputs unify
-    // and can be used to resolve.  This gets to a key observation: cannot use
-    // dead inputs to resolve a call!  The call input *must* have some uses
-    // which distinguish which function to call.
-    
-    //proj.deps_add(def); // Re-check function input if projection change liveness
-    //return proj._live;  // Pass through live
-    return _live;
+    proj.deps_add(def);    // If proj disappears, so does use of def
+    return proj._live;  // Pass through live
   }
   @Override boolean assert_live(Type live) { return live instanceof TypeMem; }
 

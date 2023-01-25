@@ -18,7 +18,7 @@ public class RootNode extends Node {
   @Override boolean is_CFG() { return true; }
 
   // Output value is:
-  // [Ctrl,All_Mem_Minus_Dead,TypeRPC.ALL_CALL,escaped_fidxs, escaped_aliases,]
+  // [Ctrl, All_Mem_Minus_Dead, TypeRPC.ALL_CALL, escaped_fidxs, escaped_aliases,]
   @Override public TypeTuple value() {
     Node mem = in(MEM_IDX);
     Node rez = in(REZ_IDX);
@@ -33,7 +33,7 @@ public class RootNode extends Node {
     ESCF.clear();
     EXT_ALIASES = BitsAlias.EMPTY;
     EXT_FIDXS = BitsFun.EMPTY;
-    // Walk
+    // Walk, finding escaped aliases and fidxs
     _escapes(rez._val);
 
     // All external aliases already escaped
@@ -111,12 +111,19 @@ public class RootNode extends Node {
   @Override public Type live() { return Type.ALL; }
 
   @Override public Node ideal_reduce() {
+    // See if the result can ever refer to local memory.
     Node rez = in(REZ_IDX);
-    if( rez!=null && in(MEM_IDX) != Env.XMEM && !(rez._val instanceof TypeMemPtr) && !(rez._val instanceof TypeFunPtr) )
+    if( rez!=null && in(MEM_IDX) != Env.XMEM &&
+        !can_lift_to(rez._val,TypeMemPtr.ISUSED) &&
+        !can_lift_to(rez._val,TypeFunPtr.GENERIC_FUNPTR) )
       return set_def(MEM_IDX,Env.XMEM);
     return null;
   }
 
+  // True if t0 can lift to t1; i.e. holding t1 constant, if we strictly lift
+  // t0 (so t0_new isa t0), then we can lift t0 until it is equal to t1.
+  static boolean can_lift_to(Type t0, Type t1) {  return t0.join(t1)==t1;  }
+  
   @Override Node walk_dom_last( Predicate<Node> P) { return null; }
 
   @Override public boolean has_tvar() { return false; }

@@ -51,6 +51,7 @@ public class SetFieldNode extends Node {
         if( st._uses.len()==1 ) {
           st.set_fld(_fld,_fin,in(1),false);
           st.xval();            // Since moved field sideways, force type
+          st._live = _live;     // The field is now alive in st
           return st;
         } else {
           // Track when uses drop to 1

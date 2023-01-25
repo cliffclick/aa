@@ -19,7 +19,8 @@ public class NewNode extends Node {
   // Unique alias class, one class per unique memory allocation site.
   // Only effectively-final, because the copy/clone sets a new alias value.
   public int _alias; // Alias class
-  private final int _reset0_alias;
+  private final int _reset0_alias; // Reset, if PrimNode aliases split & moved
+  // Alias is dead for all time
   private boolean _killed;
 
   // Just TMP.make(_alias,ISUSED)
@@ -47,7 +48,7 @@ public class NewNode extends Node {
       _killed = true;
       RootNode.kill_alias(_alias);
       Env.GVN.add_reduce_uses(this);
-      Env.GVN.add_flow(this);      
+      Env.GVN.add_flow(this);
       return this;
     }
     return null;
@@ -55,6 +56,7 @@ public class NewNode extends Node {
   
   // If all uses do not escape the pointer, the New is dead.
   private boolean used() {
+    if( is_prim() ) return true;
     for( Node use : _uses )
       if( !(use instanceof StoreNode st) || st.rez()==this )
         return true;

@@ -30,7 +30,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    test("1+(x=2*3)+x*x", "43", "43");
+    _test2("x=3; addx={y -> x+y}; addx(2)", "int:5","int:5","int:5","int:5",null,null,"Unable to resolve _+_",-1); // must inline to resolve overload {+}:Int
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -90,9 +90,9 @@ public class TestParse {
     testerr("_+_", "Syntax error; trailing junk",0);
     testerr("!_", "Missing term after operator '!_'",1);
     // Function application, traditional paren/comma args
-    test("1._+_._(2)", "3" ,"3" );
-    test("1._-_._(2)", "-1","-1"); // binary version
-    test("1.-_._()"  , "-1","-1"); // unary version
+    test("1._+_._(2)", "3", "3" );
+    test("1._-_._(2)", "-1", "-1"); // binary version
+    test("1.-_._()"  , "-1", "-1"); // unary version
     // error; mismatch arg count
     testerr("math.pi(1)", "A function is being called, but 3.141592653589793 is not a function",7);
     testerr("1._+_._(2,3)", "Passing 3 arguments to _+_ which takes 2 arguments",7);
@@ -126,11 +126,11 @@ public class TestParse {
     // Re-use ref immediately after def; parses as: x=(2*3); 1+x+x*x
     test("1+(x=2*3)+x*x", "43", "43");
     testerr("x=(1+(x=2)+x); x", "Cannot re-assign final field '.x' in @{x=2}",0);
-    test("x:=1;x++"  ,"1", "int64");
-    test("x:=1;x++;x","2", "2");
+    test("x:=1;x++", "1", "int64");
+    test("x:=1;x++;x", "2", "2");
     test("x:=1;x++ + x--","3", "3");
     test("x++","xnil", "A?");
-    test("x++;x","1", "1");
+    test("x++;x", "1", "1");
 
     // Conditional:
     test   ("0 ?    2  : 3", "3", "3"); // false
@@ -176,7 +176,7 @@ public class TestParse {
 
   @Test public void testParse02() {
     // Anonymous function definition.  Note: { x -> x&1 }; 'x' can be any struct with an operator '_&_'.
-    _test2("{x:int -> x&1}","[54]{any,4 -> int1 }","{A int64 -> int64}",null,null,null,"[54]",null,0);
+    test("{x:int -> x&1}","[54]{any,4 -> int1 }","{A int64 -> int64}",null,null,null,"[54]");
     test("{5}()", "5", "5"); // No args nor -> required; this is simply a function returning 5, being executed
     testerr("{x:flt y -> x+y}", "Ambiguous, unable to resolve { flt64 flt64 -> flt64 } and { flt64 int64 -> flt64 }",13); // {Scalar Scalar -> Scalar}
 
@@ -962,6 +962,10 @@ HashTable = {@{
   // Short form test: simple GCP, no formal args
   static private void test( String program, String gcp, String hmt, String gcp_both, String hmt_both ) {
     _test2(program,gcp,hmt,gcp_both,hmt_both,null,null,null,0);
+  }
+
+  static private void test( String program, String gcp, String hmt, String gcp_both, String hmt_both, String esc_ptrs, String esc_funs ) {
+    _test2(program,gcp,hmt,gcp_both,hmt_both,esc_ptrs,esc_funs,null,0);
   }
 
   // Run a program in all 3 modes, yes function returns, no errors

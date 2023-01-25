@@ -1,6 +1,7 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.type.TypeNil;
+import com.cliffc.aa.type.TypeStruct;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
@@ -19,8 +20,6 @@ public class TVNil extends TV3 {
   public TVNil( TV3 tv3 ) { super(true,tv3); }
   public TVLeaf not_nil() { return (TVLeaf)arg(0); }
   
-  public TV3 find_nil() { throw unimpl(); }
-
   // -------------------------------------------------------------
   @Override void _union_impl(TV3 that) { }
 
@@ -38,7 +37,7 @@ public class TVNil extends TV3 {
     return true;
   }
 
-  // same as HM w/nongten, except this & that reversed
+  // same as HM w/nongen, except this & that reversed
   boolean _unify_nil( TV3 that, TV3[] nongen, boolean test ) {
     assert !(that instanceof TVNil);
     if( test ) return true;     // Will make progress in all situations
@@ -77,9 +76,14 @@ public class TVNil extends TV3 {
   // -------------------------------------------------------------
   @Override boolean _trial_unify_ok_impl( TV3 that, boolean extras ) {
     if( that instanceof TVNil ) return true;
-    if( that instanceof TVBase base &&
-        base._t.must_nil() )
+    if( that instanceof TVBase base && base._t.must_nil() )
       return true;
+    // Some primitives will unify with NIL
+    if( that instanceof TVStruct ts ) {
+      TV3 self = ts.arg(TypeStruct.SELF);
+      if( self==null ) return false;
+      return _trial_unify_ok_impl(self,extras);
+    }
     return false;
   }
   

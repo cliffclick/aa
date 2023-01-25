@@ -1,16 +1,16 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.ErrMsg;
-import com.cliffc.aa.tvar.TV3;
-import com.cliffc.aa.tvar.TVLambda;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 
+import static com.cliffc.aa.AA.DSP_IDX;
 import static com.cliffc.aa.AA.unimpl;
 
 // Bind a 'this' into an unbound function pointer.  Inverse of FP2DSP.
 public class BindFPNode extends Node {
-  private byte _mode; // 0 unknown, +1 adds display, -1 no-op/extra/remove
-  public BindFPNode( Node fp, Node dsp ) { super(OP_BINDFP,fp,dsp); }
+  private final boolean _over;  // Binds an Overload
+  public BindFPNode( Node fp, Node dsp, boolean over ) { super(OP_BINDFP,fp,dsp); _over = over; }
   @Override public String xstr() {return "BindFP"; }
 
   Node fp() { return in(0); }
@@ -25,32 +25,19 @@ public class BindFPNode extends Node {
   //   -   NO_DSP      XXX    - BIND Pass along XXX dsp.  Unify TFP.DSP and DSP.
   //   -  HAS_DSP      ANY    - NOOP Pass along has-dsp.  
   //   -  HAS_DSP      XXX    - EXTR Pass along has-dsp.  
-  @Override public Type value() { return bind(fp()._val, dsp()._val); }
+  @Override public Type value() { return bind(fp()._val, dsp()._val,_over); }
 
-  private Type bind(Type fun, Type dsp) {    
-    if( fun instanceof TypeFunPtr tfp ) {
-      // Compute the new display as the meet of old one and input
-      Type mdsp = tfp.dsp().meet(dsp);
-      // If the input as a display, this Bind is a no-op; flag it and this
-      // cannot change.  Instead, if we are given a display and dont have one,
-      // this Bind is required and cannot change.
-      if( tfp.has_dsp() ) { assert _mode<=0; _mode=-1; }
-      else if( TypeFunPtr.has_dsp(mdsp) ) { assert _mode>=0; _mode= 1; }
-      return tfp.make_from(mdsp);
-    }
+  private Type bind(Type fun, Type dsp, boolean over) {    
+    if( !over && fun instanceof TypeFunPtr tfp )
+        return tfp.make_from(dsp);
     
     // Push Bind down into overloads
-    if( fun instanceof TypeStruct ts ) {
+    if( over && fun instanceof TypeStruct ts ) {
       TypeFld[] tfs = TypeFlds.get(ts.len());
       for( int i=0; i<ts.len(); i++ )
-        tfs[i] = ts.get(i).make_from(bind(ts.at(i),dsp));
+        tfs[i] = ts.get(i).make_from(bind(ts.at(i),dsp,false));
       return ts.make_from(tfs);
     }
-
-    // If the in(0) can never be a function nor struct, we're always a no-op.
-    if( !fun.dual().isa(TypeFunPtr.GENERIC_FUNPTR) &&
-        !fun.dual().isa(TypeStruct.ISUSED) )
-      { assert _mode <= 0; _mode = -1; }
     
     return fun;
   }
@@ -64,51 +51,45 @@ public class BindFPNode extends Node {
   @Override boolean assert_live(Type live) { return live instanceof TypeTuple tt && tt.len()==2; }
 
   @Override public Node ideal_reduce() {
-    // Already decided self is a no-op based on types, remove.
-    if( _mode == -1 ) return fp();
+
+    // Check for early bind of an anonymous function which is not using the display.
+    if( fp()._val instanceof TypeFunPtr tptr ) {
+      int fidx = tptr.fidxs().abit();
+      if( fidx>0 ) {
+        RetNode ret = RetNode.get(fidx);
+        if( ret!=null && !ret.is_copy() ) {
+          Node dsp = ret.fun().parm(DSP_IDX);
+          if( dsp==null ) return fp(); // Display is dead, no need to bind
+          else dsp.deps_add(this);     // 
+        }
+      }
+    }
+
     return null;
   }
   
   @Override public boolean has_tvar() { return true; }
+  @Override public TV3 _set_tvar() { return fp().set_tvar(); }
 
   @Override public boolean unify( boolean test ) {
-    // Wait until types decide if this Bind is a no-op or not.
-    switch( _mode ) {
-    case  0: return false;      // Stall till the Types decide
-    case  1: throw unimpl();
-    case -1: return fp().tvar().unify(tvar(),test); // Dummy Bind, just unify straight thru
-
-      
-    default: throw unimpl();
+    boolean progress = false;
+    TV3 fptv = fp().tvar();
+    if( _over && fptv instanceof TVStruct tvs ) {
+        for( int i = 0; i < tvs.len(); i++ )
+          if( !Resolvable.is_resolving(tvs.fld(i)) &&
+              tvs.arg(i) instanceof TVLambda lam )
+            progress |= lam.dsp().unify(dsp().tvar(), test);
+    } else if( fptv instanceof TVLambda lam ) {
+      progress |= lam.dsp().unify(dsp().tvar(),test);
     }
-    //// No display (yet)
-    //Type tfp = fp()._val, dsp = dsp()._val;
-    //if( dsp == Type.ANY ) return false;
-    //if( tfp == Type.ANY ) return false;
-    //boolean progress = false;
-    //if( tfp instanceof TypeStruct ts && fp().tvar() instanceof TVStruct tvs ) {
-    //  for( int i=0; i<tvs.len(); i++ )
-    //    if( !Resolvable.is_resolving(tvs.fld(i)) )
-    //      progress |= _unify(ts.at(tvs.fld(i)),tvs.arg(i),test);
-    //} else if( tfp instanceof TypeFunPtr && fp().tvar() instanceof TVLambda lam ) {
-    //  progress |= lam.unify(tvar(),test);
-    //  progress |= _unify(tfp,tvar(),test);
-    //} else {
-    //  // Dummy, unify the FP straight over
-    //  return fp().tvar().unify(tvar(),test);
-    //}
-    //return progress;
+    return progress;
   }
-
-  private boolean _unify( Type t, TV3 tv, boolean test ) {
+  private boolean _unify(Type t, TV3 tv, boolean test ) {
     if( t instanceof TypeFunPtr && tv instanceof TVLambda lam ) {
-      return lam.unify(tvar(),test) |
-        lam.dsp().unify(dsp().tvar(),test);
+      return lam.dsp().unify(dsp().tvar(),test);
     }
     return false;
   }
-
-
   
   // Error to double-bind
   @Override public ErrMsg err( boolean fast ) {

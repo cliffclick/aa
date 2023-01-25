@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVStruct;
@@ -180,9 +179,11 @@ public class StructNode extends Node {
           throw unimpl();        // TODO: Access input by field name
         } else {
           // Make field in the parent
-          parent.add_fld(fref._name,TypeFld.Access.Final,fref,_fld_starts.at(i));
-          // Stomp field locally to ANY
-          set_def(i,Env.ANY).xval();
+          parent.add_fld(fref._name,TypeFld.Access.Final,fref,_fld_starts.at(i)).xval();
+          // Stomp field locally to load from parent
+          FieldNode fld = new FieldNode(parent,fref._name,false,_fld_starts.at(i));
+          fld._val = val(i);
+          set_def(i,fld);
         }
       }
     }

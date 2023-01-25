@@ -3,8 +3,7 @@ package com.cliffc.aa.tvar;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
-import static com.cliffc.aa.AA.ARG_IDX;
-import static com.cliffc.aa.AA.DSP_IDX;
+import static com.cliffc.aa.AA.*;
 
 /** A lambda, higher-order function
  *
@@ -27,6 +26,13 @@ public class TVLambda extends TV3 {
   public TV3 dsp() { return arg(DSP_IDX); }
   public int nargs() { return len(); }
 
+  // Lambda as a whole
+  @Override TV3 strip_nil() {
+    _may_nil = false;
+    return this;
+  }
+
+  TV3 find_nil(TVNil nil) { return this; }
 
   // -------------------------------------------------------------
   @Override void _union_impl( TV3 tv3) {
