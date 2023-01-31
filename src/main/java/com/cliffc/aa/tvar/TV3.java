@@ -466,38 +466,40 @@ abstract public class TV3 implements Cloneable {
   
   // -----------------
   public static TV3 from_flow(Type t) {
-    if( t == Type.ANY || t == Type.ALL ) return new TVLeaf();
-    if( t instanceof TypeNil tn ) {
-      if( tn == TypeNil.XNIL ) return new TVNil( new TVLeaf() );
-      if( tn instanceof TypeMemPtr tmp ) {
-        TVPtr ptr = new TVPtr(from_flow(tmp._obj));
-        if( tmp.must_nil() ) ptr._may_nil = true;
-        return ptr;
-      }
-      if( tn instanceof TypeFunPtr tfp ) {
-        if( tfp.is_full() ) return new TVLeaf(); // Generic Function Ptr
-        throw unimpl(); //return new TVLeaf(); // TODO
-      }
-      if( t instanceof TypeStruct ts ) {
-        if( ts.len()==0 ) return new TVLeaf();
-        String[] ss = new String[ts.len()];
-        TV3[] tvs = new TV3[ts.len()];
-        for( int i=0; i<ts.len(); i++ ) {
-          TypeFld fld = ts.fld(i);
-          ss [i] = fld._fld;
-          tvs[i] = from_flow(fld._t);
-          if( Util.eq(fld._fld,TypeStruct.CLAZZ) ) {
-            // TODO: needs to be set_tvar vs tvar
-            TV3 tvclz = Env.PROTOS.get(ts._clz).tvar();
-            // invariant: CLAZZ/!clz fields need to be pointers to clazzes
-            ((TVPtr)tvs[i]).load().unify(tvclz,false);
-          }
-        }        
-        return new TVStruct(true,ss,tvs,false);
-      }
-      return TVBase.make(true,tn);
+    return switch( t ) {
+    case TypeFunPtr tfp -> {
+      if( !tfp.is_full() ) throw unimpl(); //return new TVLeaf(); // TODO
+      yield new TVLeaf(); // Generic Function Ptr
     }
-    throw unimpl();
+    case TypeMemPtr tmp -> {
+      TVPtr ptr = new TVPtr(from_flow(tmp._obj));
+      if( tmp.must_nil() ) ptr._may_nil = true;
+      yield ptr;
+    }
+    case TypeStruct ts -> {
+      if( ts.len()==0 ) yield new TVLeaf();
+      String[] ss = new String[ts.len()];
+      TV3[] tvs = new TV3[ts.len()];
+      for( int i=0; i<ts.len(); i++ ) {
+        TypeFld fld = ts.fld(i);
+        ss [i] = fld._fld;
+        tvs[i] = from_flow(fld._t);
+        if( Util.eq(fld._fld,TypeStruct.CLAZZ) ) {
+          // TODO: needs to be set_tvar vs tvar
+          TV3 tvclz = Env.PROTOS.get(ts._clz).tvar();
+          // invariant: CLAZZ/!clz fields need to be pointers to clazzes
+          ((TVPtr)tvs[i]).load().unify(tvclz,false);
+        }
+      }
+      yield new TVStruct(true,ss,tvs,false);
+    }
+    case TypeNil tn -> tn == TypeNil.XNIL ? new TVNil( new TVLeaf() ) : TVBase.make(true,tn);
+    case Type tt -> {
+      if( tt == Type.ANY || tt == Type.ALL ) yield new TVLeaf();
+      throw unimpl();
+    }
+    };
+      
   }
 
   // Convert a TV3 to a flow Type

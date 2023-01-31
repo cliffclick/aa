@@ -17,8 +17,7 @@ import static com.cliffc.aa.AA.unimpl;
 // NewNode, even if they have the same type.  Upon cloning both NewNodes get
 // new aliases that inherit (tree-like) from the original alias.
 //
-// Takes in a Control (often null), a Memory, and a TypeStruct producer (ala StructNode).
-// Produces a Tuple of (TypeMem,TypeMemPtr).
+// NewNodes just produce the alias, no allocation (yet).
 public class NewNode extends Node {
   // Unique alias class, one class per unique memory allocation site.
   // Only effectively-final, because the copy/clone sets a new alias value.

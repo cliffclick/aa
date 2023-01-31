@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
 
 
 // Function parameter node; almost just a Phi with an order.  There is a dense
@@ -53,6 +54,8 @@ public class ParmNode extends PhiNode {
     return t.join(_t);
   }
 
+  @Override boolean assert_live(Type live) { return (_t instanceof TypeMem) == (live instanceof TypeMem); }
+  
   @Override public Node ideal_reduce() {
     if( !(in(0) instanceof FunNode) )
       return in(0).is_copy(_idx); // Dying, or thunks
