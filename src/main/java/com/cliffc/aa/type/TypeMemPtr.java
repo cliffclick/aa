@@ -276,7 +276,8 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     return obj == null ? this : make_from(obj);
   }
 
-
+  @Override public Type sharptr2( TypeMem mem ) { return mem.sharpen(this); }
+  
   @Override BitsFun _all_reaching_fidxs( TypeMem tmem) {
     BitsFun fidxs = BitsFun.EMPTY;
     if( Type.ARF.tset(_uid) || tmem==null ) return fidxs;

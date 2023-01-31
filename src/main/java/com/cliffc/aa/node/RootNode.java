@@ -1,7 +1,11 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.TVLambda;
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.VBitSet;
 
 import java.util.function.Predicate;
@@ -17,33 +21,59 @@ public class RootNode extends Node {
 
   @Override boolean is_CFG() { return true; }
 
+  TypeMem rmem() {
+    return _val instanceof TypeTuple tt ? (TypeMem)tt.at(MEM_IDX) : TypeMem.ALLMEM.oob(_val.above_center());
+  }
+  BitsAlias ralias() {
+    return _val instanceof TypeTuple tt
+      ? ((TypeMemPtr)tt.at(4))._aliases
+      : (_val.above_center() ? BitsAlias.NALL.dual() : BitsAlias.NALL);
+  }
+  BitsFun rfidxs() {
+    return _val instanceof TypeTuple tt
+      ? ((TypeFunPtr)tt.at(3)).fidxs()
+      : (_val.above_center() ? BitsFun.NALL.dual() : BitsFun.NALL);
+  }
+
+  
   // Output value is:
   // [Ctrl, All_Mem_Minus_Dead, TypeRPC.ALL_CALL, escaped_fidxs, escaped_aliases,]
   @Override public TypeTuple value() {
+    // Conservative final memory
     Node mem = in(MEM_IDX);
+    TypeMem tmem = mem!=null && mem._val instanceof TypeMem tmem0 ? tmem0 : TypeMem.ALLMEM;
+    // Conservative final result
     Node rez = in(REZ_IDX);
-    // No top-level return yet, so return most conservative answer
-    if( mem == null || rez == null )
-      return TypeTuple.ROOT;
-    // Not sane memory
-    if( !(mem._val instanceof TypeMem tmem) )
-      return (TypeTuple)mem._val.oob(TypeTuple.ROOT);
+    Type trez = rez!=null ? rez._val : Type.ALL;
 
     // Reset for walking
-    ESCF.clear();
-    EXT_ALIASES = BitsAlias.EMPTY;
-    EXT_FIDXS = BitsFun.EMPTY;
     // Walk, finding escaped aliases and fidxs
-    _escapes(rez._val);
+    escapes_reset();
+    escapes(trez, tmem);
 
-    // All external aliases already escaped
     TypeMem tmem2 = TypeMem.ANYMEM;
-    // All other aliases also escape
-    for( int alias : EXT_ALIASES )
-      tmem2 = tmem2.set(alias,tmem.at(alias));
+    // All external aliases already escaped
+    tmem2 = tmem2.set(BitsAlias.EXTX,TypeStruct.ISUSED);
+    // All escaped functions are called inside of Root, and modify memory "off-line".
+    if( EXT_FIDXS != BitsFun.NALL )
+      for( int fidx : EXT_FIDXS ) {
+        RetNode ret = RetNode.get(fidx);
+        if( ret != null && ret._val instanceof TypeTuple rtup ) {
+          TypeMem rmem = (TypeMem)rtup.at(MEM_IDX);
+          tmem2 = (TypeMem)tmem2.meet(rmem);
+        }
+      }
+    else tmem2 = TypeMem.ALLMEM;
+    // Root changes all escaping *internal* aliases for modifiable fields
+    for( int alias : EXT_ALIASES ) {
+      TypeStruct ts = tmem2.at(alias);
+      TypeStruct ts_wide = ts.widen_mut_fields();
+      tmem2 = tmem2.set(alias, ts_wide);
+    }
+    // Kill the killed
     for( int alias : KILL_ALIASES )
-      tmem2 = tmem2.set(alias,TypeStruct.UNUSED);    
-    
+      tmem2 = tmem2.set(alias,TypeStruct.UNUSED);
+
     return TypeTuple.make(Type.CTRL,
                           tmem2,
                           TypeRPC.ALL_CALL,
@@ -54,43 +84,86 @@ public class RootNode extends Node {
   // Escape all Root results.  Escaping functions are called with the most
   // conservative HM-compatible arguments.  Escaping Structs are recursively
   // escaped, and can appear as input arguments.
-  private static final VBitSet ESCF = new VBitSet();
-  private static BitsAlias EXT_ALIASES;
-  private static BitsFun EXT_FIDXS;
-  private static BitsAlias KILL_ALIASES = BitsAlias.EMPTY;
+  private static final VBitSet VISIT = new VBitSet();
+  // Results computed here, and modified at each call.
+  static BitsAlias EXT_ALIASES;
+  static BitsFun   EXT_FIDXS  ;
 
-  private static void _escapes(Type t) {
+  static void escapes_reset() {
+    VISIT.clear();
+    EXT_ALIASES = BitsAlias.EMPTY;
+    EXT_FIDXS   = BitsFun  .EMPTY;
+  }
+  
+  static void escapes(Type t, TypeMem tmem ) {
+    if( VISIT.tset(t._uid) ) return;
     if( t == Type.ALL ) {
+      // Escaping everything
       EXT_ALIASES = BitsAlias.NALL;
-      EXT_FIDXS = BitsFun.NALL;
+      EXT_FIDXS   = BitsFun  .NALL;
     }
     if( t instanceof TypeMemPtr tmp ) {
       // Add to the set of escaped structures
       for( int alias : tmp._aliases ) {
-        if( alias==0 ) continue;
-        if( !EXT_ALIASES.test(alias) ) continue;
         EXT_ALIASES = EXT_ALIASES.set(alias);
-        //Alloc a = ALIASES.at(alias);
-        //TypeMemPtr atmp = a.tmp();
-        //for( TypeFld fld : atmp._obj )
-        //  if( !Util.eq(fld._fld,"^") )
-        //    _escapes(fld._t,work);
-        throw unimpl();
+        if( tmem!=null ) {
+          TypeStruct ts = tmem.at(alias);
+          //escapes(ts._def,tmem);
+          for( TypeFld fld : ts )
+            escapes(fld._t,tmem);
+        } else 
+          throw unimpl();
       }
     }
-    if( t instanceof TypeFunPtr tfp && !ESCF.tset(tfp._uid) ) {
+    if( t instanceof TypeFunPtr tfp ) {
       // Walk all escaped function args, and call them (like an external
       // Apply might) with the most conservative flow arguments possible.
-      for( int fidx : tfp.fidxs() ) {
-        if( fidx==0 || ESCF.tset(fidx) ) continue;
-        // TODO: Lambda.apply_push
+      for( int fidx : tfp.fidxs() )
         EXT_FIDXS = EXT_FIDXS.set(fidx);
-      }
-      // The flow return also escapes
-      _escapes(tfp._ret);
+      // The return also escapes
+      escapes(tfp._ret,tmem);
     }
   }
 
+  // Given a TV3, mimic a matching flow Type from all possible escaping
+  // aliases.  Escaped functions might be called with these aliases.
+  public BitsAlias matching_escaped_aliases(TV3 tv3, Node dep) {
+    // Caller result depends on escaping fidxs
+    if( dep!=null ) deps_add(dep);
+    BitsAlias aliases = BitsAlias.EMPTY;
+    for( int alias : ralias() )
+      if( tv3.trial_unify_ok(NewNode.get(alias).tvar(),false) )
+        aliases = aliases.set(alias); // Compatible escaping alias
+    return aliases;
+  }
+
+  static private final Ary<FunNode> EXT_FUNS_BY_NARGS = new Ary<>(new FunNode[1],0);
+  // Given a TV3 lam, mimic a matching flow TypeFunPtr from all possible
+  // escaping fidxs.  Escaped functions might be called from Root.
+  public BitsFun matching_escaped_fidxs(TVLambda lam, Node dep) {
+    // Caller result depends on escaping fidxs
+    if( dep!=null ) deps_add(dep);
+    BitsFun fidxs = BitsFun.EMPTY;
+    // Toss in a generic nargs-correct external function which has !_is_copy.
+    FunNode fun = EXT_FUNS_BY_NARGS.atX(lam.nargs());
+    if( fun==null )
+      EXT_FUNS_BY_NARGS.setX(lam.nargs(),fun=new FunNode(" generic external lambda",BitsFun.new_fidx(BitsFun.EXTX),lam.nargs()));
+    fidxs = fidxs.set(fun._fidx);
+    // Cannot ask for trial_unify_ok until HM_FREEZE, because trials can fail
+    // over time which runs the result backwards in GCP.
+    if( Combo.HM_FREEZE )
+      for( int fidx : rfidxs() ) {
+        RetNode ret = RetNode.get(fidx);
+        if( ret != null ) {     // External function, no real sig or def
+          TV3 funtvar = ret.funptr().tvar();
+          if( funtvar instanceof TVLambda esc_lam && lam.trial_unify_ok(esc_lam,false) )
+            fidxs = fidxs.set(fidx); // Compatible escaping fidx
+        }
+      }
+    return fidxs;
+  }
+  
+  private static BitsAlias KILL_ALIASES = BitsAlias.EMPTY;
   static void kill_alias( int alias ) {
     if( KILL_ALIASES.test(alias) ) return;
     KILL_ALIASES = KILL_ALIASES.set(alias);
@@ -122,7 +195,7 @@ public class RootNode extends Node {
 
   // True if t0 can lift to t1; i.e. holding t1 constant, if we strictly lift
   // t0 (so t0_new isa t0), then we can lift t0 until it is equal to t1.
-  static boolean can_lift_to(Type t0, Type t1) {  return t0.join(t1)==t1;  }
+  static boolean can_lift_to(Type t0, Type t1) {  return t0.join(t1)==t0;  }
   
   @Override Node walk_dom_last( Predicate<Node> P) { return null; }
 

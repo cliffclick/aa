@@ -743,6 +743,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
 
   // Sharpen pointer with memory
   public Type sharptr( Type ptr ) { return this==ANY ? TypeMem.ANYMEM.sharptr(ptr) : ptr; }
+  public Type sharptr2( TypeMem mem ) { return this; }
 
   // Make from existing type, replacing TMPs with alias from the map
   public Type make_from(Type head, TypeMem map, VBitSet visit) { return this; }

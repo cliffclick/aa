@@ -2,6 +2,8 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
+import com.cliffc.aa.node.Node;
+import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeStruct;
 import com.cliffc.aa.util.*;
 
@@ -119,11 +121,8 @@ public class TVStruct extends TV3 {
       : this.del_fld(i);
   }
 
-  // Struct as a whole
-  @Override TV3 strip_nil() {
-    _may_nil = false;
-    return this;
-  }
+  @Override int eidx() { return TVErr.XSTR; }
+  @Override public TVStruct as_struct() { return this; }
 
   // Record t on the delayed fresh list, and return that.  If `this` every
   // unifies to something, we need to Fresh-unify the something with `that`.
@@ -301,9 +300,6 @@ public class TVStruct extends TV3 {
     return true;
   }
   
-  @Override int eidx() { return TVErr.XSTR; }
-  @Override public TVStruct as_struct() { return this; }
-
   public ErrMsg err_resolve(Parse loc, String msg) {
     SB sb = new SB().p(msg).p(", unable to resolve ");
     VBitSet dups = get_dups();
@@ -313,7 +309,11 @@ public class TVStruct extends TV3 {
         arg(i)._str(sb,visit,dups,false).p(" and ");
     return ErrMsg.unresolved(loc,sb.unchar(5).toString());
   }
+
   
+  // -------------------------------------------------------------
+  @Override Type _as_flow( Node dep ) { throw unimpl(); }  
+
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     TV3 prim = arg(TypeStruct.SELF);
     TV3 nclz = arg(TypeStruct.CLAZZ);

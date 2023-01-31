@@ -65,8 +65,10 @@ abstract public class TV3 implements Cloneable {
   // Makes a one-shot transition from true to false.
   boolean _is_copy;
 
-  // Can be nil
+  // Might be a nil (e.g. mixed in with a 0 or some unknown ptr)
   boolean _may_nil;
+  // Cannot NOT be a nil (e.g. used as ptr.fld)
+  boolean _use_nil;
   
   // Nodes to put on a worklist, if this TV3 is modified.
   UQNodes _deps;
@@ -83,6 +85,7 @@ abstract public class TV3 implements Cloneable {
     _errs = null;               // Errors lazily added
     _is_copy = is_copy;         // Most things are is_copy
     _may_nil = false;           // Really only TVNil starts out may_nil
+    _use_nil = false;
   }
   
   // True if this a set member not leader.  Asserted for in many places.
@@ -147,10 +150,7 @@ abstract public class TV3 implements Cloneable {
   private long dbl_uid(TV3 t) { return dbl_uid(t._uid); }
   private long dbl_uid(long uid) { return ((long)_uid<<32)|uid; }
 
-  TV3 strip_nil() {
-    _may_nil = false;
-    throw unimpl();
-  }
+  TV3 strip_nil() { _may_nil = false; return this; }
   
   // -----------------
   // U-F union; this becomes that; returns 'that'.
@@ -159,6 +159,9 @@ abstract public class TV3 implements Cloneable {
     assert !unified() && !that.unified(); // Cannot union twice
     if( this==that ) return false;
     that._is_copy &= _is_copy;  // Both must be is_copy to keep is_copy
+    that._may_nil |= _may_nil;
+    that._use_nil |= _use_nil;
+    if( that._may_nil && that._use_nil ) throw unimpl();
     _union_impl(that);          // Merge subclass specific bits
     this._deps_work_clear();    // This happens before the unification
     that._deps_work_clear();
@@ -399,7 +402,7 @@ abstract public class TV3 implements Cloneable {
   // Report back false if any error happens, or true if no error.
   // No change to either side, this is a trial only.
   private static final NonBlockingHashMapLong<TV3> TDUPS = new NonBlockingHashMapLong<>();
-  boolean trial_unify_ok(TV3 that, boolean extras) {
+  public boolean trial_unify_ok(TV3 that, boolean extras) {
     TDUPS.clear();
     return _trial_unify_ok(that, extras);
   }
@@ -413,11 +416,9 @@ abstract public class TV3 implements Cloneable {
     if( that instanceof TVLeaf ) return true; // No error
     // Nil can unify with ints,flts,ptrs
     if( this instanceof TVNil ) return this._trial_unify_ok_impl(that,extras);
-    if( that instanceof TVNil ) return that._trial_unify_ok_impl(this,extras);
-    
+    if( that instanceof TVNil ) return that._trial_unify_ok_impl(this,extras);    
     // Different classes always fail
-    if( getClass() != that.getClass() )
-      throw unimpl();
+    if( getClass() != that.getClass() ) return false;
     // Subclasses check sub-parts
     return _trial_unify_ok_impl(that, extras);
   }
@@ -498,7 +499,15 @@ abstract public class TV3 implements Cloneable {
     }
     throw unimpl();
   }
-  
+
+  // Convert a TV3 to a flow Type
+  static final NonBlockingHashMapLong<Type> ADUPS = new NonBlockingHashMapLong<>();
+  public Type as_flow( Node dep ) {
+    ADUPS.clear();
+    return _as_flow(dep);
+  }
+  abstract Type _as_flow( Node dep );
+
   // -----------------
   // Glorious Printing
 

@@ -1,5 +1,8 @@
 package com.cliffc.aa.tvar;
 
+import com.cliffc.aa.Env;
+import com.cliffc.aa.node.Node;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
@@ -25,14 +28,10 @@ public class TVLambda extends TV3 {
   public TV3 ret() { return arg(0); }
   public TV3 dsp() { return arg(DSP_IDX); }
   public int nargs() { return len(); }
+  
+  @Override int eidx() { return TVErr.XFUN; }
 
-  // Lambda as a whole
-  @Override TV3 strip_nil() {
-    _may_nil = false;
-    return this;
-  }
-
-  TV3 find_nil(TVNil nil) { return this; }
+  @Override TV3 find_nil(TVNil nil) { return this; }
 
   // -------------------------------------------------------------
   @Override void _union_impl( TV3 tv3) {
@@ -63,8 +62,19 @@ public class TVLambda extends TV3 {
     return true;                // Unify will work
   }
 
-  @Override int eidx() { return TVErr.XFUN; }
-
+  // -------------------------------------------------------------
+  @Override Type _as_flow( Node dep ) {
+    // All escaping fidxs may match here.
+    BitsFun fidxs = Env.ROOT.matching_escaped_fidxs(this,dep);
+    if( _may_nil ) fidxs = fidxs.set(0);
+    if( _use_nil ) throw unimpl();
+    Type tfun = ADUPS.get(_uid);
+    if( tfun != null ) return tfun;  // TODO: Returning recursive flow-type functions
+    ADUPS.put(_uid, TypeNil.XSCALAR);
+    Type rez = ret()._as_flow(dep);
+    return TypeFunPtr.makex(false,fidxs,nargs(),Type.ANY,rez);
+  }
+  
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     sb.p("{ ");
     for( int i=1; i<_args.length; i++ )

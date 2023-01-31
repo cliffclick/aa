@@ -140,10 +140,11 @@ public class CallNode extends Node {
   static Type    tctl( TypeTuple tcall ) { return targ(tcall,CTL_IDX); }
   static TypeMem emem( TypeTuple tcall ) { return emem(tcall._ts); }
   static TypeMem emem( Type[] ts ) { return (TypeMem)ts[MEM_IDX]; } // callee memory passed into function
+  static Type    tesc( TypeTuple tcall ) { return targ(tcall,tcall.len()-1); }
   // No-check must-be-correct get TFP
   static public TypeFunPtr ttfp( Type t ) {
     return (TypeFunPtr)((t instanceof TypeTuple tcall)
-                        ? tcall._ts[tcall.len()-1]
+                        ? tcall._ts[tcall.len()-2]
                         : t.oob(TypeFunPtr.GENERIC_FUNPTR));
   }
   TypeTuple set_ttfp(TypeFunPtr tfp) {
@@ -275,7 +276,7 @@ public class CallNode extends Node {
   @Override public Type value() {
     if( _is_copy ) return _val; // Freeze until unwind
     // Result type includes a type-per-input, plus one for the function
-    final Type[] ts = Types.get(_defs._len);
+    final Type[] ts = Types.get(_defs._len+1);
     ts[CTL_IDX] = ctl()._val;
     // Not a memory to the call?
     Type mem = mem()==null ? TypeMem.ANYMEM : mem()._val;
@@ -290,6 +291,14 @@ public class CallNode extends Node {
     for( int i=DSP_IDX; i<nargs(); i++ )
       ts[i] = arg(i)==null ? TypeNil.XSCALAR : arg(i)._val;
     ts[_defs._len-1] = tfx;
+
+    // Collect local escaping arguments
+    RootNode.escapes_reset();
+    for( int i=DSP_IDX; i<nargs(); i++ )
+      RootNode.escapes(val(i),tmem);
+    BitsAlias extas = RootNode.EXT_ALIASES;
+    ts[_defs._len] = TypeMemPtr.make(false,false,extas,TypeStruct.UNUSED);
+    
     return TypeTuple.make(ts);
   }
 

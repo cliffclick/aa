@@ -1,5 +1,7 @@
 package com.cliffc.aa.tvar;
 
+import com.cliffc.aa.node.Node;
+import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeNil;
 import com.cliffc.aa.type.TypeStruct;
 import com.cliffc.aa.util.SB;
@@ -17,8 +19,10 @@ import static com.cliffc.aa.AA.unimpl;
  */
 public class TVNil extends TV3 {
   
-  public TVNil( TV3 tv3 ) { super(true,tv3); }
+  public TVNil( TV3 tv3 ) { super(true,tv3); _may_nil = true; }
   public TVLeaf not_nil() { return (TVLeaf)arg(0); }
+
+  @Override int eidx() { throw unimpl(); }
   
   // -------------------------------------------------------------
   @Override void _union_impl(TV3 that) { }
@@ -88,8 +92,8 @@ public class TVNil extends TV3 {
   }
   
   // -------------------------------------------------------------
-  @Override int eidx() { throw unimpl(); }
-
+  @Override Type _as_flow( Node dep ) { throw unimpl(); }
+  
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     return _args[0]._str(sb,visit,dups,debug).p('?');
   }  

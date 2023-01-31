@@ -6,6 +6,7 @@ import com.cliffc.aa.type.Type;
 import com.cliffc.aa.tvar.Resolvable;
 import com.cliffc.aa.tvar.TVField;
 import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.NonBlockingHashMapLong;
 
 /** Combined Global Constant Propagation and Hindly-Milner with extensions.
 
@@ -207,7 +208,16 @@ public abstract class Combo {
       if( fld.is_resolving() )
         fld.resolve_failed();
   }
-  private static void add_freeze_work()   { }
+
+  private static final NonBlockingHashMapLong<Node> FREEZE_WORK = new NonBlockingHashMapLong<>();
+  public static void add_freeze_dep( Node dep ) {
+    FREEZE_WORK.put(dep._uid,dep);
+  }
+  private static void add_freeze_work()   {
+    for( Node dep : FREEZE_WORK.values() )
+      dep.add_flow();
+    FREEZE_WORK.clear();
+  }
   
   static void reset() { HM_NEW_LEAF = HM_AMBI = HM_FREEZE=false; }
 }

@@ -396,6 +396,22 @@ map ={fun parg -> (fun (cdr parg))};
         "[17,18,19]","[39]" );
   }
 
+  // Funny test cases checking out how AA handles the difference between
+  // "forall A: [{A->A}]" vs "[forall A:{A->A}]".
+  @Test public void c_composition_err_01() {
+    run( "{ g -> (if (g 1) (g \"abc\") (g \"def\") ) }",
+         "{{[Cannot unify 1 and *str:(nint8)] -> A } -> A }",
+         "[30]{any,3 -> Scalar }");
+  }
+
+  // Another variant; notice the broken error report; the argument
+  // in "{ -> A }" is missing.
+  @Test public void c_composition_err_02() {
+    run( "f = { x->x }; g = (f f); (pair (g (rand 99)) (\"abc\"))",
+         "*(3,A:[Cannot unify { -> A } and *str:(97)])",
+         "*[17](_, Scalar, Scalar)");
+  }
+
 
   // Basic structure test
   @Test public void d_struct_00() {

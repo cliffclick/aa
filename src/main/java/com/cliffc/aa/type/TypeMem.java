@@ -404,11 +404,7 @@ public class TypeMem extends Type<TypeMem> {
     return sharp;               // return new not old
   }
   // Sharpen if a maybe-pointer
-  @Override public Type sharptr( Type ptr ) {
-    return ptr instanceof TypeMemPtr tmp ? sharpen(tmp) :
-      (ptr instanceof TypeTuple tt ? tt.sharptr(this) : ptr);
-  }
-
+  @Override public Type sharptr( Type ptr ) { return ptr.sharptr2(this); }
 
   // Pass 1:  fill "dull" cache
   //   Check "dull" & "sharp" cache for hit; if so return.

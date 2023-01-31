@@ -1,5 +1,9 @@
 package com.cliffc.aa.tvar;
 
+import com.cliffc.aa.Combo;
+import com.cliffc.aa.node.Node;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeNil;
 import com.cliffc.aa.util.Ary;
 
 import static com.cliffc.aa.AA.unimpl;
@@ -28,8 +32,12 @@ public class TVLeaf extends TV3 {
     assert _delay_fresh_deps.len()<=10; // Switch to worklist format
     return that;
   }
-  
-  TV3 find_nil(TVNil nil) { return nil; }
+
+  // Leafs never show up in errors
+  @Override int eidx() { throw unimpl(); }
+
+  // No improvement, return the not-nil leader
+  @Override TV3 find_nil(TVNil nil) { return nil; }
 
   // -------------------------------------------------------------
   @Override boolean _unify_impl(TV3 that ) {
@@ -57,6 +65,8 @@ public class TVLeaf extends TV3 {
   @Override boolean _trial_unify_ok_impl( TV3 tv3, boolean extras ) { return true; }
 
   // -------------------------------------------------------------
-  @Override int eidx() { throw unimpl(); }
-
+  @Override Type _as_flow( Node dep ) {
+    Combo.add_freeze_dep(dep);
+    return TypeNil.SCALAR.oob(!Combo.HM_FREEZE);
+  }  
 }

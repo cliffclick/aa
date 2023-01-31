@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
+import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import org.jetbrains.annotations.NotNull;
@@ -15,6 +16,28 @@ public class CastNode extends Node {
     Env.GVN.add_dom(this);
   }
   @Override public String xstr() { return "("+_t+")"; }
+
+  @Override public Type value() {
+    Type c = val(0);
+    if( c != Type.CTRL ) return c.oob();
+    Type t = val(1);
+
+    // If the cast is in-error, we cannot lift.
+    Node n1 = in(1);
+    if( n1 instanceof FreshNode frs ) n1 = frs.id();
+    // No-Op, should remove shortly
+    if( n1._val instanceof TypeStruct )
+      return n1._val;    
+    if( !checked(in(0),n1) ) return t;
+      // Pin t between cast
+      //return t.meet(_t.dual()).join(_t);
+    // Lift result.
+    return _t.join(t);
+  }
+
+  @Override public Type live_use(Node def ) {
+    return def==in(0) ? Type.ALL : _live;
+  }
 
   @Override public Node ideal_reduce() {
     Node cc = in(0).is_copy(0);
@@ -48,32 +71,17 @@ public class CastNode extends Node {
     return this;
   }
 
-  @Override public Type value() {
-    Type c = val(0);
-    if( c != Type.CTRL ) return c.oob();
-    Type t = val(1);
-
-    // If the cast is in-error, we cannot lift.
-    Node n1 = in(1);
-    if( n1 instanceof FreshNode frs ) n1 = frs.id();
-    // No-Op, should remove shortly
-    if( n1._val instanceof TypeStruct )
-      return n1._val;    
-    if( !checked(in(0),n1) ) return t;
-    // Lift result.
-    return _t.join(t);
-  }
-
-  @Override public Type live_use(Node def ) {
-    return def==in(0) ? Type.ALL : _live;
-  }
-
   @Override public boolean has_tvar() { return true; }
 
   // Unifies the input to '(Nil ?:self)'
   @Override public boolean unify( boolean test ) {
     TV3 maynil = tvar(1); // arg in HM
     TV3 notnil = tvar();  // ret in HM
+
+    // Cast-notnil vs Cast-other
+    
+
+    
     // If the maynil is already nil-checked, can be a nilable of a nilable.
     // If the cast is already satisfied, then no change
     if( maynil==notnil ) return false;
@@ -118,9 +126,14 @@ public class CastNode extends Node {
     return nnn;
   }
 
+  @Override public ErrMsg err( boolean fast ) {
+    if( val(0)==Type.XCTRL || val(1).isa(_t) ) return null;
+    return fast ? ErrMsg.FAST : ErrMsg.typerr(null,val(1),_t);
+  }
+  
   private boolean checked( Node n, Node addr ) {
     // Cast up for a typed Parm; always apply
-    if( TypeNil.XNIL.isa(_t) ) return true;
+    //if( TypeNil.XNIL.isa(_t) ) return true;
     // Cast-away-nil at a IfNode
     if( !(n instanceof CProjNode cpj && cpj._idx==1) ) return false; // Not a Cast of a CProj-True
     Node n0 = n.in(0);

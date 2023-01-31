@@ -1,5 +1,65 @@
 =======================================
-1/11/2023
+1/25/2023
+
+What is the type of { x -> 1+x } ?
+Its an overload type with a pending resolve:
+   : ( { 1 int -> int }, { 1 flt -> flt } )._
+Notice the trailing resolve: "._"   
+Notice the add functions are already bound.
+
+What is the type of { x -> x+1 } ?
+Its a little more generic:
+  : A:@{ clz = @{ _+_ = ( { A 1 -> B } ) } }
+Notice its a normal clz-based overload, this SHOULD unify with int/flt just fine.
+Notice it works with any overloaded _+_ operator.
+
+What is the type of { x y -> x+y } ?
+  : A:@{ clz = @{ _+_ = ( { A B -> C }* ... ) } }
+Notice the 2nd argument can have many choices.... so
+Notice the '* ...' which means we can clone the display and nargs, but there
+can be any number of other choices.  Similar to an open struct, except all
+the functions added are limited to nargs and display.
+
+
+
+
+I can imagine allowing any function types in an overload, as long as uses are unambiguous.
+TV types add a bind-to-an-overload, which awaits resolution; basically a pair of display & lambda-choices.
+TV types add a 'resolve field' instead of doing it in the Field.unify.  Works thru the above Bind.
+
+So now:
+
+{ x -> 1+x } :  ( { 1 int -> int }, { 1 flt -> flt } )._
+{ x -> x+1 } :  ( bind A A:@{ clz = @{ _+_ = ( { A B -> C }... )._ } } )
+
+
+
+=======================================
+1/22/2023
+
+Final resolution
+- Fields have a clz flag
+- - non-clz Fields load as normal from Structs
+- - clz Fields find the Env.PROTOS("clz") and load from there, but require the
+    input to type as a specific class first.  Once determined an edge is added
+    to verify nothing changes, and to help the incremental Combo.
+- Binds have an over flag
+- - non-over Binds expect a TFP and a display, and bind.  The TFP must not be
+    bound already.  The display can go dead, and the Bind becomes a no-op.
+    Bind also handles non-TFPs as a no-op.    
+- - over Binds expect an overload (simple tuple), and Binds to all the
+    functions in the tuple as a normal Bind above.  All the functions are
+    required to have the same arity (and after Bind, the same display).
+
+- Normal operator calls use a clz Field, then a overload Field, and call
+  with the loaded function.  No bind is required.
+- Normal Field loads do not bind, and cannot load an unbound TFP.
+- Explicit Oper field loads DO over-Bind.
+
+- Anonymous functions early-bind to the current display.
+
+
+======================================= 1/11/2023
 
 Late-Bind vs Early-Bind
 -----------------------

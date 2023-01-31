@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV3;
@@ -8,6 +7,7 @@ import com.cliffc.aa.tvar.TVLambda;
 import com.cliffc.aa.tvar.TVLeaf;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFunPtr;
+import com.cliffc.aa.type.TypeNil;
 
 // Strip out the display argument from a bound function.
 // Inverse of BindFP.
@@ -18,8 +18,9 @@ public class FP2DSPNode extends Node {
 
   Node fp() { return in(0); }
   @Override public Type value() {
-    if( !(fp()._val instanceof TypeFunPtr tfp) ) return fp()._val.oob();
-    return tfp.dsp();
+    Type fpt = fp()._val;
+    if( fpt == Type.ANY || fpt == Type.ALL ) return fpt;
+    return (fpt instanceof TypeFunPtr tfp) ? tfp.dsp() : fpt.oob(TypeNil.SCALAR);
   }
   
   @Override public boolean has_tvar() { return true; }

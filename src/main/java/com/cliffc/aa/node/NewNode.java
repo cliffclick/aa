@@ -5,7 +5,11 @@ import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVLeaf;
 import com.cliffc.aa.tvar.TVPtr;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
+
+import static com.cliffc.aa.AA.unimpl;
+
 
 // Allocates memory for the input
 //
@@ -29,7 +33,8 @@ public class NewNode extends Node {
   public NewNode( int alias ) {
     super(OP_NEW);
     _reset0_alias = alias;       // Allow a reset, if this alias splits and then we want to run a new test
-    set_alias( alias);
+    set_alias(alias);
+    NEWS.setX(alias,this);
   }
   public NewNode( ) { this(BitsAlias.new_alias()); }
 
@@ -77,10 +82,19 @@ public class NewNode extends Node {
     return nnn;
   }
 
-
   @Override public int hashCode() { return super.hashCode()+ _alias; }
   // Only ever equal to self, because of unique _alias.  We can collapse equal
   // NewNodes and join alias classes, but this is not the normal CSE and so is
   // not done by default.
   @Override public boolean equals(Object o) {  return this==o; }
+
+  private static Ary<NewNode> NEWS = new Ary<>(new NewNode[]{null,});
+  public static void reset_to_init0() { NEWS.clear(); }
+  public static NewNode get( int alias ) {
+    NewNode nnn = NEWS.atX(alias);
+    if( nnn==null ) return null;
+    if( nnn._alias==alias ) return nnn;
+    // Split and renumbered in FunNode inline, fixup in NEWS
+    throw unimpl();
+  }
 }

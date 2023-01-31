@@ -1,5 +1,6 @@
 package com.cliffc.aa.tvar;
 
+import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
@@ -15,6 +16,24 @@ public class TVBase extends TV3 {
   }
   public static TV3 make( boolean is_copy, Type t) {
     return t==Type.ALL ? new TVLeaf(is_copy) : new TVBase(is_copy,t);
+  }
+
+  @Override int eidx() {
+    if( _t instanceof TypeInt ) return TVErr.XINT;
+    if( _t instanceof TypeFlt ) return TVErr.XFLT;
+    throw unimpl(); // 
+  }
+
+  @Override TV3 strip_nil() {
+    _t = _t.join(TypeNil.NSCALR);
+    _may_nil = false;
+    return this;
+  }
+
+  // Convert the leader nil into a base+XNIL, widened if the leader is not a
+  // copy.
+  @Override TV3 find_nil( TVNil nil ) {
+    throw unimpl();
   }
   
   // -------------------------------------------------------------
@@ -41,19 +60,8 @@ public class TVBase extends TV3 {
     // Unifies OK if bases will unify, e.g. both ints or both floats
     return _t.getClass() == that._t.getClass();
   }
-
-  @Override int eidx() {
-    if( _t instanceof TypeInt ) return TVErr.XINT;
-    if( _t instanceof TypeFlt ) return TVErr.XFLT;
-    throw unimpl(); // 
-  }
-
-  TV3 strip_nil() {
-    _t = _t.join(TypeNil.NSCALR);
-    _may_nil = false;
-    return this;
-  }
-
   
+  // -------------------------------------------------------------
+  @Override Type _as_flow( Node dep ) { return _t; }  
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) { return sb.p(_t); }  
 }

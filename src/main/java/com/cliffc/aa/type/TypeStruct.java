@@ -794,7 +794,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     for( int i=0; i<_flds.length; i++ )
       flds[i] = _flds[i]._access==Access.Final
         ? _flds[i]
-        : _flds[i].make_from(ALL, Access.bot());
+        : _flds[i].make_from(TypeNil.SCALAR, Access.bot());
     return make_from(flds);
   }
   

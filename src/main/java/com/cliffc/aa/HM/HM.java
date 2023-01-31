@@ -2355,12 +2355,6 @@ public class HM {
 
     // True if any portion allows for nil
     boolean has_nil() { return _may_nil; }
-    // Add nil
-    void add_nil() {
-      if( _tflow!=null ) _tflow = _tflow.meet(TypeNil.XNIL);
-      if( _eflow!=null ) _eflow = _eflow.meet(TypeNil.XNIL);
-      _may_nil = true;
-    }
     // Strip off nil
     T2 strip_nil() {
       if( _tflow!=null ) _tflow = _tflow.join(TypeNil.NSCALR);

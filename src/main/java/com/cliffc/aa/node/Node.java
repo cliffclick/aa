@@ -533,6 +533,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   public void add_flow_defs() { Env.GVN.add_flow_defs(this); }
   public void add_flow_uses() { Env.GVN.add_flow_uses(this); }
   public Node add_flow     () { return Env.GVN.add_flow(this); }
+  public void add_reduce_uses() { Env.GVN.add_reduce_uses(this); }
 
   // Unifies this Node with others; Call/CallEpi with Fun/Parm/Ret.  NewNodes &
   // Load/Stores, etc.  Returns true if progressed, and puts neighbors back on
@@ -604,8 +605,10 @@ public abstract class Node implements Cloneable, IntSupplier {
     Node nnn = _do_reduce();
     if( nnn!=null ) {           // Something happened
       add_flow_uses();          // Users of change should recheck
-      if( nnn!=this )           // Replacement
+      if( nnn!=this ) {         // Replacement
+        add_reduce_uses();      // New chances for V-N
         subsume(nnn);           // Replace
+      }
       return nnn._elock();      // After putting in VALS
     }
     // No progress; put in VALS and return no-change
@@ -697,8 +700,11 @@ public abstract class Node implements Cloneable, IntSupplier {
         (this instanceof StructNode st && !st.is_closed()) || // Struct is in-progress
         is_prim() )                 // Never touch a Primitive
       return false; // Already a constant, or never touch an ErrNode
-    if( t instanceof TypeFunPtr tfp && tfp.dsp()!=Type.ANY )
-      return false; // Even if whole TFP is a constant, need to construct with display
+    if( t instanceof TypeFunPtr tfp ) {
+      if( tfp.dsp()!=Type.ANY ) return false; // Even if whole TFP is a constant, need to construct with display
+      // External fidxs are never constants
+      if( BitsFun.EXT.test_recur(tfp.fidx()) )  return false;
+    }    
     return true;
   }
 

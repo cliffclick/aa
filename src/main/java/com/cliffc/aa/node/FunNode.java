@@ -80,7 +80,7 @@ public class FunNode extends RegionNode {
   // Shared common constructor for Named type constructors
   FunNode(String name, int nargs ) { this(name, BitsFun.new_fidx(), nargs); }
   // Shared common constructor
-  private FunNode( String name, int fidx, int nargs ) {
+  FunNode( String name, int fidx, int nargs ) {
     super(OP_FUN);
     _name = name;
     _fidx = fidx;

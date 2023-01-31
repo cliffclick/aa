@@ -1,7 +1,9 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeFunPtr;
 
 import static com.cliffc.aa.AA.*;
 
@@ -24,6 +26,26 @@ public class AssertNode extends Node {
   @Override public String xstr() { return "assert:"+_t; }
   Node mem() { return in(MEM_IDX); }
   Node arg() { return in(REZ_IDX); }
+
+  @Override public Type value() {
+    Node arg = arg();
+    Type t1 = arg._val;
+    Type t0 = _t.simple_ptr();
+    if( t1.isa(t0) ) {
+      Type actual = arg.sharptr(mem());
+      if( actual.isa(_t) )
+        return t1;
+    }
+    // Value is capped to the assert value.
+    return t1.oob(t0);
+  }
+
+  @Override public Type live_use(Node def ) {
+    if( def==arg() ) return _live;                   // Alive as I am
+    // Alive (like normal liveness), plus the address, plus whatever can be
+    // reached from the address.
+    return ScopeNode.compute_live_mem(null,mem(),arg());
+  }
 
   @Override public Node ideal_reduce() {
     Type actual = arg().sharptr(mem());
@@ -87,27 +109,13 @@ public class AssertNode extends Node {
     return null;
   }
 
-  @Override public Type value() {
-    Node arg = arg();
-    Type t1 = arg._val;
-    Type t0 = _t.simple_ptr();
-    if( t1.isa(t0) ) {
-      Type actual = arg.sharptr(mem());
-      if( actual.isa(_t) )
-        return t1;
-    }
-    // Value is capped to the assert value.
-    return t1.oob(t0);
+  @Override public boolean has_tvar() { return true; }
+  @Override public TV3 _set_tvar() {
+    TV3 tv3 = TV3.from_flow(_t);
+    arg().set_tvar().unify(tv3,false);
+    return tv3;
   }
-
-  @Override public Type live_use(Node def ) {
-    if( def==arg() ) return _live;                   // Alive as I am
-    // Alive (like normal liveness), plus the address, plus whatever can be
-    // reached from the address.
-    return ScopeNode.compute_live_mem(null,mem(),arg());
-  }
-
-  @Override public boolean has_tvar() { return false; }
+  
 
   // Check TypeNode for being in-error
   @Override public ErrMsg err( boolean fast ) {

@@ -125,7 +125,7 @@ public class FieldNode extends Node implements Resolvable {
     case TypeFlt tf -> PrimNode.ZFLT;
     case TypeStruct ts -> Env.PROTOS.get(ts._clz);  // CLZ from instance
     // TODO: XNIL uses the INT clazz.
-    case TypeNil xnil -> xnil.isa(TypeNil.XNIL) ? PrimNode.ZINT : null;
+    case TypeNil xnil -> xnil==TypeNil.XNIL ? PrimNode.ZINT : null;
     // Other, like SCALAR, does not have a known CLZ
     default -> null;
     };

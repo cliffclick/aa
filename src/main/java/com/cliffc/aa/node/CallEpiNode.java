@@ -221,6 +221,7 @@ public final class CallEpiNode extends Node {
     for( int fidx : tfp.fidxs() ) { // For all fidxs
       if( BitsFun.is_parent(fidx) ) continue; // Do not wire parents, as they will eventually settle out
       RetNode ret = RetNode.get(fidx);        // Lookup, even if not wired
+      if( ret==null ) continue;               // Dead or RootNode.EXT_FIDX
       if( _defs.find(ret) != -1 ) continue;   // Wired already
       FunNode fun = ret.fun();
       if( !CEProjNode.wired_arg_check(tcall,fun) ) continue; // Args fail basic sanity
@@ -295,8 +296,13 @@ public final class CallEpiNode extends Node {
 
     // If above_center (not resolved) or not all wired, can bail conservative
     BitsFun fidxs = tfptr.fidxs();
-    if( fidxs.above_center() || !is_all_wired() )
-      return tfptr.oob(TypeTuple.CALLE);
+    if( fidxs.above_center() ) return TypeTuple.CALLE.dual();
+    if(  !is_all_wired() ) {    // Unknown callers?
+      // Unknown callers call everything, touch everything.  Use Root memory.
+      TypeMem rmem = Env.ROOT.rmem();
+      Type cmem = CallNode.emem(tcall);
+      return tfptr.oob(TypeTuple.make(Type.CTRL,rmem.meet(cmem),TypeNil.SCALAR));
+    }
 
     // Compute call-return value from all callee returns
     Type trez = Type.ANY;

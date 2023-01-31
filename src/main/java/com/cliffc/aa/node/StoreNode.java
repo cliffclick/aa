@@ -27,7 +27,7 @@ public class StoreNode extends Node {
     Node mem = mem(), adr = adr(), rez = rez();
     Type tmem = mem._val;
     Type tadr = adr._val;
-    Type tval = rez._val;  // Value
+    Type tval = rez==null ? Type.ANY : rez._val;  // Value
     if( !(tmem instanceof TypeMem    tm ) ) return tmem .oob(TypeMem.ALLMEM);
     if( !(tadr instanceof TypeMemPtr tmp) ) return tadr .oob(TypeMem.ALLMEM);
     TypeStruct tvs = tval instanceof TypeStruct ? (TypeStruct)tval : tval.oob(TypeStruct.ISUSED);
@@ -78,13 +78,14 @@ public class StoreNode extends Node {
     // Is this Store dead from below?
     if( mem==this ) return null; // Dead self-cycle
     if( tmp!=null && mem._val instanceof TypeMem ) {
-      if( tmp.above_center() )
+      if( tmp.above_center() ) {
         if( mem._val == _val ) return mem; // Address is high, and memory is unchanged; we can be ignored
-        else {
-          mem.deps_add(this);   // Input address changes, check reduce
-          deps_add(this);       // Our   address changes, check reduce
-        }
-
+        // Kill what is being stored; now its dead
+        if( rez() != null )
+          return set_def(3,null);
+        mem.deps_add(this);   // Input address changes, check reduce
+        deps_add(this);       // Our   address changes, check reduce
+      }
       TypeStruct ts0 = (_live instanceof TypeMem tm ? tm : _live.oob(TypeMem.ALLMEM)).ld(tmp);
       if( ts0.above_center() )  // Dead from below
         return mem;

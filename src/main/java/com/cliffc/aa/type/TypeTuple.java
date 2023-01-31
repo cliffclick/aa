@@ -170,10 +170,10 @@ public class TypeTuple extends Type<TypeTuple> {
     for( Type _t : _ts ) if( !_t.is_con() ) return false;
     return true;
   }
-  public TypeTuple sharptr( TypeMem mem ) {
+  @Override public TypeTuple sharptr2( TypeMem mem ) {
     Type[] ts = Types.clone(_ts);
     for( int i=0; i<ts.length; i++ )
-      ts[i] = mem.sharptr(ts[i]);
+      ts[i] = ts[i].sharptr2(mem);
     return make0(_any,ts);
   }
   @Override public Type simple_ptr() {

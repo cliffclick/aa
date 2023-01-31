@@ -1,5 +1,6 @@
 package com.cliffc.aa.tvar;
 
+import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeStruct;
 import com.cliffc.aa.util.SB;
@@ -24,6 +25,7 @@ public class TVErr extends TV3 {
   @Override public TVLambda as_lambda() { return (TVLambda)arg(XFUN); }
 
   public void set_struct( TVStruct st ) { assert _args[XSTR]==null; _args[XSTR] = st; }
+  @Override int eidx() { throw unimpl(); }
   
   // This is Fresh, that is TVErr and missing index i.
   // Fresh copy LHS into RHS.
@@ -80,8 +82,8 @@ public class TVErr extends TV3 {
   }
   
   // -------------------------------------------------------------
-  @Override int eidx() { throw unimpl(); }
-
+  @Override Type _as_flow( Node dep ) { throw unimpl(); }
+  
   // Defining type, vs failed unification
   public String toString(Type tdef) {
     if( tdef instanceof TypeStruct ts && _args[XFUN]!=null )

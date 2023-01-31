@@ -30,7 +30,20 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    _test2("x=3; addx={y -> x+y}; addx(2)", "int:5","int:5","int:5","int:5",null,null,"Unable to resolve _+_",-1); // must inline to resolve overload {+}:Int
+    testerr("{x:flt y -> x+y}", "Ambiguous, unable to resolve { flt64 flt64 -> flt64 } and { flt64 int64 -> flt64 }",13); // {Scalar Scalar -> Scalar}
+
+    // Here, I expect the type of `int._+_` to be something like:
+    //     int:@{ _+_= &[ { int int -> int }, { int flt -> flt}]; ...other int opers... }
+    // And the type of `andx` to be something like:
+    //     { &[int, flt] -> &[int, flt] }
+    // The problem is: how far do i let the Overloads propagate before I demand a resolution?
+    // When I call `andx(2)` I am basically seeing unification of `2` and
+    // `&[int,flt]` and I want to resolve the Overload.
+    
+    //_test2("x=3; addx={y -> x+y}; addx(2)", "int:5","int:5","int:5","int:5",null,null,"Unable to resolve _+_",-1); // must inline to resolve overload {+}:Int
+    // Here, I expect the type to be something like:
+    // { X:@{ _+_= &[ { X Y -> A }, ...], ... } &[Y, ...] -> &[A, ...] }
+    //test("{ x y -> x+y}", "","");
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -48,6 +61,26 @@ public class TestParse {
     org.junit.Assert.assertEquals(x,y);
   }
 
+  // Some HM related type tests
+  @Test public void testParse99() {
+    test("1", "1", "1");
+    // Simple primitive expansion, pre-combo
+    test("1+2", "3", "3");
+    // Big enough that the primitives do not all inline before Combo, so Combo
+    // has to deal with primitive expansions.
+    test("1+2 * 3+4 *5", "27", "27");
+    // Simple no-arg anonymous function, being called
+    test("{5}()", "5", "5");
+    // TestParse.a_basic_01
+    test("{ x -> ( 3, x )}", "[54]{any,4 -> *[11](3, Scalar) }", "{ A B -> *(3, B) }", null, null, "[11]", "[54]");
+    // TestParse.a_basic_02
+    test("{ z -> ((z 0), (z \"abc\")) }", "[54]{any,4 -> *[12](Scalar,Scalar) }", "{A {B *(97)? -> C } -> *(C,C) }", null, null, "[12]", "[54]" );
+
+    // error, missing a comma
+    testerr("{ x -> ( 3 x )}", "A function is being called, but 3 is not a function",11);
+
+  }
+  
   @Test public void testParse00() {
     test("1", "1", "1");
     // Unary operator

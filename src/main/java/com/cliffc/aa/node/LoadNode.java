@@ -78,7 +78,7 @@ public class LoadNode extends Node {
     if( !(tadr instanceof TypeMemPtr tmp) ) return null;
     if( adr instanceof FreshNode frsh ) adr = frsh.id();
     // If we can find an exact previous store, fold immediately to the value.
-    Node ps = find_previous_struct(mem(),adr,tmp._aliases);
+    Node ps = find_previous_struct(this, mem(),adr,tmp._aliases);
     if( ps!=null ) {
       if( ps instanceof StoreNode st ) {
         Node rez = st.rez();
@@ -134,7 +134,7 @@ public class LoadNode extends Node {
 
   // Find a matching prior Store - matching address.
   // Returns null if highest available memory does not match address.
-  static Node find_previous_struct(Node mem, Node adr, BitsAlias aliases ) {
+  static Node find_previous_struct(Node ldst, Node mem, Node adr, BitsAlias aliases ) {
     if( mem==null ) return null;
     // Walk up the memory chain looking for an exact matching Store or New
     int cnt=0;
@@ -161,10 +161,24 @@ public class LoadNode extends Node {
       } else if( mem instanceof MProjNode ) {
         Node mem0 = mem.in(0);
         switch( mem0 ) {
-        case CallEpiNode  node -> { return null; } // TODO: Bypass entire function call
         case MemSplitNode node -> mem = node.mem(); // Lifting out of a split/join region
         case CallNode     node -> mem = node.mem(); // Lifting out of a Call
         case RootNode     node -> { return null; }
+        case CallEpiNode  node -> {
+          CallNode call = node.call();
+          TypeTuple tcall = (TypeTuple)call._val;
+          TypeMemPtr tesc = (TypeMemPtr)CallNode.tesc(tcall);
+          BitsAlias esc_aliases = tesc._aliases;
+          if( aliases.overlaps(esc_aliases) )
+            return null;
+          // Cannot track call-modified set (unless e.g. call is_all_wired and
+          // is pure) without Root escapes.
+          if( Env.ROOT._val == TypeTuple.ROOT ) {
+            Env.ROOT.deps_add(ldst);
+            return null;
+          }
+          mem = call.mem();
+        } 
 
         case null, default -> throw unimpl(); // decide cannot be equal, and advance, or maybe-equal and return null
         }

@@ -478,7 +478,7 @@ public class Parse implements Comparable<Parse> {
     Node ifex = init(new IfNode(ctrl(),expr));
     int ifex_x = ifex.push();   // Keep until parse false-side
     set_ctrl(gvn(new CProjNode(ifex,1))); // Control for true branch
-    Node t_exp = stmt(false);               // Parse true expression
+    Node t_exp = stmt(false);             // Parse true expression
     if( t_exp == null ) t_exp = err_ctrl2("missing expr after '?'");
     ifex      = Node.pop(ifex_x);
     Node omem = Node.pop(omem_x); // Unstack the two
@@ -543,7 +543,9 @@ public class Parse implements Comparable<Parse> {
         _x = oldx;  _lastNWS = old_last;
         return err_ctrl2("Lisp-like function application split between lines "+line_last+" and "+line_now+", but must be on the same line; possible missing semicolon?");
       }
-      expr = do_call(errMsgs(oldx,oldx),args(Node.pop(eidx),arg)); // Pass the 1 arg
+      int aidx = arg.push();
+      Node dsp = gvn(new FP2DSPNode(Node.peek(eidx),null));
+      expr = do_call0(false,errMsgs(oldx,oldx),args(dsp,Node.pop(aidx),Node.pop(eidx))); // Pass the 1 arg
     }
   }
 
@@ -952,11 +954,16 @@ public class Parse implements Comparable<Parse> {
   /** Parse a tuple; first stmt but not the ',' parsed.
    *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
    */
-  private StructNode tuple(int oldx, Node s, int first_arg_start) {
+  private Node tuple(int oldx, Node s, int first_arg_start) {
     // First stmt is parsed already
     StructNode nn = new StructNode(false,false,errMsg(oldx), "", Type.ALL).init();
     Parse bad = errMsg(first_arg_start);
-    return _tuple(oldx,s,bad,nn);
+    StructNode sn = _tuple(oldx,s,bad,nn);
+    Node ptr = gvn(new NewNode());
+    int pidx = ptr.push();
+    Node mem = gvn(new StoreNode(mem(),ptr,sn,bad));
+    set_mem(mem);
+    return Node.pop(pidx);
   }
   private StructNode _tuple(int oldx, Node s, Parse bad, StructNode nn) {
     while( s!= null ) {         // More args
@@ -994,7 +1001,8 @@ public class Parse implements Comparable<Parse> {
       _e = e._par;                    // Pop nested environment
       pidx = stk.push();              // A pointer to the constructed object
     } // Pop lexical scope around struct
-    return Node.pop(pidx);
+    //return Node.pop(pidx);
+    throw unimpl(); // return ptr not struct
   }
 
   /** Parse an anonymous function; the opening '{' already parsed.  After the
@@ -1071,9 +1079,9 @@ public class Parse implements Comparable<Parse> {
       assert fun==_e._fun && fun==_e._scope.ctrl();
       for( int i=ARG_IDX; i<formals.len(); i++ ) { // User parms start
         TypeNil formal = (TypeNil)formals.at(i);
-        Node parm = gvn(new ParmNode(i,fun,errmsg,Type.ALL,con(formal)));
+        Node parm = gvn(new ParmNode(i,fun,errmsg,TypeNil.SCALAR,con(TypeNil.SCALAR)));
         if( formal!=TypeNil.SCALAR )
-          parm = gvn(new CastNode(fun,parm,formal));
+          parm = gvn(new AssertNode(mem,parm,formal,errmsg,e));
         frame.add_fld(ids.at(i),args_are_mutable,parm,bads.at(i));
       }
 
@@ -1220,9 +1228,14 @@ public class Parse implements Comparable<Parse> {
     }
     String str = new String(_buf,oldx,_x-oldx-1).intern();
     // Convert to ptr-to-constant-memory-string
-    //NewNode nnn = (NewNode)gvn( new NewStrNode.ConStr(str) );
-    //return gvn( new ProjNode(nnn,REZ_IDX));
-    throw unimpl();
+    Parse bad = errMsg(oldx);
+    StructNode scon = new StructNode(false,false,bad,"str:", Type.ALL);
+    scon.add_fld("0",Access.Final,con(TypeInt.con(str.charAt(0))),bad);
+    Node scon1 = gvn(scon.close());
+    Node ptr = new NewNode().init();
+    int nidx = ptr.push();
+    set_mem( gvn(new StoreNode(mem(),ptr,scon1,bad)) );
+    return Node.pop(nidx);
   }
 
   /*
