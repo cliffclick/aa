@@ -200,7 +200,7 @@ public abstract class Combo {
       }
       
       // Very expensive assert: everything that can make progress is on worklist
-      assert Env.ROOT.more_work(false)==0;
+      //assert Env.ROOT.more_work(false)==0;
     }
     return cnt;
   }

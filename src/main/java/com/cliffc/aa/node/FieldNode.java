@@ -239,7 +239,7 @@ public class FieldNode extends Node implements Resolvable {
     // If struct is open, more fields might appear and cannot do a resolve.
     TV3 self = tvar();
     if( !str.is_open() ) {
-      if( trial_resolve(self, str, str, test) ) return true;
+      if( trial_resolve(true, self, str, str, test) ) return true;
       // No progress, try again if self changes
       if( !test ) self.deps_add_deep(this);
     }

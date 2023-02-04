@@ -39,12 +39,14 @@ public class RootNode extends Node {
   // Output value is:
   // [Ctrl, All_Mem_Minus_Dead, TypeRPC.ALL_CALL, escaped_fidxs, escaped_aliases,]
   @Override public TypeTuple value() {
+    // Conservative final result
+    Node rez = in(REZ_IDX);
+    if( rez==null )
+      return TypeTuple.ROOT;
+    Type trez = rez!=null ? rez._val : Type.ALL;
     // Conservative final memory
     Node mem = in(MEM_IDX);
     TypeMem tmem = mem!=null && mem._val instanceof TypeMem tmem0 ? tmem0 : TypeMem.ALLMEM;
-    // Conservative final result
-    Node rez = in(REZ_IDX);
-    Type trez = rez!=null ? rez._val : Type.ALL;
 
     // Reset for walking
     // Walk, finding escaped aliases and fidxs
@@ -98,11 +100,6 @@ public class RootNode extends Node {
   
   static void escapes(Type t, TypeMem tmem ) {
     if( VISIT.tset(t._uid) ) return;
-    if( t == Type.ALL ) {
-      // Escaping everything
-      EXT_ALIASES = BitsAlias.NALL;
-      EXT_FIDXS   = BitsFun  .NALL;
-    }
     if( t instanceof TypeMemPtr tmp ) {
       // Add to the set of escaped structures
       for( int alias : tmp._aliases ) {

@@ -132,6 +132,8 @@ public class GVNGCM {
   // Any time anything is on any worklist we can always conservatively iterate on it.
   // Empties the worklists, attempting to do every possible thing.
   void do_iter() {
+    // VERY EXPENSIVE ASSERT
+    //assert Env.ROOT == null || Env.ROOT.more_work(true) == 0; // Initial conditions are correct
     while( true ) {
       ITER_CNT++; assert ITER_CNT < 10000; // Catch infinite ideal-loops
       Node n, m;
@@ -169,7 +171,7 @@ public class GVNGCM {
       }
       if( !progress ) break;
     };
-    // Expensive assert
+    // VERY EXPENSIVE ASSERT
     //assert Env.ROOT.more_work(true)==0;
     //IDEAL_VISIT.clear();
     //assert !Env.ROOT.more_ideal(IDEAL_VISIT);

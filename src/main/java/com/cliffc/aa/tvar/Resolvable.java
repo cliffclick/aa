@@ -22,7 +22,7 @@ public interface Resolvable {
   // - 0  zero matching choices
   // - 1  exactly one choice; resolvable (and resolved if not testing)
   // - 2+ two or more choices; resolve is ambiguous
-  default boolean trial_resolve( TV3 pattern, TVStruct lhs, TVStruct rhs, boolean test ) {
+  default boolean trial_resolve( boolean outie, TV3 pattern, TVStruct lhs, TVStruct rhs, boolean test ) {
     assert !rhs.is_open() && is_resolving();
 
     // Not yet resolved.  See if there is exactly 1 choice.
@@ -47,7 +47,10 @@ public interface Resolvable {
       assert old;               // Expect an unresolved label
       //lhs.add_fld(lab,pattern); // Add label and pattern, basically replace unresolved old_fld with lab
       throw com.cliffc.aa.AA.unimpl(); // todo needs pinned
-    } else prior.unify(pattern,test); // Merge pattern and prior label in LHS
+    } else {
+      if( outie ) prior. unify(pattern,test); // Merge pattern and prior label in LHS
+      else        prior._unify(pattern,test); // Merge pattern and prior label in LHS
+    }
     return true;              // Progress
   }
 

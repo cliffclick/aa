@@ -307,7 +307,7 @@ public final class CallEpiNode extends Node {
       Env.ROOT.deps_add(this);
       TypeMem rmem = Env.ROOT.rmem();
       Type cmem = CallNode.emem(tcall);
-      return tfptr.oob(TypeTuple.make(Type.CTRL,rmem.meet(cmem),TypeNil.SCALAR));
+      return tfptr.oob(TypeTuple.make(Type.CTRL,rmem.meet(cmem),Type.ALL));
     }
 
     // Compute call-return value from all callee returns

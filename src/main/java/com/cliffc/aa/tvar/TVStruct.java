@@ -147,8 +147,8 @@ public class TVStruct extends TV3 {
 
   @Override boolean _unify_impl( TV3 tv3 ) {
     TVStruct that = (TVStruct)tv3; // Invariant when called
-    trial_resolve_all(false);
-    assert !that.trial_resolve_all(true); // TODO: need a test case
+    this.trial_resolve_all(false);
+    that.trial_resolve_all(false);
 
     // Unify LHS fields into RHS
     boolean open = that.is_open();
@@ -250,7 +250,7 @@ public class TVStruct extends TV3 {
   
   
   // -------------------------------------------------------------
-  // TODO  move to Resolbvable?
+  // TODO  move to Resolvable?
   private boolean trial_resolve_all(boolean test) {
     boolean progress = false;
     for( int i=0; i<_max; i++ ) {
@@ -260,7 +260,7 @@ public class TVStruct extends TV3 {
       // Field is still resolving?
       if( res.is_resolving() ) {
         if( !is_open() ) // More fields possible, so trial_resolve cannot be tried
-          progress |= res.trial_resolve(arg(i),this,this,test); // Attempt resolve
+          progress |= res.trial_resolve(false,arg(i),this,this,test); // Attempt resolve
       } else {
         // key is resolving, but Field is already resolved
         if( test ) continue;

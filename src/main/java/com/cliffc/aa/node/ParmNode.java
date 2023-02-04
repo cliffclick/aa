@@ -29,6 +29,7 @@ public class ParmNode extends PhiNode {
 
   @Override public Type value() {
     // Not executing?
+    if( len()==0 ) return Type.ALL;
     Type ctl = val(0);
     if( ctl != Type.CTRL && ctl != Type.ALL ) return ctl.oob();
     Node in0 = in(0);

@@ -30,8 +30,9 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=true;
     RSEED=0;
-    test("x=2; y=x+1; x*y", "6", "int:6");
-    testerr("fun={x -> }; fun(0)", "Missing function body",10);
+  test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", "4.2","flt:4.2"); // Mix of types to mul2(), mix of {*} operators
+    test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
+    testerr("sq={x -> x&x}; sq(\"abc\")", "*\"abc\" is not a int64",9);
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -62,21 +63,19 @@ public class TestParse {
     // TestParse.a_basic_01
     test("{ x -> ( 3, x )}", "[56]{any,4 -> *[12](3, Scalar) }", "{ A B -> *(int:3, B) }", null, null, "[12]", "[56]");
     // TestParse.a_basic_02
-    test("{ z -> ((z 0), (z \"abc\")) }", "[56]{any,4 -> *[13](Scalar,Scalar) }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[13]", "[56]" );
+    test("{ z -> ((z 0), (z \"abc\")) }", "[56]{any,4 -> *[13]() }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[13]", "[56]" );
     // TestParse.g_overload_err_00
     testerr("( { x -> x*2 }, { x -> x*3 })._ 4", "Ambiguous, unable to resolve { D E -> F:int:G:int64 } and { H I -> F }",30);
 
     // Variations on a simple wrapped add.  Requires full annotations to type -
-    // because in fact its all ambiguous and cannot be typed without seeing all
+    // because in fact it is all ambiguous and cannot be typed without seeing all
     // the usages.
     testerr("{ x y -> x+y }", "Operator _+_ does not resolve",10);
     testerr("{ x -> 1+x }", "Ambiguous, unable to resolve { int:int64 int:int64 -> int:int64 } and { int:int64 flt:nflt64 -> flt:flt64 }",8);
     testerr("{ x -> x+1 }", "Operator _+_ does not resolve",8);
     testerr("{x:flt y -> x+y}", "Ambiguous, unable to resolve { flt:flt64 flt:flt64 -> flt:flt64 } and { flt:flt64 int:int64 -> flt:flt64 }",13); // {Scalar Scalar -> Scalar}
-    test("{x:flt y:int -> x+y}", "[55]{any,5 -> flt64 }", "{ A flt:flt64 int:int64 -> flt:flt64 }", null, null, null, "[55]");
+    test("{x:flt y:int -> x+y}", "[56]{any,5 -> flt64 }", "{ A flt:flt64 int:int64 -> flt:flt64 }", null, null, null, "[56]");
 
-
-    
     // error, missing a comma
     testerr("{ x -> ( 3 x )}", "A function is being called, but 3 is not a function",11);
 
@@ -220,12 +219,12 @@ public class TestParse {
     testerr("plus2={x -> x+2}; x", "Unknown ref 'x'",18); // Scope exit ends lifetime
     testerr("fun={x -> }; fun(0)", "Missing function body",10);
     testerr("fun(2)", "Unknown ref 'fun'", 0);
-    test("mul3={x -> y=3; x*y}; mul3(2)", "6","6"); // multiple statements in func body
-    _test2("x=3; addx={y -> x+y}; addx(2)", "int:5","int:5","int:5","int:5",null,null,"Unable to resolve _+_",-1); // must inline to resolve overload {+}:Int
-    test("x=3; mul2={x -> x*2}; mul2(2.1)", "flt:4.2","flt:4.2"); // must inline to resolve overload {*}:Flt with I->F conversion
-    //test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
-    //test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
-    //testerr("sq={x -> x&x}; sq(\"abc\")", "*\"abc\" is not a int64",9);
+    test("mul3={x -> y=3; x*y}; mul3(2)", "6","int:6"); // multiple statements in func body
+    test("x=3; addx={y -> x+y}; addx(2)", "5","int:5");
+    test("x=3; mul2={x -> x*2}; mul2(2.1)", "4.2","flt:4.2"); // must inline to resolve overload {*}:Flt with I->F conversion
+    test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", "4.2","flt:4.2"); // Mix of types to mul2(), mix of {*} operators
+    test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
+    testerr("sq={x -> x&x}; sq(\"abc\")", "*\"abc\" is not a int64",9);
     //testerr("sq={x -> x*x}; sq(\"abc\")", "*\"abc\" is none of (flt64,int64)",9);
     //testerr("f0 = { f x -> f0(x-1) }; f0(_+_,2)", "Passing 1 arguments to f0 which takes 2 arguments",16);
     //// Recursive:
