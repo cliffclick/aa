@@ -776,8 +776,13 @@ public abstract class Node implements Cloneable, IntSupplier {
   }
 
   // Assert all ideal, value and liveness calls are done
-  public final boolean more_ideal(VBitSet bs) {
-    if( bs.tset(_uid) ) return false; // Been there, done that
+  private static final VBitSet IDEAL_VISIT = new VBitSet();
+  public final boolean no_more_ideal() {
+    IDEAL_VISIT.clear();
+    return _more_ideal();
+  }
+  private boolean _more_ideal() {
+    if( IDEAL_VISIT.tset(_uid) ) return false; // Been there, done that
     if( !is_keep() && !Env.GVN.on_dead(this)) { // Only non-keeps, which is just top-level scope and prims
       Node x;
       if( !Env.GVN.on_reduce(this) ) { x = do_reduce(); if( x != null )
@@ -788,8 +793,8 @@ public abstract class Node implements Cloneable, IntSupplier {
                                                          return true; } // Found an ideal call
       if( this instanceof FunNode fun && !Env.GVN.on_inline(fun) ) fun.ideal_inline(true);
     }
-    for( Node def : _defs ) if( def != null && def.more_ideal(bs) ) return true;
-    for( Node use : _uses ) if( use != null && use.more_ideal(bs) ) return true;
+    for( Node def : _defs ) if( def != null && def._more_ideal() ) return true;
+    for( Node use : _uses ) if( use != null && use._more_ideal() ) return true;
     return false;
   }
 

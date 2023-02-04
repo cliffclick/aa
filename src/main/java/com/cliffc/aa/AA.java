@@ -45,7 +45,7 @@ public abstract class AA {
     }
   }
 
-
+  // Debug printers and finders
   public static boolean DEBUG = true;
   public static <T> T p(T x, String s) {
     if( !AA.DEBUG ) return x;
@@ -55,5 +55,12 @@ public abstract class AA {
   public static String p    () { return Env.ROOT.dumprpo(false,false,false); }  // Debugging hook
   public static String plive() { return Env.ROOT.dumprpo(false,true ,false); }  // Debugging hook
   public static Node f(int uid) { return Env.ROOT.find(uid); }        // Debugging hook
-  public static int UID=-1;
+  public static int UID=-1;     // Used to breakpoint on a named Node creation
+
+  // assert AA.once_per() || ...expensive;
+  private static int ASSERT_CNT;
+  private static int ONCE_PER=127; // Set to zero to fire every time
+  public static boolean once_per() {
+    return (ASSERT_CNT++ & ONCE_PER)!=0;
+  }
 }

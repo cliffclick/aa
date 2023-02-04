@@ -6,7 +6,6 @@ import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
 import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.VBitSet;
 
 import java.util.BitSet;
 
@@ -132,8 +131,8 @@ public class GVNGCM {
   // Any time anything is on any worklist we can always conservatively iterate on it.
   // Empties the worklists, attempting to do every possible thing.
   void do_iter() {
-    // VERY EXPENSIVE ASSERT
-    //assert Env.ROOT == null || Env.ROOT.more_work(true) == 0; // Initial conditions are correct
+    assert AA.once_per() || Env.ROOT.more_work(true) == 0; // Initial conditions are correct
+    //assert Env.ROOT.no_more_ideal(); // Has side-effects of putting things on worklist
     while( true ) {
       ITER_CNT++; assert ITER_CNT < 10000; // Catch infinite ideal-loops
       Node n, m;
@@ -147,16 +146,13 @@ public class GVNGCM {
       else break;
       if( m == null ) ITER_CNT_NOOP++;     // No progress profiling
       else n.deps_work_clear();            // Progress; deps on worklist
-      // VERY EXPENSIVE ASSERT
-      //assert Env.ROOT == null || Env.ROOT.more_work(true) == 0; // Initial conditions are correct
-      //IDEAL_VISIT.clear();
-      //assert !Env.ROOT.more_ideal(IDEAL_VISIT);
+      //assert Env.ROOT.more_work(true) == 0;
+      //assert !Env.ROOT.no_more_ideal();
     }
   }
   
   // Top-level iter clean-out.  Empties all queues & aggressively checks
   // no-more-progress.
-  private static final VBitSet IDEAL_VISIT = new VBitSet();
   public void iter() {
     while( true ) {
       do_iter();
@@ -171,10 +167,8 @@ public class GVNGCM {
       }
       if( !progress ) break;
     };
-    // VERY EXPENSIVE ASSERT
-    //assert Env.ROOT.more_work(true)==0;
-    //IDEAL_VISIT.clear();
-    //assert !Env.ROOT.more_ideal(IDEAL_VISIT);
+    assert AA.once_per() || Env.ROOT.more_work(true)==0;
+    //assert Env.ROOT.no_more_ideal(); // Has side effects of putting things on worklist
   }
 
   // Clear the dead worklist only

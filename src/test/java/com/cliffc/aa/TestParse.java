@@ -30,7 +30,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=true;
     RSEED=0;
-  test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", "4.2","flt:4.2"); // Mix of types to mul2(), mix of {*} operators
+    test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", "4.2","flt:4.2"); // Mix of types to mul2(), mix of {*} operators
     test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
     testerr("sq={x -> x&x}; sq(\"abc\")", "*\"abc\" is not a int64",9);
   }
