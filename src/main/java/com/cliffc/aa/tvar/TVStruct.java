@@ -1,11 +1,15 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.ErrMsg;
+import com.cliffc.aa.Oper;
 import com.cliffc.aa.Parse;
+import com.cliffc.aa.node.FieldNode;
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeStruct;
-import com.cliffc.aa.util.*;
+import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.Util;
+import com.cliffc.aa.util.VBitSet;
 
 import java.util.Arrays;
 
@@ -23,49 +27,60 @@ public class TVStruct extends TV3 {
   // The set of field labels, 1-to-1 with TV3 field contents.
   // Most field operations are UNORDERED, so we generally need to search the fields by string
   private String[] _flds;       // Field labels
+  // Fields are pinned in this TVStruct, or UNPINNED and can unify on the RHS of a TVClz
+  private boolean[] _pins;      // 
 
   private int _max;             // Max set of in-use flds/args
-
-  // This TVStruct is used Fresh against another TVStruct.
-  // If it ever changes fields, we need to Fresh-unify again.
-  Ary<TVStruct> _delay_fresh_deps;
-  Ary<TV3[]   > _delay_fresh_nongen;
   
   public TVStruct( Ary<String> flds ) { this(true,flds.asAry(),new TV3[flds.len()]);  }
   // Made from a StructNode; fields are known, so this is closed
   public TVStruct( boolean is_copy, String[] flds, TV3[] tvs ) { this(is_copy,flds,tvs,false); }
   // Made from a Field or SetField; fields are unknown so this is open
-  public TVStruct( boolean is_copy, String[] flds, TV3[] tvs, boolean open ) {
+  public TVStruct( boolean is_copy, String[] flds, TV3[] tvs, boolean open ) { this(is_copy,flds,pins(flds),tvs,open); }
+  public TVStruct( boolean is_copy, String[] flds, boolean[] pins, TV3[] tvs, boolean open ) {
     super(is_copy,tvs);
     _flds = flds;
+    _pins = pins;
     _open = open;
     _max = flds.length;
     assert tvs.length==_max;
   }
 
   // Used during cyclic construction
-  public void set_fld(int i, TV3 fld) { _args[i] = fld; }
+  public void set_pin_fld(int i, TV3 fld) { _args[i] = fld; _pins[i] = true; }
+  public boolean is_pinned(String fld) { return _pins[Util.find(_flds,fld)]; }
+  private static boolean[] pins( String[] flds ) {
+    boolean[] pins = new boolean[flds.length];
+    for( int i=0; i<flds.length; i++ )
+      pins[i] = Oper.is_oper(flds[i]); // Operators pinned into clazz structs
+    return pins;
+  }
 
-  public boolean add_fld(String fld, TV3 tvf) {
+  public boolean add_fld(String fld, boolean pinned, TV3 tvf) {
     if( _max == _flds.length ) {
       int len=1;
       while( len<=_max ) len<<=1;
       _flds = Arrays.copyOf(_flds,len);
+      _pins = Arrays.copyOf(_pins,len);
       _args = Arrays.copyOf(_args,len);
     }
     _flds[_max] = fld;
     _args[_max] = tvf;
+    _pins[_max] = pinned;
     _max++;
-    if( _delay_fresh_deps != null ) _do_delay_fresh();
+    // Changed struct shape, move delayed-fresh updates to now
+    move_delay_fresh();
     return true;
   }
 
   // Remove
   boolean del_fld(int idx) {
     _args[idx] = _args[_max-1];
+    _pins[idx] = _pins[_max-1];
     _flds[idx] = _flds[_max-1];
     _max--;
-    if( _delay_fresh_deps != null ) _do_delay_fresh();
+    // Changed struct shape, move delayed-fresh updates to now
+    move_delay_fresh();
     return true;
   }
   // Remove field; true if something got removed
@@ -117,36 +132,12 @@ public class TVStruct extends TV3 {
   private boolean _miss_fld( TVStruct that, int i, TV3 lhs, boolean test ) {
     if( test ) return true;
     return that.is_open()
-      ? that.add_fld(_flds[i],lhs)
+      ? that.add_fld(_flds[i],_pins[i],lhs)
       : this.del_fld(i);
   }
 
   @Override int eidx() { return TVErr.XSTR; }
   @Override public TVStruct as_struct() { return this; }
-
-  // Record t on the delayed fresh list, and return that.  If `this` every
-  // unifies to something, we need to Fresh-unify the something with `that`.
-  void delay_fresh(TVStruct that, TV3[] nongen) {
-    if( _delay_fresh_deps==null ) {
-      _delay_fresh_deps   = new Ary<>(new TVStruct[]{that  });
-      _delay_fresh_nongen = new Ary<>(new TV3   [][]{nongen});
-    }
-    if( _delay_fresh_deps.find(that)==-1 ) {
-      _delay_fresh_deps  .push(that  );
-      _delay_fresh_nongen.push(nongen);
-    }
-    assert _delay_fresh_deps.len()<=10; // Switch to worklist format
-  }
-
-  private void _do_delay_fresh() {
-    for( int i=0; i<_delay_fresh_deps._len; i++ ) {
-      TVStruct that = _delay_fresh_deps.at(i);
-      if( that.unified() ) throw unimpl(); // Compact
-      DELAY_FRESH_THIS.push(this);
-      DELAY_FRESH_THAT.push(that);
-      DELAY_FRESH_NONGEN.push(_delay_fresh_nongen.at(i));
-    }
-  }
 
   // -------------------------------------------------------------
   @Override void _union_impl( TV3 tv3 ) {
@@ -155,76 +146,82 @@ public class TVStruct extends TV3 {
   }
 
   @Override boolean _unify_impl( TV3 tv3 ) {
-    TVStruct thsi = this;          // So we can update 'this'
     TVStruct that = (TVStruct)tv3; // Invariant when called
-    if( trial_resolve_all(false) ) thsi = (TVStruct)thsi.find();
+    trial_resolve_all(false);
     assert !that.trial_resolve_all(true); // TODO: need a test case
 
     // Unify LHS fields into RHS
     boolean open = that.is_open();
-    for( int i=0; i<thsi._max; i++ ) {
-      String key = thsi._flds[i];
-      TV3 fthis = thsi.arg(key);         // Field of this
-      TV3 fthat = that.arg(key);         // Field of that
-      if( fthat==null ) {                // Missing field in that
-        if( open &&                      // RHS is open
-            !Resolvable.is_resolving(key) ) // Do not add or remove until resolved
-          that.add_fld(key,fthis);       // Add to RHS
+    for( int i=0; i<_max; i++ ) {
+      TV3 fthis = arg(i);       // Field of this      
+      String key = _flds[i];
+      boolean pinned = _pins[i];
+      int ti = Util.find(that._flds,key);
+      if( ti == -1 ) {          // Missing field in that
+        //if( Resolvable.is_resolving(key) ) continue; // Do not add or remove until resolved
+        if( open || Resolvable.is_resolving(key) )
+          that.add_fld(key,pinned,fthis);   // Add to RHS
+        else
+          that.del_fld(key);                // Remove from RHS
       } else {
+        TV3 fthat = that.arg(ti);  // Field of that
         fthis._unify(fthat,false); // Unify both into RHS
+        that._pins[ti] |= pinned;  // Unify pinned
         // Progress may require another find()
-        thsi = (TVStruct)thsi.find();
         that = (TVStruct)that.find();
+        assert !unified();      // TODO: weave this thru
       }
     }
 
     // Fields on the RHS are aligned with the LHS also
-    if( !thsi.is_open() )
-      for( int i=0; i<that._max; i++ ) {
-        String key = that._flds[i];
-        if( !Resolvable.is_resolving(key) && // Do not remove until resolved
-            thsi.arg(key)==null )            // Fields in both already done
-          that.del_fld(i);                   // Drop from RHS
+    for( int i=0; i<that._max; i++ ) {
+      String key = that._flds[i];
+      if( arg(key)==null ) {                         // Missing field in this
+        if( Resolvable.is_resolving(key) ) continue; // Do not remove until resolved
+        if( is_open() ) add_fld(key,that._pins[i],that.arg(i)); // Add to LHS
+        else del_fld(key);                                      // Drop from RHS
       }
+    }
 
     assert !that.unified(); // Missing a find
     return true;
   }
   
   // -------------------------------------------------------------
-  @Override boolean _fresh_unify_impl(TV3 tv3, TV3[] nongen, boolean test) {
+  @Override boolean _fresh_unify_impl(TV3 tv3, boolean test) {
     boolean progress = false, missing = false;
     TVStruct that = (TVStruct)tv3; // Invariant checked before calling
     assert !unified() && !that.unified();
-
-    // Record that the LHS is Fresh'd against the RHS.  If the LHS changes in
-    // the future, we'll need to re-Fresh agains the RHS.
-    delay_fresh(that, nongen);
     
     // Any pending field resolutions
     progress |= this.trial_resolve_all(test);
-    progress |= that.trial_resolve_all(test);    
+    progress |= that.trial_resolve_all(test);
+    that = (TVStruct)that.find(); // Might have to update
+    assert !unified();       // TODO: update/find thsi,that
 
     for( int i=0; i<_max; i++ ) {
       TV3 lhs = arg(i);
-      TV3 rhs = that.arg(_flds[i]); // Lookup via field name
-      if( rhs==null && Resolvable.is_resolving(_flds[i]) ) {
+      int ti = Util.find(that._flds,_flds[i]);
+      if( ti== -1 && Resolvable.is_resolving(_flds[i]) ) {
         if( that._open ) continue;
         throw unimpl();
       }
 
-      if( rhs == null ) {
+      if( ti == -1 ) {          // Missing in RHS
         if( is_open() || that.is_open() ) {
           if( test ) return true; // Will definitely make progress
-          TV3 nrhs = lhs._fresh(nongen);
+          TV3 nrhs = lhs._fresh();
           if( !that.is_open() ) // RHS not open, put copy of LHS into RHS with miss_fld error
             throw unimpl();
-          progress |= that.add_fld(_flds[i],nrhs);
+          progress |= that.add_fld(_flds[i],_pins[i],nrhs);
         } else missing = true; // Else neither side is open, field is not needed in RHS
       } else {
-        progress |= lhs._fresh_unify(rhs,nongen,test);
+        TV3 rhs = that.arg(ti); // Lookup via field name
+        progress |= lhs._fresh_unify(rhs,test);
+        that._pins[ti] |= _pins[i];
       }
-      assert !unified() && !that.unified();       // TODO: update/find thsi,that
+      that = (TVStruct)that.find(); // Might have to update
+      assert !unified();            // TODO: update/find thsi,that
       if( progress && test ) return true;
     }
 
@@ -300,7 +297,15 @@ public class TVStruct extends TV3 {
     return true;
   }
   
-  public ErrMsg err_resolve(Parse loc, String msg) {
+  public ErrMsg err_resolve(Node in0, Parse loc, String msg) {
+    if( msg.equals("No field resolves") ) {
+      if( in0 instanceof FieldNode fld ) {
+        if( Oper.is_oper(fld._fld) )
+          return ErrMsg.unresolved(loc,"Operator "+fld._fld+" does not resolve");
+        else throw unimpl();
+      }
+      return ErrMsg.unresolved(loc,msg);
+    }
     SB sb = new SB().p(msg).p(", unable to resolve ");
     VBitSet dups = get_dups();
     VBitSet visit = new VBitSet();
@@ -313,31 +318,29 @@ public class TVStruct extends TV3 {
   
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) { throw unimpl(); }  
+  public boolean is_int_clz() { return  Util.find(_flds,"!_" ) >= 0; }
+  public boolean is_flt_clz() { return  Util.find(_flds,"sin") >= 0; }
+  public boolean is_str_clz() { return  Util.find(_flds,"#_" ) >= 0; }
 
+  
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
-    TV3 prim = arg(TypeStruct.SELF);
-    TV3 nclz = arg(TypeStruct.CLAZZ);
-    if( prim!=null && nclz instanceof TVPtr pclz && pclz.load() instanceof TVStruct clz ) {
-      if( clz.arg("!_")!=null) return prim._str(sb.p("int:"),visit,dups,debug);
-      if( clz.arg("-_")!=null) return prim._str(sb.p("flt:"),visit,dups,debug);
-    }
-    
     boolean is_tup = _max==0 || Character.isDigit(_flds[0].charAt(0));
     sb.p(is_tup ? "(" : "@{");
     if( _args==null ) sb.p(", ");
     else {
       for( int idx : sorted_flds() ) {
-        String fld = _flds[idx];
+        String  fld = _flds[idx];
+        boolean pin = _pins[idx];
         // Skip resolved field names in a tuple
-        if( !is_tup || Resolvable.is_resolving(fld) )
-          sb.p(fld).p("= ");
+        if( !is_tup || Resolvable.is_resolving(fld) || !pin )
+          sb.p(fld).p(pin?"#":"").p("= ");
         if( _args[idx] == null ) sb.p("_");
         else _args[idx]._str(sb,visit,dups,debug);
         sb.p(is_tup ? ", " : "; ");
       }
     }
     if( _open ) sb.p(" ..., ");
-    sb.unchar(2);
+    if( _args!=null && _args.length>0 ) sb.unchar(2);
     sb.p(!is_tup ? "}" : ")");
     return sb;
   }

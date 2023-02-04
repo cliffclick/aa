@@ -33,19 +33,23 @@ public class TVBase extends TV3 {
   // Convert the leader nil into a base+XNIL, widened if the leader is not a
   // copy.
   @Override TV3 find_nil( TVNil nil ) {
-    throw unimpl();
+    _t = _t.meet(TypeNil.XNIL);
+    _may_nil = true;
+    if( !nil._is_copy ) _t = _t.widen(); // Widen if leader is a not a copy
+    _is_copy = false;                    // Self is not a copy
+    return this;
   }
   
   // -------------------------------------------------------------
   @Override void _union_impl(TV3 t) {
-    TVBase that = (TVBase)t;
+    TVBase that = (TVBase)t;    // Invariant when called
     that._t = that._t.meet(_t);
   }
   
-  @Override boolean _unify_impl(TV3 t ) { return union(t); }
+  @Override boolean _unify_impl(TV3 t ) { return true; }
   
   // -------------------------------------------------------------
-  @Override boolean _fresh_unify_impl(TV3 that, TV3[] nongen, boolean test) {
+  @Override boolean _fresh_unify_impl(TV3 that, boolean test) {
     TVBase base = (TVBase)that;
     Type t = _t.meet(base._t);
     if( t==base._t ) return false;

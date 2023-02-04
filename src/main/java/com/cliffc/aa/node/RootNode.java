@@ -61,6 +61,7 @@ public class RootNode extends Node {
         if( ret != null && ret._val instanceof TypeTuple rtup ) {
           TypeMem rmem = (TypeMem)rtup.at(MEM_IDX);
           tmem2 = (TypeMem)tmem2.meet(rmem);
+          ret.deps_add(this);   // Ret changes, so do we
         }
       }
     else tmem2 = TypeMem.ALLMEM;

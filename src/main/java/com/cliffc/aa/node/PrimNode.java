@@ -47,15 +47,20 @@ public abstract class PrimNode extends Node {
     _badargs=null;
   }
 
+  private static final TypeNil TSTR = TypeStruct.make_test("0",TypeInt.INT8,Access.Final);
+  
   // Int/Float primitives.  
-  public static final StructNode ZINT = new StructNode(false,false,null,"int:", Type.ALL).set_proto_instance(TypeInt.INT64).init();
-  public static final StructNode ZFLT = new StructNode(false,false,null,"flt:", Type.ALL).set_proto_instance(TypeFlt.FLT64).init();
+  public static final StructNode ZINT = new StructNode(false,false,null,"", Type.ALL).set_proto_instance(TypeInt.INT64).init();
+  public static final StructNode ZFLT = new StructNode(false,false,null,"", Type.ALL).set_proto_instance(TypeFlt.FLT64).init();
+  public static final StructNode ZSTR = new StructNode(false,false,null,"", Type.ALL).set_proto_instance(TSTR).init();
   public static final NewNode PINT = new NewNode();
   public static final NewNode PFLT = new NewNode();
+  public static final NewNode PSTR = new NewNode();
 
   public static final ConNode  INT = new ConNode(TypeInt. INT64).init();
   public static final ConNode  FLT = new ConNode(TypeFlt. FLT64).init();
   public static final ConNode NFLT = new ConNode(TypeFlt.NFLT64).init();
+  public static final ConNode  STR = new ConNode(TSTR).init();
   
   private static PrimNode[] PRIMS = null; // All primitives
 
@@ -93,6 +98,11 @@ public abstract class PrimNode extends Node {
       { new MinusF64() },
       { new SinF64() },
     };
+
+    PrimNode[][] STRS = new PrimNode[][] {
+      { new StrLen() }
+    };
+    
     // Other primitives, not binary operators
     PrimNode rand = new RandI64();
     PrimNode[] others = new PrimNode[] {
@@ -127,9 +137,11 @@ public abstract class PrimNode extends Node {
     Env.STK_0.add_fld("math",Access.Final,make_math(rand),null).xval();
 
     // Build the int and float prototypes
-    make_prim(ZFLT,PFLT,FLTS);
-    make_prim(ZINT,PINT,INTS);
+    make_prim(ZFLT,"flt:",PFLT,FLTS);
+    make_prim(ZINT,"int:",PINT,INTS);
+    make_prim(ZSTR,"str:",PSTR,STRS);
 
+    
     Env.GVN.iter();
 
     return PRIMS;
@@ -175,7 +187,7 @@ public abstract class PrimNode extends Node {
   }
   
   // Make and install a primitive Clazz.
-  private static void make_prim( StructNode clz, NewNode ptr, PrimNode[][] primss ) {
+  private static void make_prim( StructNode clz, String clzname, NewNode ptr, PrimNode[][] primss ) {
     for( PrimNode[] prims : primss ) {
       // Primitives are grouped into overload groups, where the 'this' or
       // display argument is always of the primitive type, and the other
@@ -192,8 +204,8 @@ public abstract class PrimNode extends Node {
       clz.add_fld(prims[0]._name,Access.Final,over,null);
     }
     clz.close();
-    Env.SCP_0.add_type(clz._clz,clz); // type String -> clazz Struct mapping, for scope-based type lookups
-    Env.PROTOS.put(clz._clz,clz); // global mapping
+    Env.SCP_0.add_type(clzname,clz); // type String -> clazz Struct mapping, for scope-based type lookups
+    Env.PROTOS.put(clzname,clz); // global mapping
     Env.SCP_0.set_mem(new StoreNode(Env.SCP_0.mem(),ptr.add_flow(),clz,null).init());
   }
 
@@ -263,7 +275,9 @@ public abstract class PrimNode extends Node {
 
   static TV3 make_tvar(boolean is_copy, TypeNil rez) {
     if( rez==TypeNil.XNIL ) throw unimpl();
-    return TVBase.make(is_copy,rez);
+    TV3 tv3 = TV3.from_flow(rez);
+    if( is_copy ) ((TVClz)tv3).rhs()._is_copy = true;
+    return tv3;
   }
 
   // All work done in set_tvar, no need to unify
@@ -531,6 +545,15 @@ public abstract class PrimNode extends Node {
     @Override public TypeNil apply( TypeNil[] args ) { throw AA.unimpl(); }
   }
 
+
+  public static class StrLen extends PrimNode {
+    public StrLen() { super("#_",TypeTuple.INT64,TypeInt.INT64); }
+    @Override public TypeNil apply( TypeNil[] args ) {
+      throw unimpl();
+    }
+
+  }
+  
 
   public static class RandI64 extends PrimNode {
     public RandI64() { super("rand",TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, Type.ANY, TypeInt.INT64),TypeInt.INT64); }

@@ -14,7 +14,7 @@ public class FreshNode extends Node {
   public static Node peek(Node f) { return f instanceof FreshNode fsh ? fsh.id() : f; }
 
   // The "non-generative" set is the variables which are NOT type polymorphic.
-  // This includes all lambda arguments inside of the lambda, plus any
+  // This includes all lambda arguments inside the lambda, plus any
   // variables used mid-definition.  The only variables used mid-definition are
   // forward-refs.
   TV3[] nongen() {

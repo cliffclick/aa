@@ -238,20 +238,17 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Dependents.  Changes to 'this' adds these to the worklist, and clears the list.
   Ary<Node> _deps;
-  int _dep_mark;
   // Add a dep
   void deps_add(Node dep) {
     if( _deps==null ) _deps = new Ary<>(new Node[1],0);
     if( _deps.find(dep)==-1 ) _deps.push(dep);
   }
-  // Mark the current deps set; used before the start of idealizing.
-  void deps_mark() { if( _deps != null ) _dep_mark = _deps._len; }
   // Reset deps list to mark (deps added during this idealizing do not count).
   // Add other deps to the flow & reduce lists, and clear the deps.
   public final void deps_work_clear() {
     if( _deps == null ) return;
-    for( int i=0; i<_dep_mark; i++ )
-      Env.GVN.add_reduce(_deps._es[i].add_flow());
+    for( Node dep : _deps )
+      Env.GVN.add_reduce(dep.add_flow());
     _deps.clear();
   }
 
@@ -547,7 +544,6 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Do One Step of forwards-dataflow analysis.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
   public void combo_forwards() {
-    deps_mark();
     Type oval = _val;           // Old local type
     Type nval = value();        // New type
     if( oval == nval ) return;  // No progress
@@ -560,7 +556,6 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Do One Step of backwards-dataflow analysis.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
   public void combo_backwards() {
-    deps_mark();
     Type oliv = _live;
     Type nliv = live();
     // TODO: If use._value >= constant, force live-use to ANY.
@@ -577,7 +572,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   public void combo_unify() {
     TV3 old = _tvar;
     if( old==null ) return;
-    if( _val == Type.ANY ) { tvar().deps_add_deep(this); return; } // No HM progress on untyped code
+    if( _val == Type.ANY ) { tvar().deps_add(this); return; } // No HM progress on untyped code
     if( _live== Type.ANY && !has_call_use() ) // No HM progress on dead code
       return;
     if( unify(false) ) {
@@ -601,7 +596,6 @@ public abstract class Node implements Cloneable, IntSupplier {
   // VALS table.  Return null if no progress, or this or the replacement.
   public Node do_reduce() {
     assert check_vals();
-    deps_mark();
     Node nnn = _do_reduce();
     if( nnn!=null ) {           // Something happened
       add_flow_uses();          // Users of change should recheck
@@ -643,7 +637,6 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Change values at this Node directly.
   public Node do_flow() {
-    deps_mark();
     Node progress=null;
     // Compute live bits.  If progressing, push the defs on the flow worklist.
     // This is a reverse flow computation.  Always assumed live if keep.
@@ -673,7 +666,6 @@ public abstract class Node implements Cloneable, IntSupplier {
   }
 
   public Node do_mono() {
-    deps_mark();
     Node x = ideal_mono();
     if( x==null ) return null;
     assert x==this;
@@ -681,7 +673,6 @@ public abstract class Node implements Cloneable, IntSupplier {
   }
 
   public Node do_grow() {
-    deps_mark();
     Node nnn = ideal_grow();
     if( nnn==null || nnn==this || is_dead() ) return nnn;
     return Env.GVN.add_reduce(nnn.add_flow());

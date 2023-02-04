@@ -3,7 +3,6 @@ package com.cliffc.aa.tvar;
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeNil;
-import com.cliffc.aa.type.TypeStruct;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
@@ -22,7 +21,8 @@ public class TVNil extends TV3 {
   public TVNil( TV3 tv3 ) { super(true,tv3); _may_nil = true; }
   public TVLeaf not_nil() { return (TVLeaf)arg(0); }
 
-  @Override int eidx() { throw unimpl(); }
+  @Override int eidx() { return TVErr.XNIL; }
+  @Override public TVNil as_nil() { return this; }
   
   // -------------------------------------------------------------
   @Override void _union_impl(TV3 that) { }
@@ -42,14 +42,14 @@ public class TVNil extends TV3 {
   }
 
   // same as HM w/nongen, except this & that reversed
-  boolean _unify_nil( TV3 that, TV3[] nongen, boolean test ) {
+  boolean _unify_nil_r( TV3 that, boolean test ) {
     assert !(that instanceof TVNil);
     if( test ) return true;     // Will make progress in all situations
     TVLeaf not_nil = not_nil();
     not_nil._deps_work_clear();
     // A shallow copy and fresh-unify fails if 'this' is cyclic, because the
     // shallow copy peels one part of the loop.
-    TV3 copy = that._fresh(nongen).strip_nil();
+    TV3 copy = that._fresh().strip_nil();
     _is_copy &= that._is_copy;
     not_nil.union(copy);
     if( that instanceof TVBase ) this.union(that); // Can reverse and turn into a Base
@@ -82,11 +82,15 @@ public class TVNil extends TV3 {
     if( that instanceof TVNil ) return true;
     if( that instanceof TVBase base && base._t.must_nil() )
       return true;
+    // Nil-check against the instance, not the clazz
+    if( that instanceof TVClz clz ) 
+      return _trial_unify_ok_impl(clz.rhs(),extras);
     // Some primitives will unify with NIL
     if( that instanceof TVStruct ts ) {
-      TV3 self = ts.arg(TypeStruct.SELF);
-      if( self==null ) return false;
-      return _trial_unify_ok_impl(self,extras);
+      //TV3 self = ts.arg(TypeStruct.SELF);
+      //if( self==null ) return false;
+      //return _trial_unify_ok_impl(self,extras);
+      throw unimpl();
     }
     return false;
   }

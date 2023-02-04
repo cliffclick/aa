@@ -259,16 +259,6 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   public static TypeStruct make_test( String clz, Type def, TypeFld fld0, TypeFld fld1 ) { return make(false,clz,def,TypeFlds.make(fld0,fld1)); }
   public static TypeStruct make_test( String fld_name, Type t, Access a ) { return make(TypeFld.make(fld_name,t,a)); }
 
-  // Names for wrapped primitive fields
-  public static final String SELF  =".self";
-  public static final String CLAZZ ="!clz";
-  public static final String[] PRIM_FLDS = new String[]{CLAZZ,SELF};
-  //// Wrapping type varies by current CLZ type
-  //public static TypeStruct wrapt(TypeInt ti, Type proto) { return TypeStruct.make_flds("int:",Type.ANY,TypeFld.make(CLAZZ,proto),TypeFld.make(SELF,ti)); }
-  //public static TypeStruct wrapt(TypeFlt tf, Type proto) { return TypeStruct.make_flds("flt:",Type.ANY,TypeFld.make(CLAZZ,proto),TypeFld.make(SELF,tf)); }
-  //public static TypeStruct wrapt0(Type proto) { return TypeStruct.make_flds("int:",Type.ANY,TypeFld.make(CLAZZ,proto),TypeFld.make(SELF,TypeNil.XNIL)); }
-
-
   // Add a field to an under construction TypeStruct; _flds is not interned.
   public TypeStruct add_fld( TypeFld fld ) {
     assert find(fld._fld)==-1 && !TypeFlds.interned(_flds);  // No accidental replacing, not interned
@@ -670,7 +660,6 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     _strn(sb);
-    sb.p(_clz); // Includes a leading "~" if above_center(), and a trailing ':' if not-empty
     // To distinguish "DUP:(...)" from "CLZ:(...)" we require another ':' IFF DUP is present.
     //           ()  -- parses as a no-dup no-clz tuple
     //       clz:()  -- parses as a no-dup    clz tuple
@@ -678,16 +667,16 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     //   dup:clz:()  -- parses as a    dup    clz tuple
     //       int:1234
     //       flt:3.14
-    if( _clz.isEmpty() && dups.get(_uid)!=null )  sb.p(':');
     // Shortcut print for 'int:1234" and 'flt:3.14'
     TypeFld tf;
-    if( Util.eq("int:",_clz) && (tf=get(SELF))!=null ) return tf._t._str(visit,dups,sb,debug,indent);
-    if( Util.eq("flt:",_clz) && (tf=get(SELF))!=null ) return tf._t._str(visit,dups,sb,debug,indent);
-    // Shortcut print for the full int and flt prototypes.
-    if( Util.eq("int:",_clz) && get("_+_")!=null && sb.len() > 4 ) // Longer than 'int:' already printed
-      return sb.unchar(4).p("@{INT}");
-    if( Util.eq("flt:",_clz) && get("_+_")!=null && sb.len() > 4 ) // Longer than 'flt:' already printed
-      return sb.unchar(4).p("@{FLT}");
+    if( is_top_clz() ) return sb.p("@{TOP}");
+    if( is_int_clz() ) return sb.p("@{INT}");
+    if( is_flt_clz() ) return sb.p("@{FLT}");
+    if( is_str_clz() ) return sb.p("@{STR}");
+    if( is_math_clz()) return sb.p("@{MATH}");
+    
+    sb.p(_clz); // Includes a leading "~" if above_center(), and a trailing ':' if not-empty
+    if( _clz.isEmpty() && dups.get(_uid)!=null )  sb.p(':');
     
     boolean is_tup = is_tup();
     sb.p(is_tup ? "(" : "@{");
@@ -719,10 +708,11 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
 
   @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return true; }
 
-  boolean is_top_clz () { return Util.eq(     "",_clz) && _flds.length>1 && Util.eq("flt",_flds[1]._fld); }
-  boolean is_int_clz () { return Util.eq( "int:",_clz) && _flds.length>0 && Util.eq("!_" ,_flds[0]._fld); }
-  boolean is_flt_clz () { return Util.eq( "flt:",_clz) && _flds.length>0 && Util.eq("-_" ,_flds[0]._fld); }
-  boolean is_math_clz() { return Util.eq(     "",_clz) && _flds.length>0 && Util.eq("pi" ,_flds[0]._fld); }
+  boolean is_top_clz () { return _clz.isEmpty() && _flds.length>1 && Util.eq("math",_flds[1]._fld); }
+  boolean is_int_clz () { return _clz.isEmpty() && _flds.length>0 && Util.eq("!_" ,_flds[0]._fld); }
+  boolean is_flt_clz () { return _clz.isEmpty() && _flds.length>0 && Util.eq("-_" ,_flds[0]._fld); }
+  boolean is_str_clz () { return _clz.isEmpty() && _flds.length>0 && Util.eq("#_" ,_flds[0]._fld); }
+  boolean is_math_clz() { return _clz.isEmpty() && _flds.length>0 && Util.eq("pi" ,_flds[0]._fld); }
 
   
   // e.g. (), (^=any), (^=any,"abc"), (3.14), (3.14,"abc",:=123)

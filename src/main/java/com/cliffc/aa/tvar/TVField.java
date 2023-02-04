@@ -19,15 +19,11 @@ public class TVField extends TV3 {
   public static void reset_to_init0() { FIELDS.clear(); }
 
   // -------------------------------------------------------------
-  @Override
-  void _union_impl(TV3 that) {
-    if( !(that instanceof TVBase base) ) throw unimpl();
+  @Override void _union_impl(TV3 that) {
     throw unimpl();
   }
   
-  @Override boolean _unify_impl(TV3 that ) {
-    throw unimpl();
-  }
+  @Override boolean _unify_impl(TV3 that ) { throw unimpl(); }
 
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) { throw unimpl(); }

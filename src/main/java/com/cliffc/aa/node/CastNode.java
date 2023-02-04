@@ -79,9 +79,7 @@ public class CastNode extends Node {
     TV3 notnil = tvar();  // ret in HM
 
     // Cast-notnil vs Cast-other
-    
 
-    
     // If the maynil is already nil-checked, can be a nilable of a nilable.
     // If the cast is already satisfied, then no change
     if( maynil==notnil ) return false;
@@ -89,7 +87,11 @@ public class CastNode extends Node {
     // Never a nilable nor nil
     if( maynil instanceof TVStruct )
       return notnil.unify(maynil,test);
-    
+
+    if( maynil instanceof TVClz )
+      // TODO: probably should be the CLZ RHS
+      return notnil.unify(maynil,test);
+
     // Already an expanded nilable
     if( maynil instanceof TVNil tmaynil && tmaynil.not_nil() == notnil )
       return false;

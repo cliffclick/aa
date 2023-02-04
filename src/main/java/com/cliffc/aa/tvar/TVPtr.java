@@ -19,7 +19,7 @@ public class TVPtr extends TV3 {
 
   @Override int eidx() { throw unimpl(); }
 
-  // Make the leader a nilable version of this child
+  // Make the leader a nilable version of 'this' child
   @Override TV3 find_nil(TVNil nil) {
     TV3 ptr = copy();
     ptr._may_nil = true;
@@ -33,6 +33,7 @@ public class TVPtr extends TV3 {
 
   @Override boolean _unify_impl(TV3 that ) { return arg(0)._unify(that.arg(0),false); }
 
+  // -------------------------------------------------------------
   @Override boolean _trial_unify_ok_impl( TV3 tv3, boolean extras ) {
     TVPtr that = (TVPtr)tv3; // Invariant when called
     // Structural trial unification on the one child

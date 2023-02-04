@@ -1,12 +1,13 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.node.Node;
 import com.cliffc.aa.node.CallEpiNode;
-import com.cliffc.aa.type.Type;
+import com.cliffc.aa.node.Node;
+import com.cliffc.aa.node.PrimNode;
 import com.cliffc.aa.tvar.Resolvable;
 import com.cliffc.aa.tvar.TVField;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.NonBlockingHashMapLong;
+import com.cliffc.aa.util.VBitSet;
 
 /** Combined Global Constant Propagation and Hindly-Milner with extensions.
 
@@ -134,6 +135,8 @@ public abstract class Combo {
 
     // Set all values to ANY and lives to DEAD, their most optimistic types.
     // Set all type-vars to Leafs.
+    PrimNode.ZINT.set_tvar();
+    PrimNode.ZFLT.set_tvar();
     Env.ROOT.walk_initype();
     assert Env.ROOT.more_work(false)==0; // Initial conditions are correct
 
@@ -197,7 +200,7 @@ public abstract class Combo {
       }
       
       // Very expensive assert: everything that can make progress is on worklist
-      //assert Env.ROOT.more_work(false)==0;
+      assert Env.ROOT.more_work(false)==0;
     }
     return cnt;
   }

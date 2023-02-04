@@ -213,7 +213,10 @@ public final class CallEpiNode extends Node {
     Type tcall = call._val;
     if( !(tcall instanceof TypeTuple) ) return false;
     TypeFunPtr tfp = CallNode.ttfp(tcall);
-    if( tfp.is_full() ) return false; // Error call
+    if( tfp.is_full() ) {       // Error call
+      call.deps_add(call);      // If call-type changes, self can wire
+      return false;
+    }
     if( tfp.above_center() )  return false; // Still choices to be made during GCP.
 
     // Check all fidxs for being wirable
@@ -228,6 +231,8 @@ public final class CallEpiNode extends Node {
       progress=true;
       wire1(call,fun,ret,is_combo); // Wire Call->Fun, Ret->CallEpi
     }
+    if( progress && is_all_wired() )
+      add_reduce_uses(); // Progress on pure memory uses
     return progress;
   }
 
@@ -299,6 +304,7 @@ public final class CallEpiNode extends Node {
     if( fidxs.above_center() ) return TypeTuple.CALLE.dual();
     if(  !is_all_wired() ) {    // Unknown callers?
       // Unknown callers call everything, touch everything.  Use Root memory.
+      Env.ROOT.deps_add(this);
       TypeMem rmem = Env.ROOT.rmem();
       Type cmem = CallNode.emem(tcall);
       return tfptr.oob(TypeTuple.make(Type.CTRL,rmem.meet(cmem),TypeNil.SCALAR));

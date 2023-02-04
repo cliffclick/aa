@@ -31,10 +31,7 @@ public final class FunPtrNode extends Node {
     super(OP_FUNPTR,ret);
     _name = name;
     ParmNode pdsp = ret.fun().parm(DSP_IDX);
-    if( pdsp != null ) {
-      pdsp.deps_add(this);
-      pdsp.deps_mark();
-    }
+    if( pdsp != null ) pdsp.deps_add(this);
   }
   // Display (already fresh-loaded) but no name.
   public  FunPtrNode( RetNode ret ) { this(ret.fun()._name,ret); }

@@ -64,6 +64,7 @@ public class LoadNode extends Node {
     }
     case TVPtr ptr -> self.unify(ptr.load(),test);
     case TVStruct tstr -> self.unify(adr, test); // Load from prototype, just pass-thru
+    case TVClz tclz    -> self.unify(adr, test); // Load from prototype, just pass-thru
     case TVBase   base -> self.unify(FieldNode.tv_clz(base._t), test); // Unify against primitive CLZ
     default -> throw unimpl();
     };

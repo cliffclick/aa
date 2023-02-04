@@ -1,8 +1,8 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.TV3;
-import com.cliffc.aa.tvar.TVStruct;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
@@ -215,22 +215,42 @@ public class StructNode extends Node {
   @Override TV3 _set_tvar() {
     TVStruct ts = new TVStruct(_flds);
     for( int i=0; i<len(); i++ )
-      ts.set_fld(i,in(i).set_tvar()); 
-    return ts;
+      ts.set_pin_fld(i,new TVLeaf());
+    if( _clz.isEmpty() ) return ts;
+    // Explicit clazz representation
+    StructNode proto = Env.PROTOS.get(_clz);
+    return new TVClz( (TVStruct)proto.set_tvar(), ts );
   }
   
 
   @Override public boolean unify( boolean test ) {
-    TVStruct rec = tvar().as_struct();
-
-    // Unify existing fields.  Ignore extras on either side.
     boolean progress = false;
-    for( int i=0; i<len(); i++ ) {
-      TV3 fld = rec.arg(_flds.at(i)); // Field lookup by string
-      if( fld!=null ) progress |= fld.unify(tvar(i),test);
-      if( test && progress ) return true;
+    if( _clz.isEmpty() ) {
+      // Unify existing fields.  Ignore extras on either side.
+      TVStruct rec = tvar().as_struct();      
+      for( int i=0; i<len(); i++ ) {
+        TV3 fld = rec.arg(_flds.at(i)); // Field lookup by string
+        if( fld!=null ) progress |= fld.unify(tvar(i),test);
+        if( test && progress ) return true;
+      }
+      
+    } else {
+      // Unify existing fields, first in the clazz and if that misses and is
+      // unpinned, try again in the instance.
+      TVClz clzz = tvar().as_clz();
+      TVStruct clz = clzz.clz();
+      TVStruct rec = clzz.rhs().as_struct();
+      for( int i=0; i<len(); i++ ) {
+        String label = _flds.at(i);
+        TV3 fld = clz.arg(label); // Field lookup by string
+        if( fld==null ) {
+          fld = rec.arg(label);
+          if( fld==null ) continue; // Missing field
+        }
+        progress |= fld.unify(tvar(i),test);
+        if( test && progress ) return true;
+      }      
     }
-    
     return progress;
   }
   //// Extra fields are unified with ERR since they are not created here:

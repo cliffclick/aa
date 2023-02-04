@@ -40,12 +40,13 @@ public interface Resolvable {
     // Field can be resolved to label
     if( test ) return true;     // Will be progress to resolve
 
-    String old_fld = resolve(lab);   // Change field label
+    String old_fld = resolve(lab);      // Change field label
     boolean old = lhs.del_fld(old_fld); // Remove old label from lhs, if any
-    TV3 prior = lhs.arg(lab);      // Get prior matching lhs label, if any
+    TV3 prior = lhs.arg(lab);           // Get prior matching lhs label, if any
     if( prior==null ) {
-      assert old;             // Expect an unresolved label
-      lhs.add_fld(lab,pattern);   // Add label and pattern, basically replace unresolved old_fld with lab
+      assert old;               // Expect an unresolved label
+      //lhs.add_fld(lab,pattern); // Add label and pattern, basically replace unresolved old_fld with lab
+      throw com.cliffc.aa.AA.unimpl(); // todo needs pinned
     } else prior.unify(pattern,test); // Merge pattern and prior label in LHS
     return true;              // Progress
   }

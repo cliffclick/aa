@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
@@ -311,13 +310,12 @@ public class CallNode extends Node {
     if( def==mem() ) return _live;
     if( def==fdx() ) return Type.ALL;
 
-
     // Unresolved calls need their inputs alive, so those now-live inputs unify
     // and can be used to resolve.  This gets to a key observation: cannot use
     // dead inputs to resolve a call!  The call input *must* have some uses
-    // which distinguish which function to call.
-    if( !Combo.HM_FREEZE ) return _live;
-    assert !LIFTING;
+    // which distinguish which function to call.  Cannot flip this during
+    // Combo, as will break monotonicity.
+    if( !LIFTING ) return _live;
     
     // Check that all fidxs are wired; an unwired fidx might be in-error,
     // and we want the argument alive for errors.  This is a value turn
@@ -325,7 +323,7 @@ public class CallNode extends Node {
     CallEpiNode cepi = cepi();
     boolean all_wired = _is_copy || cepi.is_all_wired();
     if( all_wired ) deps_add(def);
-    else return Type.ALL;
+    else return Type.ALL.oob(!LIFTING);
     // All wired, the arg is dead if the matching projection is dead
     int argn = _defs.find(def);
     ProjNode proj = ProjNode.proj(this, argn);

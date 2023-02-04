@@ -544,7 +544,7 @@ public class Parse implements Comparable<Parse> {
         return err_ctrl2("Lisp-like function application split between lines "+line_last+" and "+line_now+", but must be on the same line; possible missing semicolon?");
       }
       int aidx = arg.push();
-      Node dsp = gvn(new FP2DSPNode(Node.peek(eidx),null));
+      Node dsp = gvn(new FP2DSPNode(Node.peek(eidx),errMsg(oldx)));
       expr = do_call0(false,errMsgs(oldx,oldx),args(dsp,Node.pop(aidx),Node.pop(eidx))); // Pass the 1 arg
     }
   }
@@ -748,7 +748,7 @@ public class Parse implements Comparable<Parse> {
           // binds on the loaded overload.
           castnn = Node.pop(cidx);
           n = is_oper ? gvn(new BindFPNode(fd, castnn, true)) : fd;
-          if( !is_oper ) kill(castnn);
+          if( !is_oper ) { Env.GVN.add_reduce(castnn); kill(castnn); }
         }
 
       } else if( peek('(') ) {  // Attempt a function-call
@@ -959,10 +959,11 @@ public class Parse implements Comparable<Parse> {
     StructNode nn = new StructNode(false,false,errMsg(oldx), "", Type.ALL).init();
     Parse bad = errMsg(first_arg_start);
     StructNode sn = _tuple(oldx,s,bad,nn);
+    int sidx = sn.push();
     Node ptr = gvn(new NewNode());
+    sn = (StructNode)Node.pop(sidx);
     int pidx = ptr.push();
-    Node mem = gvn(new StoreNode(mem(),ptr,sn,bad));
-    set_mem(mem);
+    set_mem(gvn(new StoreNode(mem(),ptr,sn,bad)));
     return Node.pop(pidx);
   }
   private StructNode _tuple(int oldx, Node s, Parse bad, StructNode nn) {

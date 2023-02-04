@@ -61,7 +61,7 @@ public class FieldNode extends Node implements Resolvable {
       if( t instanceof TypeStruct ts )
         return lo ? meet(ts) : join(ts);
       if( t==Type.ALL ) return Type.ALL;
-      return Type.ALL.oob(!lo);
+      return TypeNil.SCALAR.oob(!lo);
     }
 
     // Clazz or local struct ?
@@ -79,8 +79,10 @@ public class FieldNode extends Node implements Resolvable {
     }
     // Hit on a field
     if( tstr instanceof TypeStruct ts && ts.find(_fld)!= -1 )
-      return ts.at(_fld);    
-    return (tstr==null ? t : tstr).oob();
+      return ts.at(_fld);
+    if( tstr!=null  ) return tstr.oob(Type.ALL);
+    if( t==Type.ANY || t==Type.ALL ) return t;
+    return t.oob(TypeNil.SCALAR);
   }
 
   private static Type meet(TypeStruct ts) { Type t = TypeNil.XSCALAR; for( TypeFld t2 : ts )  t = t.meet(t2._t); return t; }
@@ -107,8 +109,10 @@ public class FieldNode extends Node implements Resolvable {
         ? sfn.in(1)              // Same field, use same
         : Env.GVN.add_reduce(set_def(0, sfn.in(0))); // Unrelated field, bypass
 
+    // Back-to-back CLZ-Struct/Field
+    StructNode str = in(0) instanceof StructNode str0 ? str0 : clzz(val(0));
     // Back-to-back Struct/Field
-    if( in(0) instanceof StructNode str && str.err(true)==null ) {
+    if( str!=null && str.err(true)==null ) {
       int idx = str.find(_fld);
       if( idx >= 0 ) return str.in(idx);
     } else {
@@ -157,23 +161,38 @@ public class FieldNode extends Node implements Resolvable {
   @Override public boolean unify( boolean test ) {
     boolean progress = false;
 
-    TV3 tv0;
+    TV3 tv0 = tvar(0);          // If an instance field, need the input struct
+    // Clazz fields do clazz lookups, expect clazz structures
     if( _clz ) {
-      StructNode proto = clzz(val(0));
-      if( proto==null ) return false;
-      tv0 = proto.tvar();
-    } else {
-      tv0 = tvar(0);
+      switch( tv0 ) {
+      case TVClz clz -> tv0 = clz.clz(); // Clazz part from a clazzed TV
+      case TVLeaf leaf -> {              // Expand to a clazzed TV
+        StructNode proto = clzz(val(0)); // Existing prototypes for int/flt/named-clazz-types
+        if( proto == null ) {            // Unknown inferred clazz
+          if( test ) return true;        // Always progress
+          tv0 = new TVStruct(true, new String[]{_fld}, new boolean[]{true}, new TV3[]{tvar()}, true);
+          TVClz clz = new TVClz((TVStruct)tv0, new TVLeaf());
+          progress = leaf.unify(clz, test);
+        } else {
+          tv0 = proto.tvar();
+        }
+      }
+      case TVErr err -> { return false; }
+      default -> throw unimpl();
+      };
     }
-    
+
+    // Errors have a struct to unify against
     if( tv0 instanceof TVErr terr )
       tv0 = terr.as_struct();
 
+    // Still not a struct?  Make one, add field
     TVStruct str;
     if( tv0 instanceof TVStruct str0 ) str = str0;
     else {
       if( test ) return true;
-      progress |= tv0.unify(str=fresh_struct(),test);
+      TVStruct inst = new TVStruct(true, new String[]{_fld}, new TV3[]{tvar()}, true);
+      progress |= tv0.unify(str=inst,test);
     }
     
     // If resolving, cannot do a field lookup.  Attempt resolve first.
@@ -188,6 +207,12 @@ public class FieldNode extends Node implements Resolvable {
     if( fld!=null )           // Unify against a pre-existing field
       return tvar().unify(fld, test) | progress;
 
+    // If field is doing overload resolution, inject even if rec is closed
+    if( is_resolving() ) {
+      if( test ) return true;
+      throw unimpl();
+    }
+    
     // If the field is resolved, and not in struct and not in proto and the
     // struct is closed, then the field is missing.
     if( !str.is_open() ) {
@@ -210,8 +235,6 @@ public class FieldNode extends Node implements Resolvable {
     return (TVStruct)Env.PROTOS.get(clz).tvar();
   }
   
-  private TVStruct fresh_struct() { return new TVStruct(true, new String[]{_fld}, new TV3[]{tvar()}, true); }
-  
   private boolean try_resolve( TVStruct str, boolean test ) {
     // If struct is open, more fields might appear and cannot do a resolve.
     TV3 self = tvar();
@@ -224,7 +247,7 @@ public class FieldNode extends Node implements Resolvable {
     if( test ) return str.arg(_fld)==null;
     str.deps_add_deep(this);    // Try again if str closes
     // Add unresolved field if not already there (even if closed)
-    return str.arg(_fld)==null && str.add_fld(_fld,self); 
+    return str.arg(_fld)==null && str.add_fld(_fld,Oper.is_oper(_fld),self); 
   }
 
   @Override public ErrMsg err( boolean fast ) {
@@ -234,7 +257,7 @@ public class FieldNode extends Node implements Resolvable {
     if( errs.len()>1 ) throw unimpl();
     if( tvar(0) instanceof TVLeaf )
       return ErrMsg.unresolved(_bad,"Not a struct loading field "+_fld);
-    return tvar(0).as_struct().err_resolve(_bad, errs.at(0));
+    return tvar(0).as_struct().err_resolve(in(0),_bad, errs.at(0));
   }
 
   @Override public int hashCode() { return super.hashCode()+_fld.hashCode(); }

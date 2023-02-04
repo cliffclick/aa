@@ -17,8 +17,8 @@ public class ErrMsg implements Comparable<ErrMsg> {
     Field,                    // Field naming errors
     TypeErr,                  // Type errors
     NilAdr,                   // Address might be nil on mem op
-    BadArgs,                  // Unspecified primitive bad args
     UnresolvedCall,           // Unresolved calls
+    BadArgs,                  // Unspecified primitive bad args
     AllTypeErr,               // Type errors, with one of the types All
     Assert,                   // Assert type errors
     TrailingJunk,             // Trailing syntax junk

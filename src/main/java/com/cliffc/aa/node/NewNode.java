@@ -48,7 +48,7 @@ public class NewNode extends Node {
   @Override public Type value() { return _killed ? _tptr.dual() : _tptr; }
   
   @Override public Node ideal_reduce() {
-    if( !used() && !_killed ) {
+    if( !_killed && !used() ) {
       _killed = true;
       RootNode.kill_alias(_alias);
       Env.GVN.add_reduce_uses(this);
