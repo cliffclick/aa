@@ -171,7 +171,7 @@ public abstract class PrimNode extends Node {
       else if( tformal==TypeFunPtr.THUNK) nformal = Env.THUNK;
       else if( tformal==TypeMem.ALLMEM  ) nformal = Env.ALLMEM;
       else throw unimpl();
-      add_def(new ParmNode(i,fun,null,TypeNil.SCALAR,nformal).init());
+      add_def(new ParmNode(i,fun,null,tformal,nformal).init());
     }
     // The primitive, working on and producing wrapped prims
     init();

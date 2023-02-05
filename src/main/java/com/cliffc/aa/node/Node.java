@@ -247,8 +247,10 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Add other deps to the flow & reduce lists, and clear the deps.
   public final void deps_work_clear() {
     if( _deps == null ) return;
-    for( Node dep : _deps )
+    for( Node dep : _deps ) {
       Env.GVN.add_reduce(dep.add_flow());
+      if( dep instanceof FunNode fun ) Env.GVN.add_inline(fun);
+    }
     _deps.clear();
   }
 
@@ -779,7 +781,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   private static final VBitSet IDEAL_VISIT = new VBitSet();
   public final boolean no_more_ideal() {
     IDEAL_VISIT.clear();
-    return _more_ideal();
+    return !_more_ideal();
   }
   private boolean _more_ideal() {
     if( IDEAL_VISIT.tset(_uid) ) return false; // Been there, done that

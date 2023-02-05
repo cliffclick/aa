@@ -317,13 +317,11 @@ public class CallNode extends Node {
     // Combo, as will break monotonicity.
     if( !LIFTING ) return _live;
     
-    // Check that all fidxs are wired; an unwired fidx might be in-error,
-    // and we want the argument alive for errors.  This is a value turn
-    // around point (high fidxs need to fall)
-    CallEpiNode cepi = cepi();
-    boolean all_wired = _is_copy || cepi.is_all_wired();
-    if( all_wired ) deps_add(def);
-    else return Type.ALL.oob(!LIFTING);
+    // Check that all fidxs are wired.  If not wired, a future wired fidx might
+    // use the call input.
+    if( !_is_copy && (cepi()==null || !cepi().is_all_wired()) )
+      return Type.ALL;
+    deps_add(def);
     // All wired, the arg is dead if the matching projection is dead
     int argn = _defs.find(def);
     ProjNode proj = ProjNode.proj(this, argn);

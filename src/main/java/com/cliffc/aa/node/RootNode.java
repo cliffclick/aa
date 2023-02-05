@@ -41,19 +41,18 @@ public class RootNode extends Node {
   @Override public TypeTuple value() {
     // Conservative final result
     Node rez = in(REZ_IDX);
-    if( rez==null )
-      return TypeTuple.ROOT;
-    Type trez = rez!=null ? rez._val : Type.ALL;
+    if( rez==null ) return TypeTuple.ROOT;
+    Type trez = rez._val;
     // Conservative final memory
     Node mem = in(MEM_IDX);
-    TypeMem tmem = mem!=null && mem._val instanceof TypeMem tmem0 ? tmem0 : TypeMem.ALLMEM;
+    TypeMem tmem = mem._val instanceof TypeMem tmem0 ? tmem0 : mem._val.oob(TypeMem.ALLMEM);
 
     // Reset for walking
     // Walk, finding escaped aliases and fidxs
     escapes_reset();
     escapes(trez, tmem);
 
-    TypeMem tmem2 = TypeMem.ANYMEM;
+    TypeMem tmem2 = tmem;
     // All external aliases already escaped
     tmem2 = tmem2.set(BitsAlias.EXTX,TypeStruct.ISUSED);
     // All escaped functions are called inside of Root, and modify memory "off-line".
@@ -185,15 +184,18 @@ public class RootNode extends Node {
     // See if the result can ever refer to local memory.
     Node rez = in(REZ_IDX);
     if( rez!=null && in(MEM_IDX) != Env.XMEM &&
-        !can_lift_to(rez._val,TypeMemPtr.ISUSED) &&
-        !can_lift_to(rez._val,TypeFunPtr.GENERIC_FUNPTR) )
+        cannot_lift_to(rez._val,TypeMemPtr.ISUSED) &&
+        cannot_lift_to(rez._val,TypeFunPtr.GENERIC_FUNPTR) )
       return set_def(MEM_IDX,Env.XMEM);
     return null;
   }
 
   // True if t0 can lift to t1; i.e. holding t1 constant, if we strictly lift
   // t0 (so t0_new isa t0), then we can lift t0 until it is equal to t1.
-  static boolean can_lift_to(Type t0, Type t1) {  return t0.join(t1)==t0;  }
+  static boolean cannot_lift_to(Type t0, Type t1) {
+    Type mt = t0.meet(t1);
+    return !(t0==mt || t1==mt);
+  }
   
   @Override Node walk_dom_last( Predicate<Node> P) { return null; }
 

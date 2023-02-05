@@ -42,6 +42,7 @@ public abstract class Exec {
     AA.LIFTING = false;
     Combo.opto(); // Global Constant Propagation and Hindley-Milner Typing
 
+    AA.LIFTING = true;
     Env.GVN.iter(); // Re-check all ideal calls now that types have been maximally lifted
 
     Env.FILE=null;

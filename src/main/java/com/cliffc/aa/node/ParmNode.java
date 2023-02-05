@@ -44,9 +44,8 @@ public class ParmNode extends PhiNode {
       if( cprj._val==Type.CTRL ) {  // Only meet alive paths
         Type ti = val(i);
         if( cprj instanceof CRProjNode ) {
-          if( _tvar == null ) return ti; // Default input allows more callers; return the default type
           // During/after Combo, use the HM type for the GCP type instead of the given default
-          if( ti != Type.ANY ) // Fast path cutout
+          if( ti != Type.ANY && _tvar!=null )
             ti = tvar().as_flow(this);
         }
         t = t.meet(ti);

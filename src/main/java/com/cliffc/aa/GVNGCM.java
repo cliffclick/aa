@@ -147,7 +147,7 @@ public class GVNGCM {
       if( m == null ) ITER_CNT_NOOP++;     // No progress profiling
       else n.deps_work_clear();            // Progress; deps on worklist
       //assert Env.ROOT.more_work(true) == 0;
-      //assert !Env.ROOT.no_more_ideal();
+      //assert Env.ROOT.no_more_ideal();
     }
   }
   
@@ -168,7 +168,7 @@ public class GVNGCM {
       if( !progress ) break;
     };
     assert AA.once_per() || Env.ROOT.more_work(true)==0;
-    //assert Env.ROOT.no_more_ideal(); // Has side effects of putting things on worklist
+    //assert Env.ROOT == null || Env.ROOT.no_more_ideal(); // Has side effects of putting things on worklist
   }
 
   // Clear the dead worklist only

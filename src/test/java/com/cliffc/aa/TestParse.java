@@ -30,8 +30,6 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=true;
     RSEED=0;
-    test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", "4.2","flt:4.2"); // Mix of types to mul2(), mix of {*} operators
-    test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
     testerr("sq={x -> x&x}; sq(\"abc\")", "*\"abc\" is not a int64",9);
   }
   static private void assertTrue(boolean t) {
@@ -65,7 +63,7 @@ public class TestParse {
     // TestParse.a_basic_02
     test("{ z -> ((z 0), (z \"abc\")) }", "[56]{any,4 -> *[13]() }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[13]", "[56]" );
     // TestParse.g_overload_err_00
-    testerr("( { x -> x*2 }, { x -> x*3 })._ 4", "Ambiguous, unable to resolve { D E -> F:int:G:int64 } and { H I -> F }",30);
+    testerr("( { x -> x*2 }, { x -> x*3 })._ 4", "Ambiguous, unable to resolve { D E -> F } and { G B -> H }",30);
 
     // Variations on a simple wrapped add.  Requires full annotations to type -
     // because in fact it is all ambiguous and cannot be typed without seeing all
@@ -222,8 +220,8 @@ public class TestParse {
     test("mul3={x -> y=3; x*y}; mul3(2)", "6","int:6"); // multiple statements in func body
     test("x=3; addx={y -> x+y}; addx(2)", "5","int:5");
     test("x=3; mul2={x -> x*2}; mul2(2.1)", "4.2","flt:4.2"); // must inline to resolve overload {*}:Flt with I->F conversion
-    test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", "4.2","flt:4.2"); // Mix of types to mul2(), mix of {*} operators
-    test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
+    test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", "10.2","flt:10.2"); // Mix of types to mul2(), mix of {*} operators
+    test("sq={x -> x*x}; sq 2.1", "4.41","flt:4.41"); // No () required for single args
     testerr("sq={x -> x&x}; sq(\"abc\")", "*\"abc\" is not a int64",9);
     //testerr("sq={x -> x*x}; sq(\"abc\")", "*\"abc\" is none of (flt64,int64)",9);
     //testerr("f0 = { f x -> f0(x-1) }; f0(_+_,2)", "Passing 1 arguments to f0 which takes 2 arguments",16);

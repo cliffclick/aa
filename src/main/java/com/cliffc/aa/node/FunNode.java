@@ -201,13 +201,13 @@ public class FunNode extends RegionNode {
 
     // Look for appropriate type-specialize callers
     Ary<Node> body = find_body(ret);
+    // Large code-expansion allowed; can inline for other reasons
+    int path = split_size(body,parms); // Forcible size-splitting first path
+    if( path == -1 ) return null;
     if( !is_prim() ) {
       if( _cnt_size_inlines >= 10 ) return null;
       _cnt_size_inlines++; // Disallow infinite size-inlining of recursive non-primitives
     }
-    // Large code-expansion allowed; can inline for other reasons
-    int path = split_size(body,parms); // Forcible size-splitting first path
-    if( path == -1 ) return null;
     CallNode call = (CallNode)in(path).in(0);
     body.add(fptr());
 
@@ -220,6 +220,7 @@ public class FunNode extends RegionNode {
     FunNode fun = make_new_fun(ret, path);
     split_callers(ret,fun,body,path);
     assert Env.ROOT.more_work(true)==0; // Initial conditions are correct
+    //assert Env.ROOT.no_more_ideal();
     return this;
   }
 
@@ -326,8 +327,11 @@ public class FunNode extends RegionNode {
       int op = n._op;           // opcode
       if( n instanceof CallNode call ) {     // Call-of-primitive?
         Node fdx = call.fdx();
-        if( !(fdx._val instanceof TypeFunPtr tfp) ) return -1; // Calling an unknown function, await GCP
-        if( tfp.test(_fidx) ) self_recursive = true; // May be self-recursive
+        //if( !(fdx._val instanceof TypeFunPtr tfp) ) { // Calling an unknown function, await GCP
+        //  fdx.deps_add(this);
+        //  return -1; 
+        //}
+        //if( tfp.test(_fidx) ) self_recursive = true; // May be self-recursive
         if( fdx instanceof FunPtrNode fpn ) {
           if( fpn.ret().rez() instanceof PrimNode )
             op = OP_PRIM;       // Treat as primitive for inlining purposes
@@ -348,8 +352,9 @@ public class FunNode extends RegionNode {
         cnts[OP_STORE]> 2 ||
         cnts[OP_PRIM] > 6 ||   // Allow small-ish primitive counts to inline
         cnts[OP_NEW]>2 ||      // Display and return is OK
-        (cnts[OP_NEW]>1 && self_recursive) ||
-        call_indirect > 0 )
+        (cnts[OP_NEW]>1 && self_recursive)
+        //|| call_indirect > 0
+        )
       return -1;
 
     if( self_recursive ) return -1; // Await GCP & call-graph discovery before inlining self-recursive functions
@@ -415,6 +420,7 @@ public class FunNode extends RegionNode {
     Env.GVN.add_flow(ret);
     Env.GVN.add_flow(this);
     Env.GVN.add_flow_uses(this);
+    Env.GVN.add_reduce(fun);
     return fun;
   }
 

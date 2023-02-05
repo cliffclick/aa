@@ -203,8 +203,14 @@ public class TVStruct extends TV3 {
       TV3 lhs = arg(i);
       int ti = Util.find(that._flds,_flds[i]);
       if( ti== -1 && Resolvable.is_resolving(_flds[i]) ) {
+        // Open RHS allows more fields which might add choices
         if( that._open ) continue;
-        throw unimpl();
+        Resolvable res = TVField.FIELDS.get(_flds[i]);
+        if( !res.trial_resolve(false,lhs,this,that,test) ) continue;
+        if( test ) return true;
+        progress = true;
+        // Updated LHS args and RHS key
+        lhs = arg(_flds[i]);
       }
 
       if( ti == -1 ) {          // Missing in RHS

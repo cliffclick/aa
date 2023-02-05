@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVLeaf;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeFunPtr;
 import com.cliffc.aa.type.TypeNil;
 
 // "fresh" the incoming TVar: make a fresh instance before unifying
@@ -32,7 +33,7 @@ public class FreshNode extends Node {
   }
 
   @Override public Node ideal_reduce() {
-    if( _val.is_con() )
+    if( _val.is_con() && !(_val instanceof TypeFunPtr) )
       return _val==TypeNil.XNIL ? new ConNode(_val) : id();
     return null;
   }
@@ -51,7 +52,6 @@ public class FreshNode extends Node {
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !(o instanceof FreshNode frsh) ) return false;
-    return _tvar==frsh._tvar ||
-       (_tvar!=null && frsh._tvar!=null && tvar()==frsh.tvar()); // Pre-combo, must be the same Node
+    return (_tvar!=null && frsh._tvar!=null && tvar()==frsh.tvar()); // Pre-combo, must be the same Node
   }
 }

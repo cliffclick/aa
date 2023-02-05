@@ -60,8 +60,8 @@ public class FieldNode extends Node implements Resolvable {
       boolean lo = _tvar==null || Combo.HM_AMBI;
       if( t instanceof TypeStruct ts )
         return lo ? meet(ts) : join(ts);
-      if( t==Type.ALL ) return Type.ALL;
-      return TypeNil.SCALAR.oob(!lo);
+      if( t==Type.ALL | t==Type.ANY ) return t;
+      return t.oob(TypeNil.SCALAR);
     }
 
     // Clazz or local struct ?
@@ -197,8 +197,10 @@ public class FieldNode extends Node implements Resolvable {
     
     // If resolving, cannot do a field lookup.  Attempt resolve first.
     if( is_resolving() ) {
+      if( Combo.HM_AMBI ) return false; // Failed earlier, can never resolve
       progress = try_resolve(str,test);
       if( is_resolving() || test ) return progress;
+      str = (TVStruct)str.find();
     }
     assert !is_resolving();
 
