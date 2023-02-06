@@ -478,7 +478,7 @@ abstract public class TV3 implements Cloneable {
   // Stops when it sees 'n'; this closes cycles and short-cuts repeated adds of
   // 'n'.  Requires internal changes propagate internal _deps.
   private static final VBitSet DEPS_VISIT = new VBitSet();
-  public void deps_add_deep(Node n ) { DEPS_VISIT.clear(); _deps_add_deep(n); }
+  public boolean deps_add_deep(Node n ) { DEPS_VISIT.clear(); _deps_add_deep(n); return false; }
   public void _deps_add_deep(Node n ) {
     if( DEPS_VISIT.tset(_uid) ) return;
     if( _deps==null ) _deps = UQNodes.make(n);
@@ -557,6 +557,8 @@ abstract public class TV3 implements Cloneable {
     }
     case TypeStruct ts -> {
       if( ts.len()==0 ) yield new TVLeaf();
+      if( !ts._clz.isEmpty() )
+        throw unimpl();
       String[] ss = new String[ts.len()];
       TV3[] tvs = new TV3[ts.len()];
       for( int i=0; i<ts.len(); i++ ) {
@@ -677,7 +679,7 @@ abstract public class TV3 implements Cloneable {
   }
 
   // Shallow clone of fields & args.
-  TV3 copy() {
+  public TV3 copy() {
     try {
       TV3 tv3 = (TV3)clone();
       tv3._uid = CNT++;

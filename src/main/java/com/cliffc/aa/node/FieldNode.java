@@ -54,13 +54,14 @@ public class FieldNode extends Node implements Resolvable {
   
   @Override public Type value() {
     Type t = val(0);
+    if( t==Type.ANY || t==Type.ALL ) return t;
+    // Here down, always return +/- SCALAR not ANY/ALL
     if( is_resolving() ) {
       // Pre-HMT, dunno which one, use meet.
       // Still resolving, use the join of all fields.
       boolean lo = _tvar==null || Combo.HM_AMBI;
       if( t instanceof TypeStruct ts )
         return lo ? meet(ts) : join(ts);
-      if( t==Type.ALL | t==Type.ANY ) return t;
       return t.oob(TypeNil.SCALAR);
     }
 
@@ -69,20 +70,18 @@ public class FieldNode extends Node implements Resolvable {
     if( _clz ) {
       StructNode clazz = clzz(t);
       if( clazz !=null ) {
-        tstr = clazz._val;
+        tstr = clazz._val;      // Value from clazz
         // Add a dep edge to the clazz, so value changes propagate permanently
         if( len()==2 ) assert in(1)==clazz;
         else add_def(clazz);
-      }
+      } // Else clazz not defined, no clazz, no struct to field from
     } else {
-      tstr = val(0);
+      tstr = t;                 // Value direct from input
     }
     // Hit on a field
     if( tstr instanceof TypeStruct ts && ts.find(_fld)!= -1 )
-      return ts.at(_fld);
-    if( tstr!=null  ) return tstr.oob(Type.ALL);
-    if( t==Type.ANY || t==Type.ALL ) return t;
-    return t.oob(TypeNil.SCALAR);
+      return ts.at(_fld).join(TypeNil.SCALAR).meet(TypeNil.XSCALAR);
+    return (tstr==null ? t : tstr).oob(TypeNil.SCALAR);
   }
 
   private static Type meet(TypeStruct ts) { Type t = TypeNil.XSCALAR; for( TypeFld t2 : ts )  t = t.meet(t2._t); return t; }
@@ -104,17 +103,24 @@ public class FieldNode extends Node implements Resolvable {
     if( is_resolving() ) return null;
     
     // Back-to-back SetField/Field
-    if( in(0) instanceof SetFieldNode sfn && sfn.err(true)==null )
-      return Util.eq(_fld, sfn._fld)
-        ? sfn.in(1)              // Same field, use same
-        : Env.GVN.add_reduce(set_def(0, sfn.in(0))); // Unrelated field, bypass
+    if( in(0) instanceof SetFieldNode sfn && sfn.err(true)==null ) {
+      if( Util.eq(_fld, sfn._fld) ) {
+        if( sfn.val(1).isa(_val) ) return sfn.in(1); // Same field, use same
+        else sfn.in(1).deps_add(this);
+      } else {
+        return Env.GVN.add_reduce(set_def(0, sfn.in(0))); // Unrelated field, bypass
+      }
+    }
 
     // Back-to-back CLZ-Struct/Field
     StructNode str = in(0) instanceof StructNode str0 ? str0 : clzz(val(0));
     // Back-to-back Struct/Field
     if( str!=null && str.err(true)==null ) {
       int idx = str.find(_fld);
-      if( idx >= 0 ) return str.in(idx);
+      if( idx >= 0 ) {
+        if( str.val(idx).isa(_val) ) return str.in(idx);
+        else str.deps_add(this); // Revisit if input changes
+      }
     } else {
       in(0).deps_add(this); // Revisit if input changes
     }

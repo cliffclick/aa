@@ -17,8 +17,13 @@ public final class ErrNode extends Node {
   }
   @Override public String xstr() { return _err._msg; }
   @Override String str() { return "Err"; }
-  @Override public Node ideal_reduce() {  Node cc = in(0).is_copy(0);  return cc==null ? null : set_def(0,cc); }
+  @Override public Node ideal_reduce() {
+    if( len()==0 ) return null;
+    Node cc = in(0).is_copy(0);
+    return cc==null ? null : set_def(0,cc);
+  }
   @Override public Type value() {
+    if( len()==0 ) return Type.ALL;
     Type t = val(0);
     return t == Type.ANY || t == Type.XCTRL ? Type.ANY : Type.ALL; // For dead data errors return ANY (no error)
   }

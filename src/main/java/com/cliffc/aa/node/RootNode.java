@@ -2,10 +2,11 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
-import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVLambda;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.AryInt;
 import com.cliffc.aa.util.VBitSet;
 
 import java.util.function.Predicate;
@@ -46,80 +47,99 @@ public class RootNode extends Node {
     // Conservative final memory
     Node mem = in(MEM_IDX);
     TypeMem tmem = mem._val instanceof TypeMem tmem0 ? tmem0 : mem._val.oob(TypeMem.ALLMEM);
-
+    // All external aliases already escaped
+    tmem = tmem.set(BitsAlias.EXTX,TypeStruct.ISUSED);
+    
     // Reset for walking
     // Walk, finding escaped aliases and fidxs
-    escapes_reset();
-    escapes(trez, tmem);
+    escapes_reset(tmem);
+    escapes(trez);
 
-    TypeMem tmem2 = tmem;
-    // All external aliases already escaped
-    tmem2 = tmem2.set(BitsAlias.EXTX,TypeStruct.ISUSED);
-    // All escaped functions are called inside of Root, and modify memory "off-line".
-    if( EXT_FIDXS != BitsFun.NALL )
-      for( int fidx : EXT_FIDXS ) {
-        RetNode ret = RetNode.get(fidx);
-        if( ret != null && ret._val instanceof TypeTuple rtup ) {
-          TypeMem rmem = (TypeMem)rtup.at(MEM_IDX);
-          tmem2 = (TypeMem)tmem2.meet(rmem);
-          ret.deps_add(this);   // Ret changes, so do we
-        }
-      }
-    else tmem2 = TypeMem.ALLMEM;
-    // Root changes all escaping *internal* aliases for modifiable fields
-    for( int alias : EXT_ALIASES ) {
-      TypeStruct ts = tmem2.at(alias);
-      TypeStruct ts_wide = ts.widen_mut_fields();
-      tmem2 = tmem2.set(alias, ts_wide);
-    }
     // Kill the killed
     for( int alias : KILL_ALIASES )
-      tmem2 = tmem2.set(alias,TypeStruct.UNUSED);
+      EXT_MEM = EXT_MEM.set(alias,TypeStruct.UNUSED);
 
     return TypeTuple.make(Type.CTRL,
-                          tmem2,
+                          EXT_MEM,
                           TypeRPC.ALL_CALL,
                           TypeFunPtr.make(EXT_FIDXS,1),
                           TypeMemPtr.make(false,false,EXT_ALIASES,TypeStruct.ISUSED));
   }
 
   // Escape all Root results.  Escaping functions are called with the most
-  // conservative HM-compatible arguments.  Escaping Structs are recursively
-  // escaped, and can appear as input arguments.
+  // conservative HM-compatible arguments.  Escaping functions update the
+  // global memory state, and their return has to be visited also.
+
+  // Escaping pointers escape their structs, including their fields.  Escaping
+  // Structs state is pulled from the global memory state.  Struct fields can
+  // include new escaping functions, which bring in new memory state.
+
+  // This cycle fcn->mem->ptr->struct->fcn requires a worklist algo.
+  
   private static final VBitSet VISIT = new VBitSet();
+  private static final AryInt ALIASES = new AryInt();
   // Results computed here, and modified at each call.
   static BitsAlias EXT_ALIASES;
   static BitsFun   EXT_FIDXS  ;
+  static TypeMem   EXT_MEM    ;
 
-  static void escapes_reset() {
+  static void escapes_reset(TypeMem tmem) {
     VISIT.clear();
+    ALIASES.clear();
     EXT_ALIASES = BitsAlias.EMPTY;
     EXT_FIDXS   = BitsFun  .EMPTY;
+    EXT_MEM = tmem; // Root: TypeMem.ANYMEM.set(BitsAlias.EXTX,TypeStruct.ISUSED);    
   }
   
-  static void escapes(Type t, TypeMem tmem ) {
+  static void escapes( Type t ) {
+    _escapes(t);
+    while( !ALIASES.isEmpty() )
+      _escapes(EXT_MEM.at(ALIASES.pop()));
+  }
+  private static void _escapes( Type t ) {
     if( VISIT.tset(t._uid) ) return;
+    if( t == TypeNil.SCALAR || t == TypeNil.NSCALR ) {
+      EXT_ALIASES = BitsAlias.NALL;
+      EXT_FIDXS   = BitsFun  .NALL;
+    }
     if( t instanceof TypeMemPtr tmp ) {
+      if( tmp._aliases == BitsAlias.NALL ) return;
       // Add to the set of escaped structures
-      for( int alias : tmp._aliases ) {
-        EXT_ALIASES = EXT_ALIASES.set(alias);
-        if( tmem!=null ) {
-          TypeStruct ts = tmem.at(alias);
-          //escapes(ts._def,tmem);
-          for( TypeFld fld : ts )
-            escapes(fld._t,tmem);
-        } else 
-          throw unimpl();
-      }
+      for( int alias : tmp._aliases )
+        if( !EXT_ALIASES.test(alias) ) { // Never seen before escape
+          assert !KILL_ALIASES.test(alias);
+          EXT_ALIASES = EXT_ALIASES.set(alias);
+          ALIASES.push(alias);
+        }
     }
     if( t instanceof TypeFunPtr tfp ) {
+      if( tfp.fidxs() == BitsFun.NALL ) return;
       // Walk all escaped function args, and call them (like an external
       // Apply might) with the most conservative flow arguments possible.
-      for( int fidx : tfp.fidxs() )
-        EXT_FIDXS = EXT_FIDXS.set(fidx);
+      for( int fidx : tfp.fidxs() ) {
+        if( !EXT_FIDXS.test(fidx) ) {
+          EXT_FIDXS = EXT_FIDXS.set(fidx);
+          RetNode ret = RetNode.get(fidx);
+          if( ret != null && ret._val instanceof TypeTuple rtup ) {
+            ret.deps_add(Env.ROOT);
+            TypeMem rmem = (TypeMem)rtup.at(MEM_IDX);
+            TypeMem tmem2 = (TypeMem)rmem.meet(EXT_MEM);
+            for( int xalias : EXT_ALIASES )
+              if( EXT_MEM.at(xalias) != tmem2.at(xalias) &&
+                  ALIASES.find(xalias)!= -1 )
+                ALIASES.push(xalias); // Revisit
+            EXT_MEM = tmem2;
+          }
+        }
+      }
       // The return also escapes
-      escapes(tfp._ret,tmem);
+      _escapes(tfp._ret);
     }
+    // Structs escape all public fields
+    if( t instanceof TypeStruct ts )
+      for( TypeFld fld : ts )
+        // Root widens all non-final fields
+        _escapes(fld._access== TypeFld.Access.Final ? fld._t : TypeNil.SCALAR);
   }
 
   // Given a TV3, mimic a matching flow Type from all possible escaping

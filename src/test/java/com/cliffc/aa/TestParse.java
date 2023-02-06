@@ -30,6 +30,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=true;
     RSEED=0;
+
     testerr("sq={x -> x&x}; sq(\"abc\")", "*\"abc\" is not a int64",9);
   }
   static private void assertTrue(boolean t) {
@@ -59,7 +60,7 @@ public class TestParse {
     // Simple no-arg anonymous function, being called
     test("{5}()", "5", "int:5");
     // TestParse.a_basic_01
-    test("{ x -> ( 3, x )}", "[56]{any,4 -> *[12](3, Scalar) }", "{ A B -> *(int:3, B) }", null, null, "[12]", "[56]");
+    test("{ x -> ( 3, x )}", "[56]{any,4 -> *[12](3, Scalar) }", "{ A B -> *(int:3, B) }", null, null, "[nALL]", "[nALL]");
     // TestParse.a_basic_02
     test("{ z -> ((z 0), (z \"abc\")) }", "[56]{any,4 -> *[13]() }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[13]", "[56]" );
     // TestParse.g_overload_err_00

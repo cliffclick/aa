@@ -7,7 +7,6 @@ import com.cliffc.aa.tvar.TVLambda;
 import com.cliffc.aa.tvar.TVLeaf;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFunPtr;
-import com.cliffc.aa.type.TypeNil;
 
 // Strip out the display argument from a bound function.
 // Inverse of BindFP.
@@ -20,7 +19,7 @@ public class FP2DSPNode extends Node {
   @Override public Type value() {
     Type fpt = fp()._val;
     if( fpt == Type.ANY || fpt == Type.ALL ) return fpt;
-    return (fpt instanceof TypeFunPtr tfp) ? tfp.dsp() : fpt.oob(TypeNil.SCALAR);
+    return (fpt instanceof TypeFunPtr tfp) ? tfp.dsp() : fpt.oob();
   }
   
   @Override public boolean has_tvar() { return true; }

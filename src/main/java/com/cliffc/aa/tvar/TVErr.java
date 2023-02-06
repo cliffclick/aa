@@ -3,8 +3,7 @@ package com.cliffc.aa.tvar;
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeStruct;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 
 import static com.cliffc.aa.AA.unimpl;
 
@@ -21,6 +20,9 @@ public class TVErr extends TV3 {
   static final int XNIL=5;
   static final int XMAX=6;
 
+  // Specific error messages
+  Ary<String> _msgs;
+  
   public TVErr() { super(false,new TV3[XMAX]); }
 
   @Override public TVStruct as_struct() { return (TVStruct)arg(XSTR); }
@@ -72,9 +74,12 @@ public class TVErr extends TV3 {
   }
 
   public void err_msg(String msg) {
+    if( _msgs==null ) _msgs = new Ary<>(new String[1],0);
+    _msgs.push(msg);
   }
 
   // -------------------------------------------------------------
+  // Union/merge subclass specific bits
   @Override void _union_impl(TV3 that) {
     if( !(that instanceof TVErr err) ) {
       TV3 err_part = arg(that.eidx());
@@ -100,11 +105,24 @@ public class TVErr extends TV3 {
   }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
-    sb.p("[Cannot unify ");
-    for( int i=0; i<XMAX; i++ )
-      if( _args[i]!=null )
-        _args[i]._str(sb,visit,dups,debug).p(" and ");
-    return sb.unchar(5).p("]");
+    int cnt=0; for( int i=0; i<XMAX; i++ ) if( _args[i]!=null ) cnt++;
+    sb.p("[");
+    if( _msgs!=null ) {
+      for( String msg : _msgs )
+        sb.p(msg).p(", ");
+      sb.unchar(2);
+    }
+    if( cnt>0 ) {
+      if( cnt>1 ) {
+        if( _msgs==null ) sb.p("Cannot unify ");
+        else sb.p(", cannot unify ");
+      } else sb.p(", ");
+      for( int i=0; i<XMAX; i++ )
+        if( _args[i]!=null )
+          _args[i]._str(sb,visit,dups,debug).p(" and ");
+      sb.unchar(5);
+    }
+    return sb.p("]");
   }
 
 }

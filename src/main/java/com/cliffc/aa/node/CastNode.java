@@ -113,10 +113,8 @@ public class CastNode extends Node {
       throw unimpl(); // return maynil.unify(notnil,work);
 
     // Stall, until notnil becomes a TVNilable or a TVStruct
-    if( maynil instanceof TVLeaf ) {
-      maynil.deps_add_deep(this);
-      return false;
-    }
+    if( maynil instanceof TVLeaf )
+      return maynil.deps_add_deep(this);
     
     // Unify the maynil with a nilable version of notnil
     return maynil.unify(new TVNil(notnil),test);

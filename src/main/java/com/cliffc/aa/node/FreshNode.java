@@ -42,10 +42,8 @@ public class FreshNode extends Node {
   
   @Override public boolean unify( boolean test ) {
     TV3 fresh = id().tvar();
-    if( fresh instanceof TVLeaf) { // Shortcut
-      fresh.deps_add_deep(this);
-      return false;
-    }
+    if( fresh instanceof TVLeaf) // Shortcut
+      return fresh.deps_add_deep(this);
     return fresh.fresh_unify(tvar(),nongen(),test);
   }
   // Two FreshNodes are only equal, if they have compatible TVars

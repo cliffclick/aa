@@ -27,7 +27,7 @@ public final class FunPtrNode extends Node {
   // interesting thing is when an out-of-scope TVar uses the same TVar
   // internally in different parts - the copy replicates this structure.  When
   // unified, it forces equivalence in the same places.
-  public  FunPtrNode( String name, RetNode ret ) {
+  public FunPtrNode( String name, RetNode ret ) {
     super(OP_FUNPTR,ret);
     _name = name;
     ParmNode pdsp = ret.fun().parm(DSP_IDX);
@@ -73,6 +73,16 @@ public final class FunPtrNode extends Node {
     RetNode ret = ret();
     TypeTuple tret = (TypeTuple)(ret._val instanceof TypeTuple ? ret._val : ret._val.oob(TypeTuple.RET));
     return TypeFunPtr.make(ret._fidx,nargs(),Type.ANY,tret.at(REZ_IDX));
+  }
+
+  @Override public Node ideal_reduce() {
+    // Dead display post-Combo, we can wipe out the display type
+    if( _tvar!=null && tvar() instanceof TVLambda lam && !(lam.dsp() instanceof TVLeaf) &&
+        _val instanceof TypeFunPtr tfp && tfp.dsp()==Type.ANY &&
+        fun().parm(DSP_IDX)==null ) {
+      _tvar = ((TVLambda)lam.copy()).clr_dsp();
+    }
+    return null;
   }
 
   @Override public boolean has_tvar() { return true; }

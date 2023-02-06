@@ -47,12 +47,11 @@ public abstract class PrimNode extends Node {
     _badargs=null;
   }
 
-  private static final TypeNil TSTR = TypeStruct.make_test("0",TypeInt.INT8,Access.Final);
-  
   // Int/Float primitives.  
   public static final StructNode ZINT = new StructNode(false,false,null,"", Type.ALL).set_proto_instance(TypeInt.INT64).init();
   public static final StructNode ZFLT = new StructNode(false,false,null,"", Type.ALL).set_proto_instance(TypeFlt.FLT64).init();
-  public static final StructNode ZSTR = new StructNode(false,false,null,"", Type.ALL).set_proto_instance(TSTR).init();
+  //public static final StructNode ZSTR = new StructNode(false,false,null,"", Type.ALL).set_proto_instance(TypeMemPtr.STRPTR).init();
+  public static final StructNode ZSTR = new StructNode(false,false,null,"", Type.ALL).set_proto_instance(TypeInt.INT64).init();
   public static final NewNode PINT = new NewNode();
   public static final NewNode PFLT = new NewNode();
   public static final NewNode PSTR = new NewNode();
@@ -60,7 +59,8 @@ public abstract class PrimNode extends Node {
   public static final ConNode  INT = new ConNode(TypeInt. INT64).init();
   public static final ConNode  FLT = new ConNode(TypeFlt. FLT64).init();
   public static final ConNode NFLT = new ConNode(TypeFlt.NFLT64).init();
-  public static final ConNode  STR = new ConNode(TSTR).init();
+  //public static final ConNode  STR = new ConNode(TypeMemPtr.STRPTR).init();
+  public static final ConNode  STR = new ConNode(TypeInt.INT64).init();
   
   private static PrimNode[] PRIMS = null; // All primitives
 
@@ -166,6 +166,7 @@ public abstract class PrimNode extends Node {
       if(      tformal==TypeInt.INT64   ) nformal =  INT;
       else if( tformal==TypeFlt.FLT64   ) nformal =  FLT;
       else if( tformal==TypeFlt.NFLT64  ) nformal = NFLT;
+      else if( tformal==TypeMemPtr.STRPTR)nformal =  STR;
       else if( tformal==Type.ANY        ) nformal = Env.ANY;
       else if( tformal==Type.ALL        ) nformal = Env.ALL;
       else if( tformal==TypeFunPtr.THUNK) nformal = Env.THUNK;
@@ -547,6 +548,7 @@ public abstract class PrimNode extends Node {
 
 
   public static class StrLen extends PrimNode {
+    //public StrLen() { super("#_",TypeTuple.STR,TypeInt.INT64); }
     public StrLen() { super("#_",TypeTuple.INT64,TypeInt.INT64); }
     @Override public TypeNil apply( TypeNil[] args ) {
       throw unimpl();

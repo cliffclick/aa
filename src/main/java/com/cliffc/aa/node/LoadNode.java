@@ -24,11 +24,9 @@ public class LoadNode extends Node {
     Type tadr = adr()._val;
     Type tmem = mem()._val;       // Memory
     return switch(tadr ) {
-    case TypeStruct ts -> ts; // Loading from Prototype is a no-op
-    case TypeInt    ti -> ti; // Loading from Prototype is a no-op
-    case TypeFlt    tf -> tf; // Loading from Prototype is a no-op
     case TypeMemPtr tmp ->    // Loading from a pointer
       tmem instanceof TypeMem tm ? tm.ld(tmp) : tmem.oob();
+    case TypeNil tn -> tn;      // Load from prototype/primitive is a no-op
     default -> tadr.oob();      // Nothing sane
     };
   }
@@ -50,32 +48,18 @@ public class LoadNode extends Node {
     return tmem.remove_no_escapes(tptr._aliases);
   }
 
-  @Override public boolean has_tvar() { return true; }
-
-  // Standard memory unification; the Load unifies with the loaded field.
-  @Override public boolean unify( boolean test ) {
-    boolean progress = false;
-    TV3 self = tvar();
-    TV3 adr = adr().tvar();
-    return switch (adr) {
-    case TVLeaf leaf -> {  // Wait until forced to either TVStruct or TVPtr
-      leaf.deps_add_deep(this);
-      yield false;
-    }
-    case TVPtr ptr -> self.unify(ptr.load(),test);
-    case TVStruct tstr -> self.unify(adr, test); // Load from prototype, just pass-thru
-    case TVClz tclz    -> self.unify(adr, test); // Load from prototype, just pass-thru
-    case TVBase   base -> self.unify(FieldNode.tv_clz(base._t), test); // Unify against primitive CLZ
-    default -> throw unimpl();
-    };
-  }
-
   // Strictly reducing optimizations
   @Override public Node ideal_reduce() {
     Node adr = adr();
     Type tadr = adr._val;
     // We allow Loads against structs to allow for nested (inlined) structs.
-    if( tadr instanceof TypeStruct ) return adr();
+    //if( tadr instanceof TypeStruct ) return adr();
+    
+    // We allow Loads against unwrapped primitives, as part of the normal Oper
+    // expansion in the Parser.  These are no-ops.
+    if( tadr instanceof TypeInt ) return adr;
+    if( tadr instanceof TypeFlt ) return adr;
+    // Dunno about other things than pointers
     if( !(tadr instanceof TypeMemPtr tmp) ) return null;
     if( adr instanceof FreshNode frsh ) adr = frsh.id();
     // If we can find an exact previous store, fold immediately to the value.
@@ -88,7 +72,6 @@ public class LoadNode extends Node {
     }
     return null;
   }
-
 
   // Changing edges to bypass, but typically not removing nodes nor edges
   @Override public Node ideal_mono() {
@@ -166,19 +149,19 @@ public class LoadNode extends Node {
         case CallNode     node -> mem = node.mem(); // Lifting out of a Call
         case RootNode     node -> { return null; }
         case CallEpiNode  node -> {
-          CallNode call = node.call();
-          TypeTuple tcall = (TypeTuple)call._val;
-          TypeMemPtr tesc = (TypeMemPtr)CallNode.tesc(tcall);
-          BitsAlias esc_aliases = tesc._aliases;
-          if( aliases.overlaps(esc_aliases) )
-            return null;
-          // Cannot track call-modified set (unless e.g. call is_all_wired and
-          // is pure) without Root escapes.
-          if( Env.ROOT._val == TypeTuple.ROOT ) {
-            Env.ROOT.deps_add(ldst);
-            return null;
+          mem = node.is_copy(MEM_IDX); // Skip thru a copy
+          if( mem == null ) {
+            CallNode call = node.call();
+            BitsAlias esc_aliases = ((TypeMemPtr)CallNode.tesc((TypeTuple)call._val))._aliases;
+            // Collides, might be use/def by call
+            if( aliases.overlaps(esc_aliases) ) return null;
+            // Cannot track call-modified set (unless e.g. call is_all_wired and
+            // is pure) without Root escapes.
+            if( Env.ROOT._val == TypeTuple.ROOT )
+              { Env.ROOT.deps_add(ldst);  return null; }
+            // Peek through call
+            mem = call.mem();
           }
-          mem = call.mem();
         } 
 
         case null, default -> throw unimpl(); // decide cannot be equal, and advance, or maybe-equal and return null
@@ -199,4 +182,23 @@ public class LoadNode extends Node {
       }
     }
   }
+  
+  @Override public boolean has_tvar() { return true; }
+
+  // Standard memory unification; the Load unifies with the loaded field.
+  @Override public boolean unify( boolean test ) {
+    TV3 self = tvar();
+    TV3 adr = adr().tvar();
+    return switch (adr) {
+      // Wait until forced to either TVStruct or TVPtr
+    case TVLeaf leaf -> leaf.deps_add_deep(this);
+    case TVPtr ptr -> self.unify(ptr.load(),test);
+    case TVStruct tstr -> self.unify(adr, test); // Load from prototype, just pass-thru
+    case TVClz tclz    -> self.unify(adr, test); // Load from prototype, just pass-thru
+    case TVBase   base -> self.unify(FieldNode.tv_clz(base._t), test); // Unify against primitive CLZ
+    case TVErr err -> err.unify(self,test);
+    default -> throw unimpl();
+    };
+  }
+
 }

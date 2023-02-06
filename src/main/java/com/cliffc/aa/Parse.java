@@ -581,8 +581,11 @@ public class Parse implements Comparable<Parse> {
       int rhsx = _x;            // Invariant: WS already skipped
       int lhsidx = lhs.push();
       Parse err = errMsg(opx);
+      // Load against LHS pointer.  If this is a primitive, the Load is a no-op;
+      // otherwise this loads value from the reference for a clazz field lookup.
+      Node val = gvn(new LoadNode(mem(),lhs,err));
       // Get the overloaded operator field, always late binding
-      Node over = gvn(new FieldNode(lhs,binop._name,true,err));
+      Node over = gvn(new FieldNode(val,binop._name,true,err));
       // Get the resolved operator from the overload
       Node fun = gvn(new FieldNode(over,"_",false,err));
       int fidx = fun.push();
@@ -692,12 +695,12 @@ public class Parse implements Comparable<Parse> {
       if( op._nargs!=1 ) throw unimpl(); // No binary/trinary allowed here
       int e0idx = e0.push();
       Parse err = errMsg(oldx);
-      // Get the overloaded operator field, always late binding
-      // Load field e0.op2_ as an overload, load again to resolve to a TFP, and
-      // instance call.  Returns an overload from the clazz, typed as a
-      // TypeStruct tuple where the fields hold the function choices.
-      Node over = gvn(new FieldNode(e0,op._name,true,err));
-      // Selects the correct function from the TypeStruct tuple.
+      // Load against e0 pointer.  If e0 is a primitive, the Load is a no-op;
+      // otherwise this converts a reference to a value.
+      Node val = gvn(new LoadNode(mem(),e0,err));
+      // Load from the clazz value
+      Node over = gvn(new FieldNode(val,op._name,true,err));
+      // Selects the correct function from the TypeStruct overload tuple.
       Node fun = gvn(new FieldNode(over,"_",false,err));
       // Call the operator
       n = do_call(errMsgs(oldx,oldx),args(Node.pop(e0idx),fun));

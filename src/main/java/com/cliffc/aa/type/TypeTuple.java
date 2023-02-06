@@ -111,12 +111,13 @@ public class TypeTuple extends Type<TypeTuple> {
   public  static final TypeTuple TEST0= make(CTRL, TypeMem.ALLMEM, TypeFunPtr.GENERIC_FUNPTR, TypeNil.SCALAR); // Call with 1 arg
   public  static final TypeTuple TEST1= make(CTRL, TypeMem.ANYMEM, TypeFunPtr.GENERIC_FUNPTR, TypeNil.SCALAR); // Call with 1 arg
   // Arguments
-  public  static final TypeTuple INT64      = make(CTRL, TypeMem.ALLMEM, TypeInt.INT64); // {int->flt}
-  public  static final TypeTuple FLT64      = make(CTRL, TypeMem.ALLMEM, TypeFlt.FLT64); // {flt->flt}
-  public  static final TypeTuple INT64_INT64= make(CTRL, TypeMem.ALLMEM, TypeInt.INT64,TypeInt. INT64); // {int  int->int }
-  public  static final TypeTuple INT64_NFLT64=make(CTRL, TypeMem.ALLMEM, TypeInt.INT64,TypeFlt.NFLT64); // {int nflt->flt }
-  public  static final TypeTuple FLT64_FLT64= make(CTRL, TypeMem.ALLMEM, TypeFlt.FLT64,TypeFlt. FLT64); // {flt  flt->flt }
-  public  static final TypeTuple FLT64_INT64= make(CTRL, TypeMem.ALLMEM, TypeFlt.FLT64,TypeInt. INT64); // {flt  int->flt }
+  public  static final TypeTuple INT64      = make(CTRL, TypeMem.ALLMEM, TypeInt.INT64); // { int -> }
+  public  static final TypeTuple FLT64      = make(CTRL, TypeMem.ALLMEM, TypeFlt.FLT64); // { flt -> }
+  public  static final TypeTuple INT64_INT64= make(CTRL, TypeMem.ALLMEM, TypeInt.INT64,TypeInt. INT64); // { int  int -> }
+  public  static final TypeTuple INT64_NFLT64=make(CTRL, TypeMem.ALLMEM, TypeInt.INT64,TypeFlt.NFLT64); // { int nflt -> }
+  public  static final TypeTuple FLT64_FLT64= make(CTRL, TypeMem.ALLMEM, TypeFlt.FLT64,TypeFlt. FLT64); // { flt  flt -> }
+  public  static final TypeTuple FLT64_INT64= make(CTRL, TypeMem.ALLMEM, TypeFlt.FLT64,TypeInt. INT64); // { flt  int -> }
+  public  static final TypeTuple STR        = make(CTRL, TypeMem.ALLMEM, TypeMemPtr.STRPTR);            // { str -> }
   public  static final TypeTuple OOP_OOP    = make(CTRL, TypeMem.ALLMEM, TypeMemPtr.ISUSED0,TypeMemPtr.ISUSED0);
 
   //

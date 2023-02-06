@@ -292,9 +292,9 @@ public class CallNode extends Node {
     ts[_defs._len-1] = tfx;
 
     // Collect local escaping arguments
-    RootNode.escapes_reset();
+    RootNode.escapes_reset(tmem);
     for( int i=DSP_IDX; i<nargs(); i++ )
-      RootNode.escapes(val(i),tmem);
+      RootNode.escapes(val(i));
     BitsAlias extas = RootNode.EXT_ALIASES;
     ts[_defs._len] = TypeMemPtr.make(false,false,extas,TypeStruct.UNUSED);
     
@@ -315,7 +315,7 @@ public class CallNode extends Node {
     // dead inputs to resolve a call!  The call input *must* have some uses
     // which distinguish which function to call.  Cannot flip this during
     // Combo, as will break monotonicity.
-    if( !LIFTING ) return _live;
+    if( !LIFTING ) return Type.ALL;
     
     // Check that all fidxs are wired.  If not wired, a future wired fidx might
     // use the call input.
@@ -343,8 +343,7 @@ public class CallNode extends Node {
     // Specifically for the function/display, only unify on the display part.
     if( tv3 instanceof TVLambda lam ) // Expecting the call input to be a function
       return lam.dsp().unify(tvp,test);
-    tv3.deps_add_deep(proj);    // Proj will unify once tv3 becomes a fun
-    return false;
+    return tv3.deps_add_deep(proj);    // Proj will unify once tv3 becomes a fun
   }
 
   @Override public ErrMsg err( boolean fast ) {

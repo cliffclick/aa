@@ -28,6 +28,7 @@ public class TVLambda extends TV3 {
   public TV3 ret() { return arg(0); }
   public TV3 dsp() { return arg(DSP_IDX); }
   public int nargs() { return len(); }
+  public TVLambda clr_dsp() { _args[DSP_IDX] = new TVLeaf(); return this; }
   
   @Override int eidx() { return TVErr.XFUN; }
 

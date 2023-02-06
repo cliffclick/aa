@@ -871,6 +871,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( visit.tset(_uid) ) return; // Been there, done that
     // Walk reachable graph
     if( is_dead() ) return;
+    if( is_prim() ) _elock();   // Prims back into VALS
     Env.GVN.add_work_new(this);
     for( Node def : _defs )  if( def != null )  def.walk_opt(visit);
     for( Node use : _uses )                     use.walk_opt(visit);

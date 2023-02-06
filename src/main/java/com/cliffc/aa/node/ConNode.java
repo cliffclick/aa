@@ -2,11 +2,11 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.TV3;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeFlt;
-import com.cliffc.aa.type.TypeNil;
+import com.cliffc.aa.type.*;
 
 import java.util.function.Predicate;
+
+import static com.cliffc.aa.AA.unimpl;
 
 // Constant value nodes; no computation needed.  Hashconsed for unique
 // constants, except for XNIL.  XNIL allows for a TV3 typevar Nilable-Leaf with
@@ -15,7 +15,6 @@ public class ConNode<T extends Type> extends Node {
   T _t;                         // Not final for testing
   public ConNode( T t ) {
     super(OP_CON,Env.ROOT);
-    assert t.simple_ptr()==t;
     _t=t;
   }
   @Override public String xstr() {
@@ -39,10 +38,18 @@ public class ConNode<T extends Type> extends Node {
   @Override public boolean unify( boolean test ) { return false; }
 
   @Override public String toString() { return str(); }
+
+  private boolean equals_uses_tvar() {
+    return _t==TypeNil.XNIL || _t instanceof TypeMemPtr || _t instanceof TypeFunPtr;
+  }
   @Override public int hashCode() {
     // In theory also slot 0, but slot 0 is always Start.
-    // Two XNILs are typically different because their TV3s are different
-    return _t.hashCode() + (_tvar == null ? 0 : _tvar._uid);
+    int hash = _t.hashCode();
+    // Two XNILs are typically different because their TV3s are different.
+    // Also, vary two TMPs or TFPs might vary (but not e.g. Scalar)
+    if( _tvar!=null && equals_uses_tvar() )
+      hash ^= _tvar._uid;
+    return hash;
   }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
@@ -51,12 +58,18 @@ public class ConNode<T extends Type> extends Node {
     // Prior to Combo we must assume two XNILs will unify to different TV3
     // types and thus must remain seperate.  After Combo they can fold together
     // if they have the same TVars.
-    if( _t==TypeNil.XNIL && _tvar==null ) return false;
+    if( _tvar==null && equals_uses_tvar() ) return false;
     
     // Check TVars, if they exist.  This allows combining ConNodes with TVars
     // pre-Combo, except for XNIL.  E.g. all ints (or floats) are alike to TV3.
-    if( _tvar==null ) { assert con._tvar==null; return true; }
-    return tvar()==con.tvar();
+    if( _tvar==null ) {
+      if( con._tvar!=null ) _tvar=con._tvar;
+      return true;
+    }
+    if( tvar()==con.tvar() ) return true;
+    if( !equals_uses_tvar() ) return true;
+    // Two tvars must unify
+    throw unimpl();
   }
   
   @Override Node walk_dom_last( Predicate<Node> P) { return null; }
