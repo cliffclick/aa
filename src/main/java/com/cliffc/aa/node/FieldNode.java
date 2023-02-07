@@ -68,7 +68,7 @@ public class FieldNode extends Node implements Resolvable {
     // Clazz or local struct ?
     Type tstr = null;
     if( _clz ) {
-      StructNode clazz = clzz(t);
+      StructNode clazz = clz_node(t);
       if( clazz !=null ) {
         tstr = clazz._val;      // Value from clazz
         // Add a dep edge to the clazz, so value changes propagate permanently
@@ -92,13 +92,6 @@ public class FieldNode extends Node implements Resolvable {
     return t.meet(TypeNil.XSCALAR);
   }
 
-  // Checks is_err from HMT from StructNode.
-  // Gets the T2 from the base StructNode.
-  // Gets the StructNode from the aliases - needs the actual struct layout
-  private Type missing_field() {
-    throw unimpl();
-  }
-
   @Override public Node ideal_reduce() {
     if( is_resolving() ) return null;
     
@@ -113,7 +106,7 @@ public class FieldNode extends Node implements Resolvable {
     }
 
     // Back-to-back CLZ-Struct/Field
-    StructNode str = in(0) instanceof StructNode str0 ? str0 : clzz(val(0));
+    StructNode str = in(0) instanceof StructNode str0 ? str0 : clz_node(val(0));
     // Back-to-back Struct/Field
     if( str!=null && str.err(true)==null ) {
       int idx = str.find(_fld);
@@ -126,19 +119,6 @@ public class FieldNode extends Node implements Resolvable {
     }
 
     return null;
-  }
-
-  // Prototype or null
-  private static StructNode clzz(Type t) {
-    return switch( t ) {
-    case TypeInt ti -> PrimNode.ZINT;
-    case TypeFlt tf -> PrimNode.ZFLT;
-    case TypeStruct ts -> Env.PROTOS.get(ts._clz);  // CLZ from instance
-    // TODO: XNIL uses the INT clazz.
-    case TypeNil xnil -> xnil==TypeNil.XNIL ? PrimNode.ZINT : null;
-    // Other, like SCALAR, does not have a known CLZ
-    default -> null;
-    };
   }
   
     
@@ -173,7 +153,7 @@ public class FieldNode extends Node implements Resolvable {
       switch( tv0 ) {
       case TVClz clz -> tv0 = clz.clz(); // Clazz part from a clazzed TV
       case TVLeaf leaf -> {              // Expand to a clazzed TV
-        StructNode proto = clzz(val(0)); // Existing prototypes for int/flt/named-clazz-types
+        StructNode proto = clz_node(val(0)); // Existing prototypes for int/flt/named-clazz-types
         if( proto == null ) {            // Unknown inferred clazz
           if( test ) return true;        // Always progress
           tv0 = new TVStruct(true, new String[]{_fld}, new boolean[]{true}, new TV3[]{tvar()}, true);
@@ -223,24 +203,34 @@ public class FieldNode extends Node implements Resolvable {
     
     // If the field is resolved, and not in struct and not in proto and the
     // struct is closed, then the field is missing.
-    if( !str.is_open() ) {
-      throw unimpl();           // Missing field
-    }
+    if( !str.is_open() )
+      return tvar().unify_err(test) | ((TVErr)tvar()).err_msg(("Missing field "+_fld).intern(),test);
 
-    //// Add the field, make progress
-    //if( !test ) str.add_fld(_fld,tvar());
-    //return true;
-    throw unimpl();
+    // Add the field, make progress
+    if( !test ) str.add_fld(_fld,_clz,tvar());
+    return true;
   }
 
-  public static TVStruct tv_clz(Type t) {
-    String clz = switch( t ) {
+
+  public static String clz_str(Type t) {
+    return switch( t ) {
     case TypeInt ti -> "int:";
     case TypeFlt tf -> "flt:";
+    case TypeMemPtr tmp -> { throw unimpl(); } // Fetch from tmp._obj._clz?
+    case TypeStruct ts -> ts._clz;
     case TypeNil tn -> tn==TypeNil.XNIL ? "int:" : null;
     default -> null;
     };
-    return (TVStruct)Env.PROTOS.get(clz).tvar();
+  }
+
+  // Prototype or null
+  private static StructNode clz_node(Type t) {
+    String clz = clz_str(t);
+    return clz==null ? null : Env.PROTOS.get(clz);  // CLZ from instance
+  }
+
+  public static TVStruct clz_tv(Type t) {
+    return (TVStruct)clz_node(t).tvar();
   }
   
   private boolean try_resolve( TVStruct str, boolean test ) {

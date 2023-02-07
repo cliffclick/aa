@@ -147,6 +147,8 @@ public class RootNode extends Node {
   public BitsAlias matching_escaped_aliases(TV3 tv3, Node dep) {
     // Caller result depends on escaping fidxs
     if( dep!=null ) deps_add(dep);
+    BitsAlias ralias = ralias();
+    if( ralias==BitsAlias.NALL ) return BitsAlias.NALL;
     BitsAlias aliases = BitsAlias.EMPTY;
     for( int alias : ralias() )
       if( tv3.trial_unify_ok(NewNode.get(alias).tvar(),false) )

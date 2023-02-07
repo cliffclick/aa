@@ -53,9 +53,11 @@ public class PhiNode extends Node {
     RegionNode r = (RegionNode) in(0);
     assert r._defs._len==_defs._len;
     Type t = Type.ANY;
-    for( int i=1; i<_defs._len; i++ )
+    for( int i=1; i<_defs._len; i++ ) {
+      r.in(i).deps_add(this);
       if( r.val(i)!=Type.XCTRL && r.val(i)!=Type.ANY ) // Only meet alive paths
         t = t.meet(val(i));
+    }
     return t;
   }
 

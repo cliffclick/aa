@@ -246,7 +246,8 @@ public class GVNGCM {
       assert _tmps._len<16;             // Time for a BitSet
       if( _tmps.find(n)!=-1 ) return n; // Already flowed & keeped
       n.push();                         // Force alive for the duration
-      n.do_flow();                      // Update types
+      if( n.do_flow()!=null )           // Update types
+        n.deps_work_clear();            // Back on worklist for progress
       return _tmps.push(n);             // Track, for untracking at close
     }
     @Override public void close() {

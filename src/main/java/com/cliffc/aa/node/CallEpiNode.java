@@ -42,12 +42,15 @@ public final class CallEpiNode extends Node {
   // True if all Call value fidxs are wired.  Monotonic.  Always true if Call
   // fidxs are above-center (no wiring required, these paths are never taken).
   // Always false if Call fidxs are FULL or otherwise infinite.  Can be extra
-  // wired functions never called.
+  // wired functions never called.  Post-Combo, must all be wired but dead
+  // paths can be trimmed.
   public boolean is_all_wired() {
     Type tc = call()._val;
     BitsFun fidxs = CallNode.ttfp(tc).fidxs();
     if( fidxs.above_center() ) return true; // No path is taken
     if( fidxs==BitsFun.NALL ) return false; // Some unknown path is unwired
+    // Post-combo, was all wired but some dead paths may have been removed.
+    //if( AA.LIFTING && Combo.HM_FREEZE ) return true;
     int ncall=0;
     for( int i=0; i<nwired(); i++ )
       if( fidxs.test(wired(i)._fidx) ) // Verify each fidx is wired
@@ -454,12 +457,20 @@ public final class CallEpiNode extends Node {
     if( !(tv3 instanceof TVLambda tfun) ) {
       if( test ) return true;
       add_flow();           // Re-unify after forcing a Lambda, to get the args
-      return tv3.unify(new TVLambda(call.nargs(),new TVLeaf(),tvar()),test);
+      TVLambda lam = new TVLambda(call.nargs(),new TVLeaf(),tvar());
+      if( tv3==null ) {
+        // Error with no lambda, force one
+        ((TVErr)fdx.tvar())._union_impl(lam);
+        return true;
+      }
+      return tv3.unify(lam,false);
     }
     
     // Check for progress amongst args
-    int nargs = Math.min(call.nargs(),tfun.nargs());
-    for( int i=DSP_IDX; i<nargs; i++ ) {
+    int tnargs = tfun.nargs() - ARG_IDX;
+    int cnargs = call.nargs() - ARG_IDX;
+    int nargs = Math.min(tnargs,cnargs);
+    for( int i=DSP_IDX; i<nargs+ARG_IDX; i++ ) {
       TV3 formal = tfun.arg(i);
       TV3 actual = call.tvar(i);
       progress |= actual.unify(formal,test);
@@ -469,8 +480,10 @@ public final class CallEpiNode extends Node {
     // Check for progress on the return
     progress |= tvar().unify(tfun.ret(),test);
 
-    if( tfun.nargs() > nargs ) throw unimpl(); // Missing arguments
-    if( call.nargs() > nargs ) throw unimpl(); // Too many arguments
+    
+    if( tnargs > nargs )  // Missing arguments
+      progress |= tvar().unify_err(test) | ((TVErr)tvar()).err_msg(("Passing "+cnargs+" arguments to a function taking "+tnargs+" arguments").intern(),test);
+    if( cnargs > nargs ) throw unimpl(); // Too many arguments
     
     return progress;
   }

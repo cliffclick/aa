@@ -6,10 +6,7 @@ import com.cliffc.aa.Parse;
 import com.cliffc.aa.node.FieldNode;
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.Util;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 
 import java.util.Arrays;
 
@@ -306,8 +303,10 @@ public class TVStruct extends TV3 {
   public ErrMsg err_resolve(Node in0, Parse loc, String msg) {
     if( msg.equals("No field resolves") ) {
       if( in0 instanceof FieldNode fld ) {
-        if( Oper.is_oper(fld._fld) )
-          return ErrMsg.unresolved(loc,"Operator "+fld._fld+" does not resolve");
+        if( Oper.is_oper(fld._fld) ) {
+          String clz = FieldNode.clz_str(fld.val(0));
+          return ErrMsg.unresolved(loc,"No operator "+(clz==null?"":clz)+fld._fld);
+        }
         else throw unimpl();
       }
       return ErrMsg.unresolved(loc,msg);

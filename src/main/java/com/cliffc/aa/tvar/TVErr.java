@@ -30,7 +30,6 @@ public class TVErr extends TV3 {
   @Override public TVClz    as_clz   () { return (TVClz   )arg(XCLZ); }
   @Override public TVNil    as_nil   () { return (TVNil   )arg(XNIL); }
 
-  public void set_struct( TVStruct st ) { assert _args[XSTR]==null; _args[XSTR] = st; }
   @Override int eidx() { throw unimpl(); }
 
   @Override TV3 find_nil(TVNil nil) { return this; }
@@ -45,15 +44,19 @@ public class TVErr extends TV3 {
     return true;
   }
 
+  // THAT is not an error, unify it with the correct sub-part and union it to
+  // THIS error.
   @Override boolean _unify_err(TV3 that) {
     assert !unified() && !that.unified(); // Do not unify twice
     assert !(that instanceof TVErr);
-    int x = that.eidx();                  // Which part unifies
-    that._deps_work_clear();              // 
-    TV3 ecp = that.copy();                // Make a shallow clone of that
-    that._uf = this;                      // That is crushed into this
-    if( _args[x]==null ) _args[x] = ecp;  // Unify shallow clone into others of its kind
-    else ecp._unify(arg(x),false);
+    that._deps_work_clear();              //
+    if( !(that instanceof TVLeaf) ) {
+      int x = that.eidx();                 // Which part unifies
+      TV3 ecp = that.copy();               // Make a shallow clone of that
+      if( _args[x]==null ) _args[x] = ecp; // Unify shallow clone into others of its kind
+      else ecp._unify(arg(x),false);
+    }
+    that._uf = this;            // That is crushed into this
     return true;
   }
 
@@ -73,18 +76,25 @@ public class TVErr extends TV3 {
     throw unimpl();
   }
 
-  public void err_msg(String msg) {
+  // Make this tvar an error and add an error message
+  @Override public boolean unify_err(boolean test) { return false; }
+  
+  // Add an error message
+  public boolean err_msg(String msg, boolean test) {
+    if( _msgs!=null && _msgs.find(msg)!= -1 ) return false;
+    if( test ) return true;
     if( _msgs==null ) _msgs = new Ary<>(new String[1],0);
     _msgs.push(msg);
+    return true;
   }
 
   // -------------------------------------------------------------
   // Union/merge subclass specific bits
-  @Override void _union_impl(TV3 that) {
+  @Override public void _union_impl(TV3 that) {
     if( !(that instanceof TVErr err) ) {
       TV3 err_part = arg(that.eidx());
-      if( err_part != null )
-        err_part._union_impl(that);
+      if( err_part == null ) _args[that.eidx()] = that;
+      else err_part._union_impl(that);
     } else {
       throw unimpl();
     }

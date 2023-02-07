@@ -31,7 +31,7 @@ public final class ErrNode extends Node {
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
     TVErr e = new TVErr();
-    e.err_msg(_err.toString());
+    e.err_msg(_err.toString(),false);
     return e;
   }
 

@@ -1,8 +1,6 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
-import com.cliffc.aa.ErrMsg;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVLambda;
 import com.cliffc.aa.type.*;
@@ -146,9 +144,9 @@ public class CallNode extends Node {
                         ? tcall._ts[tcall.len()-2]
                         : t.oob(TypeFunPtr.GENERIC_FUNPTR));
   }
-  TypeTuple set_ttfp(TypeFunPtr tfp) {
+  void set_ttfp(TypeFunPtr tfp) {
     TypeTuple tt = (TypeTuple)_val;
-    return tt.set(nargs(),tfp);
+    tt.set(nargs(), tfp);
   }
 
   // Clones during inlining all become unique new call sites.  The original RPC
@@ -198,16 +196,12 @@ public class CallNode extends Node {
 
     // Dead, do nothing
     if( tctl(tcall)!=Type.CTRL ) { // Dead control (NOT dead self-type, which happens if we do not resolve)
-    //  if( (ctl() instanceof ConNode) ) return null;
-    //   Kill all inputs with type-safe dead constants
-    //  set_mem(Node.con(TypeMem.XMEM));
-    //  set_dsp(Node.con(TypeFunPtr.GENERIC_FUNPTR.dual()));
-    //  if( is_dead() ) return this;
-    //  for( int i=ARG_IDX; i<_defs._len; i++ )
-    //    set_def(i,Env.ANY);
-    //  gvn.add_work_defs(this);
-    //  return set_def(0,Env.XCTRL,gvn);
-      throw unimpl();
+      if( (ctl() instanceof ConNode) ) return null;
+      // Kill all inputs with type-safe dead constants
+      set_mem(Env.XMEM);
+      for( int i=ARG_IDX; i<_defs._len; i++ )
+        set_def(i,Env.ANY);
+      return set_def(0,Env.XCTRL);
     }
 
     // Have some sane function choices?
@@ -215,10 +209,6 @@ public class CallNode extends Node {
     BitsFun fidxs = tfp.fidxs();
     if( fidxs==BitsFun.EMPTY ) // TODO: zap function to empty function constant
       return null;             // Zero choices
-
-    // Try to resolve to single-target
-    Node fdx = fdx();
-    if( fdx instanceof FreshNode fresh ) fdx = fresh.id();
 
     // Wire valid targets.
     CallEpiNode cepi = cepi();
@@ -274,6 +264,7 @@ public class CallNode extends Node {
   // merge from that path.  Result tuple type:
   @Override public Type value() {
     if( _is_copy ) return _val; // Freeze until unwind
+    if( ctl()._val==Type.ALL ) return Type.ALL;
     // Result type includes a type-per-input, plus one for the function
     final Type[] ts = Types.get(_defs._len+1);
     ts[CTL_IDX] = ctl()._val;
@@ -318,9 +309,10 @@ public class CallNode extends Node {
     if( !LIFTING ) return Type.ALL;
     
     // Check that all fidxs are wired.  If not wired, a future wired fidx might
-    // use the call input.
+    // use the call input.  Post-Combo, all was wired, but dead Calls might be
+    // unwinding.
     if( !_is_copy && (cepi()==null || !cepi().is_all_wired()) )
-      return Type.ALL;
+      return Combo.HM_FREEZE ? Type.ANY : Type.ALL;
     deps_add(def);
     // All wired, the arg is dead if the matching projection is dead
     int argn = _defs.find(def);

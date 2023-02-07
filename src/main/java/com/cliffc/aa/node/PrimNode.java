@@ -50,8 +50,7 @@ public abstract class PrimNode extends Node {
   // Int/Float primitives.  
   public static final StructNode ZINT = new StructNode(false,false,null,"", Type.ALL).set_proto_instance(TypeInt.INT64).init();
   public static final StructNode ZFLT = new StructNode(false,false,null,"", Type.ALL).set_proto_instance(TypeFlt.FLT64).init();
-  //public static final StructNode ZSTR = new StructNode(false,false,null,"", Type.ALL).set_proto_instance(TypeMemPtr.STRPTR).init();
-  public static final StructNode ZSTR = new StructNode(false,false,null,"", Type.ALL).set_proto_instance(TypeInt.INT64).init();
+  public static final StructNode ZSTR = new StructNode(false,false,null,"", Type.ALL).set_proto_instance(TypeMemPtr.STRPTR).init();
   public static final NewNode PINT = new NewNode();
   public static final NewNode PFLT = new NewNode();
   public static final NewNode PSTR = new NewNode();
@@ -59,8 +58,7 @@ public abstract class PrimNode extends Node {
   public static final ConNode  INT = new ConNode(TypeInt. INT64).init();
   public static final ConNode  FLT = new ConNode(TypeFlt. FLT64).init();
   public static final ConNode NFLT = new ConNode(TypeFlt.NFLT64).init();
-  //public static final ConNode  STR = new ConNode(TypeMemPtr.STRPTR).init();
-  public static final ConNode  STR = new ConNode(TypeInt.INT64).init();
+  public static final ConNode  STR = new ConNode(TypeMemPtr.STRPTR).init();
   
   private static PrimNode[] PRIMS = null; // All primitives
 
@@ -257,6 +255,7 @@ public abstract class PrimNode extends Node {
   }
   boolean is_oper() { return true; }
 
+  @Override public Node ideal_reduce() { return in(0)==this ? Env.ANY : null; }
 
   @Override public boolean has_tvar() { return true; }
 
@@ -277,7 +276,7 @@ public abstract class PrimNode extends Node {
   static TV3 make_tvar(boolean is_copy, TypeNil rez) {
     if( rez==TypeNil.XNIL ) throw unimpl();
     TV3 tv3 = TV3.from_flow(rez);
-    if( is_copy ) ((TVClz)tv3).rhs()._is_copy = true;
+    //if( is_copy ) ((TVClz)tv3).rhs()._is_copy = true;
     return tv3;
   }
 
@@ -548,9 +547,12 @@ public abstract class PrimNode extends Node {
 
 
   public static class StrLen extends PrimNode {
-    //public StrLen() { super("#_",TypeTuple.STR,TypeInt.INT64); }
-    public StrLen() { super("#_",TypeTuple.INT64,TypeInt.INT64); }
+    public StrLen() { super("#_",TypeTuple.STR,TypeInt.INT64); }
     @Override public TypeNil apply( TypeNil[] args ) {
+      TypeNil tn = args[0];
+      if( !(args[0] instanceof TypeMemPtr tmp) ||
+          !Util.eq("str:",tmp._obj._clz) )
+        return args[0].oob(TypeInt.INT64);
       throw unimpl();
     }
 

@@ -30,8 +30,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=true;
     RSEED=0;
-
-    testerr("sq={x -> x&x}; sq(\"abc\")", "*\"abc\" is not a int64",9);
+    testerr("x=1+y","Unknown ref 'y'",4);
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -69,9 +68,9 @@ public class TestParse {
     // Variations on a simple wrapped add.  Requires full annotations to type -
     // because in fact it is all ambiguous and cannot be typed without seeing all
     // the usages.
-    testerr("{ x y -> x+y }", "Operator _+_ does not resolve",10);
+    testerr("{ x y -> x+y }", "No operator _+_",10);
     testerr("{ x -> 1+x }", "Ambiguous, unable to resolve { int:int64 int:int64 -> int:int64 } and { int:int64 flt:nflt64 -> flt:flt64 }",8);
-    testerr("{ x -> x+1 }", "Operator _+_ does not resolve",8);
+    testerr("{ x -> x+1 }", "No operator _+_",8);
     testerr("{x:flt y -> x+y}", "Ambiguous, unable to resolve { flt:flt64 flt:flt64 -> flt:flt64 } and { flt:flt64 int:int64 -> flt:flt64 }",13); // {Scalar Scalar -> Scalar}
     test("{x:flt y:int -> x+y}", "[56]{any,5 -> flt64 }", "{ A flt:flt64 int:int64 -> flt:flt64 }", null, null, null, "[56]");
 
@@ -223,11 +222,10 @@ public class TestParse {
     test("x=3; mul2={x -> x*2}; mul2(2.1)", "4.2","flt:4.2"); // must inline to resolve overload {*}:Flt with I->F conversion
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", "10.2","flt:10.2"); // Mix of types to mul2(), mix of {*} operators
     test("sq={x -> x*x}; sq 2.1", "4.41","flt:4.41"); // No () required for single args
-    testerr("sq={x -> x&x}; sq(\"abc\")", "*\"abc\" is not a int64",9);
-    //testerr("sq={x -> x*x}; sq(\"abc\")", "*\"abc\" is none of (flt64,int64)",9);
-    //testerr("f0 = { f x -> f0(x-1) }; f0(_+_,2)", "Passing 1 arguments to f0 which takes 2 arguments",16);
-    //// Recursive:
-    //test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
+    testerr("sq={x -> x&x}; sq(\"abc\")", "No operator str:_&_",10);
+    testerr("sq={x -> x*x}; sq(\"abc\")", "No operator str:_*_",10);
+    // Recursive:
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)","6","int:6");
     //test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
     //test("f0 = { x -> x ? _+_(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
     //testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);

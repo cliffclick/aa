@@ -255,6 +255,15 @@ abstract public class TV3 implements Cloneable {
   // Must always return true; used in flow-coding in many places
   abstract boolean _unify_impl(TV3 that);
 
+  // Make this tvar an error
+  public boolean unify_err(boolean test) {
+    if( test ) return true;
+    assert DUPS.isEmpty();
+    new TVErr()._unify_err(this);
+    DUPS.clear();
+    return true;
+  }
+
   // Neither side is a TVErr, so make one
   boolean _unify_err(TV3 that) {
     assert !(this instanceof TVErr) && !(that instanceof TVErr);
@@ -557,8 +566,6 @@ abstract public class TV3 implements Cloneable {
     }
     case TypeStruct ts -> {
       if( ts.len()==0 ) yield new TVLeaf();
-      if( !ts._clz.isEmpty() )
-        throw unimpl();
       String[] ss = new String[ts.len()];
       TV3[] tvs = new TV3[ts.len()];
       for( int i=0; i<ts.len(); i++ ) {
@@ -566,7 +573,11 @@ abstract public class TV3 implements Cloneable {
         ss [i] = fld._fld;
         tvs[i] = from_flow(fld._t);
       }
-      yield new TVStruct(true,ss,tvs,false);
+      TV3 tv3 = new TVStruct(true,ss,tvs,false);
+      // Clazz structs get wrapped in a TVClz
+      if( !ts._clz.isEmpty() )
+        tv3 = new TVClz((TVStruct)Env.PROTOS.get(ts._clz).tvar(),tv3);
+      yield tv3;
     }
     case TypeInt ti ->
       new TVClz((TVStruct)PrimNode.ZINT.tvar(),TVBase.make(true,ti));

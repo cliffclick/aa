@@ -392,7 +392,7 @@ public class Parse implements Comparable<Parse> {
       // p? x : nontype ... part of trinary
       Parse badt = errMsg();    // Capture location in case of type error
       if( peek(":=") ) _x=oldx2; // Avoid confusion with typed assignment test
-      else if( peek(':') && (t=type(true,null))==null ) { // Check for typed assignment
+      else if( peek(':') && (t=type(false,null))==null ) { // Check for typed assignment
         if( scope().test_if() ) _x = oldx2; // Grammar ambiguity, resolve p?a:b from a:int
         else err_ctrl0("Missing type after ':'");
       }
@@ -413,7 +413,7 @@ public class Parse implements Comparable<Parse> {
       }
 
       toks .add(tok.intern());
-      ts   .add(t  );
+      ts   .add(t);
       badfs.add(badf);
       badts.add(badt);
     }
@@ -451,9 +451,17 @@ public class Parse implements Comparable<Parse> {
       stk.add_fld (tok,Access.RW, con(TypeNil.XNIL),badf); // Create at top of scope as undefined
       scope.def_if(tok,Access.RW, true); // Record if inside arm of if (partial def error check)
     }
+    // See if assigning over a forward-ref.
+    assert scope==scope(); // untested really, just remove it trip
+    int idx=scope().stk().find(tok);
+    if( idx != -1 && scope().stk().in(idx) instanceof ForwardRefNode fref )
+      fref.assign(Node.peek(iidx)); // Define & assign the forward-ref
+
+    // Load the local display/stack-frame
     Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
     Node mem = mem();
     Node stk = gvn(new LoadNode(mem,ptr,badf));
+    // Assign/store into display/stack-frame
     Node stk2 = gvn(new SetFieldNode(tok,mutable,stk,Node.peek(iidx),badf));
     Node st = new StoreNode(mem,ptr,stk2,badf);
     scope.replace_mem(st);
@@ -766,10 +774,10 @@ public class Parse implements Comparable<Parse> {
         args.add_fld("0",Access.Final,dsp,err); // TODO: get the display start for errors
         int aidx = args.push();
         Node arg1 = stmts();
-        args = (StructNode)Node.pop(aidx);
+        args = (StructNode)Node.peek(aidx);
         // Parse rest of arguments
         _tuple(oldx-1,arg1,errMsg(first_arg_start),args); // Parse argument list
-
+        args = (StructNode)init(Node.pop(aidx));
         n = Node.pop(nidx);                       // Function
         Parse[] badargs = args.fld_starts();      // Args from tuple
         n = do_call0(false,badargs,args(args,n)); // Pass the tuple
@@ -961,15 +969,15 @@ public class Parse implements Comparable<Parse> {
     // First stmt is parsed already
     StructNode nn = new StructNode(false,false,errMsg(oldx), "", Type.ALL).init();
     Parse bad = errMsg(first_arg_start);
-    StructNode sn = _tuple(oldx,s,bad,nn);
-    int sidx = sn.push();
+    int sidx = nn.push();
+    _tuple(oldx,s,bad,nn);
     Node ptr = gvn(new NewNode());
-    sn = (StructNode)Node.pop(sidx);
+    nn = (StructNode)init(Node.pop(sidx));
     int pidx = ptr.push();
-    set_mem(gvn(new StoreNode(mem(),ptr,sn,bad)));
+    set_mem(gvn(new StoreNode(mem(),ptr,nn,bad)));
     return Node.pop(pidx);
   }
-  private StructNode _tuple(int oldx, Node s, Parse bad, StructNode nn) {
+  private void _tuple(int oldx, Node s, Parse bad, StructNode nn) {
     while( s!= null ) {         // More args
       nn.add_fld((""+nn.len()).intern(),Access.Final,s,bad);
       if( !peek(',') ) break;   // Final comma is optional
@@ -980,7 +988,7 @@ public class Parse implements Comparable<Parse> {
       nn = (StructNode)Node.pop(nn_x);
     }
     require(')',oldx);          // Balanced closing paren
-    return init(nn.close());    // No more field, init and return
+    nn.close();
   }
 
 
