@@ -226,7 +226,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // order.
   public int push() { return GVNGCM.push(this); }
   public static Node pop (int idx) { assert idx==GVNGCM.KEEP_ALIVE._defs._len;  return GVNGCM.pop(idx); }
-  public static Node peek(int idx) { assert idx<= GVNGCM.KEEP_ALIVE._defs._len;  return GVNGCM.KEEP_ALIVE.in(idx-1); }
+  public static Node peek(int idx) { assert idx<=GVNGCM.KEEP_ALIVE._defs._len;  return GVNGCM.KEEP_ALIVE.in(idx-1); }
   public static void pops(int nargs) { for( int i=0; i<nargs; i++ ) GVNGCM.KEEP_ALIVE.pop(); }
   public boolean is_keep() {
     for( Node use : _uses ) if( use instanceof KeepNode )  return true;
@@ -739,21 +739,32 @@ public abstract class Node implements Cloneable, IntSupplier {
   }
   
   // Reset
-  public final void walk_reset( ) {
-    if( Env.GVN.on_flow(this) ) return; // Been there, done that
-    Env.GVN.add_flow(this);             // On worklist and mark visited
-    Env.GVN.add_reduce(this);           // Trigger adding to VALS at next ITER
-    _val = _live = Type.ALL;            // Lowest value
-    _elock = false;                     // Clear elock if reset_to_init0
-    _tvar = null;
+  public final void walk_reset( VBitSet visit ) {
+    assert is_prim();
+    if( visit.tset(_uid) ) return; // Been there, done that
+    Env.GVN.add_flow(Env.GVN.add_reduce(this));
+    _val = _live = Type.ALL;    // Lowest value
+    _tvar = null;               // Clear TV3 for next go
+    _elock = false;             // Clear elock if reset_to_init0
+    _deps = null;               // No deps
+    walk_reset0();              // Special reset
+
+    // Remove non-prim inputs to a prim.  Skips all asserts and worklists.
+    Node c;
+    while( _defs._len>0 && (c=_defs.last())!=null && !c.is_prim() )
+      _defs.pop()._uses.del(this); // Remove backedge?
+    // Remove non-prim uses of a prim.
+    while( _uses._len>0 && !(c=_uses.last()).is_prim() )
+      while( c.len() > 0 ) {
+        Node x = c._defs.pop();
+        if( x!=null ) x._uses.del(c);
+      }
     // Walk reachable graph
-    for( Node use : _uses )                   use.walk_reset();
-    for( Node def : _defs ) if( def != null ) def.walk_reset();
-    walk_reset0();              // Per-node special reset
+    for( Node use : _uses )                   use.walk_reset(visit);
+    for( Node def : _defs ) if( def != null ) def.walk_reset(visit);
   }
   // Non-recursive specialized version
   void walk_reset0( ) {}
-
 
   // At least as alive
   private Node merge(Node x) {

@@ -30,7 +30,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=true;
     RSEED=0;
-    testerr("x=1+y","Unknown ref 'y'",4);
+    testerr("a.b.c();","Unknown ref 'a'",0);
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -226,11 +226,10 @@ public class TestParse {
     testerr("sq={x -> x*x}; sq(\"abc\")", "No operator str:_*_",10);
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)","6","int:6");
-    //test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
-    //test("f0 = { x -> x ? _+_(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
-    //testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
-    //test_obj("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",
-    //         TypeStruct.make_test(TypeNil.NIL,TypeInt.con(1),TypeInt.con(2)));
+    test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)","5","int:5");
+    test("f0 = { x -> x ? _+_(f0(x-1),1) : 0 }; f0(2)", "2","int:2");
+    testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))","(0,1,2)","*(0,1,2)");
     //
     //// Co-recursion requires parallel assignment & type inference across a lexical scope
     //test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.con(1) );

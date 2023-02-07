@@ -43,7 +43,7 @@ public class NewNode extends Node {
     _tptr = TypeMemPtr.make(alias,TypeStruct.ISUSED);
   }
   @Override public String xstr() { return "New"+"*"+_alias; } // Self short name
-  @Override void walk_reset0() { assert is_prim(); set_alias(_reset0_alias); }
+  @Override void walk_reset0() { set_alias(_reset0_alias); super.walk_reset0(); }
 
   @Override public Type value() { return _killed ? _tptr.dual() : _tptr; }
   

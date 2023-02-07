@@ -131,7 +131,7 @@ public abstract class Combo {
   static public boolean HM_FREEZE;     // After 3rd pass, HM types are frozen but GCP types continue to fall
 
   public static void opto() {
-    Env.GVN.flow_clear();       // Will be used as a worklist
+    Env.GVN.work_clear();       // Will be used as a worklist
 
     // Set all values to ANY and lives to DEAD, their most optimistic types.
     // Set all type-vars to Leafs.
@@ -222,5 +222,5 @@ public abstract class Combo {
     FREEZE_WORK.clear();
   }
   
-  static void reset() { HM_NEW_LEAF = HM_AMBI = HM_FREEZE=false; }
+  static void reset() { HM_NEW_LEAF = HM_AMBI = HM_FREEZE=false; FREEZE_WORK.clear(); }
 }

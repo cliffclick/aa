@@ -133,7 +133,7 @@ public class Env implements AutoCloseable {
     }
     _scope = new ScopeNode(is_closure,new HashMap<>(),ctrl,mem,XNIL,ptr,dsp).init();
     KEEP_ALIVE.add_def(_scope);
-    GVN.do_iter();
+    GVN.iter();
   }
 
   // Top-level Env.  Contains, e.g. the primitives.
@@ -208,26 +208,13 @@ public class Env implements AutoCloseable {
   // many top-level parses happen in a row.
   public static void top_reset() {
     ROOT.reset();
-    unhook_last(ROOT);
-    // Kill all undefined values, which promote up to the top level
-    for( int i=0; i<STK_0.len(); i++ ) {
-      Node c = STK_0.in(i);
-      if( !c.is_prim() ) {
-        GVN.add_dead(c);
-        STK_0.remove_fld(i--);
-      }
-    }
-    // Clear out the dead before clearing VALS, since they may not be reachable and will blow the elock assert
-    unhook_last(STK_0);
-    unhook_last(CTL_0);
-    unhook_last(MEM_0);
-    GVN.iter_dead();
     TV3.reset_to_init0();
     Node.VALS.clear();          // Clean out hashtable
-    GVN.flow_clear();
-    ROOT.walk_reset();          // Clean out any wired prim calls
-    KEEP_ALIVE.walk_reset();    // Clean out any wired prim calls
-    GVNGCM.KEEP_ALIVE.walk_reset();
+    GVN.work_clear();
+    VBitSet visit = new VBitSet();
+    ROOT.walk_reset(visit);          // Clean out any wired prim calls
+    KEEP_ALIVE.walk_reset(visit);    // Clean out any wired prim calls
+    GVNGCM.KEEP_ALIVE.walk_reset(visit);
     CallNode  .reset_to_init0();
     GVN.iter();                 // Clean out any dead; reset prim types
     for( Node n : Node.VALS.keySet() ) // Assert no leftover bits from the prior compilation
@@ -240,14 +227,6 @@ public class Env implements AutoCloseable {
     BitsFun   .reset_to_init0();
     BitsRPC   .reset_to_init0();
     Combo.reset();
-  }
-
-  static private void unhook_last(Node n) {
-    Node c;
-    while( !(c=n._uses.last()).is_prim() ) {
-      while( c.len()>0 ) c.pop();
-      GVN.add_dead(c);
-    }
   }
 
   // Return Scope for a name, so can be used to determine e.g. mutability

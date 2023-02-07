@@ -146,14 +146,6 @@ public class StructNode extends Node {
     return this;
   }
 
-  // Remove a field, preserving order.  For reseting primitives for multi-testing
-  public void remove_fld(int idx) {
-    remove(idx);
-    _flds.remove(idx);
-    _accesses.remove(idx);
-    _fld_starts.remove(idx);
-  }
-
   // Set a replacement field in a Struct.  Fails if trying to replace a final
   // field.
   public boolean set_fld(String id, TypeFld.Access access, Node val, boolean force ) {
@@ -190,6 +182,19 @@ public class StructNode extends Node {
     }
   }
 
+  // Remove a non-prim field, preserving order.  For reseting primitives for
+  // multi-testing
+  @Override void walk_reset0( ) {
+    Node c;
+    while( !(c=_defs.last()).is_prim() ) {
+      _flds.pop();
+      _accesses.pop();
+      _fld_starts.pop();
+      _defs.pop();
+      c._uses.del(this);
+    }
+  }
+  
   // Gather inputs into a TypeStruct.
   @Override public Type value() {
     assert _defs._len==_flds.len();

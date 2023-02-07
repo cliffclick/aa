@@ -11,10 +11,7 @@ import static com.cliffc.aa.AA.unimpl;
 // Gain precision after an If-test.
 public class CastNode extends Node {
   public final Type _t;
-  public CastNode( Node ctrl, Node ret, Type t ) {
-    super(OP_CAST,ctrl,ret); _t=t;
-    Env.GVN.add_dom(this);
-  }
+  public CastNode( Node ctrl, Node ret, Type t ) { super(OP_CAST,ctrl,ret); _t=t; }
   @Override public String xstr() { return "("+_t+")"; }
 
   @Override public Type value() {
@@ -121,9 +118,7 @@ public class CastNode extends Node {
   }
 
   @Override public @NotNull CastNode copy( boolean copy_edges) {
-    @NotNull CastNode nnn = (CastNode)super.copy(copy_edges);
-    Env.GVN.add_dom(nnn);
-    return nnn;
+    return (CastNode)super.copy(copy_edges);
   }
 
   @Override public ErrMsg err( boolean fast ) {

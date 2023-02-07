@@ -22,10 +22,6 @@ public class ParmNode extends PhiNode {
   }
   public FunNode fun() { return (FunNode) in(0); }
   @Override public String xstr() { return "Parm:"+_idx; }
-  @Override void walk_reset0() {
-    while( is_prim() && len()>2 )
-      pop(); // Kill wired primitive inputs
-  }
 
   @Override public Type value() {
     // Not executing?
@@ -41,7 +37,7 @@ public class ParmNode extends PhiNode {
     for( int i=1; i<_defs._len; i++ ) {
       Node cprj = fun.in(i);        // Control
       cprj.deps_add(this);          // Changes to control (either up or down) always revisit Parm
-      if( cprj._val==Type.CTRL ) {  // Only meet alive paths
+      if( cprj._val==Type.CTRL || cprj._val==Type.ALL ) {  // Only meet alive paths
         Type ti = val(i);
         if( cprj instanceof CRProjNode ) {
           // During/after Combo, use the HM type for the GCP type instead of the given default

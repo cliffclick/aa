@@ -172,11 +172,6 @@ public class FunNode extends RegionNode {
 
   public int nargs() { return _nargs; }
 
-  @Override void walk_reset0() {
-    while( is_prim() && len()>2 )
-      pop(); // Kill wired primitive inputs
-  }
-
   // ----
   // Graph rewriting via general inlining.  All other graph optimizations are
   // already done.

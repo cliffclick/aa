@@ -20,7 +20,6 @@ public class GVNGCM {
   private final WorkNode _work_mono   = new WorkNode("mono"  );
   private final WorkNode _work_grow   = new WorkNode("grow"  );
   private final WorkNode _work_inline = new WorkNode("inline");
-  private final WorkNode _work_dom    = new WorkNode("dom"   );
   public boolean on_dead  ( Node n ) { return _work_dead  .on(n); }
   public boolean on_flow  ( Node n ) { return _work_flow  .on(n); }
   public boolean on_reduce( Node n ) { return _work_reduce.on(n); }
@@ -42,7 +41,6 @@ public class GVNGCM {
   public void add_flow_defs  ( Node n ) { add_work_defs(_work_flow,n); }
   public void add_flow_uses  ( Node n ) { add_work_uses(_work_flow,n); }
   public void add_flow( UQNodes deps ) { if( deps != null ) for( Node dep : deps.values() ) add_flow(dep); }
-  public void add_dom(Node n) { add_work(_work_dom,n); }
   public void add_reduce_uses( Node n ) { add_work_uses(_work_reduce,n); }
   // n goes unused
   public void add_unuse( Node n ) {
@@ -87,10 +85,9 @@ public class GVNGCM {
     _work_mono  .clear();
     _work_grow  .clear();
     _work_inline.clear();
-    _work_dom   .clear();
     ITER_CNT = ITER_CNT_NOOP = 0;
   }
-  void flow_clear() { _work_flow.clear(); }
+  void work_clear() { _work_flow.clear(); _work_dead.clear(); }
 
   // Keep a Node reference alive for later.  Strongly asserted as a stack
   public static int push( Node n ) { KEEP_ALIVE.add_def(n); return KEEP_ALIVE._defs._len; }
@@ -118,7 +115,7 @@ public class GVNGCM {
   // ideal" than what was before.
   public Node xform( Node n ) {
     int idx = push(init(n));
-    do_iter();
+    iter();
     return pop(idx);
   }
   
@@ -128,13 +125,13 @@ public class GVNGCM {
   static int ITER_CNT;
   static int ITER_CNT_NOOP;
 
-  // Any time anything is on any worklist we can always conservatively iterate on it.
-  // Empties the worklists, attempting to do every possible thing.
-  void do_iter() {
+  // Top-level iter clean-out.  Does everything it can, empties all queues and
+  // aggressively checks no-more-progress.
+  public void iter() {
     assert AA.once_per() || Env.ROOT.more_work(true) == 0; // Initial conditions are correct
     //assert Env.ROOT.no_more_ideal(); // Has side-effects of putting things on worklist
     while( true ) {
-      ITER_CNT++; assert ITER_CNT < 10000; // Catch infinite ideal-loops
+      ITER_CNT++; assert ITER_CNT < 15000; // Catch infinite ideal-loops
       Node n, m;
       if( false ) ;
       else if( (n=_work_dead  .pop())!=null ) m = n._uses._len == 0 ? n.kill() : null;
@@ -149,34 +146,8 @@ public class GVNGCM {
       //assert Env.ROOT.more_work(true) == 0;
       //assert Env.ROOT.no_more_ideal();
     }
-  }
-  
-  // Top-level iter clean-out.  Empties all queues & aggressively checks
-  // no-more-progress.
-  public void iter() {
-    while( true ) {
-      do_iter();
-      // Only a very few nodes can make progress via dominance relations, and
-      // these can make progress "very far" in the graph.  So instead of using
-      // a neighbors list, we bulk revisit them here.
-      boolean progress=false;
-      for( int i=0; i<_work_dom.len(); i++ ) {
-        Node dom = _work_dom.at(i);
-        if( dom.is_dead() ) _work_dom.del(i--);
-        else progress |= dom.do_mono()!=null;
-      }
-      if( !progress ) break;
-    };
     assert AA.once_per() || Env.ROOT.more_work(true)==0;
     //assert Env.ROOT == null || Env.ROOT.no_more_ideal(); // Has side effects of putting things on worklist
-  }
-
-  // Clear the dead worklist only
-  public void iter_dead() {
-    Node n;
-    while( (n=_work_dead.pop()) != null )
-      if( n._uses._len == 0 )
-        n.kill();
   }
 
   // Did a bulk not-monotonic update.  Forcibly update the entire region at
