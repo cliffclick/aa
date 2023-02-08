@@ -32,7 +32,7 @@ public class TVClz extends TV3 {
 
   @Override boolean _unify_impl(TV3 t ) {
     TVClz clz = (TVClz)t;       // Invariant when called
-    return clz()._unify(clz.clz(),false) | ((TVClz)find()).rhs()._unify(clz.rhs(),false);
+    return clz()._unify(clz.clz(),false) | ((TVClz)find()).rhs()._unify(((TVClz)clz.find()).rhs(),false);
   }
 
 

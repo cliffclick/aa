@@ -50,9 +50,7 @@ abstract public class TV3 implements Cloneable {
 
   // This is used Fresh against that.
   // If it ever changes (add_fld to TVStruct, or TVLeaf unify), we need to re-Fresh the deps.
-  static Ary<TV3  > DELAY_FRESH_THIS  = new Ary<>(new TV3[1],0);
-  static Ary<TV3  > DELAY_FRESH_THAT  = new Ary<>(new TV3[1],0);
-  static Ary<TV3[]> DELAY_FRESH_NONGEN= new Ary<>(new TV3[1][],0);
+  static Ary<DelayFresh> DELAY_FRESH  = new Ary<>(new DelayFresh[1],0);
   
   // Disjoint Set Union set-leader.  Null if self is leader.  Not-null if not a
   // leader, but pointing to a chain leading to a leader.  Rolled up to point
@@ -73,12 +71,6 @@ abstract public class TV3 implements Cloneable {
   
   // Nodes to put on a worklist, if this TV3 is modified.
   UQNodes _deps;
-
-  // This Leaf is used Fresh against another TV3.
-  // If it ever unifies to not-Leaf, we need to re-Fresh the deps.
-  Ary<TV3  > _delay_fresh_this;
-  Ary<TV3  > _delay_fresh_that;
-  Ary<TV3[]> _delay_fresh_nongen;
 
   // Errors other than structural unify errors.
   public Ary<String> _errs;
@@ -183,14 +175,7 @@ abstract public class TV3 implements Cloneable {
   }
 
   // Move delayed-fresh updates onto not-delayed update list.
-  void move_delay_fresh() {
-    if( _delay_fresh_this == null ) return;
-    for( int i=0; i<_delay_fresh_this._len; i++ ) {
-      DELAY_FRESH_THIS  .push(_delay_fresh_this  .at(i));
-      DELAY_FRESH_THAT  .push(_delay_fresh_that  .at(i));
-      DELAY_FRESH_NONGEN.push(_delay_fresh_nongen.at(i));
-    }
-  }
+  void move_delay_fresh() { DELAY_FRESH.addAll(_delay_fresh); }
   
   // Merge subclass specific bits
   abstract void _union_impl(TV3 that);
@@ -276,19 +261,15 @@ abstract public class TV3 implements Cloneable {
   // the same as calling 'fresh' then 'unify', without the clone of 'this'.
   // Returns progress.
   static private final IdentityHashMap<TV3,TV3> VARS = new IdentityHashMap<>();
-  static private TV3 ROOT_THIS, ROOT_THAT;
-  static private TV3[] NONGEN;
+  static private DelayFresh ROOT;
 
   public boolean fresh_unify( TV3 that, TV3[] nongen, boolean test ) {
     if( this==that ) return false;
-    assert VARS.isEmpty() && DUPS.isEmpty();
-    ROOT_THIS=this;
-    ROOT_THAT=that;
-    NONGEN=nongen;
+    assert VARS.isEmpty() && DUPS.isEmpty() && ROOT==null;
+    ROOT = new DelayFresh(this,that,nongen);
     boolean progress = _fresh_unify(that,test);
     VARS.clear();  DUPS.clear();
-    ROOT_THIS=ROOT_THAT=null;
-    NONGEN=null;
+    ROOT=null;
     return progress;
   }
 
@@ -390,7 +371,7 @@ abstract public class TV3 implements Cloneable {
   // Return a fresh copy of 'this'
   TV3 fresh() {
     assert VARS.isEmpty();
-    assert NONGEN==null;
+    assert ROOT==null;
     TV3 rez = _fresh();
     VARS.clear();
     return rez;
@@ -428,9 +409,9 @@ abstract public class TV3 implements Cloneable {
   // -----------------
   private static final VBitSet ODUPS = new VBitSet();  
   boolean nongen_in() {
-    if( NONGEN==null ) return false;
+    if( ROOT==null || ROOT._nongen==null ) return false;
     ODUPS.clear();
-    for( TV3 tv3 : NONGEN )
+    for( TV3 tv3 : ROOT._nongen )
       if( _occurs_in_type(tv3) )
         return true;
     return false;
@@ -511,44 +492,74 @@ abstract public class TV3 implements Cloneable {
   }
   
   // -----------------
+
+  static class DelayFresh {
+    TV3 _lhs, _rhs;
+    TV3[] _nongen;
+    DelayFresh _next;
+    private DelayFresh(TV3 lhs, TV3 rhs, TV3[] nongen) {
+      assert !lhs.unified() && !rhs.unified();
+      _lhs=lhs;
+      _rhs=rhs;
+      _nongen=nongen;
+    }
+    boolean update() {
+      if( !_lhs.unified() && ! _rhs.unified() ) return false;
+      _lhs = _lhs.find();
+      _rhs = _rhs.find();
+      return true;              // Requires dup-check
+    }
+    boolean eq( DelayFresh df ) {
+      if( this==df ) return true;
+      if( _lhs!=df._lhs || _rhs!=df._rhs ) return false;
+      assert eq_nongen(df);
+      return true;
+    }
+    // Deep equality check nongen
+    private boolean eq_nongen( DelayFresh df ) {
+      if( _nongen == df._nongen ) return true;
+      if( _nongen.length != df._nongen.length ) return false;
+      for( int i=0; i<_nongen.length; i++ )
+        if( _nongen[i].find()!=df._nongen[i].find() )
+          return false;
+      return true;
+    }
+    @Override public String toString() {
+      return "delayed_fresh_unify["+_lhs+" to "+_rhs+", "+_nongen+"]";
+    }
+  }
+  // This Leaf is used Fresh against another TV3.
+  // If it ever unifies to not-Leaf, we need to re-Fresh the deps.
+  Ary<DelayFresh> _delay_fresh;
+
+  
   // Record that on the delayed fresh list and return that.  If `this` ever
   // unifies to something, we need to Fresh-unify the something with `that`.
   void add_delay_fresh() {
-    if( _delay_fresh_this==null ) {
-      _delay_fresh_this   = new Ary<>(new TV3[]  {ROOT_THIS});
-      _delay_fresh_that   = new Ary<>(new TV3[]  {ROOT_THAT});
-      _delay_fresh_nongen = new Ary<>(new TV3[][]{NONGEN   });
-    }
-    for( int i=0; i<_delay_fresh_this._len; i++ ) {
-      TV3 dfd = _delay_fresh_this.at(i);
-      // Lazily remove UNIONS and dups from UNIONS
-      if( dfd.unified() ) {
-        dfd = dfd.find();
-        _delay_fresh_this.set(i,null); // Set to null to avoid finding
-        // If not found, re-insert after U-F; if found dup remove
-        if( _delay_fresh_this.find(dfd) == -1 ) _delay_fresh_this.set(i,dfd);
-        else {
-          _delay_fresh_this  .del(i);
-          _delay_fresh_that  .del(i);
-          _delay_fresh_nongen.del(i);
+    // Lazy make a list to hold
+    if( _delay_fresh==null ) _delay_fresh = new Ary<>(new DelayFresh[1],0);
+    // Dup checks
+    for( int i=0; i<_delay_fresh._len; i++ ) {
+      DelayFresh dfi = _delay_fresh.at(i);
+      if( dfi.update() ) {      // Progress?  Do a dup-check
+        for( int j=0; j<i; j++ ) {
+          if( _delay_fresh.at(j) == dfi )
+            throw unimpl();     // 'i' became a dup, remove '1'
         }
       }
-      if( dfd==ROOT_THIS ) return;   // Dup, do not insert
+      if( ROOT.eq(_delay_fresh.at(i)) )
+        return;                 // Dup, do not insert
     }
-    _delay_fresh_this  .push(ROOT_THIS);
-    _delay_fresh_that  .push(ROOT_THAT);
-    _delay_fresh_nongen.push(NONGEN   );
-    assert _delay_fresh_this.len()<=10; // Switch to worklist format
+    _delay_fresh.push(ROOT);
+    assert _delay_fresh.len()<=10; // Switch to worklist format
   }
-
+  
   // Called from Combo after a Node unification; allows incremental update of
   // Fresh unification.
   public static void do_delay_fresh() {
-    while( DELAY_FRESH_THIS.len() > 0 ) {
-      TV3 thsi = DELAY_FRESH_THIS.pop().find();
-      TV3 that = DELAY_FRESH_THAT.pop().find();
-      TV3[] nongen = DELAY_FRESH_NONGEN.pop();
-      thsi.fresh_unify(that,nongen,false);
+    while( DELAY_FRESH.len() > 0 ) {
+      DelayFresh df = DELAY_FRESH.pop();
+      df._lhs.find().fresh_unify(df._rhs.find(),df._nongen,false);
     }
   }
   
@@ -696,9 +707,7 @@ abstract public class TV3 implements Cloneable {
       tv3._uid = CNT++;
       tv3._args = _args==null ? null : _args.clone();
       // Do not copy the incremental delay_fresh
-      tv3._delay_fresh_this  =null;
-      tv3._delay_fresh_that  =null;
-      tv3._delay_fresh_nongen=null;
+      tv3._delay_fresh = null;
       return tv3;
     } catch(CloneNotSupportedException cnse) {throw unimpl();}
   }

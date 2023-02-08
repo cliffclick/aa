@@ -695,7 +695,18 @@ public abstract class Node implements Cloneable, IntSupplier {
       if( tfp.dsp()!=Type.ANY ) return false; // Even if whole TFP is a constant, need to construct with display
       // External fidxs are never constants
       if( BitsFun.EXT.test_recur(tfp.fidx()) )  return false;
-    }    
+    }
+    // Call DProj being used by function ParmNode.  Removing the DProj makes
+    // the Call arg go dead, which prevents Call resolution.  Also, if the Call
+    // input is not then removed, but the target function gets inlined the
+    // inliner manifests a DProj, which makes the call input become alive
+    // again.
+    if( this instanceof ProjNode proj && proj.in(0) instanceof CallNode && _uses._len>0 ) {
+      for( Node use : _uses )
+        if( use instanceof ParmNode )
+          return false;
+    }
+    
     return true;
   }
 

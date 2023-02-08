@@ -87,7 +87,7 @@ public class GVNGCM {
     _work_inline.clear();
     ITER_CNT = ITER_CNT_NOOP = 0;
   }
-  void work_clear() { _work_flow.clear(); _work_dead.clear(); }
+  void work_clear() { _work_flow.clear(); _work_dead.clear(); _work_reduce.clear(); }
 
   // Keep a Node reference alive for later.  Strongly asserted as a stack
   public static int push( Node n ) { KEEP_ALIVE.add_def(n); return KEEP_ALIVE._defs._len; }

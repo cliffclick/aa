@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
+import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
@@ -305,12 +306,13 @@ public final class CallEpiNode extends Node {
     // If above_center (not resolved) or not all wired, can bail conservative
     BitsFun fidxs = tfptr.fidxs();
     if( fidxs.above_center() ) return TypeTuple.CALLE.dual();
-    if(  !is_all_wired() ) {    // Unknown callers?
+    if( !is_all_wired() ) {    // Unknown callers?
       // Unknown callers call everything, touch everything.  Use Root memory.
       Env.ROOT.deps_add(this);
       TypeMem rmem = Env.ROOT.rmem();
       Type cmem = CallNode.emem(tcall);
-      return tfptr.oob(TypeTuple.make(Type.CTRL,rmem.meet(cmem),Type.ALL));
+      if( !Combo.HM_FREEZE ) Combo.add_freeze_dep(this);
+      return tfptr.oob(TypeTuple.make(Type.CTRL,rmem.meet(cmem),Type.ANY.oob(LIFTING || Combo.HM_FREEZE)));
     }
 
     // Compute call-return value from all callee returns

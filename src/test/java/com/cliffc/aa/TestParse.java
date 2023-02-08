@@ -28,9 +28,9 @@ public class TestParse {
     JIG=true;
 
     DO_GCP=true;
-    DO_HMT=true;
+    DO_HMT=false;
     RSEED=0;
-    testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
+    test("{ z -> ((z 0), (z \"abc\")) }", "[55]{any,4 -> *[13]() }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[13]", "[55]" );
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -126,7 +126,7 @@ public class TestParse {
     test("1.-_._()"  , "-1", "int:-1"); // unary version
     // error; mismatch arg count
     testerr("math.pi(1)", "A function is being called, but 3.141592653589793 is not a function",7);
-    testerr("1._+_._(2,3)", "Passing 3 arguments to _+_ which takes 2 arguments",7);
+    testerr("1._+_._(2,3)", "Passing 2 arguments to _+_ which takes 1 arguments",7);
 
     // Parsed as +(1,(2*3))
     test("1._+_._(2 * 3) ", "7", "int:7");
@@ -229,14 +229,15 @@ public class TestParse {
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)","5","int:5");
     test("f0 = { x -> x ? 1+(f0(x-1)) : 0 }; f0(2)", "2","int:2");
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))","(0,1,2)","*(0,1,2)");
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))","*[12](xnil,1,2)","*(int:int64,A:int:B:int64,A)", null, null, "[12]", null);
     //
     //// Co-recursion requires parallel assignment & type inference across a lexical scope
     //test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.con(1) );
     //test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", TypeInt.BOOL );
     //
     //// This test merges 2 TypeFunPtrs in a Phi, and then fails to resolve.
-    //testerr("(math.rand(1) ? _+_ : _*_)(2,3)","Unable to resolve call",26); // either 2+3 or 2*3, or {5,6} which is INT8.
+    //testerr("(math.rand(1) ? 2._+_ : 2._*_)._(3)","Unable to resolve call",26); // either 2+3 or 2*3, or {5,6} which is INT8.
+    //testerr("(math.rand(1) ? 2._+_._ : 2._*_._)(3)","Unable to resolve call",26); // either 2+3 or 2*3, or {5,6} which is INT8.
     //test("f = g = {-> 3}; f() == g();", "int:1");
     //testerr("add = {x:int x:int -> x + x}", "Duplicate parameter name 'x'", 13);
     throw unimpl();
