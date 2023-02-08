@@ -353,7 +353,7 @@ public class CallNode extends Node {
     if( tfp.nargs() != nargs() ) {
       if( fast ) return ErrMsg.FAST;
       RetNode ret = RetNode.get(tfp.fidxs());
-      return ErrMsg.syntax(_badargs[0],err_arg_cnt(ret.fun()._name,tfp));
+      return ErrMsg.syntax(_badargs[0],err_arg_cnt(ret.funptr()._name,tfp));
     }
 
     // Now do an arg-check.  No more than 1 unresolved, so the error message is
@@ -385,7 +385,7 @@ public class CallNode extends Node {
     return null;
   }
   public String err_arg_cnt(String fname, TypeFunPtr tfp) {
-    return "Passing "+(nargs()-DSP_IDX)+" arguments to "+fname+" which takes "+(tfp.nargs()-DSP_IDX)+" arguments";
+    return "Passing "+(nargs()-ARG_IDX)+" arguments to "+fname+" which takes "+(tfp.nargs()-ARG_IDX)+" arguments";
   }
 
   public CallEpiNode cepi() {

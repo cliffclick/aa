@@ -2,9 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeNil;
-import com.cliffc.aa.type.TypeTuple;
+import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.unimpl;
 
@@ -66,8 +64,10 @@ public class IfNode extends Node {
 
     // Handle predicates, especially XNIL and wrapped ints (TypeStruct with
     // perhaps constant fields).
-    if( pred == TypeNil.XNIL    ) return TypeTuple.IF_FALSE; // The One True Zero
-    if( !TypeNil.XNIL.isa(pred) ) return TypeTuple.IF_TRUE; // missing zero, so TRUE
+    if( pred == TypeNil.XNIL   ) return TypeTuple.IF_FALSE; // The One True Zero
+    if( pred == TypeInt.ZERO   ) return TypeTuple.IF_FALSE; // 
+    if( pred == TypeFlt.con(0) ) return TypeTuple.IF_FALSE; // 
+    if( !TypeNil.XNIL.isa(pred)) return TypeTuple.IF_TRUE;  // missing zero, so TRUE
 
     // Handle e.g. TMP and TFP nil checks
     if( !(pred instanceof TypeNil tn) ) return (TypeTuple)pred.oob(TypeTuple.IF_ALL);

@@ -52,12 +52,14 @@ public class ForwardRefNode extends Node {
   boolean is_defined() { return _fref==2; }
 
   // Assign a forward-ref in the parser; scopes and defines it, closes the cycle.
-  public void assign(Node def) {
+  public void assign(Node def, String tok) {
     scoped();                   // Set forward-ref scoped
     define();                   // Set forward-ref defined
     add_def(def);               // What its defined too
     add_flow();                 // On worklist
     Env.GVN.add_reduce(this);
+    if( def._val instanceof TypeFunPtr tfp )
+      RetNode.get(tfp.fidxs()).funptr()._name = tok;
   }
   
   

@@ -13,7 +13,6 @@ public class TypeFlt extends TypeNil<TypeFlt> {
   public  byte _z;        // bitsiZe, one of: 32,64
   private double _con;      // constant
   private TypeFlt init(boolean any, boolean nil, boolean sub, int z, double con ) {
-    assert con==0 ^ z==0;
     super.init(any,nil,sub);
     _z=(byte)z;
     _con = con;
@@ -50,7 +49,6 @@ public class TypeFlt extends TypeNil<TypeFlt> {
   }
   static { new Pool(TFLT,new TypeFlt()); }
   public static TypeFlt make( boolean any, boolean nil, boolean sub, int z, double con ) {
-    assert con==0 ^ z==0;
     if( con!=0 ) {
       assert !any && !nil;
       if( !sub ) { z=log(con); con=0; } // constant plus zero is no longer a constant
@@ -66,6 +64,7 @@ public class TypeFlt extends TypeNil<TypeFlt> {
   public static final TypeFlt FLT32 = make(false,false,false,32,0);
   public static final TypeFlt NFLT64= make(false,false,true ,64,0);
   public static final TypeFlt NFLT32= make(false,false,true ,32,0);
+  public static final TypeFlt ZERO  = con(0.0);
   public static final TypeFlt PI    = con(Math.PI);
   public static final TypeFlt HALF  = con(0.5);
   public static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,PI,FLT32,NFLT32,HALF};

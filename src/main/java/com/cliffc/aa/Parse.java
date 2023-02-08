@@ -455,7 +455,7 @@ public class Parse implements Comparable<Parse> {
     assert scope==scope(); // untested really, just remove it trip
     int idx=scope().stk().find(tok);
     if( idx != -1 && scope().stk().in(idx) instanceof ForwardRefNode fref )
-      fref.assign(Node.peek(iidx)); // Define & assign the forward-ref
+      fref.assign(Node.peek(iidx),tok); // Define & assign the forward-ref
 
     // Load the local display/stack-frame
     Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display

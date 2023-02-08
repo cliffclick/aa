@@ -79,7 +79,7 @@ public final class FunPtrNode extends Node {
     // Dead display post-Combo, we can wipe out the display type
     if( _tvar!=null && tvar() instanceof TVLambda lam && !(lam.dsp() instanceof TVLeaf) &&
         _val instanceof TypeFunPtr tfp && tfp.dsp()==Type.ANY &&
-        fun().parm(DSP_IDX)==null ) {
+        xfun()!=null && xfun().parm(DSP_IDX)==null ) {
       _tvar = ((TVLambda)lam.copy()).clr_dsp();
     }
     return null;
