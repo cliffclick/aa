@@ -118,6 +118,13 @@ public class FieldNode extends Node implements Resolvable {
       in(0).deps_add(this); // Revisit if input changes
     }
 
+    // Field from a Bind of a Struct (overload)
+    if( _live==Type.ALL && in(0) instanceof BindFPNode bind && bind.fp() instanceof StructNode sn ) {
+      assert bind._over;
+      Node fp = new FieldNode(sn,_fld,_clz,_bad).init();
+      return new BindFPNode(fp,bind.dsp(),false).init();
+    }
+    
     return null;
   }
   
@@ -129,7 +136,7 @@ public class FieldNode extends Node implements Resolvable {
     if( in(0) instanceof PhiNode phi ) {
       int fcnt=0;
       for( int i=1; i<phi.len(); i++ )
-        if( phi.in(i)._op == OP_SETFLD ) fcnt++;
+        if( phi.in(i)._op == OP_SETFLD || phi.in(i)._op == OP_BINDFP ) fcnt++;
       if( fcnt>0 ) {
         Node lphi = new PhiNode(TypeNil.SCALAR,phi._badgc,phi.in(0));
         for( int i=1; i<phi.len(); i++ )

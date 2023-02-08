@@ -28,9 +28,9 @@ public class TestParse {
     JIG=true;
 
     DO_GCP=true;
-    DO_HMT=false;
+    DO_HMT=true;
     RSEED=0;
-    test("{ z -> ((z 0), (z \"abc\")) }", "[55]{any,4 -> *[13]() }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[13]", "[55]" );
+    test("1._+_._(2)", "3", "int:3" );
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -230,17 +230,16 @@ public class TestParse {
     test("f0 = { x -> x ? 1+(f0(x-1)) : 0 }; f0(2)", "2","int:2");
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))","*[12](xnil,1,2)","*(int:int64,A:int:B:int64,A)", null, null, "[12]", null);
-    //
-    //// Co-recursion requires parallel assignment & type inference across a lexical scope
-    //test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.con(1) );
-    //test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", TypeInt.BOOL );
-    //
-    //// This test merges 2 TypeFunPtrs in a Phi, and then fails to resolve.
-    //testerr("(math.rand(1) ? 2._+_ : 2._*_)._(3)","Unable to resolve call",26); // either 2+3 or 2*3, or {5,6} which is INT8.
-    //testerr("(math.rand(1) ? 2._+_._ : 2._*_._)(3)","Unable to resolve call",26); // either 2+3 or 2*3, or {5,6} which is INT8.
-    //test("f = g = {-> 3}; f() == g();", "int:1");
-    //testerr("add = {x:int x:int -> x + x}", "Duplicate parameter name 'x'", 13);
-    throw unimpl();
+
+    // Co-recursion requires parallel assignment & type inference across a lexical scope
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", "1", "int:int64" );
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", "int1", "int:int64" );
+
+    // This test merges 2 TypeFunPtrs in a Phi, and then fails to resolve.
+    test("(math.rand(1) ? 2._+_ : 2._*_) ._ (3)","int64","int:int64"); // either 2+3 or 2*3, or {5,6} which is INT8.
+    test("(math.rand(1) ? 2._+_._ : 2._*_._)(3)","int64","int:int64"); // either 2+3 or 2*3, or {5,6} which is INT8.
+    test("f = g = {-> 3}; f() == g();", "1", "int:1");
+    testerr("add = {x:int x:int -> x + x}", "Duplicate parameter name 'x'", 13);
   }
 
   @Test public void testParse03() {

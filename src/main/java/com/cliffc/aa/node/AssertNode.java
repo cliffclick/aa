@@ -9,7 +9,7 @@ import static com.cliffc.aa.AA.*;
 
 // Assert the matching type.  Parse-time error if it does not remove.  Note the
 // difference with CastNode: both Nodes always join their input with their
-// constant but a TypeNode has to be proven useless and removed before the
+// constant but an Assert has to be proven useless and removed before the
 // program is type-correct.  A CastNode is always correct from local semantics,
 // and the join is non-trivial.
 public class AssertNode extends Node {
@@ -43,7 +43,9 @@ public class AssertNode extends Node {
   @Override public Type live_use(Node def ) {
     if( def==arg() ) return _live;                   // Alive as I am
     // Alive (like normal liveness), plus the address, plus whatever can be
-    // reached from the address.
+    // reached from the address.  Because of the turn-around (changing the
+    // input value changes the input liveness) we need set a self-dep.
+    mem().deps_add(mem());
     return ScopeNode.compute_live_mem(null,mem(),arg());
   }
 

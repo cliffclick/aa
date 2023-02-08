@@ -59,6 +59,7 @@ public class LoadNode extends Node {
     // expansion in the Parser.  These are no-ops.
     if( tadr instanceof TypeInt ) return adr;
     if( tadr instanceof TypeFlt ) return adr;
+    if( tadr instanceof TypeStruct ) return adr; // Overload struct
     // Dunno about other things than pointers
     if( !(tadr instanceof TypeMemPtr tmp) ) return null;
     if( adr instanceof FreshNode frsh ) adr = frsh.id();

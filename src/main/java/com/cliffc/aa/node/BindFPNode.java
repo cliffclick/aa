@@ -9,7 +9,7 @@ import static com.cliffc.aa.AA.unimpl;
 
 // Bind a 'this' into an unbound function pointer.  Inverse of FP2DSP.
 public class BindFPNode extends Node {
-  private final boolean _over;  // Binds an Overload
+  final boolean _over;  // Binds an Overload
   public BindFPNode( Node fp, Node dsp, boolean over ) { super(OP_BINDFP,fp,dsp); _over = over; }
   @Override public String xstr() {return "BindFP"; }
 
