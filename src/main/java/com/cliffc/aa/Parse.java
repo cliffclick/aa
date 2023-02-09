@@ -625,50 +625,54 @@ public class Parse implements Comparable<Parse> {
     FunNode fun = new FunNode(ARG_IDX); // ctrl, mem, display
     init(fun.add_def(init(new CRProjNode(fun._fidx))));
     int fun_idx = fun.push();
-    NewNode nnn = scope().ptr();
+    NewNode outer_dsp = scope().ptr();
+    
     // Build Parms for system incoming values
     int rpc_idx = init(new ParmNode(CTL_IDX,fun,null,TypeRPC.ALL_CALL,Env.ALL_CALL)).push();
-    int clo_idx = init(new ParmNode(DSP_IDX,fun,null,nnn._tptr       ,scope().ptr())).push();
-    Node mem    = init(new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM  ,mem()));
-    int fptr_idx;
-    try( Env e = new Env(_e, fun, true, fun, mem, scope().ptr(), null) ) { // Nest an environment for the local vars
+    Node dsp    = init(new ParmNode(DSP_IDX,fun,null,outer_dsp._tptr ,outer_dsp   ));
+    Node mem    = init(new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM  ,Env.MEM_0   ));
+    int bptr_idx;
+    try( Env e = new Env(_e, fun, true, fun, mem, dsp, null) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
       // Display is special: the default is simply the outer lexical scope.
       // But here, in a function, the display is actually passed in as a hidden
       // extra argument and replaces the default.
-      StructNode stk = e._scope.stk();
-      // TODO: Make a new StructNode for the local display.
-      // TODO: Fold more together with "func()".
-      //stk.set_fld("^",Access.Final,Node.pop(clo_idx),true);
-      //// Parse body
-      //Node rez = _expr_higher_require(op);
-      //// Normal exit (no early-exit?)
-      //stk.close();
-      //assert e._scope.is_closure();
-      //// Standard return; function control, memory, result, RPC.  Plus a hook
-      //// to the function for faster access.
-      //Node xrpc = Node.pop(rpc_idx);
-      //Node xfun = Node.pop(fun_idx); assert xfun == fun;
-      //RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,xrpc,fun));
-      //
-      //_e = e._par;            // Pop nested environment
-      //// The FunPtr builds a real display; any up-scope references are passed in now.
-      //Node fptr = gvn(new FunPtrNode(ret,_e._scope.ptr()));
-      //fptr_idx = fptr.push(); // Return function; close-out and DCE 'e'
-      //
-      //// Extra variables in the short-circuit are not available afterwards.
-      //// Set them to Err.
-      //for( int i=1; i<stk._defs._len; i++ ) {
-      //  String fname = stk.get(i)._fld;
-      //  String msg = "'"+fname+"' not defined prior to the short-circuit";
-      //  Parse bad = errMsg(rhsx);
-      //  Node err = gvn(new ErrNode(ctrl(),bad,msg));
-      //  do_store(null,err,Access.Final,fname,bad,TypeNil.SCALAR,bad);
-      //}
-      throw unimpl();
+      StructNode frame = e._scope.stk();
+      assert fun==_e._fun && fun==_e._scope.ctrl();
+      // Parse body
+      Node rez = _expr_higher_require(op);
+      if( rez==null ) throw unimpl();
+      // Normal exit 
+      frame.close();
 
+      // Merge normal exit into all early-exit paths.
+      // TODO: this exits from the thunk, not the whole function
+      assert frame._is_closure;
+      rez = merge_exits(rez);
+      
+      // Standard return; function control, memory, result, RPC.  Plus a hook
+      // to the function for faster access.
+      Node xrpc = Node.pop(rpc_idx);
+      Node xfun = Node.pop(fun_idx); assert xfun == fun;
+      RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,xrpc,fun));
+
+      _e = e._par;            // Pop nested environment
+      // The FunPtr builds a real display; any up-scope references are passed in now.
+      Node fptr = gvn(new FunPtrNode(ret));
+      Node bind = gvn(new BindFPNode(fptr,scope().ptr(),false));
+      bptr_idx = bind.push();   // Return function; close-out and DCE 'e'
+
+      // Extra variables in the short-circuit are not available afterwards.
+      // Set them to Err.
+      for( int i=1; i<frame._defs._len; i++ ) {
+        String fname = frame.fld(i);
+        String msg = "'"+fname+"' not defined prior to the short-circuit";
+        Parse bad = errMsg(rhsx);
+        Node err = gvn(new ErrNode(ctrl(),bad,msg));
+        do_store(null,err,Access.Final,fname,bad,TypeNil.SCALAR,bad);
+      }
     }
-    //return Node.pop(fptr_idx);
+    return Node.pop(bptr_idx);
   }
 
   /** Any number field-lookups or function applications, then an optional assignment
@@ -1071,8 +1075,6 @@ public class Parse implements Comparable<Parse> {
     init(fun.add_def(init(new CRProjNode(fun._fidx))));
     int fun_idx = fun.push();
 
-    // Record H-M VStack in case we clone
-    //fun.set_nongens(_e._nongen.compact());
     // Build Parms for system incoming values
     int rpc_idx = init(new ParmNode(CTL_IDX,fun,null,TypeRPC.ALL_CALL   ,Env.ALL_CALL)).push();
     Node dsp    = init(new ParmNode(DSP_IDX,fun,null,formals.at(DSP_IDX),scope().ptr()));

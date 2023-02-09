@@ -210,8 +210,9 @@ public class GVNGCM {
     Ary<Node> _tmps = new Ary<>(new Node[1],0);
     public N _ret;
     public Node xform( Node n ) {
+      n.xval(); // Set value before reduce
       Node x = n.do_reduce();       // Attempt to reduce
-      return init(x==null ? n : x); // Value call.  No DCE.
+      return x==null ? n : x;
     }
     public Node init( Node n ) {
       assert _tmps._len<16;             // Time for a BitSet

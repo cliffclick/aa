@@ -593,7 +593,8 @@ public abstract class PrimNode extends Node {
         Node fal = X.xform(new CProjNode(iff,0));
         Node tru = X.xform(new CProjNode(iff,1));
         // Call on true branch; if false do not call.
-        Node cal = X.xform(new CallNode(true,_badargs,tru,mem,rhs));
+        Node dsp = X.xform(new FP2DSPNode(rhs,null));
+        Node cal = X.xform(new CallNode(true,_badargs,tru,mem,dsp,rhs));
         Node cep = X.xform(new CallEpiNode(cal));
         Node ccc = X.xform(new CProjNode(cep));
         Node memc= X.xform(new MProjNode(cep));
@@ -607,6 +608,12 @@ public abstract class PrimNode extends Node {
         set_def(MEM_IDX,phim);
         set_def(REZ_IDX,phi );
         while( _defs._len > ARG_IDX ) pop(); // Remove args, trigger is_copy
+        add_reduce_uses();
+        if( !(cep instanceof CallEpiNode cepi) || !cepi.is_all_wired() ) {
+          dsp.add_flow();
+          memc.add_flow();
+          cal.deps_add(dsp);
+        }
         return this;
       }
     }
@@ -660,7 +667,8 @@ public abstract class PrimNode extends Node {
         Node fal = X.xform(new CProjNode(iff,0));
         Node tru = X.xform(new CProjNode(iff,1));
         // Call on false branch; if true do not call.
-        Node cal = X.xform(new CallNode(true,_badargs,fal,mem,rhs));
+        Node dsp = X.xform(new FP2DSPNode(rhs,null));
+        Node cal = X.xform(new CallNode(true,_badargs,fal,mem,dsp,rhs));
         Node cep = X.xform(new CallEpiNode(cal));
         Node ccc = X.xform(new CProjNode(cep));
         Node memc= X.xform(new MProjNode(cep));
@@ -674,6 +682,12 @@ public abstract class PrimNode extends Node {
         set_def(MEM_IDX,phim);
         set_def(REZ_IDX,phi );
         while( _defs._len > ARG_IDX ) pop(); // Remove args, trigger is_copy
+        add_reduce_uses();
+        if( !(cep instanceof CallEpiNode cepi) || !cepi.is_all_wired() ) {
+          dsp.add_flow();
+          memc.add_flow();
+          cal.deps_add(dsp);
+        }
         return this;
       }
     }

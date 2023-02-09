@@ -200,6 +200,7 @@ public final class CallEpiNode extends Node {
           Node ctl2 = new CProjNode(prim2).init();
           Node mem2 = new MProjNode(prim2).init();
           Node rez2 = new  ProjNode(prim2,REZ_IDX).init();
+          Env.GVN.add_reduce(fun);
           return unwire(call,ret).set_is_copy(ctl2,mem2,rez2);
         }
       }

@@ -25,9 +25,10 @@ public class TVNil extends TV3 {
   @Override public TVNil as_nil() { return this; }
   
   // -------------------------------------------------------------
+  // No sub-parts to union
   @Override void _union_impl(TV3 that) { }
 
-  @Override boolean _unify_impl(TV3 that ) { throw unimpl(); }
+  @Override boolean _unify_impl(TV3 that ) { return arg(0)._unify(that.arg(0),false); }
 
   boolean _unify_nil( TV3 that, boolean test ) {
     if( test ) return true;     // Will make progress in all situations

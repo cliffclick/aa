@@ -21,6 +21,13 @@ public class FP2DSPNode extends Node {
     if( fpt == Type.ANY || fpt == Type.ALL ) return fpt;
     return (fpt instanceof TypeFunPtr tfp) ? tfp.dsp() : fpt.oob();
   }
+
+  @Override public Node ideal_reduce() {
+    if( fp() instanceof BindFPNode bind )
+      return bind.dsp();
+    return null;
+  }
+
   
   @Override public boolean has_tvar() { return true; }
 

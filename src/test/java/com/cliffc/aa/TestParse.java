@@ -30,7 +30,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=true;
     RSEED=0;
-    test("1._+_._(2)", "3", "int:3" );
+    testerr("1 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x maybe alive
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -166,21 +166,21 @@ public class TestParse {
     // Conditional:
     test   ("0 ?    2  : 3", "3", "int:3"); // false
     test   ("2 ?    2  : 3", "2", "int:2"); // true
-    test   ("math.rand(1)?x=4:x=3;x", "nint8", "int:nint8"); // x defined on both arms, so available after
-    test   ("math.rand(1)?x=2:  3;4", "4", "int:4"); // x-defined on 1 side only, but not used thereafter
-    test   ("math.rand(1)?(y=2;x=y*y):x=3;x", "nint8", "int:int64"); // x defined on both arms, so available after, while y is not
-    testerr("math.rand(1)?x=2: 3 ;x", "'x' not defined on false arm of trinary",20);
-    testerr("math.rand(1)?x=2: 3 ;y=x+2;y", "'x' not defined on false arm of trinary",20);
+    test   ("math.rand(2)?x=4:x=3;x", "nint8", "int:nint8"); // x defined on both arms, so available after
+    test   ("math.rand(2)?x=2:  3;4", "4", "int:4"); // x-defined on 1 side only, but not used thereafter
+    test   ("math.rand(2)?(y=2;x=y*y):x=3;x", "nint8", "int:int64"); // x defined on both arms, so available after, while y is not
+    testerr("math.rand(2)?x=2: 3 ;x", "'x' not defined on false arm of trinary",20);
+    testerr("math.rand(2)?x=2: 3 ;y=x+2;y", "'x' not defined on false arm of trinary",20);
     testerr("0 ? x=2 : 3;x", "'x' not defined on false arm of trinary",11);
     test   ("2 ? x=2 : 3;x", "2", "int:2"); // off-side is constant-dead, so missing x-assign is ignored
     test   ("2 ? x=2 : y  ", "2", "int:2"); // off-side is constant-dead, so missing 'y'      is ignored
     testerr("x=1;2?(x=2):(x=3);x", "Cannot re-assign final field '.x' in @{x=1}",7);
     test   ("x=1;2?   2 :(x=3);x", "1", "int:1"); // Re-assigned allowed & ignored in dead branch
-    test   ("math.rand(1)?1:int:2:int","nint8", "int:int64"); // no ambiguity between conditionals and type annotations
-    testerr("math.rand(1)?1: :2:int","missing expr after ':'",16); // missing type
-    testerr("math.rand(1)?1::2:int","missing expr after ':'",15); // missing type
-    test   ("math.rand(1)?1","int1","int:int64"); // Missing optional else defaults to nil
-    test   ("x:=0;math.rand(1)?(x:=1);x","int1","int:int64");
+    test   ("math.rand(2)?1:int:2:int","nint8", "int:int64"); // no ambiguity between conditionals and type annotations
+    testerr("math.rand(2)?1: :2:int","missing expr after ':'",16); // missing type
+    testerr("math.rand(2)?1::2:int","missing expr after ':'",15); // missing type
+    test   ("math.rand(2)?1","int1","int:int1"); // Missing optional else defaults to nil
+    test   ("x:=0;math.rand(2)?(x:=1);x","int1","int:int1");
     testerr("a.b.c();","Unknown ref 'a'",0);
   }
 
@@ -195,14 +195,14 @@ public class TestParse {
     test("0 && 1 || 2 && 3", "int:3","int:3");    // Precedence
 
     test("x:=y:=0; z=x++ && y++;(x,y,z)", // increments x, but it starts zero, so y never increments
-         "(int:1, xnil,xnil)","(int:1,A?,B?)");
+         "*[12](1, xnil,xnil)","*(int:int64,A?,B?)",null,null,"[12]",null);
     test("x:=y:=0; x++ && y++; z=x++ && y++; (x,y,z)", // x++; x++; y++; (2,1,0)
-         "(int:2, int:1, xnil)","(int:2,int:1,A?)");
+            "*[13](2, 1, xnil)","*(int:int64,int:int64,A?)", null, null, "[13]", null);
     test("(x=1) && x+2", "int:3", "int:3"); // Def x in 1st position
 
     testerr("1 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x maybe alive
     testerr("0 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x definitely not alive
-    test("math.rand(1) && (x=2;x*x) || 3 && 4", "int:int8", "int:int8"); // local use of x in short-circuit; requires unzip to find 4
+    test("math.rand(2) && (x=2;x*x) || 3 && 4", "int:int8", "int:int8"); // local use of x in short-circuit; requires unzip to find 4
   }
 
   @Test public void testParse02() {

@@ -149,6 +149,7 @@ public class LoadNode extends Node {
         case MemSplitNode node -> mem = node.mem(); // Lifting out of a split/join region
         case CallNode     node -> mem = node.mem(); // Lifting out of a Call
         case RootNode     node -> { return null; }
+        case PrimNode     prim -> { return null; }
         case CallEpiNode  node -> {
           mem = node.is_copy(MEM_IDX); // Skip thru a copy
           if( mem == null ) {
