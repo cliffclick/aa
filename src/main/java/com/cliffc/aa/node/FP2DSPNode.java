@@ -23,8 +23,14 @@ public class FP2DSPNode extends Node {
   }
 
   @Override public Node ideal_reduce() {
-    if( fp() instanceof BindFPNode bind )
-      return bind.dsp();
+    Node fp = fp();
+    if( fp instanceof FreshNode frsh ) 
+      fp = frsh.id();    
+    if( fp instanceof BindFPNode bind ) return bind.dsp();
+    else {
+      fp.deps_add(this);
+      if( fp!=fp() ) fp().deps_add(this);
+    }
     return null;
   }
 

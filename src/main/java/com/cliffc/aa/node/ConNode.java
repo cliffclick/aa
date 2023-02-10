@@ -23,6 +23,8 @@ public class ConNode<T extends Type> extends Node {
 
   @Override public Type value() { return _t; }
 
+  @Override boolean assert_live(Type live) { return (_t instanceof TypeMem) == (live instanceof TypeMem); }
+
   @Override public boolean has_tvar() {
     if( _t==Type.ALL || _t==Type.ANY ) return true;  // Specifically allowed for various unused-displays on primitives
     if( _t instanceof TypeNil ) return true; // Yes on NIL, INT, FLT, MEMPTR, FUNPTR, STRUCT
@@ -68,7 +70,7 @@ public class ConNode<T extends Type> extends Node {
     }
     if( tvar()==con.tvar() ) return true;
     if( !equals_uses_tvar() ) return true;
-    // Two tvars must unify
+    //
     throw unimpl();
   }
   

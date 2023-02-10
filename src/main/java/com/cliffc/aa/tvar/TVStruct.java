@@ -146,13 +146,15 @@ public class TVStruct extends TV3 {
     TVStruct that = (TVStruct)tv3; // Invariant when called
     this.trial_resolve_all(false);
     that.trial_resolve_all(false);
+    assert !this.unified() && !that.unified();
+    TVStruct thsi = this;
 
     // Unify LHS fields into RHS
     boolean open = that.is_open();
-    for( int i=0; i<_max; i++ ) {
-      TV3 fthis = arg(i);       // Field of this      
-      String key = _flds[i];
-      boolean pinned = _pins[i];
+    for( int i=0; i<thsi._max; i++ ) {
+      TV3 fthis = thsi.arg(i);       // Field of this      
+      String key = thsi._flds[i];
+      boolean pinned = thsi._pins[i];
       int ti = Util.find(that._flds,key);
       if( ti == -1 ) {          // Missing field in that
         //if( Resolvable.is_resolving(key) ) continue; // Do not add or remove until resolved
@@ -166,17 +168,17 @@ public class TVStruct extends TV3 {
         that._pins[ti] |= pinned;  // Unify pinned
         // Progress may require another find()
         that = (TVStruct)that.find();
-        assert !unified();      // TODO: weave this thru
+        thsi = (TVStruct)thsi.find();
       }
     }
 
     // Fields on the RHS are aligned with the LHS also
     for( int i=0; i<that._max; i++ ) {
       String key = that._flds[i];
-      if( arg(key)==null ) {                         // Missing field in this
+      if( thsi.arg(key)==null ) {                    // Missing field in this
         if( Resolvable.is_resolving(key) ) continue; // Do not remove until resolved
-        if( is_open() ) add_fld(key,that._pins[i],that.arg(i)); // Add to LHS
-        else del_fld(key);                                      // Drop from RHS
+        if( is_open() ) thsi.add_fld(key,that._pins[i],that.arg(i)); // Add to LHS
+        else thsi.del_fld(key); // Drop from RHS
       }
     }
 

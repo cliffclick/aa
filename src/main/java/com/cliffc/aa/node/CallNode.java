@@ -212,8 +212,10 @@ public class CallNode extends Node {
 
     // Wire valid targets.
     CallEpiNode cepi = cepi();
-    if( cepi!=null && cepi.check_and_wire(false) )
+    if( cepi!=null && cepi.check_and_wire(false) ) {
+      Env.GVN.add_reduce(this); // Re-run for other progress
       return this;              // Some wiring happened
+    }
 
     // Check for dead args and trim; must be after all wiring is done because
     // unknown call targets can appear during GCP and use the args.  After GCP,

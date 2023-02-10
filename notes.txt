@@ -1,4 +1,44 @@
 =======================================
+2/09/2023
+
+Fresh is horribly wrong.  Can't track just FunNodes, because still have to flag
+Fresh unrelated var uses inside of a let-def:
+   z = ....;     // let z = ... in 
+   x = ...z...;  //   let x = ...Fresh(z,x)... // z is fresh inside of x's def, with x in nongen set
+
+Theory:
+- track nongen Nodes in Scope
+- when starting a fcn scope, all parms from DSP_IDX on go in nongen set (so can find from Scope/Ctrl?)
+- when starting an assignment store, first pre-assign with ForwardRef, and push these on Scope.
+- These FREF's collapse on assignment
+
+Theory#2: Fresh copys all Scope nongen inputs.
+- End result: every fresh has a complete copy of all active nongen values.
+- Theory#2a: i'll be choked-up with Fresh, and need heavy cleanup rules.
+
+Theory#3:
+- Fresh points to a Scope with nongen list
+Theory#4:
+- Scopes nest (they do), so Fresh can follow the nongen list
+THeory#4a: i'll be choked-up with Fresh, and need heavy Scope cleanup rules
+
+
+Scopes:
+ 0    1    2    3    4    5     6     7   | 8...
+CTL  MEM  REZ  PTR  STK  XCTL  XMEM  XVAL | nongen....
+
+Theory: dangerous to merge Scopes and nongen tracking...
+Better to replicate at every Fresh (optimize later if we see huge redundant Fresh lists).
+
+--------------------
+Problem#next:
+
+Structs in FunNode/scope().stk()/Frame - first nargs arguments are ParmNodes
+and NONGEN.  Next set of fields are in the post-Let-Def set, and not NONGEN.
+Need to split structnode inputs.
+
+
+=======================================
 1/25/2023
 
 What is the type of { x -> 1+x } ?

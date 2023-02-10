@@ -18,7 +18,7 @@ public class TestLive {
     rez._val = TypeInt.con(5);
 
     // Liveness is a backwards flow.  Scope always demands all return results.
-    ScopeNode scope = new ScopeNode(false,null,null,fullmem,null,rez,null);
+    ScopeNode scope = new ScopeNode(null,null,fullmem,null,rez,null);
 
     // Check liveness base case
     scope._live = scope.live();
@@ -40,7 +40,7 @@ public class TestLive {
     ConNode fdy = new ConNode(TypeInt.con(9)).init();
 
     // New object, fields x,y holding ints
-    StructNode obj = new StructNode(false,false,null,"",Type.ALL);
+    StructNode obj = new StructNode(0,false,null,"",Type.ALL);
     obj.add_fld("x",TypeFld.Access.Final,fdx,null);
     obj.add_fld("y",TypeFld.Access.Final,fdy,null);
     obj.close().init();
@@ -49,7 +49,7 @@ public class TestLive {
     Node mem = new StoreNode(mmm,ptr,obj,null).init();
 
     // Use the object for scope exit
-    ScopeNode scope = new ScopeNode(false,null,null,mem,null,ptr,null);
+    ScopeNode scope = new ScopeNode(null,null,mem,null,ptr,null);
     scope.set_mem(mem);
     scope.set_rez(ptr);
     scope.init();

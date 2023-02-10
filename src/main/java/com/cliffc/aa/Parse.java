@@ -632,7 +632,7 @@ public class Parse implements Comparable<Parse> {
     Node dsp    = init(new ParmNode(DSP_IDX,fun,null,outer_dsp._tptr ,outer_dsp   ));
     Node mem    = init(new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM  ,Env.MEM_0   ));
     int bptr_idx;
-    try( Env e = new Env(_e, fun, true, fun, mem, dsp, null) ) { // Nest an environment for the local vars
+    try( Env e = new Env(_e, fun, 1, fun, mem, dsp, null) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
       // Display is special: the default is simply the outer lexical scope.
       // But here, in a function, the display is actually passed in as a hidden
@@ -647,7 +647,7 @@ public class Parse implements Comparable<Parse> {
 
       // Merge normal exit into all early-exit paths.
       // TODO: this exits from the thunk, not the whole function
-      assert frame._is_closure;
+      assert frame.is_closure();
       rez = merge_exits(rez);
       
       // Standard return; function control, memory, result, RPC.  Plus a hook
@@ -774,7 +774,7 @@ public class Parse implements Comparable<Parse> {
         int nidx = n.push();    // Keep alive across arg parse
         Node dsp = gvn(new FP2DSPNode(n,err));
         // Argument tuple, with "this" or display first arg
-        StructNode args = new StructNode(false,false,err, "", Type.ALL);
+        StructNode args = new StructNode(0,false,err, "", Type.ALL);
         args.add_fld("0",Access.Final,dsp,err); // TODO: get the display start for errors
         int aidx = args.push();
         Node arg1 = stmts();
@@ -852,22 +852,20 @@ public class Parse implements Comparable<Parse> {
     Node fd = gvn(new FieldNode(ld,tok,false,bad));
     if( fd.is_forward_ref() )    // Prior is actually a forward-ref
       return err_ctrl1(ErrMsg.forward_ref(this,(FunPtrNode)fd));
-    int fdidx = fd.push();
-    Node n = gvn(new FreshNode(_e._fun,fd));
+    Node n = gvn(new FreshNode(fd,_e));
     int nidx = n.push();
     // Do a full lookup on "+", and execute the function
     // Get the overloaded operator field, always late binding
     Node overplus = gvn(new FieldNode(n,"_+_",true,bad)); // Plus operator overload
     Node plus = gvn(new FieldNode(overplus,"_",false,bad)); // Resolve overload
     Node inc = con(TypeInt.con(d));
-    Node sum = do_call0(false,errMsgs(_x-2,_x,_x), args(Node.pop(nidx),inc,plus));
+    Node sum = do_call0(false,errMsgs(_x-2,_x,_x), args(Node.peek(nidx),inc,plus));
     Node stf = gvn(new SetFieldNode(tok,Access.RW,Node.peek(ld_x),sum,bad));
     // Active memory for the chosen scope, after the call to plus
     scope().replace_mem(new StoreNode(mem(),ptr,stf,bad));
-    // Fresh-again the 
-    Node n2 = gvn(new FreshNode(_e._fun,Node.pop(fdidx)));
+    n = Node.pop(nidx);
     Node.pop(ld_x);             // No longer need
-    return n2;                  // Return pre-increment value
+    return n;                   // Return pre-increment post-fresh value
   }
 
 
@@ -960,8 +958,9 @@ public class Parse implements Comparable<Parse> {
     // If in the middle of a definition (e.g. a HM Let, or recursive assign)
     // then no Fresh per normal HM rules.  If loading from normal Lambda
     // arguments, again no Fresh per normal HM rules.
-    boolean closure = scope.stk()._is_closure;
-    Node frsh = fd.is_forward_ref() || closure ? fd : gvn(new FreshNode(_e._fun,fd));
+    Node frsh = fd.is_forward_ref() || scope.stk().is_nongen(tok)
+      ? fd
+      : gvn(new FreshNode(fd,_e));
     return frsh;
   }
 
@@ -971,7 +970,7 @@ public class Parse implements Comparable<Parse> {
    */
   private Node tuple(int oldx, Node s, int first_arg_start) {
     // First stmt is parsed already
-    StructNode nn = new StructNode(false,false,errMsg(oldx), "", Type.ALL).init();
+    StructNode nn = new StructNode(0,false,errMsg(oldx), "", Type.ALL).init();
     Parse bad = errMsg(first_arg_start);
     int sidx = nn.push();
     _tuple(oldx,s,bad,nn);
@@ -1005,7 +1004,7 @@ public class Parse implements Comparable<Parse> {
    */
   private Node struct() {
     int oldx = _x-1, pidx;      // Opening @{
-    try( Env e = new Env(_e, null, false, ctrl(), mem(), _e._scope.stk(), null) ) { // Nest an environment for the local vars
+    try( Env e = new Env(_e, null, 0, ctrl(), mem(), _e._scope.stk(), null) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
       stmts(true);              // Create local vars-as-fields
       require('}',oldx);        // Matched closing }
@@ -1082,7 +1081,7 @@ public class Parse implements Comparable<Parse> {
 
     // Increase scope depth for function body.
     int bptr_idx;
-    try( Env e = new Env(_e, fun, true, fun, mem, dsp, null) ) { // Nest an environment for the local vars
+    try( Env e = new Env(_e, fun, formals._len-DSP_IDX, fun, mem, dsp, null) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
       // Display is special: the default is simply the outer lexical scope.
       // But here, in a function, the display is actually passed in as a hidden
@@ -1106,7 +1105,7 @@ public class Parse implements Comparable<Parse> {
       frame.close();
 
       // Merge normal exit into all early-exit paths
-      assert frame._is_closure;
+      assert frame.is_closure();
       rez = merge_exits(rez);
       // Standard return; function control, memory, result, RPC.  Plus a hook
       // to the function for faster access.
@@ -1243,7 +1242,7 @@ public class Parse implements Comparable<Parse> {
     String str = new String(_buf,oldx,_x-oldx-1).intern();
     // Convert to ptr-to-constant-memory-string
     Parse bad = errMsg(oldx);
-    StructNode scon = new StructNode(false,false,bad,"str:", Type.ALL);
+    StructNode scon = new StructNode(0,false,bad,"str:", Type.ALL);
     scon.add_fld("0",Access.Final,con(TypeInt.con(str.charAt(0))),bad);
     Node scon1 = gvn(scon.close());
     Node ptr = new NewNode().init();

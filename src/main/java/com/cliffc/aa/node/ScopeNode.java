@@ -20,12 +20,10 @@ public class ScopeNode extends Node {
   // Mapping from type-variables to Types.  Types have a scope lifetime like values.
   private final HashMap<String,StructNode> _types; // user-typing type names
   private Ary<IfScope> _ifs;                 // Nested set of IF-exprs used to track balanced new-refs
-  private final boolean _closure;
 
-  public ScopeNode(boolean is_closure, HashMap<String,StructNode> types,  Node ctl, Node mem, Node rez, Node ptr, StructNode dsp) {
+  public ScopeNode( HashMap<String,StructNode> types,  Node ctl, Node mem, Node rez, Node ptr, StructNode dsp) {
     super(OP_SCOPE,ctl,mem,rez,ptr,dsp);
     _types = types;
-    _closure = is_closure;
   }
   @Override boolean is_CFG() { return true; }
 
@@ -77,8 +75,6 @@ public class ScopeNode extends Node {
   }
 
   public Set<String> typeNames() { return _types.keySet(); }
-
-  public boolean is_closure() { return _closure; }
 
   @Override public Node ideal_reduce() {
     Node ctrl = in(0).is_copy(0);

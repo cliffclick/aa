@@ -30,7 +30,14 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=true;
     RSEED=0;
-    testerr("1 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x maybe alive
+    testerr("x=y; x=y","Unknown ref 'y'",2);
+
+    // 'g' is not-fresh in function 'f'.
+    // 'f' IS fresh in the body of 'g' pair.
+    test("{ g -> f = { ignore -> g }; (f 3, f \"abc\")}",
+         "[55]{*[10](^=*[5]@{}),4 -> *[14](Scalar, Scalar) }",
+         "{ A -> *( A, A) }",
+         null,null,"[14]","[55]");
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -62,6 +69,12 @@ public class TestParse {
     test("{ x -> ( 3, x )}", "[56]{any,4 -> *[12](3, Scalar) }", "{ A B -> *(int:3, B) }", null, null, "[nALL]", "[nALL]");
     // TestParse.a_basic_02
     test("{ z -> ((z 0), (z \"abc\")) }", "[56]{any,4 -> *[13]() }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[13]", "[56]" );
+
+    // TestParse.a_basic_05
+    // example that demonstrates generic and non-generic variables:
+    //test("{ g -> f = { ignore -> g }; ((f 3), (f \"abc\"))}","[56]{any,3 ->*[13]() }","{ A -> *( A, A) }",null,null,"[13]","[56]");
+
+    
     // TestParse.g_overload_err_00
     testerr("( { x -> x*2 }, { x -> x*3 })._ 4", "Ambiguous, unable to resolve { D E -> F } and { G B -> H }",30);
 
@@ -160,7 +173,7 @@ public class TestParse {
     test("x:=1;x++", "1", "int:int64");
     test("x:=1;x++;x", "2", "int:2");
     test("x:=1;x++ + x--","3", "int:3");
-    test("x++","xnil", "A?");
+    test("x++","xnil", "int:int64");
     test("x++;x", "1", "int:1");
 
     // Conditional:
@@ -229,7 +242,7 @@ public class TestParse {
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)","5","int:5");
     test("f0 = { x -> x ? 1+(f0(x-1)) : 0 }; f0(2)", "2","int:2");
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))","*[12](xnil,1,2)","*(int:int64,A:int:B:int64,A)", null, null, "[12]", null);
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))","*[12](xnil,1,2)","*(int:int64,int:int64,int:int64)", null, null, "[12]", null);
 
     // Co-recursion requires parallel assignment & type inference across a lexical scope
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", "1", "int:int64" );

@@ -48,9 +48,9 @@ public abstract class PrimNode extends Node {
   }
 
   // Int/Float primitives.  
-  public static final StructNode ZINT = new StructNode(false,false,null,"", Type.ALL).set_proto_instance(TypeInt.INT64).init();
-  public static final StructNode ZFLT = new StructNode(false,false,null,"", Type.ALL).set_proto_instance(TypeFlt.FLT64).init();
-  public static final StructNode ZSTR = new StructNode(false,false,null,"", Type.ALL).set_proto_instance(TypeMemPtr.STRPTR).init();
+  public static final StructNode ZINT = new StructNode(0,false,null,"", Type.ALL).set_proto_instance(TypeInt.INT64).init();
+  public static final StructNode ZFLT = new StructNode(0,false,null,"", Type.ALL).set_proto_instance(TypeFlt.FLT64).init();
+  public static final StructNode ZSTR = new StructNode(0,false,null,"", Type.ALL).set_proto_instance(TypeMemPtr.STRPTR).init();
   public static final NewNode PINT = new NewNode();
   public static final NewNode PFLT = new NewNode();
   public static final NewNode PSTR = new NewNode();
@@ -192,7 +192,7 @@ public abstract class PrimNode extends Node {
       // display argument is always of the primitive type, and the other
       // arguments may vary, and the correct primitive is picked using overload
       // resolution.
-      StructNode over = new StructNode(false,false,null,"",Type.ALL);
+      StructNode over = new StructNode(0,false,null,"",Type.ALL);
       int cnt=0;
       for( PrimNode prim : prims ) {
         String fld = (""+cnt++).intern();
@@ -210,7 +210,7 @@ public abstract class PrimNode extends Node {
 
   // Build and install match package
   private static NewNode make_math(PrimNode rand) {
-    StructNode math = new StructNode(false,false,null,"",Type.ALL);
+    StructNode math = new StructNode(0,false,null,"",Type.ALL);
     math.add_fld("pi",Access.Final,con(TypeFlt.PI),null);
     math.add_fld(rand._name,Access.Final,rand.as_fun(),null);
     math.close().init();

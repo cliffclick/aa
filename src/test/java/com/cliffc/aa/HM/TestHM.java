@@ -144,9 +144,9 @@ public class TestHM {
   // example that demonstrates generic and non-generic variables:
   @Test public void a_basic_05() {
     run( "{ g -> f = { ignore -> g }; (pair (f 3) (f \"abc\"))}",
-          "{ A -> *( A, A) }",
-          "[31]{any,3 ->*[17](_, Scalar, Scalar) }",
-          "[17]","[31]");
+         "{ A -> *( A, A) }",
+         "[31]{any,3 ->*[17](_, Scalar, Scalar) }",
+         "[17]","[31]");
   }
   @Test public void a_basic_06() { run("(i* 2 3)","%int64","6");  }
 

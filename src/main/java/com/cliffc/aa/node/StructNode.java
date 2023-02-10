@@ -35,9 +35,10 @@ import static com.cliffc.aa.AA.unimpl;
 // within lexical scope; shadowing requires another scope; deBruin numbers).
 public class StructNode extends Node {
 
-  // Used to distinguish closures from normal structs in the Parser (the "^"
-  // syntax escapes all nested struct scopes to the enclosing closure).
-  public final boolean _is_closure;
+  // Number of args in the enclosing function scope.  Inputs up to this count
+  // are in the NONGEN set; inputs after this are out of the NONGEN set.  This
+  // is zero for non-function scopes.
+  public final int _nargs;
 
   // Still adding fields or not.  Helps with asserting in the Parser
   private boolean _closed;
@@ -80,9 +81,9 @@ public class StructNode extends Node {
   private final Parse _paren_start;
   private final Ary<Parse> _fld_starts;
 
-  public StructNode(boolean is_closure, boolean forward_ref, Parse paren_start, String clz, Type def) {
+  public StructNode(int nargs, boolean forward_ref, Parse paren_start, String clz, Type def) {
     super(OP_STRUCT);
-    _is_closure = is_closure;
+    _nargs = nargs;
     _forward_ref = forward_ref;
     _clz = clz;
     _def = def;
@@ -94,9 +95,12 @@ public class StructNode extends Node {
 
   @Override String str() {
     SB sb = new SB().p(_clz).p("@{");
-    if( _flds.isEmpty() ) return sb.p("}").toString();
-    for( String fld : _flds ) sb.p(fld).p(";");
-    return sb.unchar().p("}").toString();
+    for( int i=0; i<_flds._len; i++ ) {
+      if( i==_nargs ) sb.p("| ");
+      sb.p(_flds.at(i)).p("; ");
+    }
+    if( _flds._len>0 ) sb.unchar(2);
+    return sb.p("}").toString();
   }
 
   // Structs with the same inputs and same field names are the same.
@@ -121,9 +125,12 @@ public class StructNode extends Node {
   public String fld(int idx) { return _flds.at(idx); }
 
   // One-time transition when closing a Struct to new fields.
-  public StructNode close() { assert !_closed; _closed=true; return this; }
+  public StructNode close() { assert !_closed; assert _nargs <= _flds._len; _closed=true; return this; }
   public boolean is_closed() { return _closed; }
 
+  public boolean is_nongen(String fld) { return _nargs!=0 && find(fld)<_nargs; }
+  public boolean is_closure() { return _nargs>0; }
+  
   // One-time transition when defining a forward ref
   public void define() { assert _forward_ref && _closed; _forward_ref=false; }
   @Override public boolean is_forward_type() { return _forward_ref; }

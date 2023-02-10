@@ -288,7 +288,7 @@ abstract public class TV3 implements Cloneable {
     
     // Famous 'occurs-check': In the non-generative set, so do a hard unify,
     // not a fresh-unify.
-    if( nongen_in() ) throw unimpl(); // return vput(that,_unify(that,test));
+    if( nongen_in() ) return vput(that,_unify(that,test));
 
     // LHS leaf, RHS is unchanged but goes in the VARS
     if( this instanceof TVLeaf leaf ) return vput(that,false);
@@ -411,9 +411,13 @@ abstract public class TV3 implements Cloneable {
   boolean nongen_in() {
     if( ROOT==null || ROOT._nongen==null ) return false;
     ODUPS.clear();
-    for( TV3 tv3 : ROOT._nongen )
+    TV3[] nongen = ROOT._nongen;
+    for( int i=0; i<nongen.length; i++ ) {
+      TV3 tv3 = nongen[i];
+      if( tv3.unified() ) nongen[i] = tv3 = tv3.find();
       if( _occurs_in_type(tv3) )
         return true;
+    }
     return false;
   }
 
@@ -422,9 +426,10 @@ abstract public class TV3 implements Cloneable {
     assert !unified() && !x.unified();
     if( x==this ) return true;
     if( ODUPS.tset(x._uid) ) return false; // Been there, done that
-    for( int i=0; i<len(); i++ )
-      if( _occurs_in_type(x.arg(i)) )
-        return true;
+    if( x._args!=null )
+      for( int i=0; i<x.len(); i++ )
+        if( x._args[i]!=null && _occurs_in_type(x.arg(i)) )
+          return true;
     return false;
   }
 

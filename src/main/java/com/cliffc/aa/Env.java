@@ -117,10 +117,10 @@ public class Env implements AutoCloseable {
   public final FunNode _fun;     // Matching FunNode for this lexical environment
 
   // Shared Env constructor.
-  Env( Env par, FunNode fun, boolean is_closure, Node ctrl, Node mem, Node dsp_ptr, StructNode fref ) {
+  Env( Env par, FunNode fun, int nargs, Node ctrl, Node mem, Node dsp_ptr, StructNode fref ) {
     _par = par;
     _fun = fun;
-    StructNode dsp = fref==null ? new StructNode(is_closure,false,null, "", Type.ALL).init() : fref;
+    StructNode dsp = fref==null ? new StructNode(nargs,false,null, "", Type.ALL).init() : fref;
     dsp.add_fld("^",TypeFld.Access.Final,dsp_ptr,null);
     NewNode ptr = new NewNode();  GVN.add_flow(ptr);
     mem = new StoreNode(mem,ptr,dsp,null).init();
@@ -131,14 +131,14 @@ public class Env implements AutoCloseable {
       //PROTOS.put(fname,dsp);
       throw unimpl();
     }
-    _scope = new ScopeNode(is_closure,new HashMap<>(),ctrl,mem,XNIL,ptr,dsp).init();
+    _scope = new ScopeNode(new HashMap<>(),ctrl,mem,XNIL,ptr,dsp).init();
     KEEP_ALIVE.add_def(_scope);
     GVN.iter();
   }
 
   // Top-level Env.  Contains, e.g. the primitives.
   // Above any file-scope level Env.
-  private Env( ) { this(null,null,false,CTL_0,MEM_0,XNIL,null); }
+  private Env( ) { this(null,null,0,CTL_0,MEM_0,XNIL,null); }
 
   // Gather and report errors and typing
   TypeEnv gather_errors(ErrMsg err) {
@@ -191,7 +191,7 @@ public class Env implements AutoCloseable {
 
   // Wire up an early function exit.  Hunts through all scopes until it finds a closure.
   Node early_exit( Parse P, Node val ) {
-    return _scope.is_closure() ? P.do_exit(_scope,val) : _par.early_exit(P,val); // Hunt for an early-exit-enabled scope
+    return _scope.stk().is_closure() ? P.do_exit(_scope,val) : _par.early_exit(P,val); // Hunt for an early-exit-enabled scope
   }
 
   // Record global static state for reset
