@@ -41,8 +41,10 @@ public class ParmNode extends PhiNode {
         Type ti = val(i);
         if( cprj instanceof CRProjNode ) {
           // During/after Combo, use the HM type for the GCP type instead of the given default
-          if( ti != Type.ANY && _tvar!=null )
+          if( ti != Type.ANY && _tvar!=null ) {
+            Env.ROOT.deps_add(this); // Depends on Root
             ti = tvar().as_flow(this);
+          }
         }
         t = t.meet(ti);
       }

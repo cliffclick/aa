@@ -387,12 +387,12 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   static final byte TRPC    = 8; // Return PCs; Continuations; call-site return points; see TypeRPC
   static final byte TMEMPTR = 9; // Memory pointer type; a collection of Alias#s
   static final byte TFUNPTR =10; // Function pointer, refers to a collection of concrete functions
-  static final byte TNILABLE=11;
+  static final byte TSCALAR =11; // Some kinda scalar (tracks alias#s and fidx#s)
+  static final byte TNILABLE=12;
   public boolean is_nil() { return _type < TNILABLE; }
   // Collections of Scalars, Memory, Fields.  Not Nilable.
-  static final byte TSTRUCT =12; // Memory Structs; tuples with named fields
-  static final byte TTUPLE  =13; // Tuples; finite collections of unrelated Types, kept in parallel
-  static final byte TUNION  =14; // Union of each primitive type
+  static final byte TSTRUCT =13; // Memory Structs; tuples with named fields
+  static final byte TTUPLE  =14; // Tuples; finite collections of unrelated Types, kept in parallel
   static final byte TARY    =15; // Tuple of indexed fields; only appears in a TSTRUCT
   static final byte TFLD    =16; // Fields in structs
   static final byte TMEM    =17; // Memory type; a map of Alias#s to TOBJs
@@ -543,6 +543,9 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       // LHS is TypeNil directly
       if( t0._type==TNIL ) return t0.nmeet(t1);
       if( t1._type==TNIL ) return t1.nmeet(t0);
+      // LHS is TypeScalar directly 
+      if( t0 instanceof TypeScalar ts ) return ts.smeet(t1);
+      if( t1 instanceof TypeScalar ts ) return ts.smeet(t0);
       // Mis-matched TypeNil subclasses
       return t0.widen_sub().meet(t1.widen_sub());
     }
@@ -624,6 +627,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     concat(ts,TypeFunPtr.TYPES);
     concat(ts,TypeRPC   .TYPES);
     concat(ts,TypeMem   .TYPES);
+    concat(ts,TypeScalar.TYPES);
     concat(ts,TypeStruct.TYPES);
     concat(ts,TypeTuple .TYPES);
     // Some more complex exciting types
@@ -814,6 +818,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       case '*' ->     TypeMemPtr.valueOf(this,dup,any);
       case '(' ->     TypeStruct.valueOf(this,dup,any,true );
       case '@' ->     TypeStruct.valueOf(this,dup,any,false);
+      case '%' ->     TypeScalar.valueOf(this,dup,any);
       case '[' -> peek("[[")
         ? TypeMem.valueOf(this,dup,any)
         : TypeFunPtr.valueOf(this,dup,any);

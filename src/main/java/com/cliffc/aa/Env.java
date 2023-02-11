@@ -58,6 +58,8 @@ public class Env implements AutoCloseable {
 
   // All possible return addresses (RPCs).
   public static final ProjNode ALL_CALL;
+  // All possible escaped *internal* aliases and fidxs
+  public static final ProjNode ALL_ESC;
 
   // Initial program state.  Includes definitions for int: and flt: clazzes,
   // which includes most common primitives.
@@ -101,6 +103,9 @@ public class Env implements AutoCloseable {
     // All the Calls in the Universe, which might call somebody.
     ALL_CALL=keep(new ProjNode(ROOT,2));
 
+    // All the escaped fidxs and aliases, which might called or modified
+    ALL_ESC = keep(new ProjNode(ROOT,3));
+    
     PROTOS = new NonBlockingHashMap<>();
 
     // The Top-Level environment; holds the primitives.
@@ -153,9 +158,8 @@ public class Env implements AutoCloseable {
     Node rez = Env.ROOT.in(REZ_IDX);
     Type mem = Env.ROOT.in(MEM_IDX)._val;
     Type val = rez._val;   
-    TypeTuple ttroot = (TypeTuple)Env.ROOT._val;
-    BitsFun   fidxs   = ((TypeFunPtr)ttroot.at(3)).fidxs(); // Can return a meet-of-joins?
-    BitsAlias aliases = ((TypeMemPtr)ttroot.at(4))._aliases;
+    BitsAlias aliases = Env.ROOT.ralias();
+    BitsFun   fidxs   = Env.ROOT.rfidxs();
     return new TypeEnv(val,     // GCP result
                        fidxs,   // Escaping FIDXS
                        aliases, // Escaping ALIASES

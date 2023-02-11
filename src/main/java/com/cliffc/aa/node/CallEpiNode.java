@@ -229,7 +229,7 @@ public final class CallEpiNode extends Node {
     for( int fidx : tfp.fidxs() ) { // For all fidxs
       if( BitsFun.is_parent(fidx) ) continue; // Do not wire parents, as they will eventually settle out
       RetNode ret = RetNode.get(fidx);        // Lookup, even if not wired
-      if( ret==null ) continue;               // Dead or RootNode.EXT_FIDX
+      if( ret==null || ret.is_copy() ) continue; // Dead or RootNode.EXT_FIDX
       if( _defs.find(ret) != -1 ) continue;   // Wired already
       FunNode fun = ret.fun();
       if( !CEProjNode.wired_arg_check(tcall,fun) ) continue; // Args fail basic sanity

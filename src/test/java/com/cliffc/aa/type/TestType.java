@@ -14,8 +14,14 @@ public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
     Object dummy = Env.TOP;
-    Type t0 = Type.valueOf("123");
-    System.out.println(t0);
+    Type t0 = TypeScalar.EXT.dual();
+    Type s0 = TypeInt.INT64.dual();
+    Type t1 = TypeNil.XNIL;
+    Type mt = t0.meet(t1);
+    Type ms = s0.meet(t1);
+    Type x = mt.dual().meet(TypeScalar.EXT);
+    Type s = ms.dual().meet(TypeInt.INT64);
+    assertSame(TypeScalar.EXT,x);
   }
 
   // Test for a collection of Types, that toString and valueOf are a bijection

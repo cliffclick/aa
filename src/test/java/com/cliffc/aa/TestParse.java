@@ -30,14 +30,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=true;
     RSEED=0;
-    testerr("x=y; x=y","Unknown ref 'y'",2);
-
-    // 'g' is not-fresh in function 'f'.
-    // 'f' IS fresh in the body of 'g' pair.
-    test("{ g -> f = { ignore -> g }; (f 3, f \"abc\")}",
-         "[55]{*[10](^=*[5]@{}),4 -> *[14](Scalar, Scalar) }",
-         "{ A -> *( A, A) }",
-         null,null,"[14]","[55]");
+    test   ("math.rand(2)?(y=2;x=y*y):x=3;x", "nint8", "int:int64"); // x defined on both arms, so available after, while y is not
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -66,17 +59,22 @@ public class TestParse {
     // Simple no-arg anonymous function, being called
     test("{5}()", "5", "int:5");
     // TestParse.a_basic_01
-    test("{ x -> ( 3, x )}", "[56]{any,4 -> *[12](3, Scalar) }", "{ A B -> *(int:3, B) }", null, null, "[nALL]", "[nALL]");
+    test("{ x -> ( 3, x )}", "[56]{any,4 -> *[12](3, %[2,12][2,56]) }", "{ A B -> *(int:3, B) }", null, null, "[12]", "[56]");
     // TestParse.a_basic_02
     test("{ z -> ((z 0), (z \"abc\")) }", "[56]{any,4 -> *[13]() }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[13]", "[56]" );
 
     // TestParse.a_basic_05
     // example that demonstrates generic and non-generic variables:
-    //test("{ g -> f = { ignore -> g }; ((f 3), (f \"abc\"))}","[56]{any,3 ->*[13]() }","{ A -> *( A, A) }",null,null,"[13]","[56]");
+    // 'g' is not-fresh in function 'f'.
+    // 'f' IS fresh in the body of 'g' pair.
+    test("{ g -> f = { ignore -> g }; (f 3, f \"abc\")}",
+         "[56]{any,4 -> *[14](%[2,14][2,56], %[2,14][2,56]) }",
+         "{ A B -> *( B, B) }",
+         null,null,"[14]","[56]");
 
     
     // TestParse.g_overload_err_00
-    testerr("( { x -> x*2 }, { x -> x*3 })._ 4", "Ambiguous, unable to resolve { D E -> F } and { G B -> H }",30);
+    testerr("( { x -> x*2 }, { x -> x*3 })._ 4", "Ambiguous, unable to resolve { C D -> E } and { F G -> H }",30);
 
     // Variations on a simple wrapped add.  Requires full annotations to type -
     // because in fact it is all ambiguous and cannot be typed without seeing all
@@ -956,6 +954,8 @@ HashTable = {@{
       String esc_funs2 =     esc_funs+"{any,3->Scalar}";
       BitsAlias aliases = esc_ptrs==null ? BitsAlias.EMPTY : ((TypeMemPtr)Type.valueOf(esc_ptrs2))._aliases;
       BitsFun   fidxs   = esc_funs==null ? BitsFun  .EMPTY : ((TypeFunPtr)Type.valueOf(esc_funs2)).fidxs() ;
+      aliases = aliases.set(BitsAlias.EXTX);
+      fidxs   = fidxs  .set(BitsFun  .EXTX);
       assertEquals(fidxs  ,te._fidxs  );
       assertEquals(aliases,te._aliases);
     }

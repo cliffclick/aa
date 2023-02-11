@@ -122,7 +122,6 @@ public class AssertNode extends Node {
   // Check TypeNode for being in-error
   @Override public ErrMsg err( boolean fast ) {
     Type arg = arg()._val;
-    Type mem = mem()._val;
     return ErrMsg.asserterr(_error_parse,arg, _t);
   }
 }

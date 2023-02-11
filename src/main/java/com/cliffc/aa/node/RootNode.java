@@ -25,15 +25,20 @@ public class RootNode extends Node {
   TypeMem rmem() {
     return _val instanceof TypeTuple tt ? (TypeMem)tt.at(MEM_IDX) : TypeMem.ALLMEM.oob(_val.above_center());
   }
-  BitsAlias ralias() {
+  public BitsAlias ralias() {
     return _val instanceof TypeTuple tt
-      ? ((TypeMemPtr)tt.at(4))._aliases
+      ? ((TypeScalar)tt.at(3))._aliases
       : (_val.above_center() ? BitsAlias.NALL.dual() : BitsAlias.NALL);
   }
-  BitsFun rfidxs() {
+  public BitsFun rfidxs() {
     return _val instanceof TypeTuple tt
-      ? ((TypeFunPtr)tt.at(3)).fidxs()
+      ? ((TypeScalar)tt.at(3))._fidxs
       : (_val.above_center() ? BitsFun.NALL.dual() : BitsFun.NALL);
+  }
+  public TypeScalar ext_scalar() {
+    return (TypeScalar)(_val instanceof TypeTuple tt
+                        ? tt.at(3)
+                        : _val.oob(TypeScalar.INT));
   }
 
   
@@ -62,8 +67,8 @@ public class RootNode extends Node {
     return TypeTuple.make(Type.CTRL,
                           EXT_MEM,
                           TypeRPC.ALL_CALL,
-                          TypeFunPtr.make(EXT_FIDXS,1),
-                          TypeMemPtr.make(false,false,EXT_ALIASES,TypeStruct.ISUSED));
+                          TypeScalar.make(EXT_ALIASES.meet(BitsAlias.EXT),
+                                          EXT_FIDXS  .meet(BitsFun.EXT  )));
   }
 
   // Escape all Root results.  Escaping functions are called with the most
@@ -101,6 +106,10 @@ public class RootNode extends Node {
     if( t == TypeNil.SCALAR || t == TypeNil.NSCALR ) {
       EXT_ALIASES = BitsAlias.NALL;
       EXT_FIDXS   = BitsFun  .NALL;
+    }
+    if( t instanceof TypeScalar tsc ) {
+      EXT_ALIASES = EXT_ALIASES.meet(tsc._aliases);
+      EXT_FIDXS   = EXT_FIDXS  .meet(tsc._fidxs  );
     }
     if( t instanceof TypeMemPtr tmp ) {
       if( tmp._aliases == BitsAlias.NALL ) return;
@@ -151,7 +160,7 @@ public class RootNode extends Node {
     if( ralias==BitsAlias.NALL ) return BitsAlias.NALL;
     BitsAlias aliases = BitsAlias.EMPTY;
     for( int alias : ralias() )
-      if( tv3.trial_unify_ok(NewNode.get(alias).tvar(),false) )
+      if( alias>3 && tv3.trial_unify_ok(NewNode.get(alias).tvar(),false) )
         aliases = aliases.set(alias); // Compatible escaping alias
     return aliases;
   }

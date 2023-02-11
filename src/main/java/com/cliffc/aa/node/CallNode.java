@@ -368,7 +368,7 @@ public class CallNode extends Node {
         if( fidx==0 ) continue;
         for( int kid=fidx; kid!=0; kid = tree.next_kid(fidx,kid) ) {
           RetNode ret = RetNode.get(kid);
-          if( ret==null ) continue;
+          if( ret==null || ret.is_copy() ) continue;
           FunNode fun = ret.fun();
           ParmNode parm = fun.parm(j);
           if( parm==null ) continue;   // Formal is dead

@@ -32,7 +32,6 @@ public class TypeInt extends TypeNil<TypeInt> {
     if( !(o instanceof TypeInt t2) ) return false;
     return super.equals(o) && _z==t2._z && _con==t2._con;
   }
-  @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     if( _z==0 )
       return sb.p(_con);

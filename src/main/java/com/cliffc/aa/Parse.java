@@ -1092,7 +1092,7 @@ public class Parse implements Comparable<Parse> {
       assert fun==_e._fun && fun==_e._scope.ctrl();
       for( int i=ARG_IDX; i<formals.len(); i++ ) { // User parms start
         TypeNil formal = (TypeNil)formals.at(i);
-        Node parm = gvn(new ParmNode(i,fun,errmsg,TypeNil.SCALAR,con(TypeNil.SCALAR)));
+        Node parm = gvn(new ParmNode(i,fun,errmsg,TypeNil.SCALAR,Env.ALL_ESC));
         if( formal!=TypeNil.SCALAR )
           parm = gvn(new AssertNode(mem,parm,formal,errmsg,e));
         frame.add_fld(ids.at(i),args_are_mutable,parm,bads.at(i));

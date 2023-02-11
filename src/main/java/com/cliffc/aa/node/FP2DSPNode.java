@@ -7,6 +7,7 @@ import com.cliffc.aa.tvar.TVLambda;
 import com.cliffc.aa.tvar.TVLeaf;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFunPtr;
+import com.cliffc.aa.type.TypeScalar;
 
 // Strip out the display argument from a bound function.
 // Inverse of BindFP.
@@ -52,6 +53,7 @@ public class FP2DSPNode extends Node {
     Type fdx = fp()._val;
     if( fdx instanceof TypeFunPtr tfp && tfp.has_dsp())
       return null;
+    if( fdx instanceof TypeScalar) return null; // Call of external function
     return fast ? ErrMsg.FAST : ErrMsg.unresolved(_bad,"A function is being called, but "+fdx+" is not a function");
   }
 }
