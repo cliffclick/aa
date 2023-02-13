@@ -26,6 +26,7 @@ public class SetFieldNode extends Node {
     _fin = fin;
     _fld = fld;
     _badf= badf;
+    _live = TypeStruct.ISUSED;
   }
   @Override public String xstr() { return "."+_fld+"="; } // Self short name
   String  str() { return xstr(); }   // Inline short name
@@ -37,7 +38,17 @@ public class SetFieldNode extends Node {
     return ts.update(_fin,_fld,val(1));
   }
 
-  
+  @Override public Type live_use( Node def ) {
+    // If this node is not alive, neither input is
+    if( !(_live instanceof TypeStruct ts) ) return _live;
+    Type fld_live = ts.at_def(_fld);
+    if( def==in(0) ) // Pass thru liveness of all fields except this one
+      return fld_live!=Type.ANY ? ts.replace_fld(TypeFld.make(_fld,Type.ANY)) : ts;
+    // For this field, pass liveness thru directly
+    return fld_live;
+  }
+  @Override boolean assert_live(Type live) { return live instanceof TypeStruct; }
+
   @Override public Node ideal_reduce() {
     Node in0 = in(0);
     // SetField directly against a Struct; just use the Struct.
@@ -62,18 +73,6 @@ public class SetFieldNode extends Node {
 
     return null;
   }
-
-  @Override public Type live_use( Node def ) {
-    // If this node is not alive, neither input is
-    if( !(_live instanceof TypeStruct ts) )
-      { assert _live==Type.ANY || _live==Type.ALL; return _live; }
-    if( def==in(0) ) // Pass thru liveness of all fields except this one
-      return ts.at_def(_fld)!=Type.ANY ? ts.replace_fld(TypeFld.make(_fld,Type.ANY)) : ts;
-    // For this field, pass liveness thru directly
-    return ts.at_def(_fld);
-  }
-  @Override boolean assert_live(Type live) { return live instanceof TypeStruct; }
-
 
   @Override public boolean has_tvar() { return true; }
   

@@ -96,15 +96,13 @@ public class CallNode extends Node {
     _rpc = BitsRPC.new_rpc(BitsRPC.ALLX); // Unique call-site index
     _unpacked=unpacked;         // Arguments are typically packed into a tuple and need unpacking, but not always
     _badargs = badargs;
+    _live=TypeMem.ALLMEM;
   }
 
   @Override public String xstr() { return (_is_copy ? "CopyCall" : (is_dead() ? "Xall" : "Call")); } // Self short name
   String  str() { return xstr(); }       // Inline short name
   @Override boolean is_CFG() { return !_is_copy; }
-  @Override public boolean is_mem() {    // Some calls are known to not write memory
-    CallEpiNode cepi = cepi();
-    return cepi!=null && ProjNode.proj(cepi,MEM_IDX)!=null;
-  }
+  @Override public boolean is_mem() { return true; }
 
   // Number of actual arguments, including closure/display at DSP_IDX.
   int nargs() { return _defs._len-1; }
@@ -298,10 +296,12 @@ public class CallNode extends Node {
     Type tcall = _val;
     if( !(tcall instanceof TypeTuple) ) // Call is has no value (yet)?
       return tcall.oob();
-    if( is_keep()  ) return Type.ALL; // Still under construction, all alive
     if( def==ctl() ) return Type.ALL;
-    if( def==mem() ) return _live;
     if( def==fdx() ) return Type.ALL;
+    boolean is_keep = is_keep();
+    if( def==mem() ) return is_keep || _live==Type.ALL ? TypeMem.ALLMEM : _live;
+    if( def==arg(DSP_IDX) && !_unpacked ) return TypeStruct.ISUSED;
+    if( is_keep  ) return Type.ALL; // Still under construction, all alive
 
     // Unresolved calls need their inputs alive, so those now-live inputs unify
     // and can be used to resolve.  This gets to a key observation: cannot use
@@ -323,7 +323,6 @@ public class CallNode extends Node {
     proj.deps_add(def);    // If proj disappears, so does use of def
     return proj._live;  // Pass through live
   }
-  @Override boolean assert_live(Type live) { return live instanceof TypeMem; }
 
 
   @Override public boolean has_tvar() { return false; }

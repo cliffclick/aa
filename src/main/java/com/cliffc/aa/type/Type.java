@@ -648,7 +648,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   }
   private static void concat( Ary<Type> ts, Type[] ts1 ) { for( Type t1 : ts1 ) _push(ts,t1); }
   private static void _push( Ary<Type> ts, Type t ) {
-    assert !t.above_center(); // Always below-center or equal, because we will dual anyways
+    assert !t.above_center(); // Always below-center or equal, because we will dual anyway
     ts.push(t);
     if( t!=t.dual() ) ts.push(t.dual());
   }

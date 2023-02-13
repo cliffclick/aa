@@ -116,6 +116,9 @@ public class GVNGCM {
   public Node xform( Node n ) {
     int idx = push(init(n));
     iter();
+    // Last KEEP use is going away; this Node should rapidly be used by an actual
+    // Node, and thus be able to compute liveness.
+    add_flow(n);
     return pop(idx);
   }
   
@@ -211,8 +214,10 @@ public class GVNGCM {
     public N _ret;
     public Node xform( Node n ) {
       n.xval(); // Set value before reduce
-      Node x = n.do_reduce();       // Attempt to reduce
-      return x==null ? n : x;
+      Node x = n.do_reduce();   // Attempt to reduce
+      Node y = x==null ? n : x;
+      add_flow(y);              // Liveness is yet to be computed
+      return y;
     }
     public Node init( Node n ) {
       assert _tmps._len<16;             // Time for a BitSet

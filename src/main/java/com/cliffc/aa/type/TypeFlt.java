@@ -56,7 +56,8 @@ public class TypeFlt extends TypeNil<TypeFlt> {
     TypeFlt t1 = POOLS[TFLT].malloc();
     return t1.init(any,nil,sub,z,con).hashcons_free();
   }
-  @Override TypeFlt make_from( boolean nil, boolean sub ) { return make(_any,nil,sub,_z,_con); }
+  @Override TypeFlt make_from(              boolean nil, boolean sub ) { return make(_any,nil,sub,_z,_con); }
+  @Override TypeFlt make_from( boolean any, boolean nil, boolean sub ) { return make( any,nil,sub,_z,_con); }
 
   public static TypeFlt con(double con) { return make(false,false,true,0,con); }
 

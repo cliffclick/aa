@@ -1,9 +1,8 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Combo;
 import com.cliffc.aa.tvar.*;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeFunPtr;
-import com.cliffc.aa.type.TypeTuple;
+import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.*;
 
@@ -75,6 +74,13 @@ public final class FunPtrNode extends Node {
     return TypeFunPtr.make(ret._fidx,nargs(),Type.ANY,tret.at(REZ_IDX));
   }
 
+  @Override public Type live_use( Node ret ) {
+    assert ret instanceof RetNode;
+    // Pre-combo, Ret is alive because unwired caller.
+    // During/post-combo, Ret is alive only if called.
+    return TypeMem.ANYMEM.oob(Combo.pre());
+  }
+  
   @Override public Node ideal_reduce() {
     // Dead display post-Combo, we can wipe out the display type
     if( _tvar!=null && tvar() instanceof TVLambda lam && !(lam.dsp() instanceof TVLeaf) &&

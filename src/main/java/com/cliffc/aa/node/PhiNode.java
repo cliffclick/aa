@@ -10,6 +10,16 @@ import static com.cliffc.aa.AA.unimpl;
 public class PhiNode extends Node {
   final Parse _badgc;
   final Type _t;                // Just a flag to signify scalar vs memory vs object
+
+
+  // If this is the merge of a value defined in an IF, the usage is correct in
+  // each arm of the IF, but might not be correct afterwards.  Keep precision
+  // in the IF arms, but fresh-unify afterwards.
+  // Example:
+  //    rez_is_4 = rand ? (x=2; x*x) : (x="abcd"; #x); // these two x's are not compatible
+  //    ... here x is an [Err cannot unify 2 and "abcd"]...
+  //final boolean _ifresh;        // Defined in an IF, use FRESH_UNIFY not UNIFY
+  
   PhiNode( byte op, Type t, Parse badgc, Node... vals ) {
     super(op,vals);
     _t = t;
@@ -60,6 +70,21 @@ public class PhiNode extends Node {
     }
     return t;
   }
+  @Override public Type live_use(Node def ) {
+    Node r = in(0);
+    if( r==def  ) return Type.ALL; // Self-loop, error
+    if( r==null ) return _live;    // Mid-collapse, error, pass live thru
+    if( r.len() != len() ) return _live; // Error, pass live thru
+    // The same def can appear on several inputs; check them all.
+    for( int i=1; i<_defs._len; i++ )
+      if( in(i)==def && !r.val(i).above_center() ) {
+        r.in(i).deps_add(def);
+        return _live==Type.ALL && _t==TypeMem.ALLMEM ? _t : _live;         // This input is as live as i am
+      }
+    // If the control changes, recompute live
+    for( int i=1; i<_defs._len; i++ ) if( in(i)==def )  r.in(i).deps_add(def);
+    return Type.ANY;            // All matching defs are not live on any path
+  }
 
   // Yes for e.g. ints, flts, memptrs, funptrs.  A Phi corresponds to the
   // merging HM value in the core AA If.
@@ -80,21 +105,6 @@ public class PhiNode extends Node {
   }
 
   //@Override BitsAlias escapees() { return BitsAlias.FULL; }
-  @Override public Type live_use(Node def ) {
-    Node r = in(0);
-    if( r==def  ) return Type.ALL; // Self-loop, error
-    if( r==null ) return _live;    // Mid-collapse, error, pass live thru
-    if( r.len() != len() ) return _live; // Error, pass live thru
-    // The same def can appear on several inputs; check them all.
-    for( int i=1; i<_defs._len; i++ )
-      if( in(i)==def && !r.val(i).above_center() ) {
-        r.in(i).deps_add(def);
-        return _live;           // This input is as live as i am
-      }
-    // If the control changes, recompute live
-    for( int i=1; i<_defs._len; i++ ) if( in(i)==def )  r.in(i).deps_add(def);
-    return Type.ANY;            // All matching defs are not live on any path
-  }
 
   @Override public ErrMsg err( boolean fast ) {
     // TODO:

@@ -42,9 +42,9 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   // overloads are above-center, while Phi meets are below center.
   private BitsFun _pos;         // Known function bits
 
-  private int _nargs;           // Number of formals, including the ctrl, mem, display
-  public Type _ret;             // Return scalar type
-  private Type _dsp;            // Display; often a TMP to a TS; ANY is dead (not live, nobody uses).
+  int _nargs;            // Number of formals, including the ctrl, mem, display
+  public Type _ret;      // Return scalar type
+  private Type _dsp; // Display; often a TMP to a TS; ANY is dead (not live, nobody uses).
 
   private TypeFunPtr _init(BitsFun pos, int nargs, Type dsp, Type ret) {
     assert !(dsp instanceof TypeFld);
@@ -189,7 +189,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     // Make sure a FIDX appears only once, up to an ending self-cycle.
     CHK2.clear();
     while( tfp._ret!=tfp ) {      // Break if self-cycle, which can have anything
-      for( int fidx : tfp.pos() ) if( CHK2.tset(fidx) ) return false;
+      for( int fidx : tfp._pos ) if( CHK2.tset(fidx) ) return false;
       if( !(tfp._ret instanceof TypeFunPtr ret) ) break;
       if( tfp._pos.is_empty() && ret._pos.is_empty() ) return false;
       tfp = ret;
@@ -372,7 +372,6 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
 
   // All fidxs, whether meet or join
   public BitsFun fidxs() { return _pos; }
-  public BitsFun pos() { return _pos; }
   public int fidx() { return _pos.getbit(); } // Asserts internally single-bit
   public boolean is_fidx() { return _pos.abit()>-1; } // Single-bit TFP
   public boolean test(int fidx) { return _pos.test_recur(fidx); }

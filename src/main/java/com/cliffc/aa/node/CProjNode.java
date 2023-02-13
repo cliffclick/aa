@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
 
 // Proj control
 public class CProjNode extends ProjNode {
@@ -22,4 +23,5 @@ public class CProjNode extends ProjNode {
     if( x==Type.ALL ) return Type. CTRL;
     return x;
   }
+  @Override Type live_use( Node def ) { return def.is_mem() ? TypeMem.ANYMEM : Type.ALL; }
 }

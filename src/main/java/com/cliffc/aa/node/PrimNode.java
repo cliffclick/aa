@@ -573,9 +573,11 @@ public abstract class PrimNode extends Node {
   public static class AndThen extends PrimNode {
     private static final TypeTuple ANDTHEN = TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, TypeInt.INT64, TypeFunPtr.THUNK); // {val tfp -> val }
     // Takes a value on the LHS, and a THUNK on the RHS.
-    public AndThen() { super("_&&_",true/*lazy*/,ANDTHEN,TypeNil.SCALAR); }
+    public AndThen() { super("_&&_",true/*lazy*/,ANDTHEN,TypeNil.SCALAR); _live = TypeMem.ALLMEM; }
+    @Override public boolean is_mem() { return true; }
     @Override public TypeNil apply(TypeNil[] ts) { throw unimpl(); }
     @Override public Type value() { return TypeTuple.RET; }
+    @Override public Type live_use( Node def ) {  return def==in(1) ? _live : Type.ALL; }
     // Expect this to inline everytime
     @Override public Node ideal_grow() {
       // Do not expand the base primitive, only clones.  This allows the base
@@ -647,9 +649,11 @@ public abstract class PrimNode extends Node {
   public static class OrElse extends PrimNode {
     private static final TypeTuple ORELSE = TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, TypeInt.INT64, TypeFunPtr.THUNK); // {val tfp -> val }
     // Takes a value on the LHS, and a THUNK on the RHS.
-    public OrElse() { super("_||_",true/*lazy*/,ORELSE,TypeNil.SCALAR); }
+    public OrElse() { super("_||_",true/*lazy*/,ORELSE,TypeNil.SCALAR); _live = TypeMem.ALLMEM; }
+    @Override public boolean is_mem() { return true; }
     @Override public TypeNil apply(TypeNil[] ts) { throw unimpl(); }
     @Override public Type value() { return TypeTuple.RET; }
+    @Override public Type live_use( Node def ) {  return def==in(1) ? _live : Type.ALL; }
     // Expect this to inline everytime
     @Override public Node ideal_grow() {
       // Do not expand the base primitive, only clones.  This allows the base

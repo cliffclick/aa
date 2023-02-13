@@ -449,7 +449,6 @@ public class Parse implements Comparable<Parse> {
       scope = scope();          // Create in the current scope
       StructNode stk = scope.stk();
       stk.add_fld (tok,Access.RW, con(TypeNil.XNIL),badf); // Create at top of scope as undefined
-      scope.def_if(tok,Access.RW, true); // Record if inside arm of if (partial def error check)
     }
     // See if assigning over a forward-ref.
     assert scope==scope(); // untested really, just remove it trip
@@ -465,8 +464,6 @@ public class Parse implements Comparable<Parse> {
     Node stk2 = gvn(new SetFieldNode(tok,mutable,stk,Node.peek(iidx),badf));
     Node st = new StoreNode(mem,ptr,stk2,badf);
     scope.replace_mem(st);
-    if( !create )               // Note 1-side-of-if update
-      scope.def_if(tok,mutable,false);
     if( mutable==Access.Final ) Oper.make(tok,false);
     return Node.pop(iidx);
   }
@@ -486,49 +483,129 @@ public class Parse implements Comparable<Parse> {
     Node ifex = init(new IfNode(ctrl(),expr));
     int ifex_x = ifex.push();   // Keep until parse false-side
     set_ctrl(gvn(new CProjNode(ifex,1))); // Control for true branch
-    Node t_exp = stmt(false);             // Parse true expression
-    if( t_exp == null ) t_exp = err_ctrl2("missing expr after '?'");
-    ifex      = Node.pop(ifex_x);
-    Node omem = Node.pop(omem_x); // Unstack the two
-    int t_exp_x = t_exp .push();  // Keep until merge point
-    int t_ctl_x = ctrl().push();  // Keep until merge point
-    int t_mem_x = mem ().push();  // Keep until merge point
-
-    scope().flip_if();       // Flip side of tracking new defs
+    
+    // True side
+    int t_scope_x;
+    try( Env e = _e = new Env(_e, null, 0, ctrl(), mem(), scope().stk(), null) ) { // Nest an environment for the local vars
+      Node t_exp = stmt(false); // Parse true expression
+      if( t_exp == null ) t_exp = err_ctrl2("missing expr after '?'");
+      scope().stk().close();
+      scope().set_def(REZ_IDX,t_exp);
+      t_scope_x = scope().push();
+      _e = e._par;            // Pop nested environment
+    }
+    
+    // Shuffle lifetimes for the true/false flip
+    Node tmp = Node.pop(t_scope_x);
+    ifex = Node.pop(ifex_x);
+    Node omem = Node.pop(omem_x);
+    t_scope_x = tmp.push();
     set_mem(omem);           // Reset memory to before the IF for the other arm
-    set_ctrl(gvn(new CProjNode(ifex,0))); // Control for false branch
-    Node f_exp = peek(':') ? stmt(false) : con(TypeNil.XNIL);
-    if( f_exp == null ) f_exp = err_ctrl2("missing expr after ':'");
+    set_ctrl(gvn(new CProjNode(ifex,0))); // Control for false branch    
 
-    Node ptr = get_display_ptr(scope()); // Pointer, possibly loaded up the display-display
+    // False side
+    int f_scope_x;
+    try( Env e = _e = new Env(_e, null, 0, ctrl(), mem(), scope().stk(), null) ) { // Nest an environment for the local vars
+      Node f_exp = peek(':') ? stmt(false) : con(TypeNil.XNIL);
+      if( f_exp == null ) f_exp = err_ctrl2("missing expr after ':'");
+      scope().stk().close();
+      scope().set_def(REZ_IDX,f_exp);
+      f_scope_x = scope().push();
+      _e = e._par;            // Pop nested environment
+    };
+
+    ScopeNode f_scope = (ScopeNode)Node.pop(f_scope_x);
+    ScopeNode t_scope = (ScopeNode)Node.pop(t_scope_x);
+
+    StructNode f_stk = f_scope.stk();
+    StructNode t_stk = t_scope.stk();
+
+    // Add offside missing field errors
     Parse bad = errMsg();
 
-    Node t_mem = Node.peek(t_mem_x);
-    Node t_ctl = Node.peek(t_ctl_x);
-    Node f_mem = mem ();
-    Node f_ctl = ctrl();
-    int f_exp_x = f_exp.push();
-
-    t_mem = scope().check_if(true ,ptr,bad,t_ctl,t_mem); // Insert errors if created only 1 side
-    f_mem = scope().check_if(false,ptr,bad,f_ctl,f_mem); // Insert errors if created only 1 side
-    scope().pop_if();         // Pop the if-scope
-    f_exp = Node.pop(f_exp_x);
-    t_mem = Node.pop(t_mem_x);
-    t_ctl = Node.pop(t_ctl_x);
-    t_exp = Node.pop(t_exp_x);
-
     // Merge results
-    RegionNode r = set_ctrl(init(new RegionNode(null,t_ctl,f_ctl)));
-    set_mem(   init(new PhiNode(TypeMem.ALLMEM,bad,r,t_mem,f_mem)));
-    Node rez = init(new PhiNode(TypeNil.SCALAR,bad,r,t_exp,f_exp)) ; // Ifex result
+    int rez_x;
+    ScopeNode scope = scope();
+    try( GVNGCM.Build<Node> X = Env.GVN.new Build<>() ) {
+      // Load the stack frame from above the trinary.
+      // We will promote common vars to it.
+      Node x_stk_now = X.xform(new LoadNode(scope.mem(),scope.ptr(),null));
+      // Control-merge the trinary
+      Node r = set_ctrl(X.xform(new RegionNode(null,t_scope.ctrl(),f_scope.ctrl())));
+      // Mem-merge the trinary
+      PhiNode phi_mem = new PhiNode(TypeMem.ALLMEM,bad,r,t_scope.mem (),f_scope.mem ());
+      scope.set_def(MEM_IDX,null);
+      Node x_mem = X.xform(phi_mem);
 
-    Env.GVN.add_work_new(f_exp);
-    Env.GVN.add_work_new(t_exp);
-    Env.GVN.add_flow(f_mem);
-    Env.GVN.add_flow(t_mem);
-    return rez;
+      // Phi-merge result of the whole trinary
+      Node rez = X.xform(new PhiNode(TypeNil.SCALAR,bad,r,t_scope.rez (),f_scope.rez ())) ; // Ifex result
+      rez_x = rez.push();
+      
+      // Load the stack frames from each T/F side
+      Node t_stk_now = X.xform(new LoadNode(t_scope.mem(),t_scope.ptr(),null));
+      Node f_stk_now = X.xform(new LoadNode(f_scope.mem(),f_scope.ptr(),null));
+
+      // Common variables are made Fresh on both sides, then Phi'd, then
+      // exported to the stack frame.
+      for( int i=1; i<t_stk.len(); i++ ) { // Walk true side, skip display
+        String fld = t_stk.fld(i);         // Field name
+        if( f_stk.find(fld) >= 0 ) {       // Variable is common to both
+          Node t_fsh = _fresh_field(X,t_stk_now,fld);
+          Node f_fsh = _fresh_field(X,f_stk_now,fld);
+          // TODO: promoted field has Access from meet of both sides
+          //Access access = t_stk.access(i).meet(f_stk.access(j));
+          x_stk_now = _phi(X,r,t_fsh,f_fsh,fld,Access.Final,x_stk_now,bad);
+        }
+      }
+
+      // Vars in LHS not in RHS get an error
+      for( int i=1; i<t_stk.len(); i++ ) { // Walk true side, skip display
+        String fld = t_stk.fld(i);         // Field name
+        if( f_stk.find(fld) == -1 ) {      // Missing in false side
+          Node t_var = _fresh_field(X,t_stk_now,fld);
+          Node f_var = _err_not_def(X,f_scope,fld,false,bad);
+          x_stk_now = _phi(X,r,t_var,f_var,fld,Access.Final,x_stk_now,bad);
+        }
+      }
+
+      // Vars in RHS not in LHS get an error
+      for( int i=1; i<f_stk.len(); i++ ) { // Walk false side, skip display
+        String fld = f_stk.fld(i);         // Field name
+        if( t_stk.find(fld) == -1 ) {      // Missing in true side
+          Node t_var = _err_not_def(X,t_scope,fld,true ,bad);
+          Node f_var = _fresh_field(X,f_stk_now,fld);
+          x_stk_now = _phi(X,r,t_var,f_var,fld,Access.Final,x_stk_now,bad);
+        }
+      }
+      
+      StoreNode post_mem = new StoreNode(x_mem,scope.ptr(),x_stk_now,null);
+      scope.set_def(MEM_IDX,null);
+      scope.set_mem(X.xform(post_mem));
+      
+      Env.GVN.add_unuse(t_scope);
+      Env.GVN.add_unuse(f_scope);
+    }
+    Env.GVN.iter();
+    return Node.pop(rez_x);
   }
 
+  private Node _fresh_field(GVNGCM.Build<Node> X, Node stk_now, String fld) {
+    Node val = X.xform(new FieldNode(stk_now,fld,false,null));
+    return X.xform(new FreshNode(val,_e));
+  }
+
+  private Node _err_not_def(GVNGCM.Build<Node> X, ScopeNode scope, String fld, boolean side, Parse bad) {
+    String msg = "'"+fld+"' not defined on '+side+' arm of trinary";
+    return X.xform(new ErrNode(scope.ctrl(),bad,msg));
+  }
+  
+  private Node _phi(GVNGCM.Build<Node> X, Node r, Node t_var, Node f_var, String fld, Access access, Node x_stk_now, Parse bad) {
+    Node phi = X.xform(new PhiNode(TypeNil.SCALAR,bad,r,t_var,f_var));
+    scope().stk().add_fld(fld,Access.RW,Env.ANY,null);
+    return X.xform(new SetFieldNode(fld,access,x_stk_now,phi,bad));          
+  }
+  
+  
   /** Parse a lisp-like function application.  To avoid the common bug of
    *  forgetting a ';', these must be on the same line.
       apply = expr

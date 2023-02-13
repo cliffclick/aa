@@ -113,7 +113,8 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     TypeNil tn = POOLS[TNIL].malloc();
     return (TypeNil)tn.init(any, nil, sub).hashcons_free();
   }
-  TypeNil make_from( boolean nil, boolean sub ) { return make(_any,nil,sub); }
+  TypeNil make_from(              boolean nil, boolean sub ) { return make(_any,nil,sub); }
+  TypeNil make_from( boolean any, boolean nil, boolean sub ) { throw unimpl(); }
 
   // Plain TypeNil (no subclass) has 8 possibilities:
   // XSCALAR OR  NIL  -- choice of anything

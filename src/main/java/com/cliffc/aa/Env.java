@@ -186,7 +186,6 @@ public class Env implements AutoCloseable {
         pscope.add_type(tname,n);
     }
 
-    _scope.set_ptr(null);       // Clear pointer to display
     Node xscope = KEEP_ALIVE.pop();// Unhook scope
     assert _scope==xscope;
     GVN.add_flow_defs(_scope);  // Recompute liveness of scope inputs

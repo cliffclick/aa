@@ -8,8 +8,8 @@ import static com.cliffc.aa.AA.MEM_IDX;
 // Proj memory
 public class MProjNode extends ProjNode {
 
-  public MProjNode( Node head ) { super(head, MEM_IDX); }
-  public MProjNode( Node head, int idx ) { super(head,idx); }
+  public MProjNode( Node head ) { this(head, MEM_IDX); }
+  public MProjNode( Node head, int idx ) { super(head,idx); _live=TypeMem.ALLMEM; }
   @Override public String xstr() { return "MProj"+_idx; }
   @Override public boolean is_mem() { return true; }
 
@@ -33,7 +33,4 @@ public class MProjNode extends ProjNode {
     
     return null;
   }
-  
-  @Override boolean assert_live(Type live) { return live instanceof TypeMem; }
-  
 }

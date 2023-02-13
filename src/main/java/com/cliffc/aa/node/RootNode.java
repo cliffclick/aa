@@ -21,6 +21,7 @@ public class RootNode extends Node {
   public RootNode() { super(OP_ROOT, null, null, null); }
 
   @Override boolean is_CFG() { return true; }
+  @Override public boolean is_mem() { return true; }
 
   TypeMem rmem() {
     return _val instanceof TypeTuple tt ? (TypeMem)tt.at(MEM_IDX) : TypeMem.ALLMEM.oob(_val.above_center());
@@ -60,10 +61,6 @@ public class RootNode extends Node {
     escapes_reset(tmem);
     escapes(trez);
 
-    // Kill the killed
-    for( int alias : KILL_ALIASES )
-      EXT_MEM = EXT_MEM.set(alias,TypeStruct.UNUSED);
-
     return TypeTuple.make(Type.CTRL,
                           EXT_MEM,
                           TypeRPC.ALL_CALL,
@@ -93,7 +90,10 @@ public class RootNode extends Node {
     ALIASES.clear();
     EXT_ALIASES = BitsAlias.EMPTY;
     EXT_FIDXS   = BitsFun  .EMPTY;
-    EXT_MEM = tmem; // Root: TypeMem.ANYMEM.set(BitsAlias.EXTX,TypeStruct.ISUSED);    
+    EXT_MEM = tmem;
+    // Kill the killed
+    for( int alias : KILL_ALIASES )
+      EXT_MEM = EXT_MEM.set(alias,TypeStruct.UNUSED);
   }
   
   static void escapes( Type t ) {
@@ -209,7 +209,18 @@ public class RootNode extends Node {
 
   }
 
-  @Override public Type live() { return Type.ALL; }
+  @Override public Type live() {
+    // Pre-combo, all memory is alive, except kills
+    if( Combo.pre() ) return Env.KEEP_ALIVE._live;
+    // During/post combo, everything that exits is live.
+    deps_add(this);             // Which also means changes in value, change live
+    return rmem().flatten_live_fields();
+  }
+
+  @Override public Type live_use(Node def) {
+    if( def==in(MEM_IDX) ) return _live;
+    return Type.ALL;
+  }
 
   @Override public Node ideal_reduce() {
     // See if the result can ever refer to local memory.

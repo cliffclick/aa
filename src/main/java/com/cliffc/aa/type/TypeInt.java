@@ -61,7 +61,8 @@ public class TypeInt extends TypeNil<TypeInt> {
     TypeInt t1 = POOLS[TINT].malloc();
     return t1.init(any,nil,sub,z,con).hashcons_free();
   }
-  @Override TypeInt make_from( boolean nil, boolean sub ) { return make(_any,nil,sub,_z,_con); }
+  @Override TypeInt make_from(              boolean nil, boolean sub ) { return make(_any,nil, sub,_z,_con); }
+  @Override TypeInt make_from( boolean any, boolean nil, boolean sub ) { return make( any,nil,sub,_z,_con); }
 
   public static TypeInt con(long con) { return make(false,false,true,0,con); }
 

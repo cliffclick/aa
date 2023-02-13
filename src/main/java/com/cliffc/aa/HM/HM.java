@@ -1269,7 +1269,7 @@ public class HM {
         // Walk all escaped function args, and call them (like an external
         // Apply might) with the most conservative flow arguments possible.
         // Escaping overloads only count after freezing.
-        for( int fidx : tfp.pos() )
+        for( int fidx : tfp.fidxs() )
           do_fidx(fidx, work);
         // The flow return also escapes
         _escapes(tfp._ret,work);

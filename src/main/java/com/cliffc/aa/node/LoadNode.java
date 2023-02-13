@@ -42,12 +42,28 @@ public class LoadNode extends Node {
     Type ptr = adr()._val;
     if( !(mem instanceof TypeMem tmem) ) return mem.oob(); // Not a memory?
     if( ptr instanceof TypeStruct ) return ptr.oob(TypeMem.ALLMEM); // Loading from a clazz
-    if( !(ptr instanceof TypeMemPtr tptr) ) return ptr.oob(); // Not a pointer?
+    TypeMemPtr tptr=null;
+    if( !(ptr instanceof TypeMemPtr tptr0) ) {
+      // Go from the incoming primitive to a Clazz struct
+      StructNode clz = FieldNode.clz_node(ptr);
+      if( clz==null ) return ptr.oob(TypeMem.ALLMEM);
+      // Use the One True Alias for the primitive Clazz
+      for( Node use : clz._uses ) {
+        if( use instanceof StoreNode st ) {
+          if( st.adr() instanceof NewNode nnn ) tptr = nnn._tptr;
+          break;
+        }
+      }
+      if( tptr==null ) return ptr.oob(TypeMem.ALLMEM);
+    } else tptr=tptr0;
+    
     if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
     // Only the named aliases is live.
     return tmem.remove_no_escapes(tptr._aliases);
   }
-
+  // Only structs are demanded from a Load
+  @Override boolean assert_live(Type live) { return live instanceof TypeStruct; }
+  
   // Strictly reducing optimizations
   @Override public Node ideal_reduce() {
     Node adr = adr();
@@ -68,7 +84,10 @@ public class LoadNode extends Node {
     if( ps!=null ) {
       if( ps instanceof StoreNode st ) {
         Node rez = st.rez();
-        return rez!=null && !_live.isa(rez._live) ? null : rez; // Stall until liveness matches
+        if( rez==null ) return null;
+        if( _live.isa(rez._live) ) return rez; // Stall until liveness matches
+        deps_add(this);                        // Self-add if live-ness updates
+        return null;
       } else throw unimpl();
     }
     return null;

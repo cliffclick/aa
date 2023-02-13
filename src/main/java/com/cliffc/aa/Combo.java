@@ -126,9 +126,15 @@ their inputs, and so their inputs are treated as dead.
 
  */
 public abstract class Combo {
-  static public boolean HM_NEW_LEAF;   // After 1st pass, potential HM new leafs will no longer lift Apply results
-  static public boolean HM_AMBI;       // After 2nd pass, unresolved Fields are ambiguous
-  static public boolean HM_FREEZE;     // After 3rd pass, HM types are frozen but GCP types continue to fall
+  public static boolean HM_NEW_LEAF;   // After 1st pass, potential HM new leafs will no longer lift Apply results
+  public static boolean HM_AMBI;       // After 2nd pass, unresolved Fields are ambiguous
+  public static boolean HM_FREEZE;     // After 3rd pass, HM types are frozen but GCP types continue to fall
+  // After Combo has run, the Call Graph is built.  All Calls are wired and all
+  // Rets explicitly know their callers.  Several approximations are waiting
+  // for Combo to start or finish.
+  public static boolean pre   () { return  AA.LIFTING && !HM_FREEZE; }
+  public static boolean during() { return !AA.LIFTING              ; }
+  public static boolean post  () { return  AA.LIFTING &&  HM_FREEZE; }
 
   public static void opto() {
     Env.GVN.work_clear();       // Will be used as a worklist
@@ -221,6 +227,6 @@ public abstract class Combo {
       dep.add_flow();
     FREEZE_WORK.clear();
   }
-  
+
   static void reset() { HM_NEW_LEAF = HM_AMBI = HM_FREEZE=false; FREEZE_WORK.clear(); }
 }

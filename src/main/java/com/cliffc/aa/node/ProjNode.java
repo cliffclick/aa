@@ -1,8 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeTuple;
+import com.cliffc.aa.type.*;
 
 // Proj data
 public class ProjNode extends Node {
@@ -15,21 +14,20 @@ public class ProjNode extends Node {
   }
   @Override public String xstr() { return "DProj"+_idx; }
 
-  // Strictly reducing
-  @Override public Node ideal_reduce() {
-    Node c = in(0).is_copy(_idx);
-    if( c != null ) return c==this ? Env.ANY : c; // Happens in dying loops
-    return null;
-  }
   @Override public Type value() {
     Type c = val(0);
     if( c instanceof TypeTuple ct && _idx < ct._ts.length )
       return ct._ts[_idx];
     return c.oob();
   }
-
-  // Only called here if alive.
-  @Override public Type live_use(Node def ) { return Type.ALL; }
+  @Override Type live_use( Node def ) { assert def.is_mem(); return TypeMem.ANYMEM; }
+  
+  // Strictly reducing
+  @Override public Node ideal_reduce() {
+    Node c = in(0).is_copy(_idx);
+    if( c != null ) return c==this ? Env.ANY : c; // Happens in dying loops
+    return null;
+  }
 
   // Standard data ProjNode has a type variable, Control or Memory projnodes do
   // not (CProj, CEProj, MProj)

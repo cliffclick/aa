@@ -1,8 +1,7 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
+import com.cliffc.aa.Env;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
 
 import java.util.HashMap;
 import java.util.Set;
@@ -19,13 +18,14 @@ public class ScopeNode extends Node {
 
   // Mapping from type-variables to Types.  Types have a scope lifetime like values.
   private final HashMap<String,StructNode> _types; // user-typing type names
-  private Ary<IfScope> _ifs;                 // Nested set of IF-exprs used to track balanced new-refs
 
   public ScopeNode( HashMap<String,StructNode> types,  Node ctl, Node mem, Node rez, Node ptr, StructNode dsp) {
     super(OP_SCOPE,ctl,mem,rez,ptr,dsp);
     _types = types;
+    _live = TypeMem.ALLMEM;
   }
   @Override boolean is_CFG() { return true; }
+  @Override public boolean is_mem() { return true; }
 
   public       Node ctrl() { return in(CTL_IDX); }
   public       Node mem () { return in(MEM_IDX); }
@@ -47,7 +47,6 @@ public class ScopeNode extends Node {
     set_def(MEM_IDX,null);
     set_def(MEM_IDX,Env.GVN.xform(st));
   }
-  @Override public boolean is_mem() { return true; }
 
   public Node get(String name) { return stk().in(name); }
   public boolean is_mutable(String name) { return stk().access(name)==Access.RW; }
@@ -125,26 +124,33 @@ public class ScopeNode extends Node {
   }
 
   @Override public TypeMem live() {
-    if( is_keep() ) return TypeMem.ALLMEM;
-    // All fields in all reachable pointers from rez() will be marked live
-    return compute_live_mem(this,mem(),rez());
+    Type mem0 = mem()==null ? TypeMem.ALLMEM : mem()._val;
+    TypeMem mem = mem0 instanceof TypeMem mem1 ? mem1 : mem0.oob(TypeMem.ALLMEM);
+    RootNode.escapes_reset(is_keep() ? TypeMem.ALLMEM : mem);
+    RootNode.escapes(rez()._val);
+    return RootNode.EXT_MEM;
+    
+    //if( is_keep() ) return TypeMem.ALLMEM;
+    //// All fields in all reachable pointers from rez() will be marked live
+    //return compute_live_mem(this,mem(),rez());
   }
 
   @Override public Type live_use(Node def ) {
     // Basic liveness ("You are Alive!") for control and returned value
     if( def == ctrl() ) return Type.ALL;
-    if( def == rez () ) return Type.ALL; // Returning a Scalar, including e.g. a mem ptr
-    if( def == ptr () ) return Type.ALL; // Display must be kept-alive during e.g. parsing.
     // Memory returns the compute_live_mem state in _live.  If rez() is a
     // pointer, this will include the memory slice.
-    if( def == mem() ) return _uses._len>0 && _uses.at(0)==Env.KEEP_ALIVE ? Type.ALL : _live;
+    if( def == mem() ) return _live;
+    if( def == rez() ) return Type.ALL; // Returning a Scalar, including e.g. a mem ptr
+    if( def == ptr() ) return Type.ALL; // Display must be kept-alive during e.g. parsing.
+    if( def == stk() ) return TypeStruct.ISUSED;
     // Any function which may yet have unwired CallEpis, and so needs full
     // memory alive until all Calls are wired.
     if( def instanceof RetNode ) return _live;
     // Merging exit path, or ConType
     return def._live;
   }
-
+  
   @Override public int hashCode() { return 123456789; }
   // ScopeNodes are never equal
   @Override public boolean equals(Object o) { return this==o; }
@@ -154,66 +160,10 @@ public class ScopeNode extends Node {
   @Override public boolean has_tvar() { return false; }
   
   // Create an if-scope and start tracking vars
-  public void push_if() {
-    if( _ifs == null ) _ifs = new Ary<>(new IfScope[1],0);
-    _ifs.push(new IfScope());
-  }
-  // Flip true-arm for false-arm
-  public void flip_if() { _ifs.last().flip(); }
-
+  private int _if_cnt;
+  public void push_if() { _if_cnt++; }
   // Pop ifscope
-  public void pop_if() { _ifs.pop(); }
-
+  public void pop_if() { _if_cnt--; }
   // Test for being inside a ?: expression
-  public boolean test_if() { return _ifs!=null && !_ifs.isEmpty(); }
-
-  public void def_if( String name, Access mutable, boolean create ) {
-    if( _ifs == null || _ifs._len==0 ) return; // Not inside an If
-    _ifs.last().def(name,mutable,create);      // Var defined in arm of if
-  }
-
-  public Node check_if( boolean arm, Node ptr, Parse bad, Node ctrl, Node mem ) { return _ifs.last().check(this,arm,ptr,bad,ctrl,mem); }
-
-  private static class IfScope {
-    HashMap<String,Access> _tvars, _fvars;
-    boolean _arm = true;
-    void flip() { _arm = !_arm; }
-    // Record creation on either arm of an if
-    void def(String name, Access mutable, boolean create) {
-      if( _tvars == null ) { _tvars = new HashMap<>(); _fvars = new HashMap<>(); }
-      // If there was no prior create inside the same if, then this update
-      // predates the if and is not involved in a partial-creation error
-      if( !create && !_arm && _tvars.get(name) != null )
-        _fvars.put(name,mutable);
-      if( create ) {
-        HashMap<String,Access> vars = _arm ? _tvars : _fvars;
-        Access res = vars.put(name,mutable);
-        assert res==null;         // No double-creation
-      }
-    }
-    // Check for balanced creation, and insert errors on unbalanced
-    Node check(ScopeNode scope, boolean arm, Node ptr, Parse bad, Node ctrl, Node mem) {
-      if( _tvars == null ) return mem; // No new vars on either arm
-      // Pull from both variable sets names that are common to both
-      if( arm ) {               // Only do it first time
-        Ary<String> names = new Ary<>(String.class).addAll(_tvars.keySet());
-        while( !names.isEmpty() ) {
-          String name = names.pop();
-          if( _fvars.remove(name)!=null ) _tvars.remove(name);
-        }
-      }
-      // Everything in this set is a partially-created variable error
-      HashMap<String,Access> vars = arm ? _fvars : _tvars;
-      if( vars.isEmpty() ) return mem;
-      for( String name : vars.keySet() ) {
-        String msg = "'"+name+"' not defined on "+arm+" arm of trinary";
-        // Exactly like a parser store of an error, on the missing side
-        Node ld  = Env.GVN.xform(new LoadNode(mem,ptr,bad));
-        Node err = Env.GVN.xform(new ErrNode(ctrl,bad,msg));
-        Node setf= Env.GVN.xform(new SetFieldNode(name,Access.Final,ld,err,bad));
-        mem = Env.GVN.xform(new StoreNode(mem,ptr,setf,bad));
-      }
-      return mem;
-    }
-  }
+  public boolean test_if() { return _if_cnt>0; }
 }

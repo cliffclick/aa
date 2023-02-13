@@ -91,6 +91,7 @@ public class StructNode extends Node {
     _accesses = new Ary<>(new TypeFld.Access[1],0);
     _paren_start = paren_start;
     _fld_starts = new Ary<>(new Parse[1],0);
+    _live = TypeStruct.ISUSED;
   }
 
   @Override String str() {
@@ -123,6 +124,7 @@ public class StructNode extends Node {
   public TypeFld.Access access(String name) { return _accesses.at(find(name)); }
 
   public String fld(int idx) { return _flds.at(idx); }
+  public TypeFld.Access access(int idx) { return _accesses.at(idx); }
 
   // One-time transition when closing a Struct to new fields.
   public StructNode close() { assert !_closed; assert _nargs <= _flds._len; _closed=true; return this; }
@@ -215,11 +217,15 @@ public class StructNode extends Node {
   // Return liveness for a field
   @Override public Type live_use( Node def ) {
     if( !(_live instanceof TypeStruct ts) ) return _live;
+    // TODO:
     int idx = _defs.find(def);        // Get Node index
     String fld = _flds.at(idx);       // Get field name
     // Use name lookup to get liveness for that field
     TypeFld lfld = ts.get(fld);       // Liveness for this field name
-    return lfld==null ? ts.oob() : lfld._t.oob();
+    Type live = lfld==null ? ts.oob() : lfld._t.oob();
+    // Stacked overloads in struct
+    if( def instanceof StructNode ) return live.oob(TypeStruct.ISUSED);
+    return live;
   }
   @Override boolean assert_live(Type live) { return live instanceof TypeStruct; }
 

@@ -23,7 +23,7 @@ public final class ErrNode extends Node {
     return cc==null ? null : set_def(0,cc);
   }
   @Override public Type value() {
-    if( len()==0 ) return Type.ALL;
+    if( len()==0 || in(0)==null ) return Type.ALL;
     Type t = val(0);
     return t == Type.ANY || t == Type.XCTRL ? Type.ANY : Type.ALL; // For dead data errors return ANY (no error)
   }

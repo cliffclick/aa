@@ -304,7 +304,9 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   public boolean is_str() { return Util.eq(_clz,"str:"); }
 
   // Make, replacing nil/sub flags
-  @Override TypeStruct make_from( boolean nil, boolean sub ) { return make(_any,nil,sub,_clz,_def,_flds); }
+  @Override TypeStruct make_from(              boolean nil, boolean sub ) { return make(_any,nil,sub,_clz,_def,_flds); }
+  @Override TypeStruct make_from( boolean any, boolean nil, boolean sub ) { return make( any,nil,sub,_clz,_def,_flds); }
+
   
   // Possibly allocated.  No fields specified.  All fields are possible and
   // might be ALL (error).  The worst possible result.
@@ -574,7 +576,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   // Field type by name, or the default.
   public Type at_def( String name ) {
     int idx = find(name);
-    return idx==-1 ? _def : _flds[idx];    
+    return idx==-1 ? _def : _flds[idx]._t;
   }
 
   // Field by index, null after end
@@ -792,7 +794,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   public TypeStruct flatten_live_fields() {
     TypeFld[] flds = TypeFlds.get(len());
     for( int i=0; i<_flds.length; i++ )
-      flds[i] = _flds[i].make_from(_flds[i].oob(), Access.bot());
+      flds[i] = _flds[i].make_from(Type.ALL.oob(_flds[i]._t==Type.ANY), Access.bot());
     return make_from(flds);
   }
 

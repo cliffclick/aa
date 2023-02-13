@@ -1,9 +1,6 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.util.*;
-
-import static com.cliffc.aa.AA.unimpl;
 
 // Tracks escaped aliases and fidxs.
 public final class TypeScalar extends TypeNil<TypeScalar> {
@@ -30,14 +27,15 @@ public final class TypeScalar extends TypeNil<TypeScalar> {
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     if( _any ) sb.p('~');
-    _aliases.str(sb.p('%'));
-    return _fidxs.str(sb);
+    _aliases.str(sb.p('%'));  
+    _fidxs  .str(sb);  
+    return _str_nil(sb);
   }
   static TypeScalar valueOf(Parse P, String cid, boolean any) {
     P.require('%');
     var aliases = P.bits(BitsAlias.EMPTY);
     var fidxs   = P.bits(BitsFun  .EMPTY);
-    TypeScalar ts = make(any,any,any,aliases,fidxs);
+    TypeScalar ts = malloc(any,false,any,aliases,fidxs).val_nil(P).hashcons_free();
     if( cid!=null ) P._dups.put(cid,ts);
     return ts;
   }
@@ -73,20 +71,31 @@ public final class TypeScalar extends TypeNil<TypeScalar> {
   final TypeNil smeet( TypeNil tn ) {
     // Parallel subclass of TypeNil (which right now means Int,Flt,MemPtr,FunPtr)
     assert !(tn instanceof TypeScalar) && tn.getClass() != TypeNil.class;
+    boolean any = _any & tn._any;
+    boolean nil = _nil & tn._nil;
+    boolean sub = _sub & tn._sub;
 
-    return switch( tn ) {
-    case TypeInt i -> _any ? i : this; // Above or below any TypeInt
-    case TypeFlt f -> _any ? f : this; // Above or below any TypeFlt
-    case TypeMemPtr tmp -> {
-      BitsAlias aliases = tmp._aliases.meet(_aliases);
-      yield _any ? tmp.make_from(aliases) : make(aliases,_fidxs);
+    // TypeScalar is high, falls to other type
+    if( _any ) {
+      switch( tn ) {
+      case TypeMemPtr tmp:
+        return TypeMemPtr.make(any,nil,sub,_aliases.meet(tmp._aliases),tmp._obj);
+      case TypeFunPtr tfp:
+        return TypeFunPtr.make(any,nil,sub,_fidxs.meet(tfp.fidxs()),tfp._nargs,tfp.dsp(),tfp._ret);
+      default:
+        return tn.make_from(any,nil,sub);
+      }      
+    } else {
+      // TypeScalar is low, other type falls to this
+      switch( tn ) {
+      case TypeMemPtr tmp:
+        return make(any,nil,sub,_aliases.meet(tmp._aliases),_fidxs);
+      case TypeFunPtr tfp:
+        return make(any,nil,sub,_aliases,_fidxs.meet(tfp.fidxs()));
+      default:
+        return make(any,nil,sub,_aliases,_fidxs);
+      }
     }
-    case TypeFunPtr tfp -> {
-      BitsFun fidxs = tfp.fidxs().meet(_fidxs);
-      yield _any ? tfp.make_from(fidxs) : make(_aliases,fidxs);
-    }
-    default ->  throw unimpl();
-    };
   }
   
 }

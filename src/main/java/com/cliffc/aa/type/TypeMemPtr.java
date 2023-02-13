@@ -112,6 +112,9 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     TypeMemPtr t1 = POOLS[TMEMPTR].malloc();
     return t1.init(any,nil,sub,aliases,obj);
   }
+  static TypeMemPtr make(boolean any, boolean nil, boolean sub, BitsAlias aliases, TypeStruct obj ) {
+    return malloc(any,nil,sub,aliases,obj).hashcons_free();
+  }
   TypeMemPtr malloc_from(TypeStruct obj) {
     return malloc(_any, _nil, _sub,_aliases,obj);
   }

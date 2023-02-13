@@ -92,6 +92,10 @@ public class FieldNode extends Node implements Resolvable {
     return t.meet(TypeNil.XSCALAR);
   }
 
+  @Override public Type live_use( Node def ) {
+    return TypeStruct.UNUSED.replace_fld(TypeFld.make(_fld,Type.ALL));
+  }
+
   @Override public Node ideal_reduce() {
     if( is_resolving() ) return null;
     
@@ -231,7 +235,7 @@ public class FieldNode extends Node implements Resolvable {
   }
 
   // Prototype or null
-  private static StructNode clz_node(Type t) {
+  static StructNode clz_node(Type t) {
     String clz = clz_str(t);
     return clz==null ? null : Env.PROTOS.get(clz);  // CLZ from instance
   }

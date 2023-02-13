@@ -154,7 +154,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     public static final Access[] values = values();
     static Access bot() { return RW; }
     public Access dual() { return values[6-ordinal()]; }
-    Access meet(Access a) { return values[Math.min(ordinal(),a.ordinal())]; }
+    public Access meet(Access a) { return values[Math.min(ordinal(),a.ordinal())]; }
     private static final String[] SHORTS = new String[]{":="        ,"=="       ,"="    ,"~="      ,"!=!","!==!","!:=!"};
     private static final String[] LONGS  = new String[]{"read/write","read-only","final","noaccess","!=!","!==!","!:=!"};
     @Override public String toString() { return LONGS[ordinal()]; }

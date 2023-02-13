@@ -511,7 +511,7 @@ public abstract class Node implements Cloneable, IntSupplier {
         Type ulive = use.live_use(this);
         live = live.meet(ulive); // Make alive used fields
       }
-    assert live==Type.ANY || live==Type.ALL || assert_live(live);
+    assert live==Type.ANY || assert_live(live);
     return live;
   }
 
@@ -527,7 +527,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Compute local contribution of use liveness to this def.
   // Overridden in subclasses that do per-def liveness.
   Type live_use( Node def ) { return _live; }
-  boolean assert_live(Type live) { return false; }
+  boolean assert_live(Type live) { return is_mem()==(live instanceof TypeMem tm && tm.flatten_live_fields()==tm); }
 
   public void add_flow_defs() { Env.GVN.add_flow_defs(this); }
   public void add_flow_uses() { Env.GVN.add_flow_uses(this); }

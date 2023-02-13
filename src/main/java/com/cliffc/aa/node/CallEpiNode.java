@@ -28,6 +28,7 @@ public final class CallEpiNode extends Node {
   public CallEpiNode( Node... nodes ) {
     super(OP_CALLEPI,nodes);
     Env.GVN.add_reduce(call());
+    _live=TypeMem.ALLMEM;
   }
   @Override public String xstr() {// Self short name
     if( _is_copy ) return "CopyEpi";
@@ -441,7 +442,6 @@ public final class CallEpiNode extends Node {
       return Type.ANY;    // Call does not call this, so not alive.
     return _live;
   }
-  @Override boolean assert_live(Type live) { return live instanceof TypeMem; }
 
   @Override public boolean has_tvar() { return true; }
 

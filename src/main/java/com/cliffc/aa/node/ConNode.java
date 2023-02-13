@@ -20,10 +20,9 @@ public class ConNode<T extends Type> extends Node {
   @Override public String xstr() {
     return _t==null ? "(null)" : _t.toString();
   }
+  @Override public boolean is_mem() { return _t instanceof TypeMem; }
 
   @Override public Type value() { return _t; }
-
-  @Override boolean assert_live(Type live) { return (_t instanceof TypeMem) == (live instanceof TypeMem); }
 
   @Override public boolean has_tvar() {
     if( _t==Type.ALL || _t==Type.ANY ) return true;  // Specifically allowed for various unused-displays on primitives

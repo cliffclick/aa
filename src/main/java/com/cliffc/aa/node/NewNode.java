@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
+import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVLeaf;
 import com.cliffc.aa.tvar.TVPtr;
@@ -53,6 +54,11 @@ public class NewNode extends Node {
       RootNode.kill_alias(_alias);
       Env.GVN.add_reduce_uses(this);
       Env.GVN.add_flow(this);
+      Env.GVN.add_flow(Env.KEEP_ALIVE);
+      Env.GVN.add_flow(GVNGCM.KEEP_ALIVE);
+      for( Node use : Env.KEEP_ALIVE._defs )
+        if( use instanceof ScopeNode )
+          Env.GVN.add_flow(use);
       return this;
     }
     return null;

@@ -46,19 +46,11 @@ public class StoreNode extends Node {
   // Compute the liveness local contribution to def's liveness.  Turns around
   // value into live: if values are ANY then nothing is demand-able.
   @Override public Type live_use( Node def ) {
-    if( _live== Type.ANY ) return Type.ANY;
-    if( _live== Type.ALL ) return Type.ALL;
     mem().deps_add(def);        // Changes to mem()'s value changes def's liveness
-    Type mval = mem()._val;
+    TypeMem jmem = _live_use_mem();
     Type aval = adr()._val;
-    if( mval == Type.ANY ) return Type.ANY;
-    if( aval == Type.ANY ) return Type.ANY;
-    
-    TypeMem tlive = _live==Type.ALL ? TypeMem.ALLMEM    : (TypeMem   )_live; // Assert _live is ANY, ALL or a TypeMem
-    TypeMem tmem  = mval ==Type.ALL ? TypeMem.ALLMEM    : (TypeMem   ) mval; // Assert  mval is ANY, ALL or a TypeMem
-    TypeMemPtr tmp= aval ==Type.ALL ? TypeMemPtr.ISUSED : (TypeMemPtr) aval; // Assert  aval is ANY, ALL or a TypeMemPtr
-    tmem = tmem.widen_mut_fields();
-    TypeMem jmem  = (TypeMem)tlive.join(tmem);
+    TypeMemPtr tmp = aval instanceof TypeMemPtr tmp0 ? tmp0 : aval.oob(TypeMemPtr.ISUSED);
+
     // TODO: if aval is precise alias, can remove it also from jmem
     if( def==mem() ) return jmem;
     // Available (live) struct
@@ -66,8 +58,23 @@ public class StoreNode extends Node {
     if( def==adr() ) return ts.oob(); // Live-use for the adr(), which is a Type.ANY/ALL
     return ts;                  // Live-use for the rez() which is a TypeStruct liveness    
   }
-  @Override boolean assert_live(Type live) { return live instanceof TypeMem; }
-
+  // Compute liveness as a TypeMem, intersection of demand and avail
+  private TypeMem _live_use_mem() {
+    if( _live== Type.ANY ) return TypeMem.ANYMEM;
+    if( _live== Type.ALL ) return TypeMem.ALLMEM;
+    Type mval = mem()._val;
+    Type aval = adr()._val;
+    if( mval == Type.ANY ) return TypeMem.ANYMEM;
+    if( aval == Type.ANY ) return TypeMem.ANYMEM;
+    
+    TypeMem tlive = _live==Type.ALL ? TypeMem.ALLMEM    : (TypeMem   )_live; // Assert _live is ANY, ALL or a TypeMem
+    TypeMem tmem  = mval ==Type.ALL ? TypeMem.ALLMEM    : (TypeMem   ) mval; // Assert  mval is ANY, ALL or a TypeMem
+    tmem = tmem.flatten_live_fields();
+    // Intersect demand and avail
+    TypeMem jmem  = (TypeMem)tlive.join(tmem);
+    return jmem;
+  }
+  
   @Override public Node ideal_reduce() {
     if( _live == Type.ANY ) return null; // Dead from below; nothing fancy just await removal
     Node mem = mem();
@@ -79,25 +86,29 @@ public class StoreNode extends Node {
     if( mem==this ) return null; // Dead self-cycle
     if( tmp!=null && mem._val instanceof TypeMem ) {
       if( tmp.above_center() ) {
-        if( mem._val == _val ) return mem; // Address is high, and memory is unchanged; we can be ignored
+        if( mem._val == _val && _live==mem._live )
+          return mem; // Address is high, and memory is unchanged; we can be ignored
         // Kill what is being stored; now its dead
         if( rez() != null ) return set_def(3,null);
       }
       TypeStruct ts0 = (_live instanceof TypeMem tm ? tm : _live.oob(TypeMem.ALLMEM)).ld(tmp);
-      if( ts0.above_center() )  // Dead from below
+      if( ts0.above_center() && _live==mem._live )  // Dead from below
         return mem;
       mem.deps_add(this);   // Input address changes, check reduce
       deps_add(this);       // Our   address changes, check reduce
     }
     
     // Store of a Store, same address
-    if( mem instanceof StoreNode st && st.adr() == adr &&
-        // Do not bypass a parallel writer
-        st.check_solo_mem_writer(this) &&
-        // And liveness aligns
-        _live.isa(mem._live) ) {
-      set_def(1,st.mem());
-      return this;
+    if( mem instanceof StoreNode st && st.adr() == adr ) {
+      // Do not bypass a parallel writer
+      if( st.check_solo_mem_writer(this) &&
+          // And liveness aligns
+          _live.isa(mem._live) ) {
+        set_def(1,st.mem());
+        return this;
+      } else {
+        mem.deps_add(this);    // If become solo writer, check again
+      }
     }
     
     //// Escape a dead MemSplit

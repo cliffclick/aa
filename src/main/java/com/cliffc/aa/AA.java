@@ -17,7 +17,7 @@ public abstract class AA {
 
   public static int RSEED;              // Global random seed for worklist draws
   public static boolean DO_GCP, DO_HMT; // Global type-precision controllers
-  public static boolean LIFTING;        // Global type-phase
+  public static boolean LIFTING = true; // Global type-phase
 
 
   private static final AbstractBuildVersion ABV;
