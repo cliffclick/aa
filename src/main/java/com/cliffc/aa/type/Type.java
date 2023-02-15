@@ -453,13 +453,11 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       POOLS[i]=new Pool((byte)i,new Type());
   }
 
-  protected T _copy() {
+  // Overridable clone method.  Not interned.
+  T copy() {
     POOLS[_type]._clone++;  POOLS[_type]._malloc--; // Move the count from malloc to clone
     return POOLS[_type].malloc();
   }
-
-  // Overridable clone method.  Not interned.
-  T copy() { assert is_simple(); return _copy(); }
 
   public  static final Type ALL    = make( TALL   ); // Bottom
   public  static final Type ANY    = make( TANY   ); // Top
@@ -543,9 +541,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       // LHS is TypeNil directly
       if( t0._type==TNIL ) return t0.nmeet(t1);
       if( t1._type==TNIL ) return t1.nmeet(t0);
-      // LHS is TypeScalar directly 
-      if( t0 instanceof TypeScalar ts ) return ts.smeet(t1);
-      if( t1 instanceof TypeScalar ts ) return ts.smeet(t0);
       // Mis-matched TypeNil subclasses
       return t0.widen_sub().meet(t1.widen_sub());
     }
@@ -620,14 +615,12 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     Ary<Type> ts = new Ary<>(new Type[1],0);
     concat(ts,Type      .TYPES);
     concat(ts,TypeNil   .TYPES);
-    //concat(ts,TypeAry   .TYPES); // Ambiguous printout
     concat(ts,TypeInt   .TYPES);
     concat(ts,TypeFlt   .TYPES);
     concat(ts,TypeMemPtr.TYPES);
     concat(ts,TypeFunPtr.TYPES);
     concat(ts,TypeRPC   .TYPES);
     concat(ts,TypeMem   .TYPES);
-    concat(ts,TypeScalar.TYPES);
     concat(ts,TypeStruct.TYPES);
     concat(ts,TypeTuple .TYPES);
     // Some more complex exciting types
@@ -668,16 +661,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     // Confirm associative
     for( Type t0 : ts )
       for( Type t1 : ts )
-        for( Type t2 : ts ) {
-          Type t01   = t0 .meet(t1 );
-          Type t12   = t1 .meet(t2 );
-          Type t01_2 = t01.meet(t2 );
-          Type t0_12 = t0 .meet(t12);
-          if( t01_2 != t0_12 && errs++ < 10 )
-            System.err.println("("+t0+"&"+t1+") & "+t2+" == "+t0+" & ("+t1+" & "+t2+");\n"+
-                               "("+t01      +") & "+t2+" == "+t0+" & ("+t12        +");\n"+
-                               t01_2                  +" == "+t0_12);
-        }
+        for( Type t2 : ts )
+          if( !_assoc(t0,t1,t2,errs) ) errs++;
     assert errs==0 : "Found "+errs+" associative errors";
 
 
@@ -709,6 +694,20 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     return true;
   }
 
+  private static boolean _assoc( Type t0, Type t1, Type t2, int errs ) {
+    Type t01   = t0 .meet(t1 );
+    Type t12   = t1 .meet(t2 );
+    Type t01_2 = t01.meet(t2 );
+    Type t0_12 = t0 .meet(t12);
+    if( t01_2 == t0_12 ) return true;
+    if( errs < 10 )
+      System.err.println("("+t0+"&"+t1+") & "+t2+" == "+t0+" & ("+t1+" & "+t2+");\n"+
+                         "("+t01      +") & "+t2+" == "+t0+" & ("+t12        +");\n"+
+                         t01_2                  +" == "+t0_12);
+    return false;
+  }
+
+  
   // True if value is above the centerline (no definite value, ambiguous)
   public boolean above_center() {
     return switch( _type ) {
@@ -818,7 +817,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       case '*' ->     TypeMemPtr.valueOf(this,dup,any);
       case '(' ->     TypeStruct.valueOf(this,dup,any,true );
       case '@' ->     TypeStruct.valueOf(this,dup,any,false);
-      case '%' ->     TypeScalar.valueOf(this,dup,any);
+      case '%' ->     TypeNil   .valueOf(this,dup,any);
       case '[' -> peek("[[")
         ? TypeMem.valueOf(this,dup,any)
         : TypeFunPtr.valueOf(this,dup,any);

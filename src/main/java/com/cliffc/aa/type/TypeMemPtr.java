@@ -10,9 +10,6 @@ import java.util.function.BinaryOperator;
 // Loads and Stores.  They carry a set of aliased TypeObjs.
 
 public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
-  // List of known memory aliases.  Zero is nil.
-  public BitsAlias _aliases;
-
   // The _obj field is unused (trivially OBJ or XOBJ) for TMPs used as graph
   // node results, because memory contents are modified in TypeMems and
   // TypeStructs and NOT in pointers - hence this field "goes stale" rapidly as
@@ -23,21 +20,18 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   // function call args).
   public TypeStruct _obj; // Meet/join of aliases.  Unused in simple_ptrs in graph nodes.
 
-  private TypeMemPtr _init( BitsAlias aliases, TypeStruct obj ) {
+  private TypeMemPtr init(boolean any, boolean nil, boolean sub, BitsAlias aliases, TypeStruct obj ) {
+    super.init(any, nil, sub, aliases, bfun(any));
     assert !aliases.test(0); // No nil in aliases, use nil/sub instead
-    _aliases = aliases;
     _obj=obj;
     return this;
   }
-  private TypeMemPtr init(boolean any, boolean haz_nil, BitsAlias aliases, TypeStruct obj ) {
-    super.init(any,haz_nil);
-    return _init(aliases,obj);
+  @Override TypeMemPtr copy() {
+    TypeMemPtr tmp = super.copy();
+    tmp._aliases = _aliases;
+    tmp._obj = _obj;
+    return tmp;
   }
-  private TypeMemPtr init(boolean any, boolean nil, boolean sub, BitsAlias aliases, TypeStruct obj ) {
-    super.init(any, nil, sub);
-    return _init(aliases,obj);
-  }
-  @Override TypeMemPtr copy() { return _copy().init(_any, _nil, _sub, _aliases,_obj); }
 
   @Override public TypeMemPtr walk( TypeStrMap map, BinaryOperator<TypeMemPtr> reduce ) { return map.map(_obj,"obj"); }
   @Override public long lwalk( LongStringFunc map, LongOp reduce ) { return map.run(_obj,"obj"); }
@@ -97,20 +91,21 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
 
 
   static { new Pool(TMEMPTR,new TypeMemPtr()); }
-  public static TypeMemPtr malloc(boolean any, boolean haz_nil, BitsAlias aliases, TypeStruct obj ) {
+  public static TypeMemPtr malloc(boolean any, boolean nil, boolean sub, BitsAlias aliases, TypeStruct obj ) {
     TypeMemPtr t1 = POOLS[TMEMPTR].malloc();
-    return t1.init(any,haz_nil,aliases,obj);
+    return t1.init(any,nil,sub,aliases,obj);
   }
+  // Convenience for some callers, supports half as many choices    
+  public static TypeMemPtr malloc(boolean any, boolean haz_nil, BitsAlias aliases, TypeStruct obj ) {
+    return malloc(any, any & haz_nil, any | !haz_nil, aliases, obj );
+  }
+
   public static TypeMemPtr make(boolean haz_nil, BitsAlias aliases, TypeStruct obj ) {
     assert !aliases.is_empty(); // Ambiguous
     return malloc(aliases.above_center(),haz_nil,aliases,obj).hashcons_free();
   }
   public static TypeMemPtr make(boolean any, boolean haz_nil, BitsAlias aliases, TypeStruct obj ) {
     return malloc(any,haz_nil,aliases,obj).hashcons_free();
-  }
-  public static TypeMemPtr malloc(boolean any, boolean nil, boolean sub, BitsAlias aliases, TypeStruct obj ) {
-    TypeMemPtr t1 = POOLS[TMEMPTR].malloc();
-    return t1.init(any,nil,sub,aliases,obj);
   }
   static TypeMemPtr make(boolean any, boolean nil, boolean sub, BitsAlias aliases, TypeStruct obj ) {
     return malloc(any,nil,sub,aliases,obj).hashcons_free();
@@ -123,7 +118,6 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public static TypeMemPtr make_nil( int alias, TypeStruct obj ) { return make(true,BitsAlias.make0(alias),obj); }
   public TypeMemPtr make_from( TypeStruct obj ) { return _obj==obj ? this : malloc_from(obj).hashcons_free(); }
   public TypeMemPtr make_from( BitsAlias aliases ) { return _aliases==aliases ? this : make(aliases.test(0),aliases.clear(0),_obj); }
-  @Override TypeMemPtr make_from( boolean nil, boolean sub ) { return malloc(_any,nil,sub,_aliases,_obj).hashcons_free(); }
 
   // Legacy constructor for legacy HM tests
   public static final int STR_ALIAS = 4; // Legacy str ptr value

@@ -547,14 +547,13 @@ public class Parse implements Comparable<Parse> {
 
       // Common variables are made Fresh on both sides, then Phi'd, then
       // exported to the stack frame.
-      for( int i=1; i<t_stk.len(); i++ ) { // Walk true side, skip display
+      for( int i=1,j; i<t_stk.len(); i++ ) { // Walk true side, skip display
         String fld = t_stk.fld(i);         // Field name
-        if( f_stk.find(fld) >= 0 ) {       // Variable is common to both
+        if( (j=f_stk.find(fld)) >= 0 ) {       // Variable is common to both
           Node t_fsh = _fresh_field(X,t_stk_now,fld);
           Node f_fsh = _fresh_field(X,f_stk_now,fld);
-          // TODO: promoted field has Access from meet of both sides
-          //Access access = t_stk.access(i).meet(f_stk.access(j));
-          x_stk_now = _phi(X,r,t_fsh,f_fsh,fld,Access.Final,x_stk_now,bad);
+          Access access = t_stk.access(i).meet(f_stk.access(j));
+          x_stk_now = _phi(X,r,t_fsh,f_fsh,fld,access,x_stk_now,bad);
         }
       }
 
@@ -564,7 +563,7 @@ public class Parse implements Comparable<Parse> {
         if( f_stk.find(fld) == -1 ) {      // Missing in false side
           Node t_var = _fresh_field(X,t_stk_now,fld);
           Node f_var = _err_not_def(X,f_scope,fld,false,bad);
-          x_stk_now = _phi(X,r,t_var,f_var,fld,Access.Final,x_stk_now,bad);
+          x_stk_now = _phi(X,r,t_var,f_var,fld,Access.bot(),x_stk_now,bad);
         }
       }
 
@@ -574,7 +573,7 @@ public class Parse implements Comparable<Parse> {
         if( t_stk.find(fld) == -1 ) {      // Missing in true side
           Node t_var = _err_not_def(X,t_scope,fld,true ,bad);
           Node f_var = _fresh_field(X,f_stk_now,fld);
-          x_stk_now = _phi(X,r,t_var,f_var,fld,Access.Final,x_stk_now,bad);
+          x_stk_now = _phi(X,r,t_var,f_var,fld,Access.bot(),x_stk_now,bad);
         }
       }
       
@@ -595,7 +594,7 @@ public class Parse implements Comparable<Parse> {
   }
 
   private Node _err_not_def(GVNGCM.Build<Node> X, ScopeNode scope, String fld, boolean side, Parse bad) {
-    String msg = "'"+fld+"' not defined on '+side+' arm of trinary";
+    String msg = "'"+fld+"' not defined on '"+side+"' arm of trinary";
     return X.xform(new ErrNode(scope.ctrl(),bad,msg));
   }
   

@@ -15,21 +15,13 @@ public class TestType {
   @Test public void testType() {
     Object dummy = Env.TOP;
     Ary<Type> ts = Type.ALL_TYPES();
-    String s = ts.at(5).str(new SB(),true,false).toString();
-    Type tx = Type._valueOf(s);
-    assertSame(ts.at(5),tx);
 
-    Type t0 = TypeNil.XNSCALR;
-    Type t1 = TypeScalar.EXT.dual();
-    Type t2 = TypeInt.INT64.dual();
+    Type t0 = TypeNil.XNIL;
+    Type t1 = TypeNil.AND_XSCALAR._dual;
 
     Type t01 = t0.meet(t1);
-    Type t01_2 = t01.meet(t2);
-
-    Type t12 = t1.meet(t2);
-    Type t0_12 = t0.meet(t12);
     
-    assertSame(t01_2,t0_12);
+    assertSame(TypeNil.NIL,t01);
   }
 
   // Test for a collection of Types, that toString and valueOf are a bijection

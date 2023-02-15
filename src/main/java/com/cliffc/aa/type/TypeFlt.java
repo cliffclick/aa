@@ -12,14 +12,14 @@ public class TypeFlt extends TypeNil<TypeFlt> {
   // _any dictates high or low
   public  byte _z;        // bitsiZe, one of: 32,64
   private double _con;      // constant
-  private TypeFlt init(boolean any, boolean nil, boolean sub, int z, double con ) {
-    super.init(any,nil,sub);
+  private TypeFlt init(boolean any, boolean nil, boolean sub, BitsAlias aliases, BitsFun fidxs, int z, double con ) {
+    super.init(any,nil,sub,aliases,fidxs);
     _z=(byte)z;
     _con = con;
     return this;
   }
-  @Override protected TypeFlt _copy() {
-    TypeFlt tf = super._copy();
+  @Override protected TypeFlt copy() {
+    TypeFlt tf = super.copy();
     tf._z = _z;
     tf._con = _con;
     return tf;
@@ -48,16 +48,24 @@ public class TypeFlt extends TypeNil<TypeFlt> {
     };
   }
   static { new Pool(TFLT,new TypeFlt()); }
-  public static TypeFlt make( boolean any, boolean nil, boolean sub, int z, double con ) {
-    if( con!=0 ) {
-      assert !any && !nil;
-      if( !sub ) { z=log(con); con=0; } // constant plus zero is no longer a constant
-    }
+  public static TypeFlt make( boolean any, boolean nil, boolean sub, BitsAlias aliases, BitsFun fidxs, int z, double con ) {
     TypeFlt t1 = POOLS[TFLT].malloc();
-    return t1.init(any,nil,sub,z,con).hashcons_free();
+    return t1.init(any,nil,sub,aliases,fidxs,z,con).canonicalize().hashcons_free();
   }
-  @Override TypeFlt make_from(              boolean nil, boolean sub ) { return make(_any,nil,sub,_z,_con); }
-  @Override TypeFlt make_from( boolean any, boolean nil, boolean sub ) { return make( any,nil,sub,_z,_con); }
+  public static TypeFlt make( boolean any, boolean nil, boolean sub, int z, double con ) {
+    return make(any,nil,sub,
+                z==0 ? BitsAlias.EMPTY : balias(any), // Constants on centerline use centerline aliases
+                z==0 ? BitsFun  .EMPTY : bfun  (any),
+                z,con);
+  }
+  @Override TypeFlt canonicalize() {
+    if( _con!=0 ) {
+      assert !_any && !_nil;
+      if( !_sub ) { _z=(byte)log(_con); _con=0; } // constant plus zero is no longer a constant
+    }
+    return this;
+  }
+  
 
   public static TypeFlt con(double con) { return make(false,false,true,0,con); }
 
@@ -79,25 +87,27 @@ public class TypeFlt extends TypeNil<TypeFlt> {
   //@Override public long   getl() { assert is_con() && ((long)_con)==_con; return (long)_con; }
 
   @Override protected TypeFlt xdual() {
-    boolean xor = _nil == _sub;
-    return _z==0 ? this : POOLS[TFLT].<TypeFlt>malloc().init(!_any,_nil^xor,_sub^xor,_z,0);
+    if( _z==0 ) return this;
+    TypeFlt x = super.xdual();
+    x._z = _z;
+    x._con = 0;
+    return x;
   }
   @Override protected TypeFlt xmeet( Type t ) {
     TypeFlt ti = (TypeFlt)t;
-    boolean any = _any & ti._any;
-    boolean nil = _nil & ti._nil;
-    boolean sub = _sub & ti._sub;
-    
-    if( !any ) {
+    TypeFlt rez = ymeet(ti);
+    rez._con = 0;
+    if( !rez._any ) {
       int lz0 =    _z==0 ? log(   _con) :    _z;
       int lz1 = ti._z==0 ? log(ti._con) : ti._z;
-      if(    _z==0 && ti._any && (ti._nil || ti._sub) && lz0 <= lz1 ) return this; // Keep a constant
-      if( ti._z==0 &&    _any && (   _nil ||    _sub) && lz1 <= lz0 ) return ti  ; // Keep a constant
-      int nz = _any ? lz1 : (ti._any ? lz0 : Math.max(lz0,lz1));
-      return make(any,nil,sub,nz,0);
+      if(    _z==0 && ti._any && (ti._nil || ti._sub) && lz0 <= lz1 ) return rez.free(this); // Keep a constant
+      if( ti._z==0 &&    _any && (   _nil ||    _sub) && lz1 <= lz0 ) return rez.free(ti  ); // Keep a constant
+      rez._z = (byte)(_any ? lz1 : (ti._any ? lz0 : Math.max(lz0,lz1)));
+    } else {
+      // Both are high, not constants.  Narrow size.
+      rez._z = (byte)Math.min(_z,ti._z);
     }
-    // Both are high, not constants.  Narrow size.
-    return make(any,nil,sub,Math.min(_z,ti._z),0);
+    return rez.hashcons_free();
   }
   static int log( double con ) { return ((double)(float)con)==con ? 32 : 64; }
 

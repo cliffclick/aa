@@ -12,15 +12,15 @@ public class TypeInt extends TypeNil<TypeInt> {
   // _any dictates high or low
   public  byte _z;        // bitsiZe, one of: 1,8,16,32,64
   private long _con;      // constant
-  private TypeInt init(boolean any, boolean nil, boolean sub, int z, long con ) {
-    super.init(any,nil,sub);
+  private TypeInt init(boolean any, boolean nil, boolean sub, BitsAlias aliases, BitsFun fidxs, int z, long con ) {
+    super.init(any,nil,sub,aliases,fidxs);
     _z=(byte)z;
     _con = con;
     return this;
   }
 
-  @Override protected TypeInt _copy() {
-    TypeInt ti = super._copy();
+  @Override protected TypeInt copy() {
+    TypeInt ti = super.copy();
     ti._z = _z;
     ti._con = _con;
     return ti;
@@ -52,17 +52,23 @@ public class TypeInt extends TypeNil<TypeInt> {
     };
   }
   static { new Pool(TINT,new TypeInt()); }
-  public static TypeInt make( boolean any, boolean nil, boolean sub, int z, long con ) {
-    // Canonicalize
-    if( con!=0 ) {
-      assert !any && !nil;
-      if( !sub ) { z=log(con); con=0; } // constant plus zero is no longer a constant
-    }
+  public static TypeInt make( boolean any, boolean nil, boolean sub, BitsAlias aliases, BitsFun fidxs, int z, long con ) {
     TypeInt t1 = POOLS[TINT].malloc();
-    return t1.init(any,nil,sub,z,con).hashcons_free();
+    return t1.init(any,nil,sub,aliases,fidxs,z,con).canonicalize().hashcons_free();
   }
-  @Override TypeInt make_from(              boolean nil, boolean sub ) { return make(_any,nil, sub,_z,_con); }
-  @Override TypeInt make_from( boolean any, boolean nil, boolean sub ) { return make( any,nil,sub,_z,_con); }
+  public static TypeInt make( boolean any, boolean nil, boolean sub, int z, long con ) {
+    return make(any,nil,sub,
+                z==0 ? BitsAlias.EMPTY : balias(any), // Constants on centerline use centerline aliases
+                z==0 ? BitsFun  .EMPTY : bfun  (any),
+                z,con);
+  }
+  @Override TypeInt canonicalize() {
+    if( _con!=0 ) {
+      assert !_any && !_nil;
+      if( !_sub ) { _z=(byte)log(_con); _con=0; } // constant plus zero is no longer a constant
+    }
+    return this;
+  }
 
   public static TypeInt con(long con) { return make(false,false,true,0,con); }
 
@@ -92,25 +98,28 @@ public class TypeInt extends TypeNil<TypeInt> {
   @Override public double getd() { assert is_con() && (long)((double)_con)==_con; return _con; }
 
   @Override protected TypeInt xdual() {
-    boolean xor = _nil == _sub;
-    return _z==0 ? this : POOLS[TINT].<TypeInt>malloc().init(!_any,_nil^xor,_sub^xor,_z,0);
+    if( _z==0 ) return this;
+    TypeInt x = super.xdual();
+    x._z = _z;
+    x._con = 0;
+    return x;
+
   }
   @Override protected TypeInt xmeet( Type t ) {
     TypeInt ti = (TypeInt)t;
-    boolean any = _any & ti._any;
-    boolean nil = _nil & ti._nil;
-    boolean sub = _sub & ti._sub;
-
-    if( !any ) {
+    TypeInt rez = ymeet(ti);
+    rez._con = 0;
+    if( !rez._any ) {
       int lz0 =    _z==0 ? log(   _con) :    _z;
       int lz1 = ti._z==0 ? log(ti._con) : ti._z;
-      if(    _z==0 && ti._any && (ti._nil || ti._sub) && lz0 <= lz1 ) return this; // Keep a constant
-      if( ti._z==0 &&    _any && (   _nil ||    _sub) && lz1 <= lz0 ) return ti  ; // Keep a constant
-      int nz = _any ? lz1 : (ti._any ? lz0 : Math.max(lz0,lz1));
-      return make(any,nil,sub,nz,0);
+      if(    _z==0 && ti._any && (ti._nil || ti._sub) && lz0 <= lz1 ) return rez.free(this); // Keep a constant
+      if( ti._z==0 &&    _any && (   _nil ||    _sub) && lz1 <= lz0 ) return rez.free(ti  ); // Keep a constant
+      rez._z = (byte)(_any ? lz1 : (ti._any ? lz0 : Math.max(lz0,lz1)));
+    } else {
+      // Both are high, not constants.  Narrow size.
+      rez._z = (byte)Math.min(_z,ti._z);
     }
-    // Both are high, not constants.  Narrow size.
-    return make(any,nil,sub,Math.min(_z,ti._z),0);
+    return rez.hashcons_free();
   }
 
   private static int log( long con ) {

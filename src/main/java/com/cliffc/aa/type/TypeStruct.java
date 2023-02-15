@@ -84,11 +84,20 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
 
   // Shallow clone, not interned BUT _flds IS INTERNED and cannot be hacked.
   // Used by e.g. Type.set_name.  Generally not suitable for TypeStruct hacking.
-  @Override TypeStruct copy() { return _copy().init(_any,_nil,_sub,_clz,_def,_flds); }
+  @Override TypeStruct copy() {
+    TypeStruct ts = super.copy();
+    ts._clz = _clz;
+    ts._def = _def;
+    ts._flds = _flds;
+    return ts;
+  }
 
   // Shallow clone, not interned AND _flds is shallow cloned, NOT interned.
   // Suitable for hacking fields.
-  TypeStruct copy2() { return _copy().init(_any,_nil,_sub,_clz,_def,TypeFlds.clone(_flds)); }
+  TypeStruct copy2() {
+    //return copy().init(_any,_nil,_sub,_clz,_def,TypeFlds.clone(_flds));
+    throw unimpl();
+  }
 
   @Override public Cyclic.Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links) {
     TypeStruct ts = (TypeStruct)t;
@@ -304,8 +313,8 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   public boolean is_str() { return Util.eq(_clz,"str:"); }
 
   // Make, replacing nil/sub flags
-  @Override TypeStruct make_from(              boolean nil, boolean sub ) { return make(_any,nil,sub,_clz,_def,_flds); }
-  @Override TypeStruct make_from( boolean any, boolean nil, boolean sub ) { return make( any,nil,sub,_clz,_def,_flds); }
+  //@Override TypeStruct make_from( boolean any, boolean nil, boolean sub ) { return make( any,nil,sub,_clz,_def,_flds); }
+
 
   
   // Possibly allocated.  No fields specified.  All fields are possible and

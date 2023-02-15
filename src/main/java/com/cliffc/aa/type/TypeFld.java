@@ -26,7 +26,9 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     _access = access;
     return this;
   }
-  @Override public TypeFld copy() { return _copy().init(_fld,_t,_access); }
+  @Override public TypeFld copy() {
+    return super.copy().init(_fld,_t,_access);
+  }
 
   @Override public TypeMemPtr walk( TypeStrMap map, BinaryOperator<TypeMemPtr> reduce ) { return map.map(_t,"t"); }
   @Override public long lwalk( LongStringFunc map, LongOp reduce ) { return map.run(_t,"t"); }
@@ -144,19 +146,19 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   }
 
   public enum Access {
-    RW,                         // Read/Write; other threads can change, I can change
-    ReadOnly,                   // Read-Only ; other threads can change
     Final,                      // No future load will ever see a different value than any final store
-    NoAccess,                   // Cannot access (either read or write)
-    HiFinal,
+    ReadOnly,                   // Read-Only ; other threads can change
+    RW,                         // Read/Write; other threads can change, I can change
+    //NoAccess,                   // Cannot access (either read or write)
+    HiReadWrite,
     HiReadOnly,
-    HiReadWrite;
+    HiFinal;
     public static final Access[] values = values();
-    static Access bot() { return RW; }
-    public Access dual() { return values[6-ordinal()]; }
+    public static Access bot() { return Final; }
+    public Access dual() { return values[values.length-1-ordinal()]; }
     public Access meet(Access a) { return values[Math.min(ordinal(),a.ordinal())]; }
-    private static final String[] SHORTS = new String[]{":="        ,"=="       ,"="    ,"~="      ,"!=!","!==!","!:=!"};
-    private static final String[] LONGS  = new String[]{"read/write","read-only","final","noaccess","!=!","!==!","!:=!"};
+    private static final String[] SHORTS = new String[]{"="    ,"=="       ,":="        ,/*"~="      ,*/"!:=!","!==!","!=!"};
+    private static final String[] LONGS  = new String[]{"final","read-only","read/write",/*"noaccess",*/"!:=!","!==!","!=!"};
     @Override public String toString() { return LONGS[ordinal()]; }
     public SB str(SB sb) { return sb.p(SHORTS[ordinal()]); }
   }

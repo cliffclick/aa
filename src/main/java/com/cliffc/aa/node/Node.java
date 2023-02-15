@@ -511,7 +511,7 @@ public abstract class Node implements Cloneable, IntSupplier {
         Type ulive = use.live_use(this);
         live = live.meet(ulive); // Make alive used fields
       }
-    assert live==Type.ANY || assert_live(live);
+    assert live==Type.ANY || live==Type.ALL || assert_live(live);
     return live;
   }
 

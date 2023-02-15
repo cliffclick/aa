@@ -14,6 +14,13 @@ public class TypeRPC extends TypeNil<TypeRPC> {
     _rpcs = rpcs;
     return this;
   }
+
+  @Override protected TypeRPC copy() {
+    TypeRPC tr = super.copy();
+    tr._rpcs = _rpcs;
+    return tr;
+  }
+
   @Override public long static_hash( ) { return ((TRPC + (long)_rpcs._hash)<<1)|1; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -42,8 +49,6 @@ public class TypeRPC extends TypeNil<TypeRPC> {
     return POOLS[TRPC].<TypeRPC>malloc().init(any,nil,sub,rpcs);
   }
   public static TypeRPC make( boolean any, boolean nil, boolean sub, BitsRPC rpcs ) { return malloc(any,nil,sub,rpcs).hashcons_free(); }
-  @Override TypeRPC make_from(              boolean nil, boolean sub ) { return make(_any,nil,sub,_rpcs); }
-  @Override TypeRPC make_from( boolean any, boolean nil, boolean sub ) { return make( any,nil,sub,_rpcs); }
 
   public static TypeRPC make( int rpc ) { return make(false,false,true,BitsRPC.make0(rpc)); }
   public static final TypeRPC ALL_CALL = make(false,false,true,BitsRPC.NALL);
@@ -52,15 +57,15 @@ public class TypeRPC extends TypeNil<TypeRPC> {
   static final TypeRPC[] TYPES = new TypeRPC[]{RPC1,ALL_CALL,EMPTY};
 
   @Override protected TypeRPC xdual() {
-    boolean xor = _nil == _sub;
-    return POOLS[TRPC].<TypeRPC>malloc().init(!_any,_nil^xor,_sub^xor,_rpcs.dual());
+    TypeRPC x = super.xdual();
+    x._rpcs = _rpcs.dual();
+    return x;
   }
   @Override protected TypeRPC xmeet( Type t ) {
     TypeRPC rpc = (TypeRPC)t;
-    boolean any = _any & rpc._any;
-    boolean nil = _nil & rpc._nil;
-    boolean sub = _sub & rpc._sub;
-    return make(any,nil,sub,_rpcs.meet( rpc._rpcs ));
+    TypeRPC rez = ymeet(rpc);
+    rez._rpcs = _rpcs.meet( rpc._rpcs );
+    return rez.hashcons_free();
   }
 
   public int rpc() { return _rpcs.getbit(); }

@@ -36,7 +36,7 @@ public class BitsFun extends Bits<BitsFun> {
   // Internal and external callers, not nil
   public  static final BitsFun NALL = new BitsFun().make_impl(ALLX,null);
   public  static final BitsFun NANY = NALL.dual();
-  private static final BitsFun  ALL = NALL.make_impl(1,new long[]{0x3});
+  public  static final BitsFun  ALL = NALL.make_impl(1,new long[]{0x3});
   private static final BitsFun  ANY = ALL.dual();
 
   public static final BitsFun EXT = make0(EXTX);

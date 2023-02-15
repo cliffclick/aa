@@ -18,38 +18,52 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   public boolean _nil; // true for OR-NIL and YES-NIL.  False for AND-NIL, NOT-NIL
   public boolean _sub; // true for OR-NIL and NOT-NIL.  False for AND-NIL, YES-NIL
 
+  // Track precision of aliases and fidxs for type unions; mostly means
+  // externally passed-in parameters have limits on which aliases they can
+  // pass-in (escaped aliases yes, but internal and not escaped, no).
+
+  // List of known memory aliases.  Zero is nil.
+  public BitsAlias _aliases;
+  
+  // List of known functions in set, or 'flip' for choice-of-functions.
+  // A single bit is a classic code pointer.  
+  public BitsFun   _fidxs;
+  
   N init( boolean any, boolean nil, boolean sub ) {
+    return init(any,nil,sub,balias(any),bfun(any));
+  }
+  
+  N init( boolean any, boolean nil, boolean sub, BitsAlias aliases, BitsFun fidxs ) {
+    assert !aliases.test(0) && !fidxs.test(0); // Nil uses the nil boolean
     super.init();
     _any = any;
     _nil = nil;
     _sub = sub;
+    _aliases = aliases;
+    _fidxs = fidxs;
     return (N)this;
   }
-  // Convenience for many subclasses.  Supports only half the total choices
-  // any &&  haz_nil == ~scalar OR  NIL ; XSCALAR;  nil &  sub
-  // any && !haz_nil == ~scalar NOT NIL ; XNSCALR; !nil &  sub
-  // all &&  haz_nil ==  scalar AND NIL ;  SCALAR; !nil & !sub
-  // all && !haz_nil ==  scalar NOT NIL ;  NSCALR; !nil &  sub
-  void init( boolean any, boolean haz_nil) {
-    super.init();
-    _any = any;
-    _nil = any &&  haz_nil;
-    _sub = any || !haz_nil;
-  }
 
-  @Override protected N _copy() {
-    N n = super._copy();
+  static BitsAlias balias(boolean any) { return any ? BitsAlias.NANY : BitsAlias.NALL; }
+  static BitsFun   bfun  (boolean any) { return any ? BitsFun  .NANY : BitsFun  .NALL; }
+  
+  @Override N copy() {
+    N n = super.copy();
     n._any = _any;
     n._nil = _nil;
     n._sub = _sub;
+    n._aliases = _aliases;
+    n._fidxs = _fidxs;
     return n;
   }
 
-  @Override long static_hash() { return
-      super.static_hash() ^
-      (_any ? (1L<<16):1) |
-      (_sub ? (1L<<19):1) |
-      (_nil ? (1L<<21):1) ;
+  @Override long static_hash() {
+    return super.static_hash() ^
+      ((_any ? (1L<<16):1) |
+       (_sub ? (1L<<19):1) |
+       (_nil ? (1L<<21):1)) ^
+      _aliases._hash ^
+      _fidxs  ._hash ;
   }
 
   @Override public boolean equals( Object o ) {
@@ -66,7 +80,10 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     if( _type != t._type ) return false;
     return _eq(t);
   }
-  boolean _eq(TypeNil tn) { return _any==tn._any && _nil==tn._nil && _sub==tn._sub;  }
+  boolean _eq(TypeNil tn) {
+    return _any==tn._any && _nil==tn._nil && _sub==tn._sub &&
+      _aliases==tn._aliases && _fidxs==tn._fidxs;
+  }
 
   static final String[][][] NSTRS = new String[][][]{
     {{ ""    , "n" },  // all, !nil, {!sub,sub}  AND, NOT
@@ -79,7 +96,15 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     assert this.getClass().equals(TypeNil.class);  // Subclasses handle directly
     if( this== NIL ) return sb.p( "nil");
     if( this==XNIL ) return sb.p("xnil");
-    return _strn(sb).p("Scalar");
+    if(  _any && _aliases==BitsAlias.NANY && _fidxs==BitsFun.NANY )
+      return _strn(sb).p("Scalar");
+    if( !_any && _aliases==BitsAlias.NALL && _fidxs==BitsFun.NALL )
+      return _strn(sb).p("Scalar");
+    // Fancy with aliases and fidxs
+    if( _any ) sb.p('~');
+    _aliases.str(sb.p('%'));  
+    _fidxs  .str(sb);  
+    return _str_nil(sb);    
   }
   // Called from subclasses, which already handle _any.  Appends something for may/must.
   private static final String[][] XSTRS = new String[][]{
@@ -99,6 +124,15 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     };
   }
 
+  static TypeNil valueOf(Parse P, String cid, boolean any) {
+    P.require('%');
+    var aliases = P.bits(BitsAlias.EMPTY);
+    var fidxs   = P.bits(BitsFun  .EMPTY);
+    TypeNil tn = (TypeNil)malloc(any,false,any,aliases,fidxs).val_nil(P).hashcons_free();
+    if( cid!=null ) P._dups.put(cid,tn);
+    return tn;
+  }
+  
   N val_nil( Parse P ) {
     if( P.peek('?' ) ) _nil = _sub = false;
     if( P.peek("+0") ) _nil = _sub = true;
@@ -109,13 +143,18 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   static {
     new Pool( TNIL, new TypeNil());
   }
+  public static TypeNil malloc( boolean any, boolean nil, boolean sub, BitsAlias aliases, BitsFun fidxs ) {
+    TypeNil tn = POOLS[TNIL].malloc();
+    return tn.init(any, nil, sub, aliases, fidxs);
+  }
+  public static TypeNil make( boolean any, boolean nil, boolean sub, BitsAlias aliases, BitsFun fidxs ) {
+    return (TypeNil)malloc(any, nil, sub, aliases, fidxs).hashcons_free();
+  }
   static TypeNil make( boolean any, boolean nil, boolean sub ) {
     TypeNil tn = POOLS[TNIL].malloc();
     return (TypeNil)tn.init(any, nil, sub).hashcons_free();
   }
-  TypeNil make_from(              boolean nil, boolean sub ) { return make(_any,nil,sub); }
-  TypeNil make_from( boolean any, boolean nil, boolean sub ) { throw unimpl(); }
-
+  
   // Plain TypeNil (no subclass) has 8 possibilities:
   // XSCALAR OR  NIL  -- choice of anything
   // XSCALAR NO  NIL  -- similar XNSCALR
@@ -132,8 +171,13 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   public static final TypeNil  NIL = make(false,true,false); // One of many nil choices
   public static final TypeNil XNIL = make(true ,true,false); // One of many nil choices
   public static final TypeNil AND_XSCALAR = make(true,false,false); // Odd choice: 0&~Scalar
+
+  public static final TypeNil INTERNAL = make(false,false,false,BitsAlias.INT,BitsFun.INT);
+  public static final TypeNil EXTERNAL = make(false,false,false,BitsAlias.EXT,BitsFun.EXT);
+  public static final TypeNil TEST0 = make(false,true,false,BitsAlias.EXT,BitsFun.INT);
+  
   // Collection of sample types for checking type lattice properties.
-  static final TypeNil[] TYPES = new TypeNil[]{SCALAR,NSCALR,NIL};
+  static final TypeNil[] TYPES = new TypeNil[]{SCALAR,NSCALR,NIL,(TypeNil)AND_XSCALAR._dual,INTERNAL,TEST0};
 
   // duals:
   //  xs +0 <->  s &0
@@ -142,37 +186,66 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   //  xs!=0 <->  s!=0 // and   NOT-nil stays NOT-nil
   @Override protected N xdual() {
     boolean xor = _nil == _sub;
-    return POOLS[_type].<N>malloc().init(!_any, _nil^xor, _sub^xor);
+    return POOLS[_type].<N>malloc().init(!_any, _nil^xor, _sub^xor, _aliases.dual(), _fidxs.dual());
   }
 
   // Only called TNIL to TNIL
   @Override protected TypeNil xmeet(Type t) {
     assert _type==TNIL && t._type==TNIL && this!=t;
-    TypeNil tn = (TypeNil)t;
-    boolean any = _any & tn._any;
-    boolean nil = _nil & tn._nil;
-    boolean sub = _sub & tn._sub;
+    N tn = (N)t;              // Invariant from caller
+    TypeNil rez = ymeet(tn);  // Invariant from caller
     // No edge xnil -> nil.  See testLattice22_nil2()
-    TypeNil rez = make(any,nil,sub);
-    if( rez==NIL && (tn==XNIL || this==XNIL) )
-      return SCALAR;
+    if( rez.xnil_ish() &&
+        (tn.nil_ish() || nil_ish()) )
+       rez._nil=false;
+    return (TypeNil)rez.hashcons_free();
+  }
+  final boolean xnil_ish() { return !_any && yes_ish(); }
+  final boolean  nil_ish() { return  _any && yes_ish(); }
+  final boolean  yes_ish() { return  _nil && !_sub;  }
+  
+
+  // Meet into a new TypeNil subclass, without interning
+  N ymeet( N tn ) {
+    N rez = super.copy();
+    rez._any = _any & tn._any;
+    rez._nil = _nil & tn._nil;
+    rez._sub = _sub & tn._sub;
+    rez._aliases = _aliases.meet(tn._aliases);
+    rez._fidxs   = _fidxs  .meet(tn._fidxs  );
     return rez;
   }
-
+  
   // LHS is TypeNil directly; RHS is a TypeNil subclass.
   final Type nmeet(TypeNil tsub) {
     assert _type==TNIL && tsub._type!=TNIL;
-    if( !_any )                 // Falling past 'tsub' to a low TypeNil
-      return meet(tsub.widen_sub());
+    if( !_any ) {               // Falling past 'tsub' to a low TypeNil
+      TypeNil tn = tsub.widen_sub();
+      return tn==this ? this : xmeet(tn);
+    }
     boolean nil = _nil & tsub._nil;
     boolean sub = _sub & tsub._sub;
-    nil &= sub; // If type would fall to subtype YES-nil, fall to AND-nil instead
-    if( nil==tsub._nil && sub==tsub._sub ) return tsub;
-    return tsub.make_from( nil, sub );
+    //nil &= sub; // If type would fall to subtype YES-nil, fall to AND-nil instead
+    BitsAlias aliases = _aliases.meet(tsub._aliases);
+    BitsFun   fidxs   = _fidxs  .meet(tsub._fidxs  );
+
+    if( sub ) {
+      // has subtype
+      throw unimpl();
+    } else {
+      // pure TN
+      throw unimpl();
+    }
+    
+    
+    //if( nil==tsub._nil && sub==tsub._sub && aliases==tsub._aliases && fidxs==tsub._fidxs ) return tsub;
+    //return tsub.copy().init(tsub._any, nil, sub, aliases, fidxs ).canonicalize().hashcons_free();
   }
 
+  N canonicalize() { return (N)this; }
+
   // Widen subtype to a TypeNil, losing its sub structure.
-  final Type widen_sub() { return _type==TNIL ? this : make(false,_nil,_sub); }
+  final TypeNil widen_sub() { assert _type!= TNIL; return make(false,_nil,_sub,_aliases,_fidxs); }
 
   // Type must support a nil
   @Override public boolean must_nil() { return !_sub; }
