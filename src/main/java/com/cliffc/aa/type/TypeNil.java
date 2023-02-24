@@ -6,8 +6,6 @@ import com.cliffc.aa.util.VBitSet;
 
 import java.util.HashMap;
 
-import static com.cliffc.aa.AA.unimpl;
-
 public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   public boolean _any;  // any vs all
   // OR  =   nil &  sub // NIL choice and subclass choice
@@ -113,6 +111,13 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   };
   SB _str_nil( SB sb ) { return sb.p(XSTRS[_nil ?1:0][_sub ?1:0]); }
   
+  N val_nil( Parse P ) {
+    if( P.peek('?' ) ) _nil = _sub = false;
+    if( P.peek("+0") ) _nil = _sub = true;
+    if( P.peek("=0") ) { _nil=true; _sub=false; }
+    return (N)this;
+  }
+  
   static Type valueOfNil(String cid) {
     return switch(cid) {
     case  "Scalar" ->   SCALAR; // FFF
@@ -128,18 +133,11 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     P.require('%');
     var aliases = P.bits(BitsAlias.EMPTY);
     var fidxs   = P.bits(BitsFun  .EMPTY);
-    TypeNil tn = (TypeNil)malloc(any,false,any,aliases,fidxs).val_nil(P).hashcons_free();
+    TypeNil tn = (TypeNil)malloc(any,false,true,aliases,fidxs).val_nil(P).hashcons_free();
     if( cid!=null ) P._dups.put(cid,tn);
     return tn;
   }
-  
-  N val_nil( Parse P ) {
-    if( P.peek('?' ) ) _nil = _sub = false;
-    if( P.peek("+0") ) _nil = _sub = true;
-    if( P.peek("=0") ) throw unimpl();
-    return (N)this;
-  }
-  
+
   static {
     new Pool( TNIL, new TypeNil());
   }
@@ -195,19 +193,19 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     N tn = (N)t;              // Invariant from caller
     TypeNil rez = ymeet(tn);  // Invariant from caller
     // No edge xnil -> nil.  See testLattice22_nil2()
-    if( rez.xnil_ish() &&
-        (tn.nil_ish() || nil_ish()) )
+    if( rez.nil_ish() &&
+        (tn.xnil_ish() || xnil_ish()) )
        rez._nil=false;
     return (TypeNil)rez.hashcons_free();
   }
-  final boolean xnil_ish() { return !_any && yes_ish(); }
-  final boolean  nil_ish() { return  _any && yes_ish(); }
+  final boolean xnil_ish() { return  _any && yes_ish(); }
+  final boolean  nil_ish() { return !_any && yes_ish(); }
   final boolean  yes_ish() { return  _nil && !_sub;  }
   
 
   // Meet into a new TypeNil subclass, without interning
   N ymeet( N tn ) {
-    N rez = super.copy();
+    N rez = copy();
     rez._any = _any & tn._any;
     rez._nil = _nil & tn._nil;
     rez._sub = _sub & tn._sub;
@@ -223,29 +221,16 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
       TypeNil tn = tsub.widen_sub();
       return tn==this ? this : xmeet(tn);
     }
-    boolean nil = _nil & tsub._nil;
-    boolean sub = _sub & tsub._sub;
-    //nil &= sub; // If type would fall to subtype YES-nil, fall to AND-nil instead
-    BitsAlias aliases = _aliases.meet(tsub._aliases);
-    BitsFun   fidxs   = _fidxs  .meet(tsub._fidxs  );
-
-    if( sub ) {
-      // has subtype
-      throw unimpl();
-    } else {
-      // pure TN
-      throw unimpl();
-    }
-    
-    
-    //if( nil==tsub._nil && sub==tsub._sub && aliases==tsub._aliases && fidxs==tsub._fidxs ) return tsub;
-    //return tsub.copy().init(tsub._any, nil, sub, aliases, fidxs ).canonicalize().hashcons_free();
+    // Keep subclass structure.  
+    TypeNil rez = tsub.ymeet(this);
+    rez._nil &= _sub & tsub._sub; // Disallow the xnil->nil edge
+    return rez.canonicalize().hashcons_free();
   }
 
   N canonicalize() { return (N)this; }
 
   // Widen subtype to a TypeNil, losing its sub structure.
-  final TypeNil widen_sub() { assert _type!= TNIL; return make(false,_nil,_sub,_aliases,_fidxs); }
+  TypeNil widen_sub() { assert _type!= TNIL; return make(false,_nil,_sub,_aliases,_fidxs); }
 
   // Type must support a nil
   @Override public boolean must_nil() { return !_sub; }

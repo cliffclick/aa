@@ -12,8 +12,8 @@ public class TypeFlt extends TypeNil<TypeFlt> {
   // _any dictates high or low
   public  byte _z;        // bitsiZe, one of: 32,64
   private double _con;      // constant
-  private TypeFlt init(boolean any, boolean nil, boolean sub, BitsAlias aliases, BitsFun fidxs, int z, double con ) {
-    super.init(any,nil,sub,aliases,fidxs);
+  private TypeFlt init(boolean any, boolean nil, boolean sub, int z, double con ) {
+    super.init(any,nil,sub,BitsAlias.EMPTY,BitsFun.EMPTY);
     _z=(byte)z;
     _con = con;
     return this;
@@ -48,15 +48,9 @@ public class TypeFlt extends TypeNil<TypeFlt> {
     };
   }
   static { new Pool(TFLT,new TypeFlt()); }
-  public static TypeFlt make( boolean any, boolean nil, boolean sub, BitsAlias aliases, BitsFun fidxs, int z, double con ) {
-    TypeFlt t1 = POOLS[TFLT].malloc();
-    return t1.init(any,nil,sub,aliases,fidxs,z,con).canonicalize().hashcons_free();
-  }
   public static TypeFlt make( boolean any, boolean nil, boolean sub, int z, double con ) {
-    return make(any,nil,sub,
-                z==0 ? BitsAlias.EMPTY : balias(any), // Constants on centerline use centerline aliases
-                z==0 ? BitsFun  .EMPTY : bfun  (any),
-                z,con);
+    TypeFlt t1 = POOLS[TFLT].malloc();
+    return t1.init(any,nil,sub,z,con).canonicalize().hashcons_free();
   }
   @Override TypeFlt canonicalize() {
     if( _con!=0 ) {

@@ -472,7 +472,7 @@ public class TestNodeSmall {
   // Code: "gen_ctr={cnt;{cnt++}}; ctrA=gen_ctr(); ctrB=gen_ctr(); ctrA(); ctrB(); ctrB()"
   //
   @Test public void testRecursiveDisplay() {
-    GVNGCM gvn = Env.GVN;
+    AA.LIFTING = true;
 
     // Build the graph for a simple recursive function display.
     // Struct (display); inputs are prior display and FunPtr
@@ -495,7 +495,7 @@ public class TestNodeSmall {
     FunNode fun = new FunNode("fact",ARG_IDX).add_def(ctl).add_def(ctl).init();
     // Parms for the Fun.  Note that the default type is "weak" because the
     // file-level display can not yet know about "fact".
-    ParmNode parm_mem     = new ParmNode(MEM_IDX,fun,null,mem._val,mem).add_def(dsp_file_mem).init();
+    ParmNode parm_mem     = new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM,mem).add_def(dsp_file_mem).init();
     ParmNode parm_dsp_ptr = new ParmNode(DSP_IDX,fun,null,dsp_file_ptr._val,(ConNode)Node.con(dsp_file_ptr._val)).add_def(dsp_file_ptr).init();
     // Close the function up
     RetNode ret = new RetNode(fun,parm_mem,parm_dsp_ptr,rpc,fun).init();
@@ -520,9 +520,11 @@ public class TestNodeSmall {
     }
 
     // Now run GCP to closure.  This is the key call being tested.
+    AA.LIFTING = false;
     DO_GCP=true;
     DO_HMT=false;
     Combo.opto();
+    AA.LIFTING = true;
 
     // Validate cyclic display/function type
     TypeFunPtr tfptr0 = (TypeFunPtr) bind._val;

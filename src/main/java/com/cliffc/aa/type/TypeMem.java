@@ -357,16 +357,15 @@ public class TypeMem extends Type<TypeMem> {
   public TypeMem slice_reaching_aliases(BitsAlias aliases) {
     if( aliases==BitsAlias.NALL ) return this;
     TypeStruct[] tos = new TypeStruct[Math.max(_pubs.length,aliases.max()+1)];
-    tos[1] = at(1);
+    tos[1] = TypeStruct.UNUSED;
     for( int i=2; i<tos.length; i++ )
-      tos[i] = aliases.test_recur(i) ? at(i) : TypeStruct.UNUSED;
+      tos[i] = aliases.test_recur(i) ? at(i) : null;
     return make0(tos);
   }
 
   // --------------------------------------------------------------------------
   // Sharpen a dull pointer against this memory.
   public TypeMemPtr sharpen( TypeMemPtr dull ) {
-    if( dull.is_valtype() ) return dull;
     assert dull==dull.simple_ptr();
     if( _sharp_cache != null ) { // Check the cache first
       TypeMemPtr sharp = _sharp_cache.get(dull._aliases);

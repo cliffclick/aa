@@ -21,7 +21,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public TypeStruct _obj; // Meet/join of aliases.  Unused in simple_ptrs in graph nodes.
 
   private TypeMemPtr init(boolean any, boolean nil, boolean sub, BitsAlias aliases, TypeStruct obj ) {
-    super.init(any, nil, sub, aliases, bfun(any));
+    super.init(any, nil, sub, aliases, BitsFun.EMPTY);
     assert !aliases.test(0); // No nil in aliases, use nil/sub instead
     _obj=obj;
     return this;

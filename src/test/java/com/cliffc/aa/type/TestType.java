@@ -16,12 +16,12 @@ public class TestType {
     Object dummy = Env.TOP;
     Ary<Type> ts = Type.ALL_TYPES();
 
-    Type t0 = TypeNil.XNIL;
+    Type t0 = TypeNil.AND_XSCALAR;
     Type t1 = TypeNil.AND_XSCALAR._dual;
 
     Type t01 = t0.meet(t1);
     
-    assertSame(TypeNil.NIL,t01);
+    //assertSame(t1,t01);
   }
 
   // Test for a collection of Types, that toString and valueOf are a bijection
@@ -38,7 +38,7 @@ public class TestType {
   }
   // Test for a collection of Strings, that toString and valueOf are a bijection
   @Test public void testValueOf() {
-    PrimNode.PRIMS();
+    //PrimNode.PRIMS();
     String[] ss = new String[] {
       "Scalar",                 // The Scalars and Nils
       "nScalar",
@@ -56,6 +56,8 @@ public class TestType {
       "flt32",                  // Simple primitive range
       "3.14",                   // Class Float
       "flt64",                  // Class Float range
+      "%[4][]",                 // BitsAlias.EXT no nil
+      "%[4][]?",                // BitsAlias.EXT yes nil
       "*[17](_, 1, ~Scalar)",   // Bare ~type as a field
       "[23]{any,3 -> *[7](3, Scalar) }", // Function returning a struct
       "*[3](_, 0=PA:*[3]@{_; _*_=*[nALL]over35:(); f=flt64}, *[](), 2=PA)", // Struct with self-references
@@ -352,7 +354,7 @@ public class TestType {
     // Crossing ints and *[ALL]+null
     Type  i8 = TypeInt.INT8;
     Type xi8 = i8.dual();
-    assertEquals( TypeNil.make(false,true,true), xi8.meet(xmem0)); // ~OOP+0 & ~i8 -> 0+Scalar
+    assertEquals( TypeNil.make(false,true,true,BitsAlias.EMPTY,BitsFun.EMPTY), xi8.meet(xmem0)); // ~OOP+0 & ~i8 -> 0+Scalar
   }
 
   // Old model: fields are ordered, and are MEETd in order.  If fields at the

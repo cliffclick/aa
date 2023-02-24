@@ -9,7 +9,7 @@ public class KeepNode extends Node {
   // All memory, except kills
   @Override public Type live () {
     RootNode.escapes_reset(TypeMem.ALLMEM);
-    RootNode.escapes(TypeNil.SCALAR);
+    RootNode.escapes(TypeNil.SCALAR,this);
     return RootNode.EXT_MEM;
   }
   @Override public Type live_use( Node def ) {

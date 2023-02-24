@@ -12,8 +12,8 @@ public class TypeInt extends TypeNil<TypeInt> {
   // _any dictates high or low
   public  byte _z;        // bitsiZe, one of: 1,8,16,32,64
   private long _con;      // constant
-  private TypeInt init(boolean any, boolean nil, boolean sub, BitsAlias aliases, BitsFun fidxs, int z, long con ) {
-    super.init(any,nil,sub,aliases,fidxs);
+  private TypeInt init(boolean any, boolean nil, boolean sub, int z, long con ) {
+    super.init(any,nil,sub,BitsAlias.EMPTY,BitsFun.EMPTY);
     _z=(byte)z;
     _con = con;
     return this;
@@ -52,15 +52,9 @@ public class TypeInt extends TypeNil<TypeInt> {
     };
   }
   static { new Pool(TINT,new TypeInt()); }
-  public static TypeInt make( boolean any, boolean nil, boolean sub, BitsAlias aliases, BitsFun fidxs, int z, long con ) {
-    TypeInt t1 = POOLS[TINT].malloc();
-    return t1.init(any,nil,sub,aliases,fidxs,z,con).canonicalize().hashcons_free();
-  }
   public static TypeInt make( boolean any, boolean nil, boolean sub, int z, long con ) {
-    return make(any,nil,sub,
-                z==0 ? BitsAlias.EMPTY : balias(any), // Constants on centerline use centerline aliases
-                z==0 ? BitsFun  .EMPTY : bfun  (any),
-                z,con);
+    TypeInt t1 = POOLS[TINT].malloc();
+    return t1.init(any,nil,sub,z,con).canonicalize().hashcons_free();
   }
   @Override TypeInt canonicalize() {
     if( _con!=0 ) {

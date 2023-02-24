@@ -285,7 +285,7 @@ public class CallNode extends Node {
     // Collect local escaping arguments
     RootNode.escapes_reset(tmem);
     for( int i=DSP_IDX; i<nargs(); i++ )
-      RootNode.escapes(val(i));
+      RootNode.escapes(val(i),this);
     BitsAlias extas = RootNode.EXT_ALIASES;
     ts[_defs._len] = TypeMemPtr.make(false,false,extas,TypeStruct.UNUSED);
     

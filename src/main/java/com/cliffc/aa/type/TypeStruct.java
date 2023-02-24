@@ -58,11 +58,11 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   private TypeFld[] _flds;
 
   TypeStruct init( boolean any, boolean nil, boolean sub, String clz, Type def, TypeFld[] flds ) {
-    super.init(any,nil,sub);
+    super.init(any,nil,sub,BitsAlias.EMPTY,BitsFun.EMPTY);
     return _init(clz,def,flds);
   }
   TypeStruct init( boolean any, String clz, Type def, TypeFld[] flds ) {
-    super.init(any,any,any);
+    super.init(any,any,any,BitsAlias.EMPTY,BitsFun.EMPTY);
     return _init(clz,def,flds);
   }
   // Here already set any,nil,sub.  Now have def,fields.  Can finish checks.
@@ -95,8 +95,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   // Shallow clone, not interned AND _flds is shallow cloned, NOT interned.
   // Suitable for hacking fields.
   TypeStruct copy2() {
-    //return copy().init(_any,_nil,_sub,_clz,_def,TypeFlds.clone(_flds));
-    throw unimpl();
+    return copy().init(_any,_nil,_sub,_clz,_def,TypeFlds.clone(_flds));
   }
 
   @Override public Cyclic.Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links) {

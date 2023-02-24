@@ -59,7 +59,7 @@ public class RootNode extends Node {
     // Reset for walking
     // Walk, finding escaped aliases and fidxs
     escapes_reset(tmem);
-    escapes(trez);
+    escapes(trez,this);
 
     return TypeTuple.make(Type.CTRL,
                           EXT_MEM,
@@ -97,12 +97,12 @@ public class RootNode extends Node {
       EXT_MEM = EXT_MEM.set(alias,TypeStruct.UNUSED);
   }
   
-  static void escapes( Type t ) {
-    _escapes(t);
+  static void escapes( Type t, Node dep ) {
+    _escapes(t,dep);
     while( !ALIASES.isEmpty() )
-      _escapes(EXT_MEM.at(ALIASES.pop()));
+      _escapes(EXT_MEM.at(ALIASES.pop()),dep);
   }
-  private static void _escapes( Type t ) {
+  private static void _escapes( Type t, Node dep ) {
     if( VISIT.tset(t._uid) ) return;
     if( !(t instanceof TypeNil tn) ) return;
     
@@ -124,7 +124,7 @@ public class RootNode extends Node {
           EXT_FIDXS = EXT_FIDXS.set(fidx);
           RetNode ret = RetNode.get(fidx);
           if( ret != null && ret._val instanceof TypeTuple rtup ) {
-            ret.deps_add(Env.ROOT);
+            ret.deps_add(dep);
             TypeMem tmem2 = (TypeMem)rtup.at(MEM_IDX).meet(EXT_MEM);
             for( int xalias : EXT_ALIASES )
               if( EXT_MEM.at(xalias) != tmem2.at(xalias) &&
@@ -136,13 +136,13 @@ public class RootNode extends Node {
       }
       // The return also escapes
       if( tn instanceof TypeFunPtr tfp )
-        _escapes(tfp._ret);
+        _escapes(tfp._ret,dep);
     }
     // Structs escape all public fields
     if( t instanceof TypeStruct ts )
       for( TypeFld fld : ts )
         // Root widens all non-final fields
-        _escapes(fld._access== TypeFld.Access.Final ? fld._t : TypeNil.SCALAR);
+        _escapes(fld._access== TypeFld.Access.Final ? fld._t : TypeNil.SCALAR,dep);
   }
 
   // Given a TV3, mimic a matching flow Type from all possible escaping

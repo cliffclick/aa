@@ -9,7 +9,7 @@ public class TypeRPC extends TypeNil<TypeRPC> {
   private BitsRPC _rpcs;         //
 
   private TypeRPC init( boolean any, boolean nil, boolean sub, BitsRPC rpcs ) {
-    super.init(any,nil,sub);
+    super.init(any,nil,sub, BitsAlias.EMPTY, BitsFun.EMPTY);
     assert _any==rpcs.above_center() || rpcs==BitsRPC.EMPTY;
     _rpcs = rpcs;
     return this;

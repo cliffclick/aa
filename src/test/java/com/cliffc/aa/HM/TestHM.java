@@ -31,18 +31,20 @@ public class TestHM {
     DO_HMT=true;
     DO_GCP=false;
     RSEED=1;
-    //b_recursive_err_98();
+    d_struct_err_07(); // F/T/1
+    //g_overload_07(); // T/F/0
   }
 
-  private void _run0s( String prog, String rprog, String rez_hm, Type gcp, int rseed, String esc_ptrs, String esc_funs  ) {
+  private void _run0s( String prog, String rprog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
     // Type the program
     HM.reset();
-    Root syn = HM.hm(prog, rseed, rez_hm!=null, gcp!=null );
+    Root syn = HM.hm(prog, rseed, rez_hm!=null, frez_gcp!=null );
     // Check the expected syntactic rewriting.  'if id e0 e1' expressions are
     // rewritten so that 'id' is known not-nul in 'e0'.  Also inferred field
     // names are actually inferred (or program is in-error).
     if( rprog==null ) rprog=prog;
     //assertEquals(stripIndent("("+rprog+")"),stripIndent(syn.toString()));
+    Type gcp = Type.valueOf(frez_gcp);
     
     // Check expected types for HMT and GCP
     if( gcp    !=null )  if( gcp != syn.flow_type() ) System.err.println(gcp + " =!= " + syn.flow_type());
@@ -65,30 +67,30 @@ public class TestHM {
     }
   }
 
-  private void _run1s( String prog, String rprog, String rez_hm, Type gcp, String esc_ptrs, String esc_funs ) {
+  private void _run1s( String prog, String rprog, String rez_hm, String frez_gcp, String esc_ptrs, String esc_funs ) {
     if( JIG )
-      _run0s(prog,rprog,rez_hm,gcp,RSEED,esc_ptrs,esc_funs);
+      _run0s(prog,rprog,rez_hm,frez_gcp,RSEED,esc_ptrs,esc_funs);
     else
       for( int rseed=0; rseed<4; rseed++ )
-        _run0s(prog,rprog,rez_hm,gcp,rseed,esc_ptrs,esc_funs);
+        _run0s(prog,rprog,rez_hm,frez_gcp,rseed,esc_ptrs,esc_funs);
   }
 
   // Run same program in all 3 combinations, but answers vary across combos
   private void run( String prog, String rprog, String rez_hm_gcp, String rez_hm_alone, String frez_gcp_hm, String frez_gcp_alone, String esc_ptrs, String esc_funs ) {
     if(   rez_hm_alone == null )   rez_hm_alone = rez_hm_gcp;
     if( frez_gcp_alone == null ) frez_gcp_alone = frez_gcp_hm;
+    if( JIG ) {
+      _run1s(prog, rprog,
+             DO_HMT ? (DO_GCP ?  rez_hm_gcp :   rez_hm_alone ) : null,
+             DO_GCP ? (DO_HMT ? frez_gcp_hm : frez_gcp_alone ) : null, esc_ptrs, esc_funs);
+    } else {
+      _run1s(prog, rprog, null        ,frez_gcp_alone, esc_ptrs, esc_funs);
+      _run1s(prog, rprog, rez_hm_alone,     null     , esc_ptrs, esc_funs);
+      _run1s(prog, rprog, rez_hm_gcp  ,frez_gcp_hm   , esc_ptrs, esc_funs);
+    }
     Type gcp_alone = Type.valueOf(frez_gcp_alone);
     Type gcp_hm    = Type.valueOf(frez_gcp_hm   );
     assert gcp_hm.isa(gcp_alone); // Broken test, expected GCP only improves with more information
-    if( JIG ) {
-      _run1s(prog, rprog,
-             DO_HMT ? (DO_GCP ?  rez_hm_gcp :  rez_hm_alone ) : null,
-             DO_GCP ? (DO_HMT ?      gcp_hm :     gcp_alone ) : null, esc_ptrs, esc_funs);
-    } else {
-      _run1s(prog, rprog, null        ,gcp_alone, esc_ptrs, esc_funs);
-      _run1s(prog, rprog, rez_hm_alone,null     , esc_ptrs, esc_funs);
-      _run1s(prog, rprog, rez_hm_gcp  ,gcp_hm   , esc_ptrs, esc_funs);
-    }
   }
   // Same thing with a bunch of default arguments
   private void run( String prog, String rprog, String rez_hm, String frez_gcp, String esc_ptrs, String esc_funs ) { run(prog,rprog,rez_hm,null,frez_gcp,null,esc_ptrs,esc_funs); }
@@ -136,7 +138,7 @@ public class TestHM {
         // GCP with HM
         "*[17](_, 3, *[4]str:(97))",
         // GCP is weaker without HM, reports error tuple
-        "*[17](_, nScalar, nScalar)",
+        "*[17](_, %[4][], %[4][])",
         "[17]", null );
   }
   // example that demonstrates generic and non-generic variables:
@@ -271,7 +273,7 @@ public class TestHM {
         "m = {x -> (l x)}; "+
         "n = {x -> (m x)}; "+
         "(if (rand 2) (n 1) (n \"abc\"))",
-        "%[Cannot unify int64 and *str:(97)]", "nScalar" );
+        "%[Cannot unify int64 and *str:(97)]", "%[4][]" );
   }
 
 
@@ -316,7 +318,7 @@ public class TestHM {
         "*(%*str:(int8),%flt64)",
         "*(%*str:(int8),%flt64)",
         "*[17](_, *[4]str:(int8), flt64)",
-        "*[17](_, Scalar, Scalar)",
+        "*[17](_, %[4][]?, %[4][]?)",
         "[17]",null);
   }
   // map takes a function and an element (collection?) and applies it (applies to collection?)
@@ -358,7 +360,7 @@ map ={fun parg -> (fun (cdr parg))};
         "*(%*str:(int8),%int64)",
         "*(%*str:(int8),%int64)",
         "*[17](_, *[4]str:(int8), int64)",
-        "*[17](_, Scalar, Scalar)",
+        "*[17](_, %[4][]?, %[4][]?)",
         "[17]",null );
   }
   // Toss a function into a pair & pull it back out
@@ -398,8 +400,8 @@ map ={fun parg -> (fun (cdr parg))};
 
         "{ A? -> *( B:[Cannot unify 5 and *(3, B)], B) }",
         "{ A? -> *( B:[Cannot unify 5 and *(3, B)], B) }",
-        "[39]{any,3 -> *[17,18](_, 5, nScalar) }",
-        "[39]{any,3 -> *[17,18](_, 5, nScalar) }",
+        "[39]{any,3 -> *[17,18](_, 5, %[19][]) }",
+        "[39]{any,3 -> *[17,18](_, 5, %[19][]) }",
         "[17,18,19]","[39]" );
   }
 
@@ -407,16 +409,19 @@ map ={fun parg -> (fun (cdr parg))};
   // "forall A: [{A->A}]" vs "[forall A:{A->A}]".
   @Test public void c_composition_err_01() {
     run( "{ g -> (if (g 1) (g \"abc\") (g \"def\") ) }",
-         "{{[Cannot unify 1 and *str:(nint8)] -> A } -> A }",
+         "{{[Cannot unify 1 and *str:(nint8)] -> A:%B? } -> A }",
          "[30]{any,3 -> Scalar }");
   }
 
   // Another variant; notice the broken error report; the argument
   // in "{ -> A }" is missing.
   @Test public void c_composition_err_02() {
-    run( "f = { x->x }; g = (f f); (pair (g (rand 99)) (\"abc\"))",
-         "*(3,A:[Cannot unify { -> A } and *str:(97)])",
-         "*[17](_, Scalar, Scalar)");
+    run( "f = { x->x }; g = (f f); (pair (g (rand 99)) (\"abc\"))", null,
+         "*(%int64,A:[Cannot unify { -> A } and *str:(97)])",
+         "*(%int64,A:[Cannot unify { -> A } and *str:(97)])",
+         "*[17](_,  int64, Scalar)",
+         "*[17](_, Scalar, Scalar)",
+          null,null);
   }
 
 
@@ -559,7 +564,7 @@ map ={fun parg -> (fun (cdr parg))};
         "res2 = (f @{a=2;b=1.2f;c=\"def\"} @{a=3;b=2.3f;d=\"abc\"});"+
         "@{f=f;res1=res1;res2=res2}",
 
-        "*@{ f    =  { A:%*@{ a=B;... } A -> A };"+
+        "*@{ f    =  { A:%*@{ a=B?;... } A -> A };"+
         "    res1 = %*@{ a = Missing field a: 2};"+
         "    res2 = %*@{ a=nint8; b=nflt32 }"+
         "}",
@@ -640,7 +645,7 @@ out_bool= (map in_str { xstr -> (eq xstr "def")});
         "*(%*str:(int8),%int64)",
         "*(%*str:(int8),%int64)",
         "*[19](_, *[4]str:(int8), int64)",
-        "*[19](_, Scalar, Scalar)",
+        "*[19](_, %[4][]?, %[4][]?)",
         "[19]",null);
   }
   @Test public void e_recur_struct_06() {
@@ -660,7 +665,7 @@ all = @{
         "*( 3, *str:(97))",
         "*( 3, *str:(97))",
         "*[18](_, 3 , *[4]str:(97))",
-        "*[18](_, nScalar, nScalar)",
+        "*[18](_, %[4][], %[4][])",
         "[18]",null);
   }
   // Test example from AA with expanded ints
@@ -702,7 +707,7 @@ A:*@{
   @Test public void e_recur_struct_11() {
     run("fun = { rec -> (pair rec rec.x)}; (pair (fun @{x=3;y=4}) (fun @{x=\"abc\";z=2.1f}))",
          "*(*(*@{x=3;y=4},3), *(*@{x=A:*str:(97);z=2.1f},A))",
-         "*[18](_, 0=PA:*[17](_, *[19,20]@{_; x=nScalar}, nScalar), 1=PA)",
+         "*[18](_, 0=PA:*[17](_, *[19,20]@{_; x=%[4][]}, %[4][]), 1=PA)",
         "[17,18,19,20]",null);
   }
   // Recursive structs.  Next: passing extra fields, but the function requires
@@ -756,7 +761,7 @@ con12=(fun 1.2f);
         "         (fun @{x=\"abc\";z=2.1f} )  )"+ // available {x,z}
         "  } { rec -> (pair rec rec.x) } )",      // required  {x}
         "*(A:*(*@{x=B:[Cannot unify 3 and *str:(97)]},B),A)",
-        "*[17](_, 0=PA:*[20](_, *[18,19]@{_; x=nScalar}, nScalar), 1=PA)",
+        "*[17](_, 0=PA:*[20](_, *[18,19]@{_; x=%[4][]}, %[4][]), 1=PA)",
         "[17,18,19,20]","[]");
   }
 
@@ -816,7 +821,7 @@ loop = { name cnt ->
         "%*str:(nint8)?",     // Both HM and GCP
         "%[Cannot unify int64 and *str:(nint8)?]", // HM alone cannot do this one
         "*[4]str:(nint8)",    // Both HM and GCP
-        "nScalar",            // GCP alone gets a very weak answer
+        "%[4][]",             // GCP alone gets a very weak answer
         null,null);
   }
   // Basic uplifting after check
@@ -1361,7 +1366,7 @@ list_int2 = (List list_int1 "abc");
         list + rsize + prog,
         // Note that the H-M type is completely unrolled, same as the code
         "*( %int64, *@{ nxt=*@{ nxt=*@{ nxt=A?; val=17}; val=19}; val=*str:(97)})",
-        "*[18](_, int64, 1=PA:*[17]@{_; nxt=PA; val=nScalar})",
+        "*[18](_, int64, 1=PA:*[17]@{_; nxt=PA; val=%[4][]})",
         "[17,18]",null);
   }
 
@@ -1381,8 +1386,8 @@ list_int1
         prog,
         "*@{nxt=*@{nxt=A?;val=int64};val=[Cannot unify int64 and *str:(97)]}",
         "*@{nxt=*@{nxt=A?;val=int64};val=[Cannot unify int64 and *str:(97)]}",
-        "PA:*[17]@{_; nxt=PA; val=nScalar}",
-        "PA:*[17]@{_; nxt=PA; val=nScalar}",
+        "PA:*[17]@{_; nxt=PA; val=%[4][]}",
+        "PA:*[17]@{_; nxt=PA; val=%[4][]}",
         "[17]",null);
   }
 
@@ -1927,7 +1932,7 @@ cage1 = (cage);
 cage2 = (cage);
 catcage = (cage1.put cat);
 dogcage = (cage2.put dog);
-petcage = (if rand catcage dogcage);
+petcage = (if (rand 2) catcage dogcage);
 maybecat = catcage.get;
 maybedog = dogcage.get;
 maybepet = petcage.get;

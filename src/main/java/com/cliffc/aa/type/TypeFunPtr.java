@@ -32,7 +32,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   private Type _dsp; // Display; often a TMP to a TS; ANY is dead (not live, nobody uses).
 
   private TypeFunPtr init(boolean any, boolean nil, boolean sub, BitsFun fidxs, int nargs, Type dsp, Type ret ) {
-    super.init(any,nil,sub,balias(any),fidxs);
+    super.init(any,nil,sub,BitsAlias.EMPTY,fidxs);
     assert !(dsp instanceof TypeFld);
     _nargs=nargs; _dsp=dsp; _ret=ret;
     return this;
@@ -372,6 +372,27 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     return make_from(ds,rs);
   }
 
+
+  // [30]{-> XA:[29,31]{ -> XA} } meet [29]{-> ~Scalar} meet *[4]
+  
+  // Since meeting [30] and [29] will force a roll-up of the TFPs to XA:[29,30,31]{->XA}
+  // and then meeting with string *[4] will give a TypeNil %[4][29,30,31].
+  
+  // Whereas a meet of [30] and *[4] will give a TN of %[4][30], following by
+  // meeting with [29] gives a TypeNil of %[4][29,30] and misses [31].
+
+  // To keep associativity, TFPs roll up all FIDXS in the cyclic tail
+  @Override TypeNil widen_sub() {
+    TypeNil tn = 
+      ( _ret!=this && _ret instanceof TypeFunPtr tfp )
+              ? tfp.widen_sub()
+              : this;
+    BitsFun fidxs = _fidxs.meet(tn._fidxs);
+    
+    return TypeNil.make(false,_nil,_sub,_aliases,fidxs);
+  }
+
+  
   @Override public boolean is_con()       {
     // Constant display or unbound display
     return (!has_dsp() || _dsp.is_con()) &&

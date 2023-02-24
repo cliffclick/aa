@@ -434,6 +434,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         _pool++;                // Pull a from free pool
         t = (T)_frees.pop();
       }
+      t.init();
       return t;                 // Set breakpoints here to find a uid
     }
     <T extends Type> T free(T t1, T t2) {
@@ -617,9 +618,9 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     concat(ts,TypeNil   .TYPES);
     concat(ts,TypeInt   .TYPES);
     concat(ts,TypeFlt   .TYPES);
+    concat(ts,TypeRPC   .TYPES);
     concat(ts,TypeMemPtr.TYPES);
     concat(ts,TypeFunPtr.TYPES);
-    concat(ts,TypeRPC   .TYPES);
     concat(ts,TypeMem   .TYPES);
     concat(ts,TypeStruct.TYPES);
     concat(ts,TypeTuple .TYPES);

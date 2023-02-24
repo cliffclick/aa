@@ -4,7 +4,6 @@ import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
 import org.junit.Test;
 
-import static com.cliffc.aa.AA.REZ_IDX;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -18,7 +17,7 @@ public class TestLive {
     rez._val = TypeInt.con(5);
 
     // Liveness is a backwards flow.  Scope always demands all return results.
-    ScopeNode scope = new ScopeNode(null,null,fullmem,null,rez,null);
+    ScopeNode scope = new ScopeNode(null,null,fullmem,rez,null,null);
 
     // Check liveness base case
     scope._live = scope.live();
@@ -76,7 +75,7 @@ public class TestLive {
     ptr.xliv();
     assertEquals(TypeMem.ALL,ptr._live);
     mmm.xliv();
-    assertEquals(expected_live,mmm._live); // Since ptr is scalar, all memory is alive
+    assertEquals(TypeMem.ANYMEM,mmm._live); // Since ptr is scalar, all memory is alive
     fdx.xliv();
     assertEquals(Type.ALL,fdx._live); // Since ptr is scalar, all memory is alive
 

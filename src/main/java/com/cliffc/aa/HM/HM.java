@@ -1829,7 +1829,7 @@ public class HM {
   static class If extends PrimSyn {
     @Override String name() { return "if"; }
     public If() {
-      super(IDS[3],T2.make_leaf(),T2.make_leaf(),T2.make_leaf(),T2.make_leaf());
+      super(IDS[3],T2.make_nil(T2.make_leaf()),T2.make_leaf(),T2.make_leaf(),T2.make_leaf());
     }
     @Override PrimSyn make() { return new If(); }
     @Override boolean hm(Work<Syntax> work) {
@@ -2329,7 +2329,8 @@ public class HM {
       _args.remove("?");  // No longer have the "?" key, not a nilable anymore
       // Nested nilable-and-not-leaf, need to fixup the nilable
       if( n.is_base() ) {
-        _tflow = n._tflow.meet(TypeNil.XNIL);
+        // If used as a not-nil, it might be nil and need a nil-check
+        _tflow = _use_nil ? n._tflow.meet(TypeNil.XNIL) : n._tflow;
         if( !_is_copy ) _tflow = _tflow.widen();
         if( n._eflow!=null ) _eflow = n._eflow.meet(TypeNil.XNIL);
         if( !n._is_copy ) clr_cp();
@@ -2353,8 +2354,6 @@ public class HM {
     private long dbl_uid(T2 t) { return dbl_uid(t._uid); }
     private long dbl_uid(long uid) { return ((long)_uid<<32)|uid; }
 
-    // True if any portion allows for nil
-    boolean has_nil() { return _may_nil; }
     // Strip off nil
     T2 strip_nil() {
       if( _tflow!=null ) _tflow = _tflow.join(TypeNil.NSCALR);
@@ -2421,7 +2420,10 @@ public class HM {
     Type _as_flow(Syntax syn, boolean deep) {
       assert !unified();
       if( is_err() ) return TypeNil.SCALAR;
-      if( is_leaf() ) return TypeNil.SCALAR.oob(!HM_FREEZE);
+      if( is_leaf() ) {
+        if( HM_FREEZE ) return TypeNil.SCALAR;
+        return (DO_HM || !_use_nil) ? TypeNil.XSCALAR : TypeNil.AND_XSCALAR;
+      }
       if( is_base() ) return _tflow;
       if( is_ptr() ) {
         if( !deep ) Root.EXT_DEPS.add(syn); // Result depends on escapes

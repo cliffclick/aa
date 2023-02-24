@@ -127,8 +127,8 @@ public class ScopeNode extends Node {
     Type mem0 = mem()==null ? TypeMem.ALLMEM : mem()._val;
     TypeMem mem = mem0 instanceof TypeMem mem1 ? mem1 : mem0.oob(TypeMem.ALLMEM);
     RootNode.escapes_reset(is_keep() ? TypeMem.ALLMEM : mem);
-    RootNode.escapes(rez()._val);
-    return RootNode.EXT_MEM;
+    RootNode.escapes(rez()._val,this);
+    return RootNode.EXT_MEM.flatten_live_fields().slice_reaching_aliases(RootNode.EXT_ALIASES);
     
     //if( is_keep() ) return TypeMem.ALLMEM;
     //// All fields in all reachable pointers from rez() will be marked live
