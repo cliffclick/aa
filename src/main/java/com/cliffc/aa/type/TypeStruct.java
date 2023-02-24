@@ -46,8 +46,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   // Roughly a tree-shaped clazz designation.  A colon-separated list of clazz
   // names, which may be empty.  Parent clazzes on the left, child on the
   // right.  Used by Field lookups for final constant fields kept in the clazz
-  // and not here.  A leading '~' character means the clazz is high instead of
-  // low, mostly matters during meets to preserve symmetry.
+  // and not here. 
   public String _clz;
 
   // Default value
@@ -74,7 +73,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     return this;
   }
 
-  private static boolean check_name(String n) { return n.isEmpty() || Util.eq(n,"~") || n.charAt(n.length()-1)==':'; }
+  private static boolean check_name(String n) { return n.isEmpty() || n.charAt(n.length()-1)==':'; }
   // No instance of the default
   private static boolean check(Type def, TypeFld[] flds) {
     assert !(def instanceof TypeFld);
@@ -346,9 +345,9 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
       is_con &= tfs[i] == _flds[i];
     }
     if( is_con ) return this;   // On centerline, a constant struct
-    String dclz = clz_dual(_clz);
+    //String dclz = clz_dual(_clz);
     boolean xor = _nil == _sub;
-    return malloc(!_any, _nil^xor, _sub^xor, dclz, _def._dual, TypeFlds.hash_cons(tfs));
+    return malloc(!_any, _nil^xor, _sub^xor, _clz, _def._dual, TypeFlds.hash_cons(tfs));
   }
 
   // Recursive dual
@@ -374,7 +373,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     assert RECURSIVE_MEET > 0 || (MEETS0.isEmpty());
 
     // Common name prefix
-    String clz = clz_meet(_clz,that._clz);
+    String clz = clz_meet(_clz,that._clz,_any,that._any);
     Type def = _def.meet(that._def);
     boolean any = _any & that._any;
 
@@ -425,18 +424,12 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   private static void add_fldc(TypeFld fld) { add_fldc(fld._fld,fld._access); }
   private static void add_fldc(String fld, Access access) { FLDS.push(TypeFld.malloc(fld,null,access)); }
 
-  static boolean above_center( String clz ) { return clz.length()>0 && clz.charAt(0)=='~'; }
   // Meet over clazz names.
   // TODO: will also need a unique lexical numbering, not just a name, to
   // handle the case of the same name used in two different scopes.
-  public static String clz_meet(String s0, String s1) {
+  public static String clz_meet(String s0, String s1, boolean a0, boolean a1) {
     if( Util.eq(s0,s1) ) return s0; // Fast path
     assert check_name(s0) && check_name(s1);
-    // Peel off sign character
-    boolean a0 = above_center(s0);
-    boolean a1 = above_center(s1);
-    if( a0 ) s0 = s0.substring(1).intern();
-    if( a1 ) s1 = s1.substring(1).intern();
 
     // Sort by name length
     if( s0.length() > s1.length() ) { String tmp=s0; s0=s1; s1=tmp;  boolean x=a0; a0=a1; a1=x; }
@@ -450,17 +443,11 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     String s2;
     if( i==s0.length() ) {      // Have a common prefix?
       s2 = a0 ? s1 : s0;        // Short guy is high, keep long; short guy is low keep short
-      if( a0&a1 ) s2 = ("~"+s2).intern();  // If high, add back sign character
     } else {                    // Mismatched, always use low prefix
       s2 = s0.substring(0,x).intern();
     }
     assert check_name(s2);
     return s2;
-  }
-  private static String clz_dual(String s0) {
-    return above_center(s0)
-      ? s0.substring(1).intern()
-      : ("~"+s0).intern();
   }
 
   // Recursive meet in progress.
@@ -559,11 +546,8 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   }
 
   // ------ Utilities -------
-  // Clazz name, without leading "~"
-  public String clz() {
-    if( _clz.isEmpty() ) return _clz;
-    return _clz.charAt(0)=='~' ? _dual._clz : _clz;
-  }
+  // Clazz name
+  public String clz() { return _clz; }
   // All fields for iterating.
   public int len() { return _flds.length; } // Count of fields
   // Find index by name
@@ -685,7 +669,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     if( is_str_clz() ) return sb.p("@{STR}");
     if( is_math_clz()) return sb.p("@{MATH}");
     
-    sb.p(_clz); // Includes a leading "~" if above_center(), and a trailing ':' if not-empty
+    sb.p(_clz); // Includes a trailing ':' if not-empty
     if( _clz.isEmpty() && dups.get(_uid)!=null )  sb.p(':');
     
     boolean is_tup = is_tup();
@@ -728,12 +712,12 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   // e.g. (), (^=any), (^=any,"abc"), (3.14), (3.14,"abc",:=123)
   // @{}, @{x=3.14; y="abc"; z:=123}
   static TypeStruct valueOf(Parse P, String dup, boolean any, boolean is_tup ) {
-    TypeStruct ts = malloc(any,any ? "~" : "",ALL.oob(any),TypeFlds.get(0));
+    TypeStruct ts = malloc(any,"",ALL.oob(any),TypeFlds.get(0));
     if( dup!=null ) P._dups.put(dup,ts);
     String clz = P.id();
     if( clz!=null ) {
       P.require(':');
-      ts._clz = ((any?"~":"")+clz+":").intern();
+      ts._clz = (clz+":").intern();
     }
     if( !is_tup ) { P.require('@');  P.require('{'); } else P.require('(');
     char close = is_tup ? ')' : '}';

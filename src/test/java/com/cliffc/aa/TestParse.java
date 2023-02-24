@@ -28,9 +28,9 @@ public class TestParse {
     JIG=true;
 
     DO_GCP=true;
-    DO_HMT=true;
+    DO_HMT=false;
     RSEED=0;
-    test   ("math.rand(2)?(y=2;x=y*y):x=3;x", "nint8", "int:int64"); // x defined on both arms, so available after, while y is not
+    test("1+2", "3", "int:3");
   }
   static private void assertTrue(boolean t) {
     if( t ) return;

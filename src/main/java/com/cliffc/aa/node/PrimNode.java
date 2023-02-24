@@ -549,11 +549,10 @@ public abstract class PrimNode extends Node {
   public static class StrLen extends PrimNode {
     public StrLen() { super("#_",TypeTuple.STR,TypeInt.INT64); }
     @Override public TypeNil apply( TypeNil[] args ) {
-      TypeNil tn = args[0];
       if( !(args[0] instanceof TypeMemPtr tmp) ||
           !Util.eq("str:",tmp._obj._clz) )
         return args[0].oob(TypeInt.INT64);
-      throw unimpl();
+      return tmp.oob(TypeInt.INT64);
     }
 
   }

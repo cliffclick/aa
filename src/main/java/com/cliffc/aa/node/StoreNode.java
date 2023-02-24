@@ -177,10 +177,12 @@ public class StoreNode extends Node {
   // leaf is never expected to unify with anything.
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
-    TV3 rez = rez().set_tvar();
-    TV3 ptr = adr().set_tvar();
-    if( ptr instanceof TVPtr pv3 ) rez.unify(pv3.load(),false);
-    else ptr.unify(new TVPtr(rez),false);
+    if( rez()!=null ) {
+      TV3 rez = rez().set_tvar();
+      TV3 ptr = adr().set_tvar();
+      if( ptr instanceof TVPtr pv3 ) rez.unify(pv3.load(),false);
+      else ptr.unify(new TVPtr(rez),false);
+    }
     return new TVLeaf();
   }
 

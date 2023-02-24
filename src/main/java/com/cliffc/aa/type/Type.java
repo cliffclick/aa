@@ -812,7 +812,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       case '0','1','2','3','4','5','6','7','8','9','-' -> num();
       case '"'  -> throw unimpl(); // parse string
       case '~' -> type(dup,-1 < _x++,fld_num);
-      case ':' -> type(dup,_x++ < -1,-2); // DUP::@{} dup struct with no clz, skip the extra ':' and normal struct parse
+      case ':' -> type(dup,_x++ < -1 | any,-2); // DUP::@{} dup struct with no clz, skip the extra ':' and normal struct parse
       case '#' ->     TypeRPC   .valueOf(this,dup,any) ;
       case '{' ->     TypeTuple .valueOf(this,dup,any) ;
       case '*' ->     TypeMemPtr.valueOf(this,dup,any);

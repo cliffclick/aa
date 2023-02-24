@@ -219,6 +219,7 @@ public class Env implements AutoCloseable {
     KEEP_ALIVE.walk_reset(visit);    // Clean out any wired prim calls
     GVNGCM.KEEP_ALIVE.walk_reset(visit);
     CallNode  .reset_to_init0();
+    Combo.reset();
     GVN.iter();                 // Clean out any dead; reset prim types
     for( Node n : Node.VALS.keySet() ) // Assert no leftover bits from the prior compilation
       assert n._uid < Node._INIT0_CNT; //
@@ -229,7 +230,6 @@ public class Env implements AutoCloseable {
     BitsAlias .reset_to_init0();
     BitsFun   .reset_to_init0();
     BitsRPC   .reset_to_init0();
-    Combo.reset();
   }
 
   // Return Scope for a name, so can be used to determine e.g. mutability

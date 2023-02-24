@@ -188,8 +188,8 @@ public class TestType {
     // Confirm lattice: {        ~i8 -> 1 -> i8        }
     TypeStruct  i16= TypeStruct.make(false,"int:",TypeInt.INT16 , TypeFlds.EMPTY);
     TypeStruct  i8 = TypeStruct.make(false,"int:",TypeInt.INT8  , TypeFlds.EMPTY);
-    TypeStruct xi8 = TypeStruct.make( true,"~int:",TypeInt.INT8.dual(), TypeFlds.EMPTY);
-    TypeStruct xi16= TypeStruct.make( true,"~int:",TypeInt.INT16.dual(), TypeFlds.EMPTY);
+    TypeStruct xi8 = TypeStruct.make( true,"int:",TypeInt.INT8.dual(), TypeFlds.EMPTY);
+    TypeStruct xi16= TypeStruct.make( true,"int:",TypeInt.INT16.dual(), TypeFlds.EMPTY);
     TypeStruct z   = TypeStruct.make(false,"int:",TypeInt.con(0), TypeFlds.EMPTY);
     TypeStruct o   = TypeStruct.make(false,"int:",TypeInt.TRUE  , TypeFlds.EMPTY);
     assertEquals(xi8,xi8.meet(xi16)); // ~i16-> ~i8
