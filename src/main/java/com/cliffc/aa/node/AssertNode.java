@@ -46,7 +46,8 @@ public class AssertNode extends Node {
     // reached from the address.  Because of the turn-around (changing the
     // input value changes the input liveness) we need set a self-dep.
     mem().deps_add(mem());
-    return ScopeNode.compute_live_mem(null,mem(),arg());
+    //return ScopeNode.compute_live_mem(null,mem(),arg());
+    throw unimpl();
   }
 
   @Override public Node ideal_reduce() {

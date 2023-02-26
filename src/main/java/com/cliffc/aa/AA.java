@@ -59,8 +59,8 @@ public abstract class AA {
 
   // assert AA.once_per() || ...expensive;
   private static int ASSERT_CNT;
-  private static int ONCE_PER=127; // Set to zero to fire every time
-  public static boolean once_per() {
-    return (ASSERT_CNT++ & ONCE_PER)!=0;
+  public static boolean once_per() { return once_per(8); }
+  public static boolean once_per(int log) {
+    return (ASSERT_CNT++ & ((1L<<(log-1))-1))!=0;
   }
 }

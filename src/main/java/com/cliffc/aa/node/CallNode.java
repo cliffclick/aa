@@ -299,7 +299,7 @@ public class CallNode extends Node {
     if( def==ctl() ) return Type.ALL;
     if( def==fdx() ) return Type.ALL;
     boolean is_keep = is_keep();
-    if( def==mem() ) return is_keep || _live==Type.ALL ? TypeMem.ALLMEM : _live;
+    if( def==mem() ) return is_keep || _live==Type.ALL ? RootNode.def_mem(def) : _live;
     if( def==arg(DSP_IDX) && !_unpacked ) return TypeStruct.ISUSED;
     if( is_keep  ) return Type.ALL; // Still under construction, all alive
 

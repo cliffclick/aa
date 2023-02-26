@@ -110,10 +110,12 @@ public class StructNode extends Node {
   }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
-    if( _closed ) return false; // V-N only for closed structs
     return super.equals(o) && o instanceof StructNode rec &&
-      _flds.equals(rec._flds) && _accesses.equals(rec._accesses) &&
-      _def==rec._def && Util.eq(_clz,rec._clz);
+      _closed==rec._closed &&
+      _flds.equals(rec._flds) &&
+      _accesses.equals(rec._accesses) &&
+      _def==rec._def &&
+      Util.eq(_clz,rec._clz);
   }
 
   // String-to-node-index
@@ -127,8 +129,15 @@ public class StructNode extends Node {
   public TypeFld.Access access(int idx) { return _accesses.at(idx); }
 
   // One-time transition when closing a Struct to new fields.
-  public StructNode close() { assert !_closed; assert _nargs <= _flds._len; _closed=true; return this; }
   public boolean is_closed() { return _closed; }
+  public StructNode close() {
+    assert !_closed;
+    assert _nargs <= _flds._len;
+    unelock();                  // Changes hash
+    _closed=true;
+    Env.GVN.add_reduce(this);   // Rehash
+    return this;
+  }
 
   public boolean is_nongen(String fld) { return _nargs!=0 && find(fld)<_nargs; }
   public boolean is_closure() { return _nargs>0; }
@@ -282,4 +291,5 @@ public class StructNode extends Node {
   //  //return true;
   //  throw unimpl();
   //}
+  
 }

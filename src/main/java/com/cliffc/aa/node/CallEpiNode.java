@@ -28,7 +28,7 @@ public final class CallEpiNode extends Node {
   public CallEpiNode( Node... nodes ) {
     super(OP_CALLEPI,nodes);
     Env.GVN.add_reduce(call());
-    _live=TypeMem.ALLMEM;
+    _live=RootNode.def_mem(this);
   }
   @Override public String xstr() {// Self short name
     if( _is_copy ) return "CopyEpi";

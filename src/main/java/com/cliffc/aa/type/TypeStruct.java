@@ -786,7 +786,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   public TypeStruct flatten_live_fields() {
     TypeFld[] flds = TypeFlds.get(len());
     for( int i=0; i<_flds.length; i++ )
-      flds[i] = _flds[i].make_from(Type.ALL.oob(_flds[i]._t==Type.ANY), Access.bot());
+      flds[i] = _flds[i].make_from(Type.ALL, Access.bot());
     return make_from(flds);
   }
 

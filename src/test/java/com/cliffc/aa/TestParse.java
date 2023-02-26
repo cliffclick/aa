@@ -30,7 +30,8 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    test("1+2", "3", "int:3");
+    test   ("x:=0;math.rand(2)?(x:=1);x","int1","int:int1");
+    testerr("a.b.c();","Unknown ref 'a'",0);
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -59,7 +60,7 @@ public class TestParse {
     // Simple no-arg anonymous function, being called
     test("{5}()", "5", "int:5");
     // TestParse.a_basic_01
-    test("{ x -> ( 3, x )}", "[56]{any,4 -> *[12](3, %[2,12][2,56]) }", "{ A B -> *(int:3, B) }", null, null, "[12]", "[56]");
+    test("{ x -> ( 3, x )}", "[56]{any,4 -> *[12](3, %[2,12][2,56]?) }", "{ A B -> *(int:3, B) }", null, null, "[12]", "[56]");
     // TestParse.a_basic_02
     test("{ z -> ((z 0), (z \"abc\")) }", "[56]{any,4 -> *[13]() }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[13]", "[56]" );
 
@@ -172,7 +173,7 @@ public class TestParse {
     test("x:=1;x++;x", "2", "int:2");
     test("x:=1;x++ + x--","3", "int:3");
     test("x++","xnil", "int:int64");
-    test("x++;x", "1", "int:1");
+    test("x++;x", "1", "int:int64");
 
     // Conditional:
     test   ("0 ?    2  : 3", "3", "int:3"); // false

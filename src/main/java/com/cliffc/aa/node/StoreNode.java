@@ -76,6 +76,7 @@ public class StoreNode extends Node {
   }
   
   @Override public Node ideal_reduce() {
+    if( is_prim() ) return null;
     if( _live == Type.ANY ) return null; // Dead from below; nothing fancy just await removal
     Node mem = mem();
     Node adr = adr();
@@ -104,8 +105,13 @@ public class StoreNode extends Node {
       if( st.check_solo_mem_writer(this) &&
           // And liveness aligns
           _live.isa(mem._live) ) {
-        set_def(1,st.mem());
-        return this;
+        // Storing same-over-same, just use the first store
+        if( rez()==st.rez() ) return st;
+        // If not wiping out an error, wipe out the first store
+        if( st.rez().err(true)==null ) {
+          set_def(1,st.mem());
+          return this;
+        }
       } else {
         mem.deps_add(this);    // If become solo writer, check again
       }

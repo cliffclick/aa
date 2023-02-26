@@ -1,7 +1,6 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
 
 import static com.cliffc.aa.AA.MEM_IDX;
 
@@ -9,7 +8,10 @@ import static com.cliffc.aa.AA.MEM_IDX;
 public class MProjNode extends ProjNode {
 
   public MProjNode( Node head ) { this(head, MEM_IDX); }
-  public MProjNode( Node head, int idx ) { super(head,idx); _live=TypeMem.ALLMEM; }
+  public MProjNode( Node head, int idx ) {
+    super(head,idx);
+    _live=RootNode.def_mem(null);
+  }
   @Override public String xstr() { return "MProj"+_idx; }
   @Override public boolean is_mem() { return true; }
 

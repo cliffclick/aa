@@ -41,14 +41,17 @@ public class BindFPNode extends Node {
     
     return fun;
   }
-  
+
+  // Displays are always alive, if the Bind is alive.  However, if the Bind is
+  // binding an overload the result is a struct-liveness instead just ALL.
   @Override public Type live_use(Node def) {
-    // GENERIC_FUNPTR indicates the display is dead.
-    if( _live==TypeFunPtr.GENERIC_FUNPTR )
-      return Type.ALL.oob(def==dsp());
-    return _live;
+    if( def==dsp() ) return Type.ALL;
+    return _over ? TypeStruct.ISUSED : Type.ALL;
   }
-  @Override boolean assert_live(Type live) { return live instanceof TypeTuple tt && tt.len()==2; }
+  // Bind can be used by a Field, and so have a struct-liveness
+  @Override public boolean assert_live(Type live) {
+    return live==Type.ANY || live==Type.ALL || live instanceof TypeStruct;
+  }
 
   @Override public Node ideal_reduce() {
 

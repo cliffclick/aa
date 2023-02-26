@@ -47,6 +47,7 @@ public class FieldNode extends Node implements Resolvable {
     String old = _fld;
     _fld = label;
     add_flow();
+    in(0).add_flow(); // Liveness sharpens to specific field
     return old;
   }
   
@@ -92,7 +93,13 @@ public class FieldNode extends Node implements Resolvable {
     return t.meet(TypeNil.XSCALAR);
   }
 
+  // If the field is resolving, we do not know which field to demand, so demand
+  // them all when lifting and none when lowering.  
   @Override public Type live_use( Node def ) {
+    if( is_resolving() ) return TypeStruct.UNUSED.oob(Combo.pre());
+    // Clazz load, the instance is normal-live
+    if( _clz && def==in(0) ) return Type.ALL;
+    // Otherwise normal fields and clazz fields are field-alive.
     return TypeStruct.UNUSED.replace_fld(TypeFld.make(_fld,Type.ALL));
   }
 
@@ -189,13 +196,13 @@ public class FieldNode extends Node implements Resolvable {
     else {
       if( test ) return true;
       TVStruct inst = new TVStruct(true, new String[]{_fld}, new TV3[]{tvar()}, true);
-      progress |= tv0.unify(str=inst,test);
+      progress = tv0.unify(str=inst,test);
     }
     
     // If resolving, cannot do a field lookup.  Attempt resolve first.
     if( is_resolving() ) {
       if( Combo.HM_AMBI ) return false; // Failed earlier, can never resolve
-      progress = try_resolve(str,test);
+      progress |= try_resolve(str,test);
       if( is_resolving() || test ) return progress;
       str = (TVStruct)str.find();
     }

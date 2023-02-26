@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Combo;
+import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 
@@ -77,8 +78,11 @@ public final class FunPtrNode extends Node {
   @Override public Type live_use( Node ret ) {
     assert ret instanceof RetNode;
     // Pre-combo, Ret is alive because unwired caller.
-    // During/post-combo, Ret is alive only if called.
-    return TypeMem.ANYMEM.oob(Combo.pre());
+    if( Combo.pre() ) return RootNode.def_mem(ret);    
+    // During/post-combo, Ret is alive only if called or escaped.
+    if( Env.ROOT.rfidxs().test(fidx()) ) // Escaped
+      return Env.ROOT._live;             // Whatever Root requires, we do also
+    return TypeMem.ANYMEM;               // Dead, no memory demand
   }
   
   @Override public Node ideal_reduce() {

@@ -214,7 +214,7 @@ public class GVNGCM {
     public N _ret;
     public Node xform( Node n ) {
       n.xval(); // Set value before reduce
-      Node x = n.do_reduce();   // Attempt to reduce
+      Node x = (n instanceof RegionNode || n instanceof PhiNode) ? null : n.do_reduce();   // Attempt to reduce
       Node y = x==null ? n : x;
       add_flow(y);              // Liveness is yet to be computed
       return y;

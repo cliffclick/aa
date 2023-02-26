@@ -46,7 +46,7 @@ public class LoadNode extends Node {
     if( !(ptr instanceof TypeMemPtr tptr0) ) {
       // Go from the incoming primitive to a Clazz struct
       StructNode clz = FieldNode.clz_node(ptr);
-      if( clz==null ) return ptr.oob(TypeMem.ALLMEM);
+      if( clz==null ) return RootNode.def_mem(def);
       // Use the One True Alias for the primitive Clazz
       for( Node use : clz._uses ) {
         if( use instanceof StoreNode st ) {
@@ -128,8 +128,8 @@ public class LoadNode extends Node {
     if( mem instanceof PhiNode mphi && adr instanceof NewNode ) {
       Node lphi = new PhiNode(TypeNil.SCALAR,mphi._badgc,mphi.in(0));
       for( int i=1; i<mphi._defs._len; i++ )
-        lphi.add_def(Env.GVN.add_work_new(new LoadNode(mphi.in(i),adr,_bad)));
-      subsume(lphi);
+        lphi.add_def(Env.GVN.add_work_new(new LoadNode(mphi.in(i),adr,_bad).init()));
+      subsume(lphi.init());
       return lphi;
     }
 

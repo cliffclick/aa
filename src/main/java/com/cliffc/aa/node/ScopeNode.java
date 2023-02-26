@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.type.*;
 
@@ -22,7 +23,7 @@ public class ScopeNode extends Node {
   public ScopeNode( HashMap<String,StructNode> types,  Node ctl, Node mem, Node rez, Node ptr, StructNode dsp) {
     super(OP_SCOPE,ctl,mem,rez,ptr,dsp);
     _types = types;
-    _live = TypeMem.ALLMEM;
+    _live = RootNode.def_mem(this);
   }
   @Override boolean is_CFG() { return true; }
   @Override public boolean is_mem() { return true; }
@@ -85,61 +86,18 @@ public class ScopeNode extends Node {
   // functions, on behalf of the following CEProjs.
   @Override public Type value() { return Type.CTRL; }
 
-  // From a memory and a possible pointer-to-memory, find all the reachable
-  // aliases and fold them into 'live'.  This is unlike other live_use
-  // because this "turns around" the incoming live memory to also be the
-  // demanded/used memory.
-  static TypeMem compute_live_mem(ScopeNode scope, Node mem, Node rez) {
-    Type tmem = mem._val;
-    Type trez = rez._val;
-    if( !(tmem instanceof TypeMem tmem0) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
-    if( TypeMemPtr.ISUSED.isa(trez) ) return tmem0.flatten_live_fields(); // All possible pointers, so all memory is alive
-    // For function pointers, all memory returnable from any function is live.
-    if( trez instanceof TypeFunPtr tfp && scope != null ) {
-      TypeMem tmem3 = TypeMem.ANYMEM;
-      for( int i=ARG_IDX+1 ; i<scope._defs._len; i++ ) {
-        if( !(scope.in(i) instanceof RetNode ret) ) continue;
-        int fidx = ret.fidx();
-        if( ret._val instanceof TypeTuple tret && tfp.test(fidx) ) {
-          TypeMem post_call = (TypeMem)tret.at(MEM_IDX);
-          TypeMem cepi_out;
-          if( tmem0==post_call ) {
-            cepi_out = tmem0;
-          } else {
-            Type trez2 = tret.at(REZ_IDX);
-            BitsAlias esc_in = tfp.dsp() instanceof TypeMemPtr tmp ? tmp._aliases : BitsAlias.EMPTY;
-            //cepi_out = CallEpiNode.live_out(tmem0, post_call, trez2, esc_in, null);
-            throw unimpl();
-          }
-          tmem3 = (TypeMem)tmem3.meet(cepi_out);
-        }
-      }
-      return tmem3.flatten_live_fields();
-    }
-    if( !(trez instanceof TypeMemPtr) ) return TypeMem.ANYMEM; // Not a pointer, basic live only
-    if( trez.above_center() ) return TypeMem.ANYMEM; // Have infinite choices still, report basic live only
-    // Find everything reachable from the pointer and memory, and report it all
-    BitsAlias aliases = tmem0.all_reaching_aliases(((TypeMemPtr)trez)._aliases);
-    return tmem0.slice_reaching_aliases(aliases).flatten_live_fields();
-  }
-
   @Override public TypeMem live() {
+    if( is_keep() && Combo.pre() ) return RootNode.def_mem(this);
     Type mem0 = mem()==null ? TypeMem.ALLMEM : mem()._val;
     TypeMem mem = mem0 instanceof TypeMem mem1 ? mem1 : mem0.oob(TypeMem.ALLMEM);
-    RootNode.escapes_reset(is_keep() ? TypeMem.ALLMEM : mem);
+    RootNode.escapes_reset(mem);
     RootNode.escapes(rez()._val,this);
     return RootNode.EXT_MEM.flatten_live_fields().slice_reaching_aliases(RootNode.EXT_ALIASES);
-    
-    //if( is_keep() ) return TypeMem.ALLMEM;
-    //// All fields in all reachable pointers from rez() will be marked live
-    //return compute_live_mem(this,mem(),rez());
   }
 
   @Override public Type live_use(Node def ) {
     // Basic liveness ("You are Alive!") for control and returned value
     if( def == ctrl() ) return Type.ALL;
-    // Memory returns the compute_live_mem state in _live.  If rez() is a
-    // pointer, this will include the memory slice.
     if( def == mem() ) return _live;
     if( def == rez() ) return Type.ALL; // Returning a Scalar, including e.g. a mem ptr
     if( def == ptr() ) return Type.ALL; // Display must be kept-alive during e.g. parsing.

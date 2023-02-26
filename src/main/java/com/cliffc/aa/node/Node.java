@@ -765,10 +765,13 @@ public abstract class Node implements Cloneable, IntSupplier {
     while( _defs._len>0 && (c=_defs.last())!=null && !c.is_prim() )
       _defs.pop()._uses.del(this); // Remove backedge?
     // Remove non-prim uses of a prim.
-    while( _uses._len>0 && !(c=_uses.last()).is_prim() )
-      while( c.len() > 0 ) {
-        Node x = c._defs.pop();
-        if( x!=null ) x._uses.del(c);
+    for( int i=0; i<_uses._len; i++ )
+      if( !(c = _uses.at(i)).is_prim() ) {
+        while( c.len() > 0 ) {
+          Node x = c._defs.pop();
+          if( x!=null ) x._uses.del(c);
+        }
+        i--;
       }
     // Walk reachable graph
     for( Node use : _uses )                   use.walk_reset(visit);

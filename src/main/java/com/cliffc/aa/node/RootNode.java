@@ -48,7 +48,7 @@ public class RootNode extends Node {
   @Override public TypeTuple value() {
     // Conservative final result
     Node rez = in(REZ_IDX);
-    if( rez==null ) return TypeTuple.ROOT;
+    if( rez==null ) return TypeTuple.make(Type.CTRL,def_mem(this),TypeRPC.ALL_CALL,TypeNil.SCALAR);
     Type trez = rez._val;
     // Conservative final memory
     Node mem = in(MEM_IDX);
@@ -61,6 +61,8 @@ public class RootNode extends Node {
     escapes_reset(tmem);
     escapes(trez,this);
 
+    // Roots value is all reachable alias memory shapes, plus all reachable
+    // (escaped) aliases and functions.
     return TypeTuple.make(Type.CTRL,
                           EXT_MEM,
                           TypeRPC.ALL_CALL,
@@ -106,7 +108,7 @@ public class RootNode extends Node {
     if( VISIT.tset(t._uid) ) return;
     if( !(t instanceof TypeNil tn) ) return;
     
-    if( tn._aliases != BitsAlias.NALL ) {
+    if( tn._aliases != BitsAlias.NALL && !tn._aliases.above_center() ) {
       // Add to the set of escaped aliases
       for( int alias : tn._aliases )
         if( !EXT_ALIASES.test(alias) ) { // Never seen before escape
@@ -116,7 +118,7 @@ public class RootNode extends Node {
         }
     }
 
-    if( tn._fidxs != BitsFun.NALL ) {
+    if( tn._fidxs != BitsFun.NALL && !tn._fidxs.above_center() ) {
       // Walk all escaped function args, and call them (like an external
       // Apply might) with the most conservative flow arguments possible.
       for( int fidx : tn._fidxs ) {
@@ -184,31 +186,37 @@ public class RootNode extends Node {
       }
     return fidxs;
   }
-  
+
+  // Default memory during initial Iter, before Combo: all memory minus the
+  // kills.  Many things produce def_mem, and in general it has to be used
+  // until Combo finishes the Call Graph.
   private static BitsAlias KILL_ALIASES = BitsAlias.EMPTY;
   static void kill_alias( int alias ) {
     if( KILL_ALIASES.test(alias) ) return;
     KILL_ALIASES = KILL_ALIASES.set(alias);
-    Env.GVN.add_flow(Env.ROOT);
-    CACHE_DEF_MEM = null;
+    CACHE_DEF_MEM = CACHE_DEF_MEM.set(alias,TypeStruct.UNUSED);
+    // Re-flow all dependents
+    Env.GVN.add_flow(PROGRESS);
+    PROGRESS.clear();
   }
-  private static TypeMem CACHE_DEF_MEM;
-  static TypeMem def_mem() {
-    if( KILL_ALIASES == BitsAlias.EMPTY ) return TypeMem.ALLMEM;
-    if( CACHE_DEF_MEM!=null ) return CACHE_DEF_MEM;
-    TypeMem mem = TypeMem.ALLMEM;
-    for( int alias : KILL_ALIASES )
-      mem = mem.set(alias,TypeStruct.UNUSED);
-    return (CACHE_DEF_MEM = mem);
+  private static TypeMem CACHE_DEF_MEM = TypeMem.ALLMEM;
+  private static final Ary<Node> PROGRESS = new Ary<>(new Node[1],0);
+  static TypeMem def_mem(Node n) {
+    if( n!=null && PROGRESS.find(n)==-1 ) PROGRESS.push(n);
+    return CACHE_DEF_MEM;
+  }
+  // Lift default memory to "nothing except external"
+  public static void combo_def_mem() {
+    CACHE_DEF_MEM = CACHE_DEF_MEM.set(1,TypeStruct.UNUSED);
+  }
 
-  }
 
   @Override public Type live() {
     // Pre-combo, all memory is alive, except kills
     if( Combo.pre() ) return Env.KEEP_ALIVE._live;
     // During/post combo, everything that exits is live.
     deps_add(this);             // Which also means changes in value, change live
-    return rmem().flatten_live_fields();
+    return rmem().flatten_live_fields().slice_reaching_aliases(ralias());
   }
 
   @Override public Type live_use(Node def) {
@@ -254,5 +262,7 @@ public class RootNode extends Node {
     while( len() > REZ_IDX+1 )
       pop();
     KILL_ALIASES = BitsAlias.EMPTY;
+    CACHE_DEF_MEM = TypeMem.ALLMEM;
+    PROGRESS.clear();
   }
 }

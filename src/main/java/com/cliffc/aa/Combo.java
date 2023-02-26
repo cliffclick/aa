@@ -1,8 +1,6 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.node.CallEpiNode;
-import com.cliffc.aa.node.Node;
-import com.cliffc.aa.node.PrimNode;
+import com.cliffc.aa.node.*;
 import com.cliffc.aa.tvar.Resolvable;
 import com.cliffc.aa.tvar.TVField;
 import com.cliffc.aa.type.Type;
@@ -143,6 +141,8 @@ public abstract class Combo {
     // Set all type-vars to Leafs.
     PrimNode.ZINT.set_tvar();
     PrimNode.ZFLT.set_tvar();
+    PrimNode.ZSTR.set_tvar();
+    RootNode.combo_def_mem();
     Env.ROOT.walk_initype();
     assert Env.ROOT.more_work(false)==0; // Initial conditions are correct
 

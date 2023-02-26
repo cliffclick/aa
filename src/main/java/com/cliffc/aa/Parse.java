@@ -451,19 +451,19 @@ public class Parse implements Comparable<Parse> {
       stk.add_fld (tok,Access.RW, con(TypeNil.XNIL),badf); // Create at top of scope as undefined
     }
     // See if assigning over a forward-ref.
-    assert scope==scope(); // untested really, just remove it trip
-    int idx=scope().stk().find(tok);
+    int idx = scope().stk().find(tok);
     if( idx != -1 && scope().stk().in(idx) instanceof ForwardRefNode fref )
       fref.assign(Node.peek(iidx),tok); // Define & assign the forward-ref
 
-    // Load the local display/stack-frame
+    // Load the display/stack-frame for the defining scope.
     Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
     Node mem = mem();
     Node stk = gvn(new LoadNode(mem,ptr,badf));
-    // Assign/store into display/stack-frame
+    // Build a new display/stack-frame
     Node stk2 = gvn(new SetFieldNode(tok,mutable,stk,Node.peek(iidx),badf));
+    // Store into the local scope (NOT defining scope)
     Node st = new StoreNode(mem,ptr,stk2,badf);
-    scope.replace_mem(st);
+    scope().replace_mem(st);
     if( mutable==Access.Final ) Oper.make(tok,false);
     return Node.pop(iidx);
   }
@@ -486,7 +486,7 @@ public class Parse implements Comparable<Parse> {
     
     // True side
     int t_scope_x;
-    try( Env e = _e = new Env(_e, null, 0, ctrl(), mem(), scope().stk(), null) ) { // Nest an environment for the local vars
+    try( Env e = _e = new Env(_e, null, 0, ctrl(), mem(), scope().ptr(), null) ) { // Nest an environment for the local vars
       Node t_exp = stmt(false); // Parse true expression
       if( t_exp == null ) t_exp = err_ctrl2("missing expr after '?'");
       scope().stk().close();
@@ -505,7 +505,7 @@ public class Parse implements Comparable<Parse> {
 
     // False side
     int f_scope_x;
-    try( Env e = _e = new Env(_e, null, 0, ctrl(), mem(), scope().stk(), null) ) { // Nest an environment for the local vars
+    try( Env e = _e = new Env(_e, null, 0, ctrl(), mem(), scope().ptr(), null) ) { // Nest an environment for the local vars
       Node f_exp = peek(':') ? stmt(false) : con(TypeNil.XNIL);
       if( f_exp == null ) f_exp = err_ctrl2("missing expr after ':'");
       scope().stk().close();
@@ -527,15 +527,15 @@ public class Parse implements Comparable<Parse> {
     int rez_x;
     ScopeNode scope = scope();
     try( GVNGCM.Build<Node> X = Env.GVN.new Build<>() ) {
-      // Load the stack frame from above the trinary.
-      // We will promote common vars to it.
-      Node x_stk_now = X.xform(new LoadNode(scope.mem(),scope.ptr(),null));
       // Control-merge the trinary
       Node r = set_ctrl(X.xform(new RegionNode(null,t_scope.ctrl(),f_scope.ctrl())));
       // Mem-merge the trinary
       PhiNode phi_mem = new PhiNode(TypeMem.ALLMEM,bad,r,t_scope.mem (),f_scope.mem ());
       scope.set_def(MEM_IDX,null);
       Node x_mem = X.xform(phi_mem);
+      // Load the stack frame from above the trinary.
+      // We will promote common vars to it.
+      Node x_stk_now = X.xform(new LoadNode(x_mem,scope.ptr(),null));
 
       // Phi-merge result of the whole trinary
       Node rez = X.xform(new PhiNode(TypeNil.SCALAR,bad,r,t_scope.rez (),f_scope.rez ())) ; // Ifex result
@@ -594,7 +594,7 @@ public class Parse implements Comparable<Parse> {
   }
 
   private Node _err_not_def(GVNGCM.Build<Node> X, ScopeNode scope, String fld, boolean side, Parse bad) {
-    String msg = "'"+fld+"' not defined on '"+side+"' arm of trinary";
+    String msg = "'"+fld+"' not defined on "+side+" arm of trinary";
     return X.xform(new ErrNode(scope.ctrl(),bad,msg));
   }
   
@@ -839,7 +839,7 @@ public class Parse implements Comparable<Parse> {
           // binds on the loaded overload.
           castnn = Node.pop(cidx);
           n = is_oper ? gvn(new BindFPNode(fd, castnn, true)) : fd;
-          if( !is_oper ) { Env.GVN.add_reduce(castnn); kill(castnn); }
+          if( !is_oper ) { Env.GVN.add_flow(Env.GVN.add_reduce(castnn)); kill(castnn); }
         }
 
       } else if( peek('(') ) {  // Attempt a function-call
@@ -940,7 +940,7 @@ public class Parse implements Comparable<Parse> {
     // Active memory for the chosen scope, after the call to plus
     scope().replace_mem(new StoreNode(mem(),ptr,stf,bad));
     n = Node.pop(nidx);
-    Node.pop(ld_x);             // No longer need
+    Node.pop(ld_x).add_flow();  // No longer need
     return n;                   // Return pre-increment post-fresh value
   }
 
