@@ -59,16 +59,20 @@ public class RootNode extends Node {
     // Reset for walking
     // Walk, finding escaped aliases and fidxs
     escapes_reset(tmem);
-    escapes(trez,this);
+    escapes(trez);
+    // Walk the global Calls also
+    for( int i=ARG_IDX; i<len(); i++ ) {
+      CallNode call = (CallNode)in(i);
+      for( int j=DSP_IDX; j<call.nargs(); j++ )
+        escapes(call.val(j));
+    }
 
     // Roots value is all reachable alias memory shapes, plus all reachable
     // (escaped) aliases and functions.
     return TypeTuple.make(Type.CTRL,
                           EXT_MEM,
                           TypeRPC.ALL_CALL,
-                          TypeNil.make(false,false,false,
-                                       EXT_ALIASES.meet(BitsAlias.EXT),
-                                       EXT_FIDXS  .meet(BitsFun  .EXT)));
+                          escapes_get());
   }
 
   // Escape all Root results.  Escaping functions are called with the most
@@ -84,11 +88,12 @@ public class RootNode extends Node {
   private static final VBitSet VISIT = new VBitSet();
   private static final AryInt ALIASES = new AryInt();
   // Results computed here, and modified at each call.
-  static BitsAlias EXT_ALIASES;
-  static BitsFun   EXT_FIDXS  ;
-  static TypeMem   EXT_MEM    ;
+  private static BitsAlias EXT_ALIASES;
+  private static BitsFun   EXT_FIDXS  ;
+          static TypeMem   EXT_MEM    ;
 
-  static void escapes_reset(TypeMem tmem) {
+  // Called before computing to reset state
+  private static void escapes_reset(TypeMem tmem) {
     VISIT.clear();
     ALIASES.clear();
     EXT_ALIASES = BitsAlias.EMPTY;
@@ -98,13 +103,20 @@ public class RootNode extends Node {
     for( int alias : KILL_ALIASES )
       EXT_MEM = EXT_MEM.set(alias,TypeStruct.UNUSED);
   }
-  
-  static void escapes( Type t, Node dep ) {
-    _escapes(t,dep);
-    while( !ALIASES.isEmpty() )
-      _escapes(EXT_MEM.at(ALIASES.pop()),dep);
+  // Called after computing to get state
+  private static TypeNil escapes_get() {
+    return TypeNil.make(false,false,false,
+                        EXT_ALIASES.meet(BitsAlias.EXT),
+                        EXT_FIDXS  .meet(BitsFun  .EXT));
   }
-  private static void _escapes( Type t, Node dep ) {
+
+  // Called once per escaping value
+  private static void escapes( Type t ) {
+    _escapes(t);
+    while( !ALIASES.isEmpty() )
+      _escapes(EXT_MEM.at(ALIASES.pop()));
+  }
+  private static void _escapes( Type t ) {
     if( VISIT.tset(t._uid) ) return;
     if( !(t instanceof TypeNil tn) ) return;
     
@@ -126,7 +138,7 @@ public class RootNode extends Node {
           EXT_FIDXS = EXT_FIDXS.set(fidx);
           RetNode ret = RetNode.get(fidx);
           if( ret != null && ret._val instanceof TypeTuple rtup ) {
-            ret.deps_add(dep);
+            ret.deps_add(Env.ROOT);
             TypeMem tmem2 = (TypeMem)rtup.at(MEM_IDX).meet(EXT_MEM);
             for( int xalias : EXT_ALIASES )
               if( EXT_MEM.at(xalias) != tmem2.at(xalias) &&
@@ -138,13 +150,13 @@ public class RootNode extends Node {
       }
       // The return also escapes
       if( tn instanceof TypeFunPtr tfp )
-        _escapes(tfp._ret,dep);
+        _escapes(tfp._ret);
     }
     // Structs escape all public fields
     if( t instanceof TypeStruct ts )
       for( TypeFld fld : ts )
         // Root widens all non-final fields
-        _escapes(fld._access== TypeFld.Access.Final ? fld._t : TypeNil.SCALAR,dep);
+        _escapes(fld._access== TypeFld.Access.Final ? fld._t : TypeNil.SCALAR);
   }
 
   // Given a TV3, mimic a matching flow Type from all possible escaping
@@ -220,8 +232,10 @@ public class RootNode extends Node {
   }
 
   @Override public Type live_use(Node def) {
+    if( def==in(CTL_IDX) ) return Type.ALL;
     if( def==in(MEM_IDX) ) return _live;
-    return Type.ALL;
+    if( def==in(REZ_IDX) ) return Type.ALL;
+    return _live;               // Global calls take same memory as me
   }
 
   @Override public Node ideal_reduce() {

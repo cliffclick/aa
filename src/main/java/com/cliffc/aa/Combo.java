@@ -203,6 +203,7 @@ public abstract class Combo {
         for( Node use : n._uses )
           if( use instanceof CallEpiNode cepi ) cepi.check_and_wire(true);
         if( n instanceof CallEpiNode cepi ) cepi.check_and_wire(true);
+        if( n instanceof CallNode call ) call.check_global();
       }
       
       // Very expensive assert: everything that can make progress is on worklist

@@ -7,11 +7,7 @@ public class KeepNode extends Node {
   @Override public boolean is_mem() { return true; }
   @Override public Type value() { return Type.ALL; }
   // All memory, except kills
-  @Override public Type live () {
-    RootNode.escapes_reset(TypeMem.ALLMEM);
-    RootNode.escapes(TypeNil.SCALAR,this);
-    return RootNode.EXT_MEM;
-  }
+  @Override public Type live () { return RootNode.def_mem(this); }
   @Override public Type live_use( Node def ) {
     if( def.is_mem() ) return _live;
     if( def instanceof   StructNode ) return TypeStruct.ISUSED;

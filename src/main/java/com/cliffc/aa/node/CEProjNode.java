@@ -33,7 +33,7 @@ public class CEProjNode extends CProjNode {
     if( tfp.fidxs().above_center() ) return false; // Call not executing yet
     if( !tfp.fidxs().test_recur(fun._fidx) ) return false; // Call not executing this wired path
     // Argument count mismatch
-    return tcall.len()-1/*tfp*/-1/*esc*/ == fun.nargs();
+    return tcall.len()-1/*tfp*/ == fun.nargs();
   }
 
   static boolean wired_arg_check( Type tcall0, FunNode fun ) {

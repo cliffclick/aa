@@ -189,13 +189,12 @@ public class TVStruct extends TV3 {
   // -------------------------------------------------------------
   @Override boolean _fresh_unify_impl(TV3 tv3, boolean test) {
     boolean progress = false, missing = false;
-    TVStruct that = (TVStruct)tv3; // Invariant checked before calling
-    assert !unified() && !that.unified();
+    assert !unified() && !tv3.unified();
     
     // Any pending field resolutions
     progress |= this.trial_resolve_all(test);
-    progress |= that.trial_resolve_all(test);
-    that = (TVStruct)that.find(); // Might have to update
+    progress |= ((TVStruct)tv3.find()).trial_resolve_all(test);
+    TVStruct that = (TVStruct)tv3.find(); // Might have to update
     assert !unified();       // TODO: update/find thsi,that
 
     for( int i=0; i<_max; i++ ) {
@@ -257,6 +256,7 @@ public class TVStruct extends TV3 {
   // -------------------------------------------------------------
   // TODO  move to Resolvable?
   private boolean trial_resolve_all(boolean test) {
+    assert !unified();
     boolean progress = false;
     for( int i=0; i<_max; i++ ) {
       String key = _flds[i];

@@ -1,8 +1,11 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.*;
+import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.TVLeaf;
+import com.cliffc.aa.tvar.TVPtr;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.unimpl;
@@ -39,6 +42,10 @@ public class StoreNode extends Node {
     if( tmp.above_center() && precise ) {
       tmp = tmp.dual();
       tvs = TypeStruct.UNUSED;
+    } else if( adr()._live==Type.ANY ) {
+      tvs = TypeStruct.UNUSED;  // Store address is dead, then stored struct is unused
+    } else {
+      adr().deps_add(this);
     }
     return tm.update(tmp._aliases,tvs,precise);
   }
@@ -47,7 +54,7 @@ public class StoreNode extends Node {
   // value into live: if values are ANY then nothing is demand-able.
   @Override public Type live_use( Node def ) {
     mem().deps_add(def);        // Changes to mem()'s value changes def's liveness
-    TypeMem jmem = _live_use_mem();
+    TypeMem jmem = _live_use_mem(def);
     Type aval = adr()._val;
     TypeMemPtr tmp = aval instanceof TypeMemPtr tmp0 ? tmp0 : aval.oob(TypeMemPtr.ISUSED);
 
@@ -59,9 +66,9 @@ public class StoreNode extends Node {
     return ts;                  // Live-use for the rez() which is a TypeStruct liveness    
   }
   // Compute liveness as a TypeMem, intersection of demand and avail
-  private TypeMem _live_use_mem() {
+  private TypeMem _live_use_mem(Node def) {
     if( _live== Type.ANY ) return TypeMem.ANYMEM;
-    if( _live== Type.ALL ) return TypeMem.ALLMEM;
+    if( _live== Type.ALL ) return RootNode.def_mem(def);
     Type mval = mem()._val;
     Type aval = adr()._val;
     if( mval == Type.ANY ) return TypeMem.ANYMEM;
@@ -85,16 +92,18 @@ public class StoreNode extends Node {
 
     // Is this Store dead from below?
     if( mem==this ) return null; // Dead self-cycle
-    if( tmp!=null && mem._val instanceof TypeMem ) {
-      if( tmp.above_center() ) {
-        if( mem._val == _val && _live==mem._live )
-          return mem; // Address is high, and memory is unchanged; we can be ignored
-        // Kill what is being stored; now its dead
-        if( rez() != null ) return set_def(3,null);
+    if( tmp!=null && mem._val instanceof TypeMem memval ) {
+      // Address is high, do not bother storing.  Kill stored thing.
+      // Keep the store op until values are monotonic.
+      if( tmp.above_center() && rez() != null )
+        return Env.GVN.add_reduce(set_def(3,null)); // Try again
+      // Same/same up/down
+      if( _live==mem._live && mem._val == _val ) {
+        // If dead from either above or below, we can remove
+        if( tmp.above_center() ) return mem;
+        TypeStruct ts0 = (_live instanceof TypeMem tm ? tm : _live.oob(TypeMem.ALLMEM)).ld(tmp);
+        if( ts0.above_center() ) return mem;
       }
-      TypeStruct ts0 = (_live instanceof TypeMem tm ? tm : _live.oob(TypeMem.ALLMEM)).ld(tmp);
-      if( ts0.above_center() && _live==mem._live )  // Dead from below
-        return mem;
       mem.deps_add(this);   // Input address changes, check reduce
       deps_add(this);       // Our   address changes, check reduce
     }

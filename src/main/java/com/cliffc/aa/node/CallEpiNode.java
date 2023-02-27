@@ -36,10 +36,12 @@ public final class CallEpiNode extends Node {
     return "CallEpi";
   }
   @Override boolean is_CFG() { return !_is_copy; }
-  public CallNode call() { return (CallNode)in(0); }
   @Override public boolean is_mem() { return true; }
-  public int nwired() { return _defs._len-1; }
-  public RetNode wired(int x) { return (RetNode)in(x+1); }
+  public CallNode call() { return (CallNode)in(0); }
+  // True if this calls an external function, and so escapes all arguments
+  boolean is_global() { return in(1)!=null; }
+  public int nwired() { return _defs._len-2; }
+  public RetNode wired(int x) { return (RetNode)in(x+2); }
 
   // True if all Call value fidxs are wired.  Monotonic.  Always true if Call
   // fidxs are above-center (no wiring required, these paths are never taken).
@@ -243,11 +245,11 @@ public final class CallEpiNode extends Node {
   }
 
   // Wire the call args to a known function, letting the function have precise
-  // knowledge of its callers and arguments.  This adds a edges in the graph
-  // but NOT in the CG, until _cg_wired gets set.
+  // knowledge of its callers and arguments.  
   void wire1( CallNode call, Node fun, Node ret, boolean is_combo ) {
     assert _defs.find(ret)==-1; // No double wiring
     wire0(call,fun,is_combo);
+    if( len()==1 ) add_def(null); // Skip a slot for a future Root wire
     // Wire self to the return
     add_def(ret);
     GVN.add_flow(this);

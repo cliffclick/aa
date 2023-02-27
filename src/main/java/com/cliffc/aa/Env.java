@@ -218,12 +218,12 @@ public class Env implements AutoCloseable {
     ROOT.walk_reset(visit);          // Clean out any wired prim calls
     KEEP_ALIVE.walk_reset(visit);    // Clean out any wired prim calls
     GVNGCM.KEEP_ALIVE.walk_reset(visit);
-    CallNode  .reset_to_init0();
     Combo.reset();
     GVN.iter();                 // Clean out any dead; reset prim types
     for( Node n : Node.VALS.keySet() ) // Assert no leftover bits from the prior compilation
       assert n._uid < Node._INIT0_CNT; //
     Node      .reset_to_init0();
+    CallNode  .reset_to_init0();
     GVN       .reset_to_init0();
     FunNode   .reset_to_init0();
     NewNode   .reset_to_init0();

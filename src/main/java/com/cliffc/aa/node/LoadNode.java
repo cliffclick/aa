@@ -173,13 +173,12 @@ public class LoadNode extends Node {
           mem = node.is_copy(MEM_IDX); // Skip thru a copy
           if( mem == null ) {
             CallNode call = node.call();
-            BitsAlias esc_aliases = ((TypeMemPtr)CallNode.tesc((TypeTuple)call._val))._aliases;
+            BitsAlias esc_aliases = Env.ROOT.ralias();
             // Collides, might be use/def by call
-            if( aliases.overlaps(esc_aliases) ) return null;
-            // Cannot track call-modified set (unless e.g. call is_all_wired and
-            // is pure) without Root escapes.
-            if( Env.ROOT._val == TypeTuple.ROOT )
-              { Env.ROOT.deps_add(ldst);  return null; }
+            if( aliases.overlaps(esc_aliases) ) {
+              Env.ROOT.deps_add(ldst); // Revisit if fewer escapes
+              return null;
+            }
             // Peek through call
             mem = call.mem();
           }

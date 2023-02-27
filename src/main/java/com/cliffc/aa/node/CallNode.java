@@ -135,11 +135,10 @@ public class CallNode extends Node {
   static Type    tctl( TypeTuple tcall ) { return targ(tcall,CTL_IDX); }
   static TypeMem emem( TypeTuple tcall ) { return emem(tcall._ts); }
   static TypeMem emem( Type[] ts ) { return (TypeMem)ts[MEM_IDX]; } // callee memory passed into function
-  static Type    tesc( TypeTuple tcall ) { return targ(tcall,tcall.len()-1); }
   // No-check must-be-correct get TFP
   static public TypeFunPtr ttfp( Type t ) {
     return (TypeFunPtr)((t instanceof TypeTuple tcall)
-                        ? tcall._ts[tcall.len()-2]
+                        ? tcall._ts[tcall.len()-1]
                         : t.oob(TypeFunPtr.GENERIC_FUNPTR));
   }
   void set_ttfp(TypeFunPtr tfp) {
@@ -266,7 +265,7 @@ public class CallNode extends Node {
     if( _is_copy ) return _val; // Freeze until unwind
     if( ctl()._val==Type.ALL ) return Type.ALL;
     // Result type includes a type-per-input, plus one for the function
-    final Type[] ts = Types.get(_defs._len+1);
+    final Type[] ts = Types.get(_defs._len);
     ts[CTL_IDX] = ctl()._val;
     // Not a memory to the call?
     Type mem = mem()==null ? TypeMem.ANYMEM : mem()._val;
@@ -282,16 +281,23 @@ public class CallNode extends Node {
       ts[i] = arg(i)==null ? TypeNil.XSCALAR : arg(i)._val;
     ts[_defs._len-1] = tfx;
 
-    // Collect local escaping arguments
-    RootNode.escapes_reset(tmem);
-    for( int i=DSP_IDX; i<nargs(); i++ )
-      RootNode.escapes(val(i),this);
-    BitsAlias extas = RootNode.EXT_ALIASES;
-    ts[_defs._len] = TypeMemPtr.make(false,false,extas,TypeStruct.UNUSED);
-    
     return TypeTuple.make(ts);
   }
 
+  // If this function is called by an external function, all its arguments
+  // escape.
+  public void check_global() {
+    BitsFun tfx = ttfp(_val).fidxs();
+    if( !BitsFun.EXT.overlaps(tfx) ) return; // Not called externally
+    // One-time, wire to Root to enable flows of escapes
+    CallEpiNode cepi = cepi();
+    if( cepi.len()>1 && cepi.in(1)==Env.ROOT ) return;
+    assert cepi.len()==1 || cepi.in(1)==null;
+    if( cepi.len()==1 ) cepi.add_def(Env.ROOT);
+    else cepi.set_def(1,Env.ROOT);
+    Env.ROOT.add_def(this);
+  }
+  
   @Override public Type live_use(Node def) {
     Type tcall = _val;
     if( !(tcall instanceof TypeTuple) ) // Call is has no value (yet)?

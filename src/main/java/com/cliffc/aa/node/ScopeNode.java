@@ -87,12 +87,8 @@ public class ScopeNode extends Node {
   @Override public Type value() { return Type.CTRL; }
 
   @Override public TypeMem live() {
-    if( is_keep() && Combo.pre() ) return RootNode.def_mem(this);
-    Type mem0 = mem()==null ? TypeMem.ALLMEM : mem()._val;
-    TypeMem mem = mem0 instanceof TypeMem mem1 ? mem1 : mem0.oob(TypeMem.ALLMEM);
-    RootNode.escapes_reset(mem);
-    RootNode.escapes(rez()._val,this);
-    return RootNode.EXT_MEM.flatten_live_fields().slice_reaching_aliases(RootNode.EXT_ALIASES);
+    assert is_keep() || Combo.pre() || is_prim();
+    return RootNode.def_mem(this);
   }
 
   @Override public Type live_use(Node def ) {
