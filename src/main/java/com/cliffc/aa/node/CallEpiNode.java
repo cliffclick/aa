@@ -431,7 +431,7 @@ public final class CallEpiNode extends Node {
     if( _is_copy ) return def._live; // A copy
     // Not a copy
     if( def==in(0) ) return _live; // The Call
-    if( ((RetNode)def).mem()==null ) return Type.ANY; // No memory input
+    if( def instanceof RetNode ret && ret.mem()==null ) return Type.ANY; // No memory input
     // Wired return.
     // The given function is alive, only if the Call will Call it.
     // This is morally equivalent to a Phi with dead control input declaring the value also dead.
@@ -439,10 +439,14 @@ public final class CallEpiNode extends Node {
     Type tcall = call()._val;
     if( !(tcall instanceof TypeTuple) ) return tcall.above_center() ? Type.ANY : _live;
     BitsFun fidxs = CallNode.ttfp(tcall).fidxs();
-    int fidx = ((RetNode)def).fidx();
-    if( fidxs.above_center() || !fidxs.test_recur(fidx) )
-      return Type.ANY;    // Call does not call this, so not alive.
-    return _live;
+    if( fidxs.above_center() ) return Type.ANY; // Not called, so not alive
+    // Call does not call this, so not alive.
+    if( def instanceof RetNode ret )
+      return fidxs.test_recur(ret.fidx()) ? _live : Type.ANY;
+    // Must be Root
+    if( ((RootNode)def).rfidxs().overlaps(fidxs) )
+      return _live;
+    return Type.ANY;
   }
 
   @Override public boolean has_tvar() { return true; }

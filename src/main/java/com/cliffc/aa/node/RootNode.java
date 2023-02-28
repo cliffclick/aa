@@ -36,19 +36,23 @@ public class RootNode extends Node {
       ? ((TypeNil)tt.at(3))._fidxs
       : (_val.above_center() ? BitsFun.NALL.dual() : BitsFun.NALL);
   }
-  public TypeNil ext_scalar() {
-    return (TypeNil)(_val instanceof TypeTuple tt
-                        ? tt.at(3)
-                        : _val.oob(TypeNil.INTERNAL));
+  
+  // Used by TV3 as_flow for a external Leaf value.
+  public TypeNil ext_scalar(Node dep) {
+    TypeNil tn = (TypeNil)(_val instanceof TypeTuple tt
+                           ? tt.at(3)
+                           : _val.oob(TypeNil.INTERNAL));
+    return tn;
   }
 
   
   // Output value is:
-  // [Ctrl, All_Mem_Minus_Dead, TypeRPC.ALL_CALL, escaped_fidxs, escaped_aliases,]
+  // [Ctrl, All_Mem_Minus_Dead, TypeRPC.ALL_CALL, [escaped_fidxs, escaped_aliases]]
   @Override public TypeTuple value() {
-    // Conservative final result
+    // Conservative final result.  Until Combo external calls can still wire, and escape arguments
     Node rez = in(REZ_IDX);
-    if( rez==null ) return TypeTuple.make(Type.CTRL,def_mem(this),TypeRPC.ALL_CALL,TypeNil.SCALAR);
+    if( rez==null || Combo.pre() )
+      return TypeTuple.make(Type.CTRL,def_mem(this),TypeRPC.ALL_CALL,TypeNil.SCALAR);
     Type trez = rez._val;
     // Conservative final memory
     Node mem = in(MEM_IDX);
@@ -226,9 +230,15 @@ public class RootNode extends Node {
   @Override public Type live() {
     // Pre-combo, all memory is alive, except kills
     if( Combo.pre() ) return Env.KEEP_ALIVE._live;
-    // During/post combo, everything that exits is live.
-    deps_add(this);             // Which also means changes in value, change live
-    return rmem().flatten_live_fields().slice_reaching_aliases(ralias());
+    // During/post combo, check external Call users
+    Type live = Type.ANY;           // Start at lattice top
+    for( Node use : _uses )         // Computed across all uses
+      if( use._live != Type.ANY && use.is_mem() ) { // If use is alive, propagate liveness
+        Type ulive = use.live_use(this);
+        live = live.meet(ulive); // Make alive used fields
+      }
+    assert live==Type.ANY || live instanceof TypeMem;
+    return live;
   }
 
   @Override public Type live_use(Node def) {

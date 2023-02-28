@@ -67,10 +67,10 @@ public class TVErr extends TV3 {
     TVErr terr = new TVErr();
     terr._unify_err(that);
     _fresh_unify(terr,false);
-    return true;    
+    return true;
   }
   // This is an Err and that is fresh and not an error
-  boolean _fresh_unify_err_fresh(TV3 that) {
+  final boolean _fresh_unify_err_fresh(TV3 that) {
     assert !unified() && !that.unified(); // Do not unify twice
     assert !(that instanceof TVErr);
     throw unimpl();
@@ -105,7 +105,18 @@ public class TVErr extends TV3 {
   }
   
   // -------------------------------------------------------------
-  @Override Type _as_flow( Node dep ) { throw unimpl(); }
+  // If there's exactly one type, we can as_flow it.  Otherwise, ambiguous and
+  // not sure what to do.
+  @Override Type _as_flow( Node dep ) {
+    TV3 tv=null;
+    for( TV3 tvar : _args ) {
+      if( tvar!=null ) {
+        if( tv!=null ) throw unimpl(); // Multi choices; not sure what to do with Type
+        tv = tvar.find();
+      }
+    }
+    return tv._as_flow(dep);
+  }
   
   // Defining type, vs failed unification
   public String toString(Type tdef) {

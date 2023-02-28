@@ -1,9 +1,9 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
 
 
 // Function parameter node; almost just a Phi with an order.  There is a dense
@@ -44,6 +44,12 @@ public class ParmNode extends PhiNode {
           if( ti != Type.ANY && _tvar!=null ) {
             Env.ROOT.deps_add(this); // Depends on Root
             ti = tvar().as_flow(this);
+            // Pre-freeze, use the high values
+            if( !Combo.HM_FREEZE ) {
+              ti = ti.dual();
+              Combo.add_freeze_dep(this);
+            }
+            _tvar.deps_add_deep(this); // Updates to tvar recompute flow
           }
         }
         t = t.meet(ti);

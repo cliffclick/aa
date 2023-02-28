@@ -35,6 +35,6 @@ public class TVLeaf extends TV3 {
 
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) {
-    return Env.ROOT.ext_scalar();
+    return Env.ROOT.ext_scalar(dep);
   }  
 }

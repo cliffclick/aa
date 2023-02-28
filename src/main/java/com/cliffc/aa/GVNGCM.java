@@ -118,8 +118,7 @@ public class GVNGCM {
     iter();
     // Last KEEP use is going away; this Node should rapidly be used by an actual
     // Node, and thus be able to compute liveness.
-    add_flow(n);
-    return pop(idx);
+    return add_flow(pop(idx));
   }
   
   // During start-up, ~2000 total iterations, something like 95% of which are

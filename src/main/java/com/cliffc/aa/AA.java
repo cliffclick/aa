@@ -63,4 +63,5 @@ public abstract class AA {
   public static boolean once_per(int log) {
     return (ASSERT_CNT++ & ((1L<<(log-1))-1))!=0;
   }
+  static void reset() { ASSERT_CNT=0; }
 }

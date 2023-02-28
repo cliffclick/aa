@@ -574,11 +574,11 @@ public abstract class Node implements Cloneable, IntSupplier {
   public void combo_unify() {
     TV3 old = _tvar;
     if( old==null ) return;
-    if( _val == Type.ANY ) { tvar().deps_add(this); return; } // No HM progress on untyped code
+    if( _val == Type.ANY ) { tvar().deps_add_deep(this); return; } // No HM progress on untyped code
     if( _live== Type.ANY && !has_call_use() ) // No HM progress on dead code
       return;
     if( unify(false) ) {
-      assert !_tvar.debug_find().unify(old.debug_find(),true);// monotonic: unifying with the result is no-progress
+      assert !_tvar.find().unify(old.find(),true);// monotonic: unifying with the result is no-progress
       TV3.do_delay_fresh();
       // HM changes; push related neighbors
       for( Node def : _defs ) if( def!=null && def.has_tvar() ) def.add_flow();

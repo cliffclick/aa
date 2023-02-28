@@ -30,7 +30,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    test("1+2", "3", "int:3");
+    test("1  > 2", "xnil", "A?");
   }
   static private void assertTrue(boolean t) {
     if( t ) return;

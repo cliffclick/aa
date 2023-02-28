@@ -42,10 +42,10 @@ public class StoreNode extends Node {
     if( tmp.above_center() && precise ) {
       tmp = tmp.dual();
       tvs = TypeStruct.UNUSED;
-    } else if( adr()._live==Type.ANY ) {
-      tvs = TypeStruct.UNUSED;  // Store address is dead, then stored struct is unused
     } else {
-      adr().deps_add(this);
+      adr().deps_add(this);     // Depends on adr liveness
+      if( adr()._live==Type.ANY )
+        tvs = TypeStruct.UNUSED;  // Store address is dead, then stored struct is unused
     }
     return tm.update(tmp._aliases,tvs,precise);
   }

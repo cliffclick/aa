@@ -604,6 +604,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   public TypeStruct oob(TypeStruct e) { return above_center() ? e.dual() : e; }
   public TypeMem    oob(TypeMem    e) { return above_center() ? e.dual() : e; }
   public TypeMemPtr oob(TypeMemPtr e) { return above_center() ? e.dual() : e; }
+  public TypeFunPtr oob(TypeFunPtr e) { return above_center() ? e.dual() : e; }
   public TypeNil    oob(TypeNil    e) { return above_center() ? (TypeNil)e.dual() : e; }
   public T oob(boolean b) { return b ? dual() : (T)this; }
 

@@ -4,6 +4,7 @@ import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFunPtr;
+import com.cliffc.aa.type.TypeMemPtr;
 
 import static com.cliffc.aa.AA.*;
 
@@ -29,30 +30,41 @@ public class AssertNode extends Node {
 
   @Override public Type value() {
     Node arg = arg();
-    Type t1 = arg._val;
-    Type t0 = _t.simple_ptr();
-    if( t1.isa(t0) ) {
-      Type actual = arg.sharptr(mem());
-      if( actual.isa(_t) )
-        return t1;
-    }
+    Type targ = arg._val;
+    if( targ.isa(_t) ) return targ;
+    if( targ instanceof TypeMemPtr || _t instanceof TypeMemPtr )
+      throw unimpl();
+    
+    //Type t0 = _t.simple_ptr();
+    //if( t1.isa(t0) ) {
+    //  Type actual = arg.sharptr(mem());
+    //  if( actual.isa(_t) )
+    //    return t1;
+    //  throw unimpl();
+    //}
     // Value is capped to the assert value.
-    return t1.oob(t0);
+    return targ.oob(_t);
   }
 
   @Override public Type live_use(Node def ) {
     if( def==arg() ) return _live;                   // Alive as I am
-    // Alive (like normal liveness), plus the address, plus whatever can be
-    // reached from the address.  Because of the turn-around (changing the
-    // input value changes the input liveness) we need set a self-dep.
-    mem().deps_add(mem());
-    //return ScopeNode.compute_live_mem(null,mem(),arg());
-    throw unimpl();
+    //// Alive (like normal liveness), plus the address, plus whatever can be
+    //// reached from the address.  Because of the turn-around (changing the
+    //// input value changes the input liveness) we need set a self-dep.
+    //mem().deps_add(mem());
+    ////return ScopeNode.compute_live_mem(null,mem(),arg());
+    //throw unimpl();
+    return RootNode.def_mem(def);
   }
 
   @Override public Node ideal_reduce() {
-    Type actual = arg().sharptr(mem());
-    return actual.isa(_t) ? arg() : null;
+    Type targ = arg()._val;
+    if( targ.isa(_t) ) return arg();
+    if( targ instanceof TypeMemPtr || _t instanceof TypeMemPtr )
+      throw unimpl();
+    return null;
+    //Type actual = arg().sharptr(mem());
+    //return actual.isa(_t) ? arg() : null;
   }
   @Override public Node ideal_grow() {
     Node arg= arg();

@@ -222,6 +222,7 @@ public class Env implements AutoCloseable {
     GVN.iter();                 // Clean out any dead; reset prim types
     for( Node n : Node.VALS.keySet() ) // Assert no leftover bits from the prior compilation
       assert n._uid < Node._INIT0_CNT; //
+    AA.reset();
     Node      .reset_to_init0();
     CallNode  .reset_to_init0();
     GVN       .reset_to_init0();

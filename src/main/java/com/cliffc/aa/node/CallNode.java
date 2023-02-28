@@ -274,7 +274,11 @@ public class CallNode extends Node {
 
     // Function pointer.
     Node fdx = fdx();
-    TypeFunPtr tfx = fdx._val instanceof TypeFunPtr tfx2 ? tfx2 : (TypeFunPtr)fdx._val.oob(TypeFunPtr.GENERIC_FUNPTR);
+    TypeFunPtr tfx = switch( fdx._val ) {
+    case TypeFunPtr tfx2 -> tfx2;
+    case TypeNil tn -> tn.oob(TypeFunPtr.GENERIC_FUNPTR).make_from(tn._fidxs);
+    default -> fdx._val.oob(TypeFunPtr.GENERIC_FUNPTR);
+    };
     // Copy args for called functions.  FIDX is already refined.
     // Also gather all aliases from all args.
     for( int i=DSP_IDX; i<nargs(); i++ )
@@ -288,14 +292,16 @@ public class CallNode extends Node {
   // escape.
   public void check_global() {
     BitsFun tfx = ttfp(_val).fidxs();
-    if( !BitsFun.EXT.overlaps(tfx) ) return; // Not called externally
+    if( tfx.above_center() || !BitsFun.EXT.overlaps(tfx) ) return; // Not called externally
     // One-time, wire to Root to enable flows of escapes
     CallEpiNode cepi = cepi();
     if( cepi.len()>1 && cepi.in(1)==Env.ROOT ) return;
     assert cepi.len()==1 || cepi.in(1)==null;
     if( cepi.len()==1 ) cepi.add_def(Env.ROOT);
     else cepi.set_def(1,Env.ROOT);
-    Env.ROOT.add_def(this);
+    // Root changes value when Call does; Call gets more alive
+    Env.ROOT.add_def(this).add_flow();
+    add_flow();
   }
   
   @Override public Type live_use(Node def) {

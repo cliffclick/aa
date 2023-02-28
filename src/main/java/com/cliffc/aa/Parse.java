@@ -600,7 +600,7 @@ public class Parse implements Comparable<Parse> {
   
   private Node _phi(GVNGCM.Build<Node> X, Node r, Node t_var, Node f_var, String fld, Access access, Node x_stk_now, Parse bad) {
     Node phi = X.xform(new PhiNode(TypeNil.SCALAR,bad,r,t_var,f_var));
-    scope().stk().add_fld(fld,Access.RW,Env.ANY,null);
+    scope().stk().add_fld(fld,Access.RW,con(TypeNil.XNIL),null);
     return X.xform(new SetFieldNode(fld,access,x_stk_now,phi,bad));          
   }
   

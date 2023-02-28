@@ -72,8 +72,9 @@ public class TVLambda extends TV3 {
     Type tfun = ADUPS.get(_uid);
     if( tfun != null ) return tfun;  // TODO: Returning recursive flow-type functions
     ADUPS.put(_uid, TypeNil.XSCALAR);
+    Type dsp = nargs() > DSP_IDX ? dsp()._as_flow(dep) : Type.ALL;
     Type rez = ret()._as_flow(dep);
-    return TypeFunPtr.makex(false,fidxs,nargs(),Type.ANY,rez);
+    return TypeFunPtr.makex(false,fidxs,nargs(),dsp,rez);
   }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
