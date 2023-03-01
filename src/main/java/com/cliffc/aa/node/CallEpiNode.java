@@ -316,7 +316,7 @@ public final class CallEpiNode extends Node {
       TypeMem rmem = Env.ROOT.rmem();
       Type cmem = CallNode.emem(tcall);
       if( !Combo.HM_FREEZE ) Combo.add_freeze_dep(this);
-      return tfptr.oob(TypeTuple.make(Type.CTRL,rmem.meet(cmem),TypeNil.XSCALAR.oob(LIFTING || Combo.HM_FREEZE)));
+      return tfptr.oob(TypeTuple.make(Type.CTRL,rmem.meet(cmem),Type.ANY.oob(LIFTING || Combo.HM_FREEZE)));
     }
 
     // Compute call-return value from all callee returns

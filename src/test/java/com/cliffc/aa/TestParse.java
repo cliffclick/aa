@@ -61,7 +61,7 @@ public class TestParse {
     // TestParse.a_basic_01
     test("{ x -> ( 3, x )}", "[56]{any,4 -> *[12](3, %[2,12][2,56]?) }", "{ A B -> *(int:3, B) }", null, null, "[12]", "[56]");
     // TestParse.a_basic_02
-    test("{ z -> ((z 0), (z \"abc\")) }", "[56]{any,4 -> *[13](Scalar,Scalar) }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[12,13]", "[56]" );
+    test("{ z -> ((z 0), (z \"abc\")) }", "[56]{any,4 -> *[13]() }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[12,13]", "[56]" );
 
     // TestParse.a_basic_05
     // example that demonstrates generic and non-generic variables:
@@ -172,7 +172,7 @@ public class TestParse {
     test("x:=1;x++;x", "2", "int:2");
     test("x:=1;x++ + x--","3", "int:3");
     test("x++","nil", "int:int64");
-    test("x++;x","1", "int:1");
+    test("x++;x","1", "int:int64");
 
     // Conditional:
     test   ("0 ?    2  : 3", "3", "int:3"); // false
