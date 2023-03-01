@@ -40,7 +40,7 @@ public class IfNode extends Node {
   Node flip(Node that) {
     ProjNode p0 = (ProjNode)_uses.atX(0);
     ProjNode p1 = (ProjNode)_uses.atX(1);
-    if( p0==null || p1==null ) return null; // Not well formed
+    if( p0==null || p1==null ) return null; // Not well-formed
     if( p0._idx==1 ) { ProjNode tmp=p0; p0=p1; p1=tmp; }
     //Node x0 = Env.GVN.xreduce(new CProjNode(that,0));
     //Node x1 = Env.GVN.xreduce(new CProjNode(that,1));
@@ -64,10 +64,10 @@ public class IfNode extends Node {
 
     // Handle predicates, especially XNIL and wrapped ints (TypeStruct with
     // perhaps constant fields).
-    if( pred == TypeNil.XNIL   ) return TypeTuple.IF_FALSE; // The One True Zero
+    if( pred == TypeNil.NIL    ) return TypeTuple.IF_FALSE; // The One True Zero
     if( pred == TypeInt.ZERO   ) return TypeTuple.IF_FALSE; // 
     if( pred == TypeFlt.con(0) ) return TypeTuple.IF_FALSE; // 
-    if( !TypeNil.XNIL.isa(pred)) return TypeTuple.IF_TRUE;  // missing zero, so TRUE
+    if( !TypeNil.NIL.isa(pred) ) return TypeTuple.IF_TRUE;  // missing zero, so TRUE
 
     // Handle e.g. TMP and TFP nil checks
     if( !(pred instanceof TypeNil tn) ) return (TypeTuple)pred.oob(TypeTuple.IF_ALL);

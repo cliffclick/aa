@@ -26,6 +26,9 @@ public class RootNode extends Node {
   TypeMem rmem() {
     return _val instanceof TypeTuple tt ? (TypeMem)tt.at(MEM_IDX) : TypeMem.ALLMEM.oob(_val.above_center());
   }
+  Type rrez() {
+    return _val instanceof TypeTuple tt ? tt.at(REZ_IDX) : _val.oob(TypeNil.SCALAR);
+  }
   public BitsAlias ralias() {
     return _val instanceof TypeTuple tt
       ? ((TypeNil)tt.at(3))._aliases
@@ -39,15 +42,15 @@ public class RootNode extends Node {
   
   // Used by TV3 as_flow for a external Leaf value.
   public TypeNil ext_scalar(Node dep) {
-    TypeNil tn = (TypeNil)(_val instanceof TypeTuple tt
-                           ? tt.at(3)
-                           : _val.oob(TypeNil.INTERNAL));
-    return tn;
+    assert Combo.HM_FREEZE;
+    return (TypeNil)(_val instanceof TypeTuple tt
+                     ? tt.at(3)
+                     : _val.oob(TypeNil.INTERNAL));
   }
 
   
   // Output value is:
-  // [Ctrl, All_Mem_Minus_Dead, TypeRPC.ALL_CALL, [escaped_fidxs, escaped_aliases]]
+  // [Ctrl, All_Mem_Minus_Dead, Rezult, [escaped_fidxs, escaped_aliases]]
   @Override public TypeTuple value() {
     // Conservative final result.  Until Combo external calls can still wire, and escape arguments
     Node rez = in(REZ_IDX);
@@ -75,7 +78,7 @@ public class RootNode extends Node {
     // (escaped) aliases and functions.
     return TypeTuple.make(Type.CTRL,
                           EXT_MEM,
-                          TypeRPC.ALL_CALL,
+                          trez,
                           escapes_get());
   }
 
@@ -237,14 +240,18 @@ public class RootNode extends Node {
         Type ulive = use.live_use(this);
         live = live.meet(ulive); // Make alive used fields
       }
-    assert live==Type.ANY || live instanceof TypeMem;
-    return live;
+    if( live==Type.ANY ) return live;
+    TypeMem mem = (TypeMem)live;
+    // Liveness for return value
+    TypeMem mem2 = rmem().slice_reaching_aliases(ralias()).flatten_live_fields();
+    return mem.meet(mem2.meet(TypeMem.EXTMEM));
   }
 
   @Override public Type live_use(Node def) {
     if( def==in(CTL_IDX) ) return Type.ALL;
     if( def==in(MEM_IDX) ) return _live;
     if( def==in(REZ_IDX) ) return Type.ALL;
+    assert def instanceof CallNode;
     return _live;               // Global calls take same memory as me
   }
 
@@ -253,8 +260,11 @@ public class RootNode extends Node {
     Node rez = in(REZ_IDX);
     if( rez!=null && in(MEM_IDX) != Env.XMEM &&
         cannot_lift_to(rez._val,TypeMemPtr.ISUSED) &&
-        cannot_lift_to(rez._val,TypeFunPtr.GENERIC_FUNPTR) )
-      return set_def(MEM_IDX,Env.XMEM);
+        cannot_lift_to(rez._val,TypeFunPtr.GENERIC_FUNPTR) ) {
+      set_def(MEM_IDX,Env.XMEM);
+      Env.XMEM.xliv();          // Added a new use
+      return this;
+    }
     return null;
   }
 
@@ -285,6 +295,7 @@ public class RootNode extends Node {
     set_def(REZ_IDX,null);
     while( len() > REZ_IDX+1 )
       pop();
+    EXT_FUNS_BY_NARGS.clear();
     KILL_ALIASES = BitsAlias.EMPTY;
     CACHE_DEF_MEM = TypeMem.ALLMEM;
     PROGRESS.clear();

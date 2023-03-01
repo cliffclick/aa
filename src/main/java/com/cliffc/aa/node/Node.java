@@ -574,7 +574,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   public void combo_unify() {
     TV3 old = _tvar;
     if( old==null ) return;
-    if( _val == Type.ANY ) { tvar().deps_add_deep(this); return; } // No HM progress on untyped code
+    if( _val == Type.ANY ) { /*tvar().deps_add_deep(this); */ return; } // No HM progress on untyped code
     if( _live== Type.ANY && !has_call_use() ) // No HM progress on dead code
       return;
     if( unify(false) ) {

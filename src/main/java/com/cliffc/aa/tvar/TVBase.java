@@ -30,10 +30,10 @@ public class TVBase extends TV3 {
     return this;
   }
 
-  // Convert the leader nil into a base+XNIL, widened if the leader is not a
+  // Convert the leader nil into a base+NIL, widened if the leader is not a
   // copy.
   @Override TV3 find_nil( TVNil nil ) {
-    _t = _t.meet(TypeNil.XNIL);
+    _t = _t.meet(TypeNil.NIL);
     _may_nil = true;
     if( !nil._is_copy ) _t = _t.widen(); // Widen if leader is a not a copy
     _is_copy = false;                    // Self is not a copy

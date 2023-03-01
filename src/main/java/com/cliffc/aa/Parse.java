@@ -362,7 +362,7 @@ public class Parse implements Comparable<Parse> {
   private Node stmt(boolean lookup_current_scope_only) {
     if( peek('^') ) {           // Early function exit
       Node ifex = ifex();
-      if( ifex==null ) ifex = Env.XNIL;
+      if( ifex==null ) ifex = Env.NIL;
       if( _e._par._par==null )
         return err_ctrl1(ErrMsg.syntax(this,"Function exit but outside any function"));
       return _e.early_exit(this,ifex);
@@ -419,7 +419,7 @@ public class Parse implements Comparable<Parse> {
     }
 
     // Normal statement value parse
-    Node ifex = default_nil ? Env.XNIL : ifex(); // Parse an expression for the statement value
+    Node ifex = default_nil ? Env.NIL : ifex(); // Parse an expression for the statement value
     // Check for no-statement after start of assignment, e.g. "x = ;"
     if( ifex == null ) {        // No statement?
       if( toks._len == 0 ) return null;
@@ -448,7 +448,7 @@ public class Parse implements Comparable<Parse> {
     if( create ) {              // Token not already bound at any scope
       scope = scope();          // Create in the current scope
       StructNode stk = scope.stk();
-      stk.add_fld (tok,Access.RW, con(TypeNil.XNIL),badf); // Create at top of scope as undefined
+      stk.add_fld (tok,Access.RW, con(TypeNil.NIL),badf); // Create at top of scope as undefined
     }
     // See if assigning over a forward-ref.
     int idx = scope().stk().find(tok);
@@ -506,7 +506,7 @@ public class Parse implements Comparable<Parse> {
     // False side
     int f_scope_x;
     try( Env e = _e = new Env(_e, null, 0, ctrl(), mem(), scope().ptr(), null) ) { // Nest an environment for the local vars
-      Node f_exp = peek(':') ? stmt(false) : con(TypeNil.XNIL);
+      Node f_exp = peek(':') ? stmt(false) : con(TypeNil.NIL);
       if( f_exp == null ) f_exp = err_ctrl2("missing expr after ':'");
       scope().stk().close();
       scope().set_def(REZ_IDX,f_exp);
@@ -600,7 +600,7 @@ public class Parse implements Comparable<Parse> {
   
   private Node _phi(GVNGCM.Build<Node> X, Node r, Node t_var, Node f_var, String fld, Access access, Node x_stk_now, Parse bad) {
     Node phi = X.xform(new PhiNode(TypeNil.SCALAR,bad,r,t_var,f_var));
-    scope().stk().add_fld(fld,Access.RW,con(TypeNil.XNIL),null);
+    scope().stk().add_fld(fld,Access.RW,con(TypeNil.NIL),null);
     return X.xform(new SetFieldNode(fld,access,x_stk_now,phi,bad));          
   }
   
@@ -903,7 +903,7 @@ public class Parse implements Comparable<Parse> {
   private Node inc(String tok, int d) {
     // More-or-less expands as:
     // If x not defined yet
-    //    x0 := 0;  // define x as mutable XNIL
+    //    x0 := 0;  // define x as mutable NIL
     // x1 = x0 + 1; // add
     // newmem = oldmem.put("x",x1);
     // x0           // Fresh ref of 'x' is returned
@@ -911,7 +911,7 @@ public class Parse implements Comparable<Parse> {
     ScopeNode scope = lookup_scope(tok=tok.intern(),false); // Find prior scope of token
     // Need a load/call/store sensible options
     if( scope==null ) {         // Token not already bound to a value
-      do_store(null,con(TypeNil.XNIL),Access.RW,tok,null,TypeNil.SCALAR,null);
+      do_store(null,con(TypeNil.NIL),Access.RW,tok,null,TypeNil.SCALAR,null);
       scope = scope();
     } else {                    // Check existing token for mutable
       if( !scope.is_mutable(tok) )
@@ -1227,7 +1227,7 @@ public class Parse implements Comparable<Parse> {
     s.early_val ().add_def(rez   );
     set_ctrl(Env.XCTRL);
     set_mem (Node.con(TypeMem.ANYMEM));
-    return Env.XNIL;
+    return Env.NIL;
   }
 
   /** A balanced operator as a fact().  Any balancing token can be used.
@@ -1285,7 +1285,7 @@ public class Parse implements Comparable<Parse> {
     if( n instanceof Long   ) {
       if( _buf[_x-1]=='.' ) _x--; // Java default parser allows "1." as an integer; pushback the '.'
       long l = n.longValue();
-      return con(l==0 ? TypeNil.XNIL : TypeInt.con(l));
+      return con(l==0 ? TypeNil.NIL : TypeInt.con(l));
     }
     if( n instanceof Double ) return con(TypeFlt.con(n.doubleValue()));
     throw new RuntimeException(n.getClass().toString()); // Should not happen

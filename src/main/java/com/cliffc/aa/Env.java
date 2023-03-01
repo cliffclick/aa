@@ -50,11 +50,12 @@ public class Env implements AutoCloseable {
   public static final ConNode ALL;   // Common ALL / used for errors
   public static final ConNode XCTRL; // Always dead control
   public static final ConNode XNIL;  // Default 0
+  public static final ConNode  NIL;  // Default 0
   public static final ConNode XSCALAR;// Default scalar
   public static final ConNode THUNK; // Default thunk parameter
   public static final ConNode UNUSED;// Dead alias
   public static final ConNode ALLMEM;//   Used whole memory
-  public static final ConNode XMEM;  // Unused whole memory
+  public static final ConNode   XMEM;// Unused whole memory
 
   // All possible return addresses (RPCs).
   public static final ProjNode ALL_CALL;
@@ -88,11 +89,12 @@ public class Env implements AutoCloseable {
     ALL   = keep(new ConNode<>(Type.ALL   ));
     XCTRL = keep(new ConNode<>(Type.XCTRL ));
     XNIL  = keep(new ConNode<>(TypeNil.XNIL));
+    NIL   = keep(new ConNode<>(TypeNil. NIL));
     XSCALAR=keep(new ConNode<>(TypeNil.XSCALAR));
     THUNK = keep(new ConNode<>(TypeFunPtr.THUNK));
     UNUSED= keep(new ConNode<>(TypeStruct.UNUSED));
     ALLMEM= keep(new ConNode<>(TypeMem.ALLMEM));
-    XMEM  = keep(new ConNode<>(TypeMem.ANYMEM));
+    XMEM  = keep(new ConNode<>(TypeMem.EXTMEM));
 
     // The Universe outside the parse program
     ROOT  = keep(new RootNode());

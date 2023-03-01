@@ -396,7 +396,7 @@ public class HM {
   }
   private static Syntax number() {
     if( BUF[X]=='0' && (BUF[X+1]!='.' || !isDigit(BUF[X+2])) )
-      { X++; return new Con(TypeNil.XNIL); }
+      { X++; return new Con(TypeNil.NIL); }
     int sum=0;
     while( X<BUF.length && isDigit(BUF[X]) )
       sum = sum*10+BUF[X++]-'0';
@@ -568,7 +568,7 @@ public class HM {
     Con(Type con) { super(con); _con=con; }
     @Override SB str(SB sb) { return p1(sb,null); }
     @Override SB p1(SB sb, VBitSet dups) {
-      if( _con==TypeNil.XNIL ) return sb.p("0");
+      if( _con==TypeNil.NIL ) return sb.p("0");
       if( _con instanceof TypeMemPtr cptr && cptr.is_str() )
         return sb.p('"').p(switch( (char)cptr._obj.at(0).getl() ) {
           case 'a' -> "abc";
@@ -586,7 +586,7 @@ public class HM {
     @Override void add_hm_work( @NotNull Work<Syntax> work) { }
     @Override int prep_tree( Syntax par, VStack nongen, Work<Syntax> work ) {
       // A '0' turns into a nilable leaf.
-      T2 base = _con==TypeNil.XNIL
+      T2 base = _con==TypeNil.NIL
         ? T2.make_nil(T2.make_leaf())
         : (_con instanceof TypeMemPtr cptr && cptr.is_str() ? T2.make_str(cptr) : T2.make_base(_con));
       prep_tree_impl(par, nongen, work, base);
@@ -1894,7 +1894,7 @@ public class HM {
       Type pred = flows[0];
       if( !(pred instanceof TypeNil tn) ) return pred.oob();
       if( tn._nil ) return tn._sub ? TypeInt.XSCALAR : TypeInt.TRUE; // OR, YES
-      else          return tn._sub ? TypeNil.XNIL    : TypeInt.BOOL; // NO, AND
+      else          return tn._sub ? TypeNil. NIL    : TypeInt.BOOL; // NO, AND
     }
   }
 
@@ -1910,7 +1910,7 @@ public class HM {
       if( pred.above_center() ) return TypeNil.XSCALAR;
       if( pred instanceof TypeMemPtr tmp && tmp.is_str() ) {
         Type chr = tmp._obj.at(0);
-        return chr==TypeInt.ZERO ? TypeInt.TRUE : TypeNil.XNIL;
+        return chr==TypeInt.ZERO ? TypeInt.TRUE : TypeNil.NIL;
       }
       return TypeInt.BOOL;
     }
@@ -1932,7 +1932,6 @@ public class HM {
       // Already an expanded nilable with base
       if( arg.is_base() && ret.is_base() ) {
         assert !arg.is_open() && !ret.is_open();
-        //assert arg._tflow == ret._tflow.meet(TypeNil.XNIL);
         return false;
       }
       // Already an expanded nilable with ptr
@@ -3004,7 +3003,7 @@ public class HM {
       // Nilable, recurse on the not-nil.  If t isa XNIL, the T2 structure will
       // never lift the output.
       if( is_nil() ) {
-        if( t.isa(TypeNil.XNIL) ) make_map = false;
+        if( t.isa(TypeNil.NIL) ) make_map = false;
         Type tn = t.join(TypeNil.NSCALR);
         arg("?").walk_types_in(tn, make_map );
       }
@@ -3103,7 +3102,7 @@ public class HM {
         Type notnil = t.join(TypeNil.NSCALR); // Clear the nil
         Type liftnn = arg("?").walk_types_out(notnil,apply, test);
         // If we cleared a nil, add it back
-        return notnil==t ? liftnn : liftnn.meet(TypeNil.XNIL);
+        return notnil==t ? liftnn : liftnn.meet(TypeNil.NIL);
       }
 
       if( is_fun() ) {          // Walk returns not arguments

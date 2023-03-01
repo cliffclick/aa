@@ -10,22 +10,27 @@ import static org.junit.Assert.assertTrue;
 public class TestLive {
   @Test public void testBasic() {
     Node fullmem = new ConNode<>(TypeMem.ALLMEM);
-    fullmem._val = TypeMem.ALLMEM;
+    fullmem._val = fullmem._live = TypeMem.ALLMEM;
 
     // Return the number '5' - should be alive with no special memory.
     Node rez = new ConNode<>(TypeInt.con(5));
     rez._val = TypeInt.con(5);
 
-    // Liveness is a backwards flow.  Scope always demands all return results.
-    ScopeNode scope = new ScopeNode(null,null,fullmem,rez,null,null);
+    // Liveness is a backwards flow.  Root always demands all return results.
+    RootNode root = Env.ROOT;
+    root.set_def(1,fullmem);
+    root.set_def(2,rez    );
+    Combo.HM_FREEZE = true;     // Parsing done, Root gives precise results
+    root.xval();
+    root.xliv();
 
     // Check liveness base case
-    scope._live = scope.live();
-    assertEquals(TypeMem.ANYMEM,scope._live);
+    assertEquals(TypeMem.ANYMEM,root._live);
 
     // Check liveness recursive back one step
     rez._live = rez.live();
     assertEquals(Type.ALL,rez._live);
+    Combo.HM_FREEZE = false;    // Reset
   }
 
   @Test public void testNewNode() {
@@ -48,26 +53,27 @@ public class TestLive {
     Node mem = new StoreNode(mmm,ptr,obj,null).init();
 
     // Use the object for scope exit
-    ScopeNode scope = new ScopeNode(null,null,mem,null,ptr,null);
-    scope.set_mem(mem);
-    scope.set_rez(ptr);
-    scope.init();
+    RootNode root = Env.ROOT;
+    root.set_def(1,mem);
+    root.set_def(2,ptr);
+    Combo.HM_FREEZE = true;     // Parsing done, Root gives precise results
+    root.xval();
 
-    // Check 'live' is stable on creation, except for mem & scope
+    // Check 'live' is stable on creation, except for mem & root
     // which are 'turning around' liveness.
     // Value was computed in a forwards flow.
-    for( Node n : new Node[]{mmm,fdx,fdy,obj,ptr,mem,scope} ) {
-      if( n != mem && n != scope )
+    for( Node n : new Node[]{mmm,fdx,fdy,obj,ptr,mem,root} ) {
+      if( n != mem && n != root )
         assertTrue(n.live().isa(n._live));
       assertEquals(n._val,n.value());
     }
 
     // Check liveness base case
-    scope.xliv();
+    root.xliv();
     // Since simple forwards-flow, the default memory is known UNUSED.
     // However, we got provided at least one object.
     TypeMem expected_live = ((TypeMem) mem._val).flatten_live_fields();
-    assertEquals(scope._live,expected_live);
+    assertEquals(root._live,expected_live);
 
     // Check liveness recursive back one step
     mem.xliv();
@@ -78,6 +84,7 @@ public class TestLive {
     assertEquals(TypeMem.ANYMEM,mmm._live); // Since ptr is scalar, all memory is alive
     fdx.xliv();
     assertEquals(Type.ALL,fdx._live); // Since ptr is scalar, all memory is alive
+    Combo.HM_FREEZE = false;          // Reset
 
   }
 }

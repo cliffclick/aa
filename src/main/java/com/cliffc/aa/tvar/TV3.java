@@ -291,12 +291,12 @@ abstract public class TV3 implements Cloneable {
     if( nongen_in() ) return vput(that,_unify(that,test));
 
     // LHS leaf, RHS is unchanged but goes in the VARS
-    if( this instanceof TVLeaf leaf ) return vput(that,false);
-    if( that instanceof TVLeaf      )  // RHS is a tvar; union with a deep copy of LHS
+    if( this instanceof TVLeaf ) return vput(that,false);
+    if( that instanceof TVLeaf ) // RHS is a tvar; union with a deep copy of LHS
       return test || vput(that,that.union(_fresh()));
     
     // Special handling for nilable
-    if( !(that instanceof TVNil) && this instanceof TVNil nil ) return vput(that,nil._fresh_unify_nil(that,test));
+    if( !(that instanceof TVNil) && this instanceof TVNil nil ) return vput(that,false);
     if( !(this instanceof TVNil) && that instanceof TVNil nil ) return nil._unify_nil_r(this,test);
 
     // Special handling for Base SCALAR, which can "forget" pointers
@@ -304,12 +304,10 @@ abstract public class TV3 implements Cloneable {
       return false;             // No change to 'that'
     
     // Two unrelated classes make an error
-    if( getClass() != that.getClass() ) {
-      if( test ) return true;
+    if( getClass() != that.getClass() )
       return that instanceof TVErr terr
-        ? terr._fresh_unify_err_fresh(this)
-        : this._fresh_unify_err      (that);
-    }
+        ? terr._fresh_unify_err_fresh(this,test)
+        : this._fresh_unify_err      (that,test);
 
     boolean progress = false;
 
@@ -356,7 +354,7 @@ abstract public class TV3 implements Cloneable {
   private boolean vput(TV3 that, boolean progress) { VARS.put(this,that); return progress; }
   
   // This is fresh, and neither is a TVErr.
-  boolean _fresh_unify_err(TV3 that) {
+  boolean _fresh_unify_err(TV3 that, boolean test) {
     assert !(this instanceof TVErr) && !(that instanceof TVErr);
     TVErr terr = new TVErr();
     //return terr._unify_err(this) | terr._unify_err(that);
@@ -599,7 +597,7 @@ abstract public class TV3 implements Cloneable {
       new TVClz((TVStruct)PrimNode.ZINT.tvar(),TVBase.make(true,ti));
     case TypeFlt tf ->
       new TVClz((TVStruct)PrimNode.ZFLT.tvar(),TVBase.make(true,tf));
-    case TypeNil tn -> tn == TypeNil.XNIL
+    case TypeNil tn -> tn == TypeNil.NIL
       ? new TVNil( new TVLeaf() )
       : TVBase.make(true,tn);
     case Type tt -> {

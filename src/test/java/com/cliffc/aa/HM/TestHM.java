@@ -29,10 +29,11 @@ public class TestHM {
     JIG=true;
 
     DO_HMT=true;
-    DO_GCP=false;
+    DO_GCP=true;
     RSEED=1;
-    d_struct_err_07(); // F/T/1
-    //g_overload_07(); // T/F/0
+    //b_recursive_02();
+    //b_recursive_03();
+    b_recursive_04();
   }
 
   private void _run0s( String prog, String rprog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -525,7 +526,7 @@ map ={fun parg -> (fun (cdr parg))};
     run("{ x -> y = ( x x.v ); 0}",
         // { x:&[ {A->B}; @{v=A;...} ] -> y = ( x.0 x.1.v ); 0}",
         "{ A:[Cannot unify {B->A} and *@{ v=B;...}] -> C? }",
-        "[29]{any,3 ->xnil }",
+        "[29]{any,3 ->nil }",
         "[5]","[29,7]");
   }
 
@@ -990,8 +991,8 @@ loop = { name cnt ->
         "red = (pair 123 \"red\" ); (pair (dec red.0) (isempty red.1))",
         "*(%int64,%int64)",
         "*(%int64,%int64)",
-        "*[18](_, 122, xnil)",
-        "*[18](_, 122, xnil)",
+        "*[18](_, 122, nil)",
+        "*[18](_, 122, nil)",
         "[18]",null);
   }
 
@@ -1003,8 +1004,8 @@ loop = { name cnt ->
         "{ pred -> c =(if pred ({_pred -> (pair 123 \"red\" )}(notnil pred)) (pair 456  \"blue\" )); (pair (dec c.0) (isempty c.1))}",
         "{A? -> *(%int64,%int64) }",
         "{A? -> *(%int64,%int64) }",
-        "[37]{any,3 -> *[19](_, int64, xnil) }",
-        "[37]{any,3 -> *[19](_, int64, xnil) }",
+        "[37]{any,3 -> *[19](_, int64, nil) }",
+        "[37]{any,3 -> *[19](_, int64, nil) }",
         "[19]","[37]");
   }
 
@@ -1083,8 +1084,8 @@ loop = { name cnt ->
 
         "{ A? -> *(%int64,%int64) }",
         "{ A? -> *(%int64,%int64) }",
-        "[37]{any,3 -> *[18](_, int64, xnil) }",
-        "[37]{any,3 -> *[18](_, int64, xnil) }",
+        "[37]{any,3 -> *[18](_, int64, nil) }",
+        "[37]{any,3 -> *[18](_, int64, nil) }",
         "[18]","[37]");
   }
 

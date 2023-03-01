@@ -356,6 +356,7 @@ public class TypeMem extends Type<TypeMem> {
   // Slice memory by aliases; unnamed aliases are replaced with ~use.
   public TypeMem slice_reaching_aliases(BitsAlias aliases) {
     if( aliases==BitsAlias.NALL ) return this;
+    if( aliases==BitsAlias.NANY ) return ANYMEM;
     TypeStruct[] tos = new TypeStruct[Math.max(_pubs.length,aliases.max()+1)];
     tos[1] = TypeStruct.UNUSED;
     for( int i=2; i<tos.length; i++ )

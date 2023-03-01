@@ -58,26 +58,7 @@ public class TVNil extends TV3 {
     return true;
   }
 
-  boolean _fresh_unify_nil( TV3 that, boolean test ) {
-    assert !(that instanceof TVNil);
-    if( that instanceof TVBase base ) {
-      TypeNil t = (TypeNil)base._t.meet(TypeNil.XNIL);
-      if( base._t == t ) return false;
-      if( !test ) base._t = t;
-      return true;
-    }
-    //TVLeaf not_nil = not_nil();
-    //not_nil._deps_work_clear();
-    //TV3 copy = that.copy().strip_nil();
-    //_is_copy &= that._is_copy;
-    //not_nil.union(copy);
-    //if( that instanceof TVBase ) this.union(that); // Can reverse and turn into a Base
-    //else that.union(this);      // Force 'that' to be nil-able version
-    //return true;
-    throw unimpl();
-  }
 
-  
   // -------------------------------------------------------------
   @Override boolean _trial_unify_ok_impl( TV3 that, boolean extras ) {
     if( that instanceof TVNil ) return true;

@@ -16,6 +16,7 @@ public class ConNode<T extends Type> extends Node {
   public ConNode( T t ) {
     super(OP_CON,Env.ROOT);
     _t=t;
+    _live = is_mem() ? TypeMem.ALLMEM : Type.ALL;
   }
   @Override public String xstr() {
     return _t==null ? "(null)" : _t.toString();
@@ -41,12 +42,12 @@ public class ConNode<T extends Type> extends Node {
   @Override public String toString() { return str(); }
 
   private boolean equals_uses_tvar() {
-    return _t==TypeNil.XNIL || _t instanceof TypeMemPtr || _t instanceof TypeFunPtr;
+    return _t==TypeNil.NIL || _t instanceof TypeMemPtr || _t instanceof TypeFunPtr;
   }
   @Override public int hashCode() {
     // In theory also slot 0, but slot 0 is always Start.
     int hash = _t.hashCode();
-    // Two XNILs are typically different because their TV3s are different.
+    // Two NILs are typically different because their TV3s are different.
     // Also, vary two TMPs or TFPs might vary (but not e.g. Scalar)
     if( _tvar!=null && equals_uses_tvar() )
       hash ^= _tvar._uid;
@@ -56,13 +57,13 @@ public class ConNode<T extends Type> extends Node {
     if( this==o ) return true;
     if( !(o instanceof ConNode con) ) return false;
     if( _t!=con._t ) return false;
-    // Prior to Combo we must assume two XNILs will unify to different TV3
+    // Prior to Combo we must assume two NILs will unify to different TV3
     // types and thus must remain seperate.  After Combo they can fold together
     // if they have the same TVars.
     if( _tvar==null && equals_uses_tvar() ) return false;
     
     // Check TVars, if they exist.  This allows combining ConNodes with TVars
-    // pre-Combo, except for XNIL.  E.g. all ints (or floats) are alike to TV3.
+    // pre-Combo, except for NIL.  E.g. all ints (or floats) are alike to TV3.
     if( _tvar==null ) {
       if( con._tvar!=null ) _tvar=con._tvar;
       return true;

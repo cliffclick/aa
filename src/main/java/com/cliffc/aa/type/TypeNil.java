@@ -166,8 +166,8 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   public static final TypeNil  NSCALR= make(false,false,true ); // ptrs, ints, flts     ; things that fit in a machine register
   public static final TypeNil XSCALAR= (TypeNil)SCALAR.dual();
   public static final TypeNil XNSCALR= (TypeNil)NSCALR.dual();
-  public static final TypeNil  NIL = make(false,true,false); // One of many nil choices
-  public static final TypeNil XNIL = make(true ,true,false); // One of many nil choices
+  public static final TypeNil XNIL = make(false,true,false); // One of many nil choices
+  public static final TypeNil  NIL = make(true ,true,false); // One of many nil choices
   public static final TypeNil AND_XSCALAR = make(true,false,false); // Odd choice: 0&~Scalar
 
   public static final TypeNil INTERNAL = make(false,false,false,BitsAlias.INT,BitsFun.INT);
@@ -175,7 +175,7 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   public static final TypeNil TEST0 = make(false,true,false,BitsAlias.EXT,BitsFun.INT);
   
   // Collection of sample types for checking type lattice properties.
-  static final TypeNil[] TYPES = new TypeNil[]{SCALAR,NSCALR,NIL,(TypeNil)AND_XSCALAR._dual,INTERNAL,TEST0};
+  static final TypeNil[] TYPES = new TypeNil[]{SCALAR,NSCALR,XNIL,(TypeNil)AND_XSCALAR._dual,INTERNAL,TEST0};
 
   // duals:
   //  xs +0 <->  s &0
@@ -242,7 +242,7 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   @Override public Type widen() { return this; }
 
   @Override public long getl() {
-    return this==XNIL ? 0 : super.getl();
+    return this==NIL ? 0 : super.getl();
   }
 
   // Parser init

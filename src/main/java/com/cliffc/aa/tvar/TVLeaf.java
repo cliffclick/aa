@@ -1,8 +1,11 @@
 package com.cliffc.aa.tvar;
 
+import com.cliffc.aa.AA;
+import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeNil;
 
 import static com.cliffc.aa.AA.unimpl;
 
@@ -35,6 +38,8 @@ public class TVLeaf extends TV3 {
 
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) {
-    return Env.ROOT.ext_scalar(dep);
+    if( Combo.HM_FREEZE ) return Env.ROOT.ext_scalar(dep);
+    Combo.add_freeze_dep(dep);
+    return (AA.DO_HMT || !_use_nil) ? TypeNil.XSCALAR : TypeNil.AND_XSCALAR;
   }  
 }

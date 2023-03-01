@@ -13,15 +13,17 @@ import static org.junit.Assert.*;
 public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
-    Object dummy = Env.TOP;
+    //Object dummy = Env.TOP;
     Ary<Type> ts = Type.ALL_TYPES();
-
-    Type t0 = TypeNil.AND_XSCALAR;
-    Type t1 = TypeNil.AND_XSCALAR._dual;
-
-    Type t01 = t0.meet(t1);
     
-    //assertSame(t1,t01);
+    Type xnil = TypeNil.XNIL;
+    Type  nil = TypeNil. NIL;
+    Type xnx = xnil.meet(nil);
+
+    Type bool = TypeInt.BOOL;
+    Type xbx = bool._dual.meet(xnil);
+    assertSame(TypeNil.SCALAR,xnx);
+    assertSame(xnil,xbx);
   }
 
   // Test for a collection of Types, that toString and valueOf are a bijection
@@ -131,7 +133,7 @@ public class TestType {
     //       [0,2]-> rec ^ [4]->str => [~0+4]->~obj
     //
     // nil.isa(*rec?) so nil.join(*str) isa (*rec?).join(*str)
-    Type t0 = TypeNil.XNIL;      // [0  ] -> obj
+    Type t0 = TypeNil.NIL;      // [0  ] -> obj
     Type t1 = TypeMemPtr.ISUSED0;// [0,2] -> rec
     assertTrue(t0.isa(t1));      // [0,2] -> obj -- meet is not t1
   }
@@ -240,7 +242,7 @@ public class TestType {
     Type tup = TypeStruct.ISUSED; // All Structs
 
     Type abc = TypeStruct.NAMEPT; // String constant
-    Type zer = TypeNil.XNIL;
+    Type zer = TypeNil.NIL;
     Type tp0 = TypeStruct.make_test("0",zer,TypeFld.Access.Final);  // tuple of a '0'
 
     Type tupX= tup.dual();
@@ -311,8 +313,8 @@ public class TestType {
 
     // "~str+0" or "*[~0+4+]~str?" includes a nil, but nothing can fall to a nil
     // (breaks lattice)... instead they fall to their appropriate nil-type.
-    assertEquals(TypeNil.NIL,xstr0.meet( nil ));
-    TypeNil xxstr0 = (TypeNil)xstr0.meet( xnil );
+    assertEquals(TypeNil.XNIL,xstr0.meet( xnil ));
+    TypeNil xxstr0 = (TypeNil)xstr0.meet(  nil );
     assertTrue(xxstr0._any && !xxstr0._nil && !xxstr0._sub);  // (~str) & 0 // high string and MUST support nil
 
     // This is a choice ptr-to-alias#1, vs a nil-able ptr-to-alias#2.  Since
@@ -326,18 +328,18 @@ public class TestType {
 
     // "~@{}?" or "*[~0+2+]~@{}?" includes a nil, but nothing can fall to a nil
     // (breaks lattice)... instead they fall to their appropriate nil-type.
-    assertEquals(TypeNil.NIL,xtup0.meet( nil ));
-    TypeNil xxtup0 = (TypeNil)xtup0.meet( xnil );
+    assertEquals(TypeNil.XNIL,xtup0.meet( xnil ));
+    TypeNil xxtup0 = (TypeNil)xtup0.meet( nil );
     assertTrue(xxtup0._any && !xxtup0._nil && !xxtup0._sub);  // (~tup) & 0 // high string and MUST support nil
     //assertEquals(TypeNil.XNIL,xtup0.meet( xnil )); // TODO
     assertTrue (xtup0.isa(pzer0));
     assertTrue (xtup .isa(pzer ));
     //assertTrue(TypeMem.MEM_TUP.dual().ld(xstr).isa(TypeMem.MEM_ZER.ld(pabc)));
 
-    assertTrue(xnil .isa(pabc0)); // nil expands as [0]->obj so !isa [2]->"abc"
-    assertTrue(xnil .isa(pstr0)); // nil expands as [0]->obj so !isa [4]->str
-    assertTrue(xnil .isa(ptup0)); // nil expands as [0]->obj so !isa [2]->()
-    assertTrue(xnil .isa(pzer0)); // nil expands as [0]->obj so !isa [2]->@{}
+    assertTrue(nil .isa(pabc0)); // nil expands as [0]->obj so !isa [2]->"abc"
+    assertTrue(nil .isa(pstr0)); // nil expands as [0]->obj so !isa [4]->str
+    assertTrue(nil .isa(ptup0)); // nil expands as [0]->obj so !isa [2]->()
+    assertTrue(nil .isa(pzer0)); // nil expands as [0]->obj so !isa [2]->@{}
 
     assertTrue(pabc0.isa(pstr0));
     assertTrue(pabc .isa(pstr ));
@@ -386,7 +388,7 @@ public class TestType {
     TypeMem mem = TypeMem.make0(tos.asAry()); // [7:@{c==nil},8:{c=*[0,9]},9:@{x==1}]
     // *[1]? join *[2] ==> *[1+2]?
     // {~0+7+8} -> @{ c== [~0] -> @{x==1}} // Retain precision after nil
-    Type ptr12 = TypeNil.NIL.join(TypeMemPtr.make(-alias1,a1.dual())).join( TypeMemPtr.make(-alias2,a2.dual()));
+    Type ptr12 = TypeNil.XNIL.join(TypeMemPtr.make(-alias1,a1.dual())).join( TypeMemPtr.make(-alias2,a2.dual()));
     // mem.ld(*[1+2]?) ==> @{c:0}
     // Currently retaining precision after nil: [~0] -> @{ x==1}
     Type ld = mem.ld((TypeMemPtr)ptr12);

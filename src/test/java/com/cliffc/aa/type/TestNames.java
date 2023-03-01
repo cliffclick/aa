@@ -227,7 +227,7 @@ public class TestNames {
 
 
   final static S[] ss0 = new S[]{scd,i64,point,empty};
-  final static Type[] ts0 = new Type[]{Type.ALL,TypeNil.SCALAR,TypeNil.NSCALR,TypeNil.NIL};
+  final static Type[] ts0 = new Type[]{Type.ALL,TypeNil.SCALAR,TypeNil.NSCALR,TypeNil.XNIL};
 
   @Test public void testType() {
     // Include the duals in everything

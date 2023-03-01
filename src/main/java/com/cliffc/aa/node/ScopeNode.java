@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.type.*;
 
@@ -87,7 +86,7 @@ public class ScopeNode extends Node {
   @Override public Type value() { return Type.CTRL; }
 
   @Override public TypeMem live() {
-    assert is_keep() || Combo.pre() || is_prim();
+    //assert is_keep() || Combo.pre() || is_prim();
     return RootNode.def_mem(this);
   }
 

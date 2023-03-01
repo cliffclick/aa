@@ -61,19 +61,26 @@ public class TVErr extends TV3 {
   }
 
   // This is fresh and an Err and that is not.
-  @Override boolean _fresh_unify_err(TV3 that) {
+  @Override boolean _fresh_unify_err(TV3 that, boolean test) {
     assert !unified() && !that.unified(); // Do not unify twice
     assert !(that instanceof TVErr);
-    TVErr terr = new TVErr();
-    terr._unify_err(that);
-    _fresh_unify(terr,false);
-    return true;
+    //TVErr terr = new TVErr();
+    //terr._unify_err(that);
+    //_fresh_unify(terr,false);
+    //return true;
+    throw unimpl();
   }
   // This is an Err and that is fresh and not an error
-  final boolean _fresh_unify_err_fresh(TV3 that) {
+  final boolean _fresh_unify_err_fresh(TV3 that, boolean test) {
     assert !unified() && !that.unified(); // Do not unify twice
     assert !(that instanceof TVErr);
-    throw unimpl();
+    // Fresh-unify that into the matching error part
+    TV3 tv3 = arg(that.eidx());
+    if( tv3==null ) {
+      if( !test ) _args[that.eidx()] = that;
+      return true;
+    }
+    return that._fresh_unify(arg(that.eidx()),test);
   }
 
   // Make this tvar an error and add an error message

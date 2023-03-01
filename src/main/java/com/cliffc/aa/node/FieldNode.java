@@ -236,7 +236,7 @@ public class FieldNode extends Node implements Resolvable {
     case TypeFlt tf -> "flt:";
     case TypeMemPtr tmp -> { throw unimpl(); } // Fetch from tmp._obj._clz?
     case TypeStruct ts -> ts._clz;
-    case TypeNil tn -> tn==TypeNil.XNIL ? "int:" : null;
+    case TypeNil tn -> tn==TypeNil.NIL ? "int:" : null;
     default -> null;
     };
   }

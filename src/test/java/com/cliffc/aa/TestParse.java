@@ -30,7 +30,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    test("1  > 2", "xnil", "A?");
+    test   ("math.rand(2)?(y=2;x=y*y):x=3;x", "nint8", "int:int64"); // x defined on both arms, so available after, while y is not
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -61,7 +61,7 @@ public class TestParse {
     // TestParse.a_basic_01
     test("{ x -> ( 3, x )}", "[56]{any,4 -> *[12](3, %[2,12][2,56]?) }", "{ A B -> *(int:3, B) }", null, null, "[12]", "[56]");
     // TestParse.a_basic_02
-    test("{ z -> ((z 0), (z \"abc\")) }", "[56]{any,4 -> *[13]() }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[12,13]", "[56]" );
+    test("{ z -> ((z 0), (z \"abc\")) }", "[56]{any,4 -> *[13](Scalar,Scalar) }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[12,13]", "[56]" );
 
     // TestParse.a_basic_05
     // example that demonstrates generic and non-generic variables:
@@ -94,22 +94,22 @@ public class TestParse {
     test("1", "1", "int:1");
     // Unary operator
     test("-1", "-1", "int:-1");
-    test("!1", "xnil", "A?");
+    test("!1", "nil", "A?");
     // Binary operators
     test("1+2", "3", "int:3");
     test("1-2", "-1",  "int:-1");
     test("1+2*3", "7", "int:7");
     test("1  < 2", "1", "int:1");
     test("1  <=2", "1", "int:1");
-    test("1  > 2", "xnil", "A?");
-    test("1  >=2", "xnil", "A?");
-    test("1  ==2", "xnil", "A?");
+    test("1  > 2", "nil", "A?");
+    test("1  >=2", "nil", "A?");
+    test("1  ==2", "nil", "A?");
     test("1  !=2", "1", "int:1");
     test("1.2< 2", "1", "int:1");
     test("1.2<=2", "1", "int:1");
-    test("1.2> 2", "xnil", "A?");
-    test("1.2>=2", "xnil", "A?");
-    test("1.2==2", "xnil", "A?");
+    test("1.2> 2", "nil", "A?");
+    test("1.2>=2", "nil", "A?");
+    test("1.2==2", "nil", "A?");
     test("1.2!=2", "1", "int:1");
 
     // Binary with precedence check
@@ -149,9 +149,9 @@ public class TestParse {
     test("1._+_._(2;3)", "4", "int:4"); // statements in arguments
     // Operators squished together
     test("-1== -1",  "1",  "int:1");
-    test("0== !!1",  "xnil", "A?");
-    test("2==-1",    "xnil", "A?");
-    test("-1==--1",  "xnil", "A?");
+    test("0== !!1",  "nil", "A?");
+    test("2==-1",    "nil", "A?");
+    test("-1==--1",  "nil", "A?");
     test("-1==---1", "1",  "int:1");
     testerr("-1== --", "Missing term after operator '-_'",7);
   }
@@ -171,8 +171,8 @@ public class TestParse {
     test("x:=1;x++", "1", "int:int64");
     test("x:=1;x++;x", "2", "int:2");
     test("x:=1;x++ + x--","3", "int:3");
-    test("x++","xnil", "int:int64");
-    test("x++;x", "1", "int:int64");
+    test("x++","nil", "int:int64");
+    test("x++;x","1", "int:1");
 
     // Conditional:
     test   ("0 ?    2  : 3", "3", "int:3"); // false
