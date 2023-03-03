@@ -275,6 +275,7 @@ public final class CallEpiNode extends Node {
       };
       actual = is_combo ? actual.init1() : Env.GVN.init(actual);
       arg.add_def(actual);
+      actual.xliv();
       if( arg._val.is_con() ) // Added an edge, value may change or go in-error
         arg.add_flow_defs();  // So use-liveness changes
     }

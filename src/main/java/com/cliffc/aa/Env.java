@@ -131,6 +131,7 @@ public class Env implements AutoCloseable {
     dsp.add_fld("^",TypeFld.Access.Final,dsp_ptr,null);
     NewNode ptr = new NewNode();  GVN.add_flow(ptr);
     mem = new StoreNode(mem,ptr,dsp,null).init();
+    mem.in(1).xliv();
     // Install a top-level prototype mapping
     if( fref!=null ) {          // Forward ref?
       //String fname = fref._ts._name;

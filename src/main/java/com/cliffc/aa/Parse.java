@@ -579,6 +579,7 @@ public class Parse implements Comparable<Parse> {
       StoreNode post_mem = new StoreNode(x_mem,scope.ptr(),x_stk_now,null);
       scope.set_def(MEM_IDX,null);
       scope.set_mem(X.xform(post_mem));
+      Env.GVN.revalive(x_mem,post_mem);
       
       Env.GVN.add_unuse(t_scope);
       Env.GVN.add_unuse(f_scope);

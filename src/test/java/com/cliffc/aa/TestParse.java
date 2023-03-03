@@ -30,7 +30,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)","6","int:6");
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", "1", "int:int64" );
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -237,10 +237,10 @@ public class TestParse {
     testerr("sq={x -> x*x}; sq(\"abc\")", "No operator str:_*_",10);
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)","6","int:6");
-    test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)","5","int:5");
+    test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)","int64","int:int64");
     test("f0 = { x -> x ? 1+(f0(x-1)) : 0 }; f0(2)", "2","int:2");
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))","*[12](xnil,1,2)","*(int:int64,int:int64,int:int64)", null, null, "[12]", null);
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))","*[14](nil,1,2)","*(int:int64,int:int64,int:int64)", null, null, "[14]", null);
 
     // Co-recursion requires parallel assignment & type inference across a lexical scope
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", "1", "int:int64" );

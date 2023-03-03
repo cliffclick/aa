@@ -81,7 +81,8 @@ public final class FunPtrNode extends Node {
     if( Combo.pre() ) return RootNode.def_mem(ret);    
     // During/post-combo, Ret is alive only if called or escaped.
     Env.ROOT.deps_add(ret);
-    if( Env.ROOT.rfidxs().test(fidx()) ) // Escaped
+    FunNode fun = xfun();
+    if( fun!=null && Env.ROOT.rfidxs().test(fun._fidx) ) // Escaped
       return Env.ROOT._live;             // Whatever Root requires, we do also
     return TypeMem.ANYMEM;               // Dead, no memory demand
   }
