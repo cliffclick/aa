@@ -30,7 +30,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    test   ("math.rand(2)?(y=2;x=y*y):x=3;x", "nint8", "int:int64"); // x defined on both arms, so available after, while y is not
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)","6","int:6");
   }
   static private void assertTrue(boolean t) {
     if( t ) return;

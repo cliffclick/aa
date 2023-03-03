@@ -617,7 +617,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   private Node _do_reduce() {
     // Replace with a constant, if possible
     if( should_con(_val) )
-      return con(_val);
+      return merge(con(_val));
 
     // Try CSE
     if( !_elock ) {             // Not in VALS and can still replace

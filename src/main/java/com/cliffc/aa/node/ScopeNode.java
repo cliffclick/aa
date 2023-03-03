@@ -112,11 +112,6 @@ public class ScopeNode extends Node {
 
   @Override public boolean has_tvar() { return false; }
   
-  // Create an if-scope and start tracking vars
-  private int _if_cnt;
-  public void push_if() { _if_cnt++; }
-  // Pop ifscope
-  public void pop_if() { _if_cnt--; }
   // Test for being inside a ?: expression
-  public boolean test_if() { return _if_cnt>0; }
+  public boolean test_if() { return stk()._nargs==-1; }
 }

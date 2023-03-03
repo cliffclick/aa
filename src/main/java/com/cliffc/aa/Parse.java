@@ -393,7 +393,7 @@ public class Parse implements Comparable<Parse> {
       Parse badt = errMsg();    // Capture location in case of type error
       if( peek(":=") ) _x=oldx2; // Avoid confusion with typed assignment test
       else if( peek(':') && (t=type(false,null))==null ) { // Check for typed assignment
-        if( scope().test_if() ) _x = oldx2; // Grammar ambiguity, resolve p?a:b from a:int
+        if( _e.test_if() ) _x = oldx2; // Grammar ambiguity, resolve p?a:b from a:int
         else err_ctrl0("Missing type after ':'");
       }
       if( peek(":=") ) rs.set(toks._len);              // Re-assignment parse
@@ -478,7 +478,6 @@ public class Parse implements Comparable<Parse> {
     if( expr == null ) return null; // Expr is required, so missing expr implies not any ifex
     if( !peek('?') ) return expr;   // No if-expression
 
-    scope().push_if();          // Start if-expression tracking new defs
     int omem_x = mem().push();  // Keep until parse false-side
     Node ifex = init(new IfNode(ctrl(),expr));
     int ifex_x = ifex.push();   // Keep until parse false-side
@@ -486,7 +485,7 @@ public class Parse implements Comparable<Parse> {
     
     // True side
     int t_scope_x;
-    try( Env e = _e = new Env(_e, null, 0, ctrl(), mem(), scope().ptr(), null) ) { // Nest an environment for the local vars
+    try( Env e = _e = new Env(_e, null, -1, ctrl(), mem(), scope().ptr(), null) ) { // Nest an environment for the local vars
       Node t_exp = stmt(false); // Parse true expression
       if( t_exp == null ) t_exp = err_ctrl2("missing expr after '?'");
       scope().stk().close();
@@ -505,7 +504,7 @@ public class Parse implements Comparable<Parse> {
 
     // False side
     int f_scope_x;
-    try( Env e = _e = new Env(_e, null, 0, ctrl(), mem(), scope().ptr(), null) ) { // Nest an environment for the local vars
+    try( Env e = _e = new Env(_e, null, -1, ctrl(), mem(), scope().ptr(), null) ) { // Nest an environment for the local vars
       Node f_exp = peek(':') ? stmt(false) : con(TypeNil.NIL);
       if( f_exp == null ) f_exp = err_ctrl2("missing expr after ':'");
       scope().stk().close();
@@ -1445,7 +1444,9 @@ public class Parse implements Comparable<Parse> {
   private ForwardRefNode val_fref(String tok, Parse bad) {
     ForwardRefNode fref = init(new ForwardRefNode(tok,bad));
     // Place in nearest enclosing closure scope, this will keep promoting until we find the actual scope
-    StructNode stk = scope().stk();
+    Env e = _e;
+    while( e._scope.test_if() ) e = e._par;
+    StructNode stk = e._scope.stk();
     stk.add_fld(tok,Access.Final,fref,null);
     return fref;
   }

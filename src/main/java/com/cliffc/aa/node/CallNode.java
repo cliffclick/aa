@@ -195,7 +195,7 @@ public class CallNode extends Node {
     if( tctl(tcall)!=Type.CTRL ) { // Dead control (NOT dead self-type, which happens if we do not resolve)
       if( (ctl() instanceof ConNode) ) return null;
       // Kill all inputs with type-safe dead constants
-      set_mem(Env.XMEM);
+      set_mem(Env.ANY);
       for( int i=ARG_IDX; i<_defs._len; i++ )
         set_def(i,Env.ANY);
       return set_def(0,Env.XCTRL);

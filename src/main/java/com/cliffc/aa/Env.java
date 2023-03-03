@@ -259,4 +259,11 @@ public class Env implements AutoCloseable {
   }
   // Update type name token to type mapping in the current scope
   void add_type( String name, StructNode t ) { _scope.add_type(name,t); }
+
+  // Test for being inside a ?: expression
+  boolean test_if() {
+    if( _scope.test_if() ) return true;
+    if( _scope.stk().is_closure() ) return false;
+    return _par.test_if();
+  }
 }
