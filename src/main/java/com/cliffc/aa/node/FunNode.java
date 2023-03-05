@@ -268,6 +268,7 @@ public class FunNode extends RegionNode {
       int op = n._op;           // opcode
       if( op == OP_FUN  && n       != this ) continue; // Call to other function, not part of inlining
       if( op == OP_PARM && n.in(0) != this ) continue; // Arg  to other function, not part of inlining
+      if( op == OP_ROOT ) continue; // Escaped global function
       if( op == OP_RET && n != ret ) continue; // Return (of other function)
       // OP_FUNPTR: Can be reached from an internal NewObjNode/display, or
       // following the local Return.  The local FunPtrs are added below.
@@ -327,11 +328,11 @@ public class FunNode extends RegionNode {
         //  return -1; 
         //}
         //if( tfp.test(_fidx) ) self_recursive = true; // May be self-recursive
-        if( fdx instanceof FunPtrNode fpn ) {
-          if( fpn.ret().rez() instanceof PrimNode )
-            op = OP_PRIM;       // Treat as primitive for inlining purposes
-        } else
-          call_indirect++;
+        //if( fdx instanceof FunPtrNode fpn ) {
+        //  if( fpn.ret().rez() instanceof PrimNode )
+        //    op = OP_PRIM;       // Treat as primitive for inlining purposes
+        //} else
+        //  call_indirect++;
       }
       cnts[op]++;               // Histogram ops
     }

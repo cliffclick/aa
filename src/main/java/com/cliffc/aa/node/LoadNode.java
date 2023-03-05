@@ -14,6 +14,7 @@ public class LoadNode extends Node {
   public LoadNode( Node mem, Node adr, Parse bad ) {
     super(OP_LOAD,null,mem,adr);
     _bad = bad;
+    _live=TypeStruct.ISUSED;
   }
   Node mem() { return in(MEM_IDX); }
   Node adr() { return in(DSP_IDX); }
@@ -37,10 +38,11 @@ public class LoadNode extends Node {
   // If the Load computes a constant, the address live-ness is determined how
   // Combo deals with constants, and not here.
   @Override public Type live_use(Node def ) {
+    assert _live instanceof TypeStruct ts && ts.flatten_live_fields()==ts;
     if( def==adr() ) return Type.ALL;
-    Type mem = mem()._val;
+    // Memory demands
+    adr().deps_add(def);
     Type ptr = adr()._val;
-    if( !(mem instanceof TypeMem tmem) ) return mem.oob(); // Not a memory?
     if( ptr instanceof TypeStruct ) return ptr.oob(TypeMem.ALLMEM); // Loading from a clazz
     TypeMemPtr tptr=null;
     if( !(ptr instanceof TypeMemPtr tptr0) ) {
@@ -56,10 +58,10 @@ public class LoadNode extends Node {
       }
       if( tptr==null ) return ptr.oob(TypeMem.ALLMEM);
     } else tptr=tptr0;
-    
+
     if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
-    // Only the named aliases is live.
-    return tmem.remove_no_escapes(tptr._aliases);
+    // Demand memory produce the desired structs
+    return TypeMem.make(tptr._aliases,(TypeStruct)_live);
   }
   // Only structs are demanded from a Load
   @Override boolean assert_live(Type live) { return live instanceof TypeStruct; }
@@ -125,10 +127,14 @@ public class LoadNode extends Node {
     // Load from a memory Phi; split through in an effort to sharpen the memory.
     // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
     // TODO: Hoist out of loops.
-    if( mem instanceof PhiNode mphi && adr instanceof NewNode ) {
+    if( mem instanceof PhiNode mphi && adr instanceof NewNode && !(mphi instanceof ParmNode) ) {
       Node lphi = new PhiNode(TypeNil.SCALAR,mphi._badgc,mphi.in(0));
-      for( int i=1; i<mphi._defs._len; i++ )
-        lphi.add_def(Env.GVN.add_work_new(new LoadNode(mphi.in(i),adr,_bad).init()));
+      for( int i=1; i<mphi._defs._len; i++ ) {
+        Node ld = Env.GVN.add_work_new(new LoadNode(mphi.in(i),adr,_bad).init());
+        ld._live = _live;
+        lphi.add_def(ld);
+      }
+      lphi._live = _live;
       subsume(lphi.init());
       return lphi;
     }

@@ -47,7 +47,12 @@ public class RootNode extends Node {
                      ? tt.at(3)
                      : _val.oob(TypeNil.INTERNAL));
   }
-
+  // Used by CallEpiNode for the return type of unknown external functions
+  public TypeNil ext_caller() {
+    return (TypeNil)(_val instanceof TypeTuple tt
+                     ? tt.at(3)
+                     : _val.oob(TypeNil.SCALAR));
+  }
   
   // Output value is:
   // [Ctrl, All_Mem_Minus_Dead, Rezult, [escaped_fidxs, escaped_aliases]]

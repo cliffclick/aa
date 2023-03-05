@@ -144,8 +144,6 @@ public class TVStruct extends TV3 {
 
   @Override boolean _unify_impl( TV3 tv3 ) {
     TVStruct that = (TVStruct)tv3; // Invariant when called
-    this.trial_resolve_all(false);
-    that.trial_resolve_all(false);
     assert !this.unified() && !that.unified();
     TVStruct thsi = this;
 
@@ -189,28 +187,12 @@ public class TVStruct extends TV3 {
   // -------------------------------------------------------------
   @Override boolean _fresh_unify_impl(TV3 tv3, boolean test) {
     boolean progress = false, missing = false;
-    assert !unified() && !tv3.unified();
-    
-    // Any pending field resolutions
-    progress |= this.trial_resolve_all(test);
-    progress |= ((TVStruct)tv3.find()).trial_resolve_all(test);
+    assert !unified() && !tv3.unified();    
     TVStruct that = (TVStruct)tv3.find(); // Might have to update
-    assert !unified();       // TODO: update/find thsi,that
 
     for( int i=0; i<_max; i++ ) {
       TV3 lhs = arg(i);
       int ti = Util.find(that._flds,_flds[i]);
-      if( ti== -1 && Resolvable.is_resolving(_flds[i]) ) {
-        // Open RHS allows more fields which might add choices
-        if( that._open ) continue;
-        Resolvable res = TVField.FIELDS.get(_flds[i]);
-        if( !res.trial_resolve(false,lhs,this,that,test) ) continue;
-        if( test ) return true;
-        progress = true;
-        // Updated LHS args and RHS key
-        lhs = arg(_flds[i]);
-      }
-
       if( ti == -1 ) {          // Missing in RHS
         if( is_open() || that.is_open() ) {
           if( test ) return true; // Will definitely make progress
@@ -255,9 +237,8 @@ public class TVStruct extends TV3 {
   
   // -------------------------------------------------------------
   // TODO  move to Resolvable?
-  private boolean trial_resolve_all(boolean test) {
+  void trial_resolve_all() {
     assert !unified();
-    boolean progress = false;
     for( int i=0; i<_max; i++ ) {
       String key = _flds[i];
       Resolvable res = TVField.FIELDS.get(key);
@@ -265,18 +246,16 @@ public class TVStruct extends TV3 {
       // Field is still resolving?
       if( res.is_resolving() ) {
         if( !is_open() ) // More fields possible, so trial_resolve cannot be tried
-          progress |= res.trial_resolve(false,arg(i),this,this,test); // Attempt resolve
+          res.trial_resolve(true,arg(i),this,this, false); // Attempt resolve
       } else {
         // key is resolving, but Field is already resolved
-        if( test ) continue;
         TV3 old = arg(i);        // Old unresolved value
         del_fld(i);              // Remove resolving key
         TV3 t3 = arg(res.fld()); // Get resolved label, if any
         if( t3==null ) throw unimpl(); //_args.put(res._fld,old); // Insert resolved-label, even if this is open, since operation is a label replacement
-        else progress |= old._unify(t3,test); // Unify into existing (fold labels together)
+        else old._unify(t3, false); // Unify into existing (fold labels together)
       }
     }
-    return progress;
   }
 
   @Override boolean _trial_unify_ok_impl( TV3 tv3, boolean extras ) {

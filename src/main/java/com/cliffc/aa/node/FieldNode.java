@@ -96,9 +96,15 @@ public class FieldNode extends Node implements Resolvable {
   // If the field is resolving, we do not know which field to demand, so demand
   // them all when lifting and none when lowering.  
   @Override public Type live_use( Node def ) {
-    if( is_resolving() ) return TypeStruct.UNUSED.oob(Combo.pre());
+    if( is_resolving() ) {
+      if( Combo.pre() || Combo.post() | Combo.HM_AMBI )
+        return TypeStruct.ISUSED; // Not sure which one, so pick all
+      // Still might resolve, and therefore keep alive only the resolved field.
+      deps_add(def);
+      return TypeStruct.UNUSED;
+    }
     // Clazz load, the instance is normal-live
-    if( _clz && def==in(0) ) return Type.ALL;
+    if( _clz && def==in(0) ) return TypeStruct.ISUSED;
     // Otherwise normal fields and clazz fields are field-alive.
     return TypeStruct.UNUSED.replace_fld(TypeFld.make(_fld,Type.ALL));
   }
@@ -195,7 +201,9 @@ public class FieldNode extends Node implements Resolvable {
     if( tv0 instanceof TVStruct str0 ) str = str0;
     else {
       if( test ) return true;
-      TVStruct inst = new TVStruct(true, new String[]{_fld}, new TV3[]{tvar()}, true);
+      TVStruct inst = new TVStruct(true, new String[]{}, new TV3[]{}, true);
+      if( !is_resolving() )
+        inst.add_fld(_fld,Oper.is_oper(_fld),tvar());
       progress = tv0.unify(str=inst,test);
     }
     
@@ -253,17 +261,12 @@ public class FieldNode extends Node implements Resolvable {
   
   private boolean try_resolve( TVStruct str, boolean test ) {
     // If struct is open, more fields might appear and cannot do a resolve.
-    TV3 self = tvar();
-    if( !str.is_open() ) {
-      if( trial_resolve(true, self, str, str, test) ) return true;
-      // No progress, try again if self changes
-      if( !test ) self.deps_add_deep(this);
-    }
-    // Progress if field is missing
-    if( test ) return str.arg(_fld)==null;
-    str.deps_add_deep(this);    // Try again if str closes
-    // Add unresolved field if not already there (even if closed)
-    return str.arg(_fld)==null && str.add_fld(_fld,Oper.is_oper(_fld),self); 
+    if( str.is_open() ) return false;
+    if( trial_resolve(true, tvar(), str, str, test) )
+      return true;              // Resolve succeeded!
+    // No progress, try again if self changes
+    if( !test ) tvar().deps_add_deep(this);
+    return false;
   }
 
   @Override public ErrMsg err( boolean fast ) {

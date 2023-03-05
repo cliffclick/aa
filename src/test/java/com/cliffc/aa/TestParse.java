@@ -30,7 +30,8 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", "1", "int:int64" );
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)","6","int:6");
+
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -61,7 +62,7 @@ public class TestParse {
     // TestParse.a_basic_01
     test("{ x -> ( 3, x )}", "[56]{any,4 -> *[12](3, %[2,12][2,56]?) }", "{ A B -> *(int:3, B) }", null, null, "[12]", "[56]");
     // TestParse.a_basic_02
-    test("{ z -> ((z 0), (z \"abc\")) }", "[56]{any,4 -> *[13]() }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[12,13]", "[56]" );
+    test("{ z -> ((z 0), (z \"abc\")) }", "[56]{any,4 -> *[13](%[2,12,13][2,56]?, %[2,12,13][2,56]?) }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[12,13]", "[56]" );
 
     // TestParse.a_basic_05
     // example that demonstrates generic and non-generic variables:
@@ -87,6 +88,12 @@ public class TestParse {
 
     // error, missing a comma
     testerr("{ x -> ( 3 x )}", "A function is being called, but 3 is not a function",11);
+
+    // TestParse.b_recursive_01
+    test("{ f -> (f f) }", "[56]{any,4 -> %[2][2,56]? }", "{A B:{C B -> D } -> D }", null, null, "[]", "[56]" );
+
+    // TestParse.b_recursive_05, Y combinator
+    test("{ f -> ({ x -> (f (x x))} { x -> (f (x x))})}", "[56]{any,4 -> %[2][2,56]? }", "{ A { B C -> C } -> C }", null, null, "[]", "[56]" );
 
   }
   
@@ -172,7 +179,7 @@ public class TestParse {
     test("x:=1;x++;x", "2", "int:2");
     test("x:=1;x++ + x--","3", "int:3");
     test("x++","nil", "int:int64");
-    test("x++;x","1", "int:int64");
+    test("x++;x","1", "int:1");
 
     // Conditional:
     test   ("0 ?    2  : 3", "3", "int:3"); // false

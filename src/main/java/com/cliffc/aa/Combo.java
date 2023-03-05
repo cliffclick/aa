@@ -213,7 +213,7 @@ public abstract class Combo {
   }
 
   private static void add_new_leaf_work() { }
-  private static void add_ambi_work()     {
+  private static void add_ambi_work() {
     for( Resolvable fld : TVField.FIELDS.values() )
       if( fld.is_resolving() )
         fld.resolve_failed();

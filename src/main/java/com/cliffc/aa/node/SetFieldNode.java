@@ -42,10 +42,18 @@ public class SetFieldNode extends Node {
     // If this node is not alive, neither input is
     if( !(_live instanceof TypeStruct ts) ) return _live;
     Type fld_live = ts.at_def(_fld);
-    if( def==in(0) ) // Pass thru liveness of all fields except this one
-      return fld_live!=Type.ANY ? ts.replace_fld(TypeFld.make(_fld,Type.ANY)) : ts;
     // For this field, pass liveness thru directly
-    return fld_live;
+    if( def==in(1) ) return fld_live;
+    // For memory, pass thru liveness of all fields except this one
+    if( fld_live==Type.ANY ) return ts; // Already dead
+    // Here liveness depends on incoming value (i.e., value turns around into
+    // liveness).  If incoming field is Final, this SetField is in-error and
+    // keeps alive the field to preserve the prior SetField.
+    TypeFld fld = ts.get(_fld);
+    if( fld==null && !ts.above_center()     ) return ts;
+    if( fld!=null && fld._access!=Access.RW ) return ts;
+    // SetField resolved the demand for this field, so remove from live-use
+    return ts.replace_fld(TypeFld.make(_fld,Type.ANY));
   }
   @Override boolean assert_live(Type live) { return live instanceof TypeStruct; }
 
@@ -89,9 +97,6 @@ public class SetFieldNode extends Node {
   @Override public boolean unify( boolean test ) {
     TVStruct self = tvar( ).as_struct();
     TVStruct rec  = tvar(0).as_struct();
-
-    //boolean progress = self.arg(_fld).fresh_unify(rec.arg(_fld),null,test);
-
     // Unify all other common fields, same as normal struct unification
     return 
       self.half_unify(rec ,_fld,test) |
@@ -103,7 +108,7 @@ public class SetFieldNode extends Node {
       return val(0).above_center() ? null : bad("Unknown",fast,null);
     TypeFld fld = ts.get(_fld);
     if( fld==null )
-      return bad("No such",fast,ts);
+      return ts.above_center() ? null : bad("No such",fast,ts);
     Access access = fld._access;
     if( access!=Access.RW )
       return bad("Cannot re-assign "+access,fast,ts);

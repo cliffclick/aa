@@ -130,10 +130,11 @@ public class GVNGCM {
   // Top-level iter clean-out.  Does everything it can, empties all queues and
   // aggressively checks no-more-progress.
   public void iter() {
+    int cnt = ITER_CNT;
     assert AA.once_per() || Env.ROOT.more_work(true) == 0; // Initial conditions are correct
     //assert Env.ROOT.no_more_ideal(); // Has side-effects of putting things on worklist
     while( true ) {
-      ITER_CNT++; assert ITER_CNT < 15000; // Catch infinite ideal-loops
+      cnt++; assert cnt < 15000; // Catch infinite ideal-loops
       Node n, m;
       if( false ) ;
       else if( (n=_work_dead  .pop())!=null ) m = n._uses._len == 0 ? n.kill() : null;
@@ -150,6 +151,7 @@ public class GVNGCM {
     }
     assert AA.once_per() || Env.ROOT.more_work(true)==0;
     //assert Env.ROOT == null || Env.ROOT.no_more_ideal(); // Has side effects of putting things on worklist
+    ITER_CNT=cnt;
   }
 
   // Did a bulk not-monotonic update.  Forcibly update the entire region at

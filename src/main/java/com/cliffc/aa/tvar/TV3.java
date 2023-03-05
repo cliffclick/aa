@@ -51,6 +51,7 @@ abstract public class TV3 implements Cloneable {
   // This is used Fresh against that.
   // If it ever changes (add_fld to TVStruct, or TVLeaf unify), we need to re-Fresh the deps.
   static Ary<DelayFresh> DELAY_FRESH  = new Ary<>(new DelayFresh[1],0);
+  static Ary<TVStruct> DELAY_RESOLVE  = new Ary<>(new TVStruct[1],0);
   
   // Disjoint Set Union set-leader.  Null if self is leader.  Not-null if not a
   // leader, but pointing to a chain leading to a leader.  Rolled up to point
@@ -164,8 +165,10 @@ abstract public class TV3 implements Cloneable {
     that._use_nil |= _use_nil;
     if( that._may_nil && that._use_nil ) throw unimpl();
     _union_impl(that);          // Merge subclass specific bits
-    // Move delayed-fresh updates onto not-delayed update list
+    // Move delayed-fresh updates onto the not-delayed update list
     move_delay_fresh();
+    // Move delayed-resolve updates onto the not-delayed update list
+    move_delay_resolve();
     // Add Node updates to _work_flow list
     this._deps_work_clear();    // This happens before the unification
     that._deps_work_clear();
@@ -175,8 +178,14 @@ abstract public class TV3 implements Cloneable {
   }
 
   // Move delayed-fresh updates onto not-delayed update list.
-  void move_delay_fresh() { DELAY_FRESH.addAll(_delay_fresh); }
-  
+  void move_delay_fresh() {
+    if( _delay_fresh!=null ) {
+      DELAY_FRESH.addAll(_delay_fresh);
+      _delay_fresh.clear();
+    }
+  }
+  void move_delay_resolve() { }
+
   // Merge subclass specific bits
   abstract void _union_impl(TV3 that);
   
@@ -277,10 +286,6 @@ abstract public class TV3 implements Cloneable {
     if( this==that ) return false;
     assert !unified() && !that.unified();
 
-    // Record that the LHS is Fresh'd against the RHS.  If the LHS changes in
-    // the future, we'll need to re-Fresh agains the RHS.
-    if( !test ) add_delay_fresh();
-
     // Check for cycles
     TV3 prior = VARS.get(this);
     if( prior!=null )                        // Been there, done that
@@ -291,7 +296,12 @@ abstract public class TV3 implements Cloneable {
     if( nongen_in() ) return vput(that,_unify(that,test));
 
     // LHS leaf, RHS is unchanged but goes in the VARS
-    if( this instanceof TVLeaf ) return vput(that,false);
+    if( this instanceof TVLeaf ) {
+      // Record that the LHS is Fresh'd against the RHS.  If the LHS changes in
+      // the future, we'll need to re-Fresh agains the RHS.
+      if( !test ) add_delay_fresh();
+      return vput(that,false);
+    }
     if( that instanceof TVLeaf ) // RHS is a tvar; union with a deep copy of LHS
       return test || vput(that,that.union(_fresh()));
     
@@ -393,7 +403,7 @@ abstract public class TV3 implements Cloneable {
     // top-level will fresh-deps unify correctly
     // nested ones tho, will need a new fresh-deps from old to new
     TV3 t = copy();
-    add_delay_fresh();          // Related via fresh, so track updates
+    if( this instanceof TVLeaf ) add_delay_fresh(); // Related via fresh, so track updates
     VARS.put(this,t);           // Stop cyclic structure looping
     if( _args!=null )
       for( int i=0; i<t.len(); i++ )
@@ -448,7 +458,7 @@ abstract public class TV3 implements Cloneable {
     long duid = dbl_uid(that._uid);
     if( TDUPS.putIfAbsent(duid,this)!=null )
       return true;              // Visit only once, and assume will resolve
-    if( this instanceof TVLeaf ) return true; // No error
+    if( this instanceof TVLeaf leaf ) return Resolvable.add_pat_leaf(leaf); // No error
     if( that instanceof TVLeaf ) return true; // No error
     // Nil can unify with ints,flts,ptrs
     if( this instanceof TVNil ) return this._trial_unify_ok_impl(that,extras);
@@ -460,9 +470,7 @@ abstract public class TV3 implements Cloneable {
   }
 
   // Subclasses specify on sub-parts
-  boolean _trial_unify_ok_impl( TV3 that, boolean extras ) {
-    throw unimpl();
-  }
+  boolean _trial_unify_ok_impl( TV3 that, boolean extras ) { throw unimpl(); }
   
   // -----------------
   
@@ -494,8 +502,10 @@ abstract public class TV3 implements Cloneable {
     _deps = null;
   }
   
-  // -----------------
-
+  // -----------------  
+  // Delayed-Fresh-Unify of LHS vs RHS.  LHS was a leaf and so imparted no
+  // structure to RHS.  When LHS changes to a non-leaf, the RHS needs to
+  // re-Fresh-Unify.  
   static class DelayFresh {
     TV3 _lhs, _rhs;
     TV3[] _nongen;
@@ -541,15 +551,18 @@ abstract public class TV3 implements Cloneable {
   void add_delay_fresh() {
     // Lazy make a list to hold
     if( _delay_fresh==null ) _delay_fresh = new Ary<>(new DelayFresh[1],0);
-    // Dup checks
+    // Dup checks: no dups upon insertion, but due to later unification we
+    // might get more dups.  Every time we detect some progress, re-filter for
+    // dups.
     for( int i=0; i<_delay_fresh._len; i++ ) {
       DelayFresh dfi = _delay_fresh.at(i);
       if( dfi.update() ) {      // Progress?  Do a dup-check
         for( int j=0; j<i; j++ ) {
           if( _delay_fresh.at(j) == dfi )
-            throw unimpl();     // 'i' became a dup, remove '1'
+            throw unimpl();     // 'i' became a dup, remove 'j'
         }
       }
+      // Inserting ROOT, unless a dup
       if( ROOT.eq(_delay_fresh.at(i)) )
         return;                 // Dup, do not insert
     }
@@ -562,8 +575,14 @@ abstract public class TV3 implements Cloneable {
   public static void do_delay_fresh() {
     while( DELAY_FRESH.len() > 0 ) {
       DelayFresh df = DELAY_FRESH.pop();
+      int old = DELAY_FRESH.len();
       df._lhs.find().fresh_unify(df._rhs.find(),df._nongen,false);
+      assert old == DELAY_FRESH.len(); // This might be OK, but need a test case
     }
+  }
+  public static void do_delay_resolve() {
+    while( DELAY_RESOLVE.len() > 0 )
+      DELAY_RESOLVE.pop().trial_resolve_all();
   }
   
   // -----------------
@@ -696,6 +715,7 @@ abstract public class TV3 implements Cloneable {
   private TV3 _find(int uid, VBitSet visit) {
     if( visit.tset(_uid) ) return null;
     if( _uid==uid ) return this;
+    if( _uf!=null ) return _uf._find(uid,visit);
     if( _args==null ) return null;
     for( TV3 arg : _args )
       if( arg!=null && (arg=arg._find(uid,visit)) != null )
@@ -714,5 +734,10 @@ abstract public class TV3 implements Cloneable {
       return tv3;
     } catch(CloneNotSupportedException cnse) {throw unimpl();}
   }
-  public static void reset_to_init0() { CNT=0; TVField.reset_to_init0(); }
+  public static void reset_to_init0() {
+    CNT=0;
+    TVField.reset_to_init0();
+    DELAY_FRESH.clear();
+    DELAY_RESOLVE.clear();
+  }
 }

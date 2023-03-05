@@ -2,6 +2,8 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.node.Node;
+import com.cliffc.aa.node.FieldNode;
+import com.cliffc.aa.util.Ary;
 
 public interface Resolvable {
   // True if this field is still resolving: the actual field being referenced
@@ -22,18 +24,25 @@ public interface Resolvable {
   // - 0  zero matching choices
   // - 1  exactly one choice; resolvable (and resolved if not testing)
   // - 2+ two or more choices; resolve is ambiguous
+  static Ary<TVLeaf> PAT_LEAFS = new Ary<TVLeaf>(new TVLeaf[1],0);
   default boolean trial_resolve( boolean outie, TV3 pattern, TVStruct lhs, TVStruct rhs, boolean test ) {
     assert !rhs.is_open() && is_resolving();
 
     // Not yet resolved.  See if there is exactly 1 choice.
+    PAT_LEAFS.clear();
     String lab = null;
     for( int i=0; i<rhs.len(); i++ ) {
       String id = rhs.fld(i);
       if( !is_resolving(id) && pattern.trial_unify_ok(rhs.arg(id),false) ) {
         if( lab==null ) lab=id;   // No choices yet, so take this one
-        // 2nd choice; ambiguous; either cannot resolve (yet), or too late and
-        // will never resolve
-        else return false;
+        else {
+          // 2nd choice; ambiguous; either cannot resolve (yet), or too late
+          // and will never resolve.  Record all pattern leaves in the RHS
+          // delay list which may later expand and force the resolve.
+          while( PAT_LEAFS._len>0 )
+            PAT_LEAFS.pop().delay_resolve(rhs);
+          return false;
+        }
       }
     }
     if( lab==null ) return false; // No match, so error and never resolves
@@ -54,6 +63,12 @@ public interface Resolvable {
     return true;              // Progress
   }
 
+  static boolean add_pat_leaf(TVLeaf leaf) {
+    if( PAT_LEAFS.find(leaf)== -1 )
+      PAT_LEAFS.add(leaf);
+    return true;
+  }
+    
   // Resolve failed; if ambiguous report that; if nothing present report that;
   // otherwise force unification on all choices which will trigger an error on
   // each choice.
@@ -63,6 +78,7 @@ public interface Resolvable {
       : "No field resolves";
     tvar().err(err);
     Env.GVN.add_flow((Node)this);
+    ((FieldNode)this).deps_work_clear();
   }
   // True if ambiguous (more than one match), false if no matches.
   private boolean ambi(TV3 self, TVStruct tvs) {

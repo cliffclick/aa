@@ -53,35 +53,40 @@ public class StoreNode extends Node {
   // Compute the liveness local contribution to def's liveness.  Turns around
   // value into live: if values are ANY then nothing is demand-able.
   @Override public Type live_use( Node def ) {
-    mem().deps_add(def);        // Changes to mem()'s value changes def's liveness
-    TypeMem jmem = _live_use_mem(def);
-    Type aval = adr()._val;
-    TypeMemPtr tmp = aval instanceof TypeMemPtr tmp0 ? tmp0 : aval.oob(TypeMemPtr.ISUSED);
+    // Liveness as a TypeMem
+    TypeMem live = _live== Type.ANY ? TypeMem.ANYMEM
+      : (_live== Type.ALL ? RootNode.def_mem(def)
+         : (TypeMem)_live);
+    // Input memory as a TypeMem
+    Type mem0 = mem()._val;
+    TypeMem mem = mem0== Type.ANY ? TypeMem.ANYMEM
+      : (mem0== Type.ALL ? TypeMem.ALLMEM
+         : (TypeMem)mem0);
+    TypeMemPtr tmp = adr()._val instanceof TypeMemPtr tmp0 ? tmp0 : adr()._val.oob(TypeMemPtr.ISUSED);
 
-    // TODO: if aval is precise alias, can remove it also from jmem
-    if( def==mem() ) return jmem;
-    // Available (live) struct
-    TypeStruct ts = jmem.ld(tmp);
-    if( def==adr() ) return ts.oob(); // Live-use for the adr(), which is a Type.ANY/ALL
-    return ts;                  // Live-use for the rez() which is a TypeStruct liveness    
+    // Liveness for memory?
+    if( def==mem() ) {
+      // Assume all above center aliases kill everything (will optimistically
+      // kill what we need) to make uses go away
+      if( tmp._aliases.above_center() ) {
+        for( int alias : tmp._aliases )
+          live = live.set(alias,TypeStruct.UNUSED);
+        return live;
+      }
+      mem().deps_add(def);
+      // Precise update if its a single alias, and no value at alias is arriving here
+      int alias = tmp._aliases.abit();
+      if( alias!=-1 && mem.at(alias).above_center() )
+        return live.set(alias,TypeStruct.UNUSED); // Precise set, no longer demanded
+      // Imprecise update, cannot dataflow kill alias going backwards
+      return live;
+    }
+
+    // Demanded struct; if ptr just any/all else demand struct
+    TypeStruct ts = live.ld(tmp);
+    return def==adr() ? ts.oob() : ts;
   }
-  // Compute liveness as a TypeMem, intersection of demand and avail
-  private TypeMem _live_use_mem(Node def) {
-    if( _live== Type.ANY ) return TypeMem.ANYMEM;
-    if( _live== Type.ALL ) return RootNode.def_mem(def);
-    Type mval = mem()._val;
-    Type aval = adr()._val;
-    if( mval == Type.ANY ) return TypeMem.ANYMEM;
-    if( aval == Type.ANY ) return TypeMem.ANYMEM;
-    
-    TypeMem tlive = _live==Type.ALL ? TypeMem.ALLMEM    : (TypeMem   )_live; // Assert _live is ANY, ALL or a TypeMem
-    TypeMem tmem  = mval ==Type.ALL ? TypeMem.ALLMEM    : (TypeMem   ) mval; // Assert  mval is ANY, ALL or a TypeMem
-    tmem = tmem.flatten_live_fields();
-    // Intersect demand and avail
-    TypeMem jmem  = (TypeMem)tlive.join(tmem);
-    return jmem;
-  }
-  
+
   @Override public Node ideal_reduce() {
     if( is_prim() ) return null;
     if( _live == Type.ANY ) return null; // Dead from below; nothing fancy just await removal
@@ -102,7 +107,7 @@ public class StoreNode extends Node {
         // If dead from either above or below, we can remove
         if( tmp.above_center() ) return mem;
         TypeStruct ts0 = (_live instanceof TypeMem tm ? tm : _live.oob(TypeMem.ALLMEM)).ld(tmp);
-        if( ts0.above_center() ) return mem;
+        if( ts0==TypeStruct.UNUSED ) return mem;
       }
       mem.deps_add(this);   // Input address changes, check reduce
       deps_add(this);       // Our   address changes, check reduce

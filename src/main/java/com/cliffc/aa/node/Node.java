@@ -580,6 +580,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( unify(false) ) {
       assert !_tvar.find().unify(old.find(),true);// monotonic: unifying with the result is no-progress
       TV3.do_delay_fresh();
+      TV3.do_delay_resolve();
       // HM changes; push related neighbors
       for( Node def : _defs ) if( def!=null && def.has_tvar() ) def.add_flow();
       for( Node use : _uses ) if(              use.has_tvar() ) use.add_flow();

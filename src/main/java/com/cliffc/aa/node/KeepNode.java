@@ -12,6 +12,7 @@ public class KeepNode extends Node {
     if( def.is_mem() ) return _live;
     if( def instanceof   StructNode ) return TypeStruct.ISUSED;
     if( def instanceof SetFieldNode ) return TypeStruct.ISUSED;
+    if( def instanceof     LoadNode ) return TypeStruct.ISUSED;
     if( def instanceof    FieldNode fld && fld._val instanceof TypeStruct )
       return TypeStruct.ISUSED; // Fields from CLAZZes can return Struct overloads
     return Type.ALL;

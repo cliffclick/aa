@@ -6,6 +6,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeNil;
+import com.cliffc.aa.util.Ary;
 
 import static com.cliffc.aa.AA.unimpl;
 
@@ -13,6 +14,8 @@ public class TVLeaf extends TV3 {
 
   public TVLeaf() { }
   public TVLeaf( boolean is_copy ) { super(is_copy); }
+
+  private Ary<TVStruct> _delay_resolve;
 
   // Leafs never show up in errors
   @Override int eidx() { throw unimpl(); }
@@ -41,5 +44,15 @@ public class TVLeaf extends TV3 {
     if( Combo.HM_FREEZE ) return Env.ROOT.ext_scalar(dep);
     Combo.add_freeze_dep(dep);
     return (AA.DO_HMT || !_use_nil) ? TypeNil.XSCALAR : TypeNil.AND_XSCALAR;
-  }  
+  }
+
+  // -------------------------------------------------------------
+  void delay_resolve(TVStruct tvs) {
+    if( _delay_resolve==null ) _delay_resolve = new Ary<>(new TVStruct[1],0);
+    if( _delay_resolve.find(tvs)== -1 )
+      _delay_resolve.push(tvs);
+  }
+
+  @Override void move_delay_resolve() { DELAY_RESOLVE.addAll(_delay_resolve); }
+  
 }

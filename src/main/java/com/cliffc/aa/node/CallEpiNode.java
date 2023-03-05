@@ -39,7 +39,7 @@ public final class CallEpiNode extends Node {
   @Override public boolean is_mem() { return true; }
   public CallNode call() { return (CallNode)in(0); }
   // True if this calls an external function, and so escapes all arguments
-  boolean is_global() { return in(1)!=null; }
+  boolean is_global() { return len()>1 && in(1)!=null; }
   public int nwired() { return _defs._len-2; }
   public RetNode wired(int x) { return (RetNode)in(x+2); }
 
@@ -260,6 +260,9 @@ public final class CallEpiNode extends Node {
   // Wire without the redundancy check, or adding to the CallEpi
   void wire0(CallNode call, Node fun, boolean is_combo) {
     // Wire.  Bulk parallel function argument path add
+    Node cep = new CEProjNode(call);
+    cep  = is_combo ? cep.init1() : Env.GVN.init(cep);
+    fun.add_def(GVN.add_flow(cep));
 
     // Add an input path to all incoming arg ParmNodes from the Call.  Cannot
     // assert finding all args, because dead args may already be removed - and
@@ -281,9 +284,6 @@ public final class CallEpiNode extends Node {
     }
 
     // Add matching control to function via a CallGraph edge.
-    Node cep = new CEProjNode(call);
-    cep  = is_combo ? cep.init1() : Env.GVN.init(cep);
-    fun.add_def(GVN.add_flow(cep));
     GVN.add_flow(fun);
     for( Node use : fun._uses ) GVN.add_flow(use);
     if( fun instanceof FunNode ) GVN.add_inline((FunNode)fun);
@@ -317,7 +317,8 @@ public final class CallEpiNode extends Node {
       TypeMem rmem = Env.ROOT.rmem();
       Type cmem = CallNode.emem(tcall);
       if( !Combo.HM_FREEZE ) Combo.add_freeze_dep(this);
-      return tfptr.oob(TypeTuple.make(Type.CTRL,rmem.meet(cmem),Type.ANY.oob(LIFTING || Combo.HM_FREEZE)));
+      Type rfuns = is_global() ? Env.ROOT.ext_caller() : Type.ALL;
+      return TypeTuple.make(Type.CTRL,rmem.meet(cmem),rfuns);
     }
 
     // Compute call-return value from all callee returns
