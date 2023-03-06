@@ -139,7 +139,10 @@ public class Env implements AutoCloseable {
       //PROTOS.put(fname,dsp);
       throw unimpl();
     }
-    _scope = new ScopeNode(new HashMap<>(),ctrl,mem,XNIL,ptr,dsp).init();
+    HashMap<String,TypeNil> types = new HashMap<>();
+    _scope = new ScopeNode(types,ctrl,mem,XNIL,ptr,dsp).init();
+    if( _par==null )
+      Type.init0(types);
     KEEP_ALIVE.add_def(_scope);
     GVN.iter();
   }
@@ -184,9 +187,10 @@ public class Env implements AutoCloseable {
     ScopeNode pscope = _par._scope;
     stk.promote_forward(pscope.stk());
     for( String tname : _scope.typeNames() ) {
-      StructNode n = _scope.get_type(tname);
-      if( n.is_forward_type() )
-        pscope.add_type(tname,n);
+      TypeNil t = _scope.get_type(tname);
+      //if( t.is_forward_type() )
+      //  pscope.add_type(tname,t);
+      throw unimpl();
     }
 
     Node xscope = KEEP_ALIVE.pop();// Unhook scope
@@ -252,19 +256,18 @@ public class Env implements AutoCloseable {
   }
 
   // Type lookup in any scope
-  StructNode lookup_type( String tvar ) {
-    assert tvar.charAt(tvar.length()-1)==':';
-    StructNode t = _scope.get_type(tvar);
+  Type lookup_type( String tvar ) {
+    Type t = _scope.get_type(tvar);
     if( t != null ) return t;
     return _par == null ? null : _par.lookup_type(tvar);
   }
   // Update type name token to type mapping in the current scope
-  void add_type( String name, StructNode t ) { _scope.add_type(name,t); }
+  void add_type( String name, TypeNil t ) { _scope.add_type(name,t); }
 
   // Test for being inside a ?: expression
   boolean test_if() {
     if( _scope.test_if() ) return true;
-    if( _scope.stk().is_closure() ) return false;
+    if( _scope.stk().is_closure() || _par==null ) return false;
     return _par.test_if();
   }
 }

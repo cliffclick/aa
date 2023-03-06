@@ -6,8 +6,6 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
-import static com.cliffc.aa.AA.unimpl;
-
 /** A ptr-to-struct
  *
  */
@@ -17,7 +15,7 @@ public class TVPtr extends TV3 {
   // Get the Struct
   public TV3 load() { return arg(0); }
 
-  @Override int eidx() { throw unimpl(); }
+  @Override int eidx() { return TVErr.XPTR; }
 
   // Make the leader a nilable version of 'this' child
   @Override TV3 find_nil(TVNil nil) {

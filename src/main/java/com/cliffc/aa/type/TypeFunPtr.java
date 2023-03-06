@@ -388,7 +388,6 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
               ? tfp.widen_sub()
               : this;
     BitsFun fidxs = _fidxs.meet(tn._fidxs);
-    
     return TypeNil.make(false,_nil,_sub,_aliases,fidxs);
   }
 

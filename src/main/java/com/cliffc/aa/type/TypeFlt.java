@@ -56,6 +56,7 @@ public class TypeFlt extends TypeNil<TypeFlt> {
     if( _con!=0 ) {
       assert !_any && !_nil;
       if( !_sub ) { _z=(byte)log(_con); _con=0; } // constant plus zero is no longer a constant
+      else { _z=0; }
     }
     return this;
   }
@@ -71,7 +72,7 @@ public class TypeFlt extends TypeNil<TypeFlt> {
   public static final TypeFlt PI    = con(Math.PI);
   public static final TypeFlt HALF  = con(0.5);
   public static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,PI,FLT32,NFLT32,HALF};
-  static void init1( HashMap<String,Type> types ) {
+  static void init1( HashMap<String,TypeNil> types ) {
     types.put("flt32",FLT32);
     types.put("flt64",FLT64);
     types.put("flt"  ,FLT64);
@@ -106,5 +107,8 @@ public class TypeFlt extends TypeNil<TypeFlt> {
   static int log( double con ) { return ((double)(float)con)==con ? 32 : 64; }
 
   @Override public TypeFlt widen() { return FLT64; }
+  @Override TypeNil cross_flt(TypeNil i) {
+    return  i instanceof TypeInt ii ? ii.cross_flt(this) : null;
+  }
   @Override public boolean is_con() { return _z==0; }
 }

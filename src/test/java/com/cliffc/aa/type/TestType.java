@@ -16,14 +16,10 @@ public class TestType {
     //Object dummy = Env.TOP;
     Ary<Type> ts = Type.ALL_TYPES();
     
-    Type xnil = TypeNil.XNIL;
-    Type  nil = TypeNil. NIL;
-    Type xnx = xnil.meet(nil);
-
-    Type bool = TypeInt.BOOL;
-    Type xbx = bool._dual.meet(xnil);
-    assertSame(TypeNil.SCALAR,xnx);
-    assertSame(xnil,xbx);
+    Type i = TypeInt.BOOL;
+    Type f = TypeFlt.FLT32;
+    Type mt = i.meet(f);
+    assertSame(mt,f);
   }
 
   // Test for a collection of Types, that toString and valueOf are a bijection

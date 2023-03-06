@@ -2490,6 +2490,57 @@ public class TestLattice {
     test(xscalr);
   }
 
+  // Simple injection of small ints into float ranges
+  @Test public void testLattice24() {
+    N.reset();
+    N scalar    = new N("Scalar");
+    
+    N i64 = new N("i64", scalar );
+    N f64 = new N("f64", scalar );
+    
+    N i32 = new N("i32", i64,f64 );
+    N f32 = new N("f32", f64 );
+    
+    N i1  = new N("i1" , i32,f32 );
+    
+    N one = new N("1"  , i1 );
+    N pi  = new N("3.14",f32 );
+
+    N i1x = new N("~i1" , one );
+    
+    N i32x= new N("~i32", i1x );
+    N f32x= new N("~f32", pi, i1x  );
+    
+    N i64x= new N("~i64", i32x);
+    N f64x= new N("~f64", f32x,i32x);
+    
+    N xscalr    = new N("~Scalar",i64x,f64x);
+
+    scalar.set_dual(xscalr);
+    i64   .set_dual(i64x  );
+    f64   .set_dual(f64x  );
+    i32   .set_dual(i32x  );
+    f32   .set_dual(f32x  );
+    i1    .set_dual(i1x   );
+
+    test(xscalr);
+
+    // Check the lattice similar to main AA.
+    // Commutativity: true by definition in this case.
+    // Symmetry 1 : if A&B==MT, then ~A&~MT==~A and ~B&~MT==~B
+    assert check_symmetry1();
+    // Associative: (A&B)&C == A&(B&C)
+    assert check_associative();
+    // Symmetry 2 : if A isa B, then A.join(C) isa B.join(C)
+    //              if A&B ==B, then ~(~A&~C) & ~(~B&~C) == ~(~B&~C)
+    // After some algebra, this becomes: (A&B) + C == B + C; since A&B==B, this
+    // is a trivial condition, except that in practice it caught a lot of
+    // broken implementations.
+    assert check_symmetry2();
+
+  }
+
+  
   // Open question for a future testLattice test:
   //
   //    Under what circumstances can 'meet' return a NIL?

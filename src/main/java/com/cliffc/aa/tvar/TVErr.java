@@ -18,7 +18,8 @@ public class TVErr extends TV3 {
   static final int XFLT=3;
   static final int XCLZ=4;
   static final int XNIL=5;
-  static final int XMAX=6;
+  static final int XPTR=6;
+  static final int XMAX=7;
 
   // Specific error messages
   Ary<String> _msgs;

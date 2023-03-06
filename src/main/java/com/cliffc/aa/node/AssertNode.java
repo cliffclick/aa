@@ -2,9 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.TV3;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeFunPtr;
-import com.cliffc.aa.type.TypeMemPtr;
+import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.*;
 
@@ -32,39 +30,33 @@ public class AssertNode extends Node {
     Node arg = arg();
     Type targ = arg._val;
     if( targ.isa(_t) ) return targ;
-    if( targ instanceof TypeMemPtr || _t instanceof TypeMemPtr )
-      throw unimpl();
     
-    //Type t0 = _t.simple_ptr();
-    //if( t1.isa(t0) ) {
-    //  Type actual = arg.sharptr(mem());
-    //  if( actual.isa(_t) )
-    //    return t1;
-    //  throw unimpl();
-    //}
+    Type t0 = _t.simple_ptr();
+    if( targ.isa(t0) ) {
+      Type actual = arg.sharptr(mem());
+      if( actual.isa(_t) )  return targ;
+    }
     // Value is capped to the assert value.
     return targ.oob(_t);
   }
 
-  @Override public Type live_use(Node def ) {
+  @Override public Type live_use( Node def ) {
     if( def==arg() ) return _live;                   // Alive as I am
-    //// Alive (like normal liveness), plus the address, plus whatever can be
-    //// reached from the address.  Because of the turn-around (changing the
-    //// input value changes the input liveness) we need set a self-dep.
-    //mem().deps_add(mem());
-    ////return ScopeNode.compute_live_mem(null,mem(),arg());
-    //throw unimpl();
-    return RootNode.def_mem(def);
+    if( _live == Type.ALL ) return TypeMem.ALLMEM;   // All possible pointers
+    Type ptr = arg()._val;
+    if( !(ptr instanceof TypeMemPtr tmp) )
+      return ptr.oob(TypeMem.ALLMEM);
+    return tmp.above_center() ? TypeMem.ANYMEM : TypeMem.make(tmp._aliases,((TypeStruct)_live));
   }
 
   @Override public Node ideal_reduce() {
     Type targ = arg()._val;
     if( targ.isa(_t) ) return arg();
-    if( targ instanceof TypeMemPtr || _t instanceof TypeMemPtr )
-      throw unimpl();
+    if( targ instanceof TypeMemPtr || _t instanceof TypeMemPtr ) {
+      Type actual = arg().sharptr(mem());
+      return actual.isa(_t) ? arg() : null;
+    }
     return null;
-    //Type actual = arg().sharptr(mem());
-    //return actual.isa(_t) ? arg() : null;
   }
   @Override public Node ideal_grow() {
     Node arg= arg();
@@ -104,7 +96,7 @@ public class AssertNode extends Node {
 
     // Push TypeNodes 'up' to widen the space they apply to, and hopefully push
     // the type check closer to the source of a conflict.
-    Node fun = arg.in(0);
+    Node fun = arg.len()>0 ? arg.in(0) : null;
     if( arg instanceof PhiNode &&
         // Not allowed to push up the typing on the unknown arg... because
         // unknown new callers also need the check.
@@ -135,6 +127,8 @@ public class AssertNode extends Node {
   // Check TypeNode for being in-error
   @Override public ErrMsg err( boolean fast ) {
     Type arg = arg()._val;
+    if( arg instanceof TypeMemPtr tmp )
+      arg = mem()._val.sharptr(tmp);
     return ErrMsg.asserterr(_error_parse,arg, _t);
   }
 }

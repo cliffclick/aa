@@ -156,6 +156,9 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public  static final TypeMemPtr STRPTR = make_str(TypeInt.INT8);
 
   static final Type[] TYPES = new Type[]{ISUSED0,EMTPTR,DISPLAY,DISPLAY_PTR};
+  public static void init1( HashMap<String,TypeNil> types ) {
+    types.put("str",STRPTR);
+  }
 
   @Override protected TypeMemPtr xdual() {
     BitsAlias ad = _aliases.dual();

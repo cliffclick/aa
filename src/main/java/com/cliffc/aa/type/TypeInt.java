@@ -78,7 +78,7 @@ public class TypeInt extends TypeNil<TypeInt> {
   public  static final TypeInt C3    = con(3);
   public  static final TypeInt C123  = con(123456789L);
   static final TypeInt[] TYPES = new TypeInt[]{INT64,NINT64,INT32,INT16,INT8,NINT8,BOOL,TRUE,C3,C123};
-  static void init1( HashMap<String,Type> types ) {
+  public static void init1( HashMap<String,TypeNil> types ) {
     types.put("bool" ,BOOL);
     types.put("int1" ,BOOL);
     types.put("int8" ,INT8);
@@ -125,6 +125,19 @@ public class TypeInt extends TypeNil<TypeInt> {
   }
 
   @Override public TypeInt widen() { return INT64; }
+  
+  @Override TypeNil cross_flt(TypeNil f) {
+    if( !(f instanceof TypeFlt flt) ) return null;
+    // If the float is high, inject it into the next smaller high int  .
+    // If the int   is high, inject it into the smallest     low float.
+    // If the int   is low , inject it into the next larger  low  float.
+    if( flt._any )  return TypeInt.make(flt._any,flt._nil,flt._sub,flt._z>>1,0).xmeet(this);
+    int z = _z==0 ? log(_con) : _z;
+    if( !_any && z==64 ) return null;    
+    return TypeFlt.make(false,_nil,_sub,_any || z<32 ? 32 : 64,_con).xmeet(flt);
+  }
+
+  
   @Override public boolean is_con()  { return _z==0; }
   public TypeInt minsize(TypeInt ti) {
     int zs =    _z==0 ? log(   _con) :    _z;

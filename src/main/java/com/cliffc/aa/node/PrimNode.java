@@ -48,9 +48,9 @@ public abstract class PrimNode extends Node {
   }
 
   // Int/Float primitives.  
-  public static final StructNode ZINT = new StructNode(0,false,null,"", Type.ALL).set_proto_instance(TypeInt.INT64).init();
-  public static final StructNode ZFLT = new StructNode(0,false,null,"", Type.ALL).set_proto_instance(TypeFlt.FLT64).init();
-  public static final StructNode ZSTR = new StructNode(0,false,null,"", Type.ALL).set_proto_instance(TypeMemPtr.STRPTR).init();
+  public static final StructNode ZINT = new StructNode(0,false,null,"", Type.ALL);
+  public static final StructNode ZFLT = new StructNode(0,false,null,"", Type.ALL);
+  public static final StructNode ZSTR = new StructNode(0,false,null,"", Type.ALL);
   public static final NewNode PINT = new NewNode();
   public static final NewNode PFLT = new NewNode();
   public static final NewNode PSTR = new NewNode();
@@ -203,7 +203,6 @@ public abstract class PrimNode extends Node {
       clz.add_fld(prims[0]._name,Access.Final,over,null);
     }
     clz.close();
-    Env.SCP_0.add_type(clzname,clz); // type String -> clazz Struct mapping, for scope-based type lookups
     Env.PROTOS.put(clzname,clz); // global mapping
     Env.SCP_0.set_mem(new StoreNode(Env.SCP_0.mem(),ptr.add_flow(),clz,null).init());
   }

@@ -382,7 +382,7 @@ public class Parse implements Comparable<Parse> {
       String tok = token();     // Scan for 'id = ...'
       if( tok == null ) break;  // Out of ids
       int oldx2 = _x;           // Unwind assignment flavor point
-      Type t = TypeNil.SCALAR;
+      Type t = null;
       // x  =: ... type  assignment, handled before we get here
       // x  =  ... final assignment
       // x :=  ... var   assignment
@@ -441,7 +441,6 @@ public class Parse implements Comparable<Parse> {
   private Node do_store(ScopeNode scope, Node ifex, Access mutable, String tok, Parse badf, Type t, Parse badt ) {
     if( ifex instanceof FunPtrNode fptr )
       fptr.bind(tok);           // Debug only: give name to function
-    final int iidx = ifex.push();
     // Find scope for token.  If not defining struct fields, look for any
     // prior def.  If defining a struct, tokens define a new field in this scope.
     boolean create = scope==null;
@@ -450,10 +449,18 @@ public class Parse implements Comparable<Parse> {
       StructNode stk = scope.stk();
       stk.add_fld (tok,Access.RW, con(TypeNil.NIL),badf); // Create at top of scope as undefined
     }
+    
+    // Assert type if asked for
+    if( t!=null )
+      ifex = gvn(new AssertNode(null, ifex, t, badf, _e));
+
     // See if assigning over a forward-ref.
     int idx = scope().stk().find(tok);
     if( idx != -1 && scope().stk().in(idx) instanceof ForwardRefNode fref )
-      fref.assign(Node.peek(iidx),tok); // Define & assign the forward-ref
+      fref.assign(ifex,tok); // Define & assign the forward-ref
+
+    // Save across display load
+    final int iidx = ifex.push();
 
     // Load the display/stack-frame for the defining scope.
     Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
@@ -911,7 +918,7 @@ public class Parse implements Comparable<Parse> {
     ScopeNode scope = lookup_scope(tok=tok.intern(),false); // Find prior scope of token
     // Need a load/call/store sensible options
     if( scope==null ) {         // Token not already bound to a value
-      do_store(null,con(TypeNil.NIL),Access.RW,tok,null,TypeNil.SCALAR,null);
+      do_store(null,con(TypeNil.NIL),Access.RW,tok,null,null,null);
       scope = scope();
     } else {                    // Check existing token for mutable
       if( !scope.is_mutable(tok) )
@@ -1423,18 +1430,14 @@ public class Parse implements Comparable<Parse> {
   private Type tid(boolean allow_fref) {
     String tok = token();
     if( tok==null ) return null;
-    if( Util.isUpperCase(tok) )
-      throw unimpl();           // Reserved for type variables
     // Shortcut for the two primitive types
+    tok = tok.intern();
+    Type t = _e.lookup_type(tok);
+    if( t != null ) return t;
+    if( !allow_fref ) // Forward-refs not allowed in this context
+      return null;    // SO no type here
     String tname = (tok+":").intern();
-    StructNode clz = _e.lookup_type(tname);
-    if( clz == null ) {
-      if( !allow_fref ) // Forward-refs not allowed in this context
-        return null;    // SO no type here
-      clz = type_fref(tname,false); // None, so create
-    }
-    // Clazzes have a canonical worse-case instance
-    return clz.instance_type();
+    return type_fref(tname,false); // None, so create
   }
 
   // Create a value forward-reference.  Must turn into a function call later.
@@ -1455,7 +1458,7 @@ public class Parse implements Comparable<Parse> {
   // Create a type forward-reference.  Must be type-defined later.  Called when
   // seeing a name in a type context for the first time.  Builds an empty type
   // NewNode and returns it.
-  private StructNode type_fref(String tname, boolean is_val) {
+  private Type type_fref(String tname, boolean is_val) {
     //NewNode tn = new NewNode(false,true,tname,BitsAlias.new_alias());
     //tn._val = tn.value();
     //_gvn.add_work_new(tn);

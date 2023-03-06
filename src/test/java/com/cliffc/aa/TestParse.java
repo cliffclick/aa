@@ -30,8 +30,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)","6","int:6");
-
+    testerr("\"abc\":int", "*str:(97) is not a int64",5);
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -262,22 +261,22 @@ public class TestParse {
 
   @Test public void testParse03() {
     // Type annotations
-    test("-1:int", TypeInt.con( -1));
-    test("(1+2.3):flt", TypeFlt.con(3.3));
+    test("-1:int", "-1","int:-1");
+    test("(1+2.3):flt", "3.3", "flt:3.3");
     test("x:int = 1", "int:1", "int:1");
     test("x:flt = 1", "int:1", "int:1"); // casts for free to a float
-    testerr("x:flt32 = 123456789", "123456789 is not a flt32",1);
+    testerr("x:flt32 = 123456789", "123456789 is not a flt32",0);
     testerr("1:","Syntax error; trailing junk",1); // missing type
     testerr("2:x", "Syntax error; trailing junk", 1);
     testerr("(2:)", "Syntax error; trailing junk", 2);
 
-    test   (" -1 :int1", TypeInt.con(-1));
+    test   (" -1 :int1", "-1", "int:-1"); // parses as -(1:int)
     testerr("(-1):int1", "-1 is not a int1",4);
-    testerr("\"abc\":int", "*\"abc\" is not a int64",5);
-    testerr("1:str", "1 is not a *str",1);
+    testerr("\"abc\":int", "*str:(97) is not a int64",5);
+    testerr("1:str", "1 is not a *str:(int8)",1);
 
-    test   ("{x:int -> x*2}(1)", TypeInt.con(2)); // Types on parms
-    testerr("{x:str -> x}(1)", "1 is not a *str", 13);
+    test   ("{x:int -> x*2}(1)", "2","int:2"); // Types on parms
+    testerr("{x:str -> x}(1)", "1 is not a *str:(int8)", 13);
 
     // Type annotations on dead args are ignored
     test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));

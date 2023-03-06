@@ -231,7 +231,9 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
 
   // Widen subtype to a TypeNil, losing its sub structure.
   TypeNil widen_sub() { assert _type!= TNIL; return make(false,_nil,_sub,_aliases,_fidxs); }
-
+  // Support small ints in floats
+  TypeNil cross_flt(TypeNil t) { return null; }
+  
   // Type must support a nil
   @Override public boolean must_nil() { return !_sub; }
 
@@ -246,10 +248,11 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   }
 
   // Parser init
-  public static void init0( HashMap<String,Type> types ) {
+  public static void init0( HashMap<String,TypeNil> types ) {
     types.put("scalar",SCALAR);
     TypeInt.init1(types);
     TypeFlt.init1(types);
+    TypeMemPtr.init1(types);
     TypeStruct.init1();
   }
 }

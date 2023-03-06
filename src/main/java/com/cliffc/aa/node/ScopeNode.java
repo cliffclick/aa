@@ -17,9 +17,9 @@ import static com.cliffc.aa.type.TypeFld.Access;
 public class ScopeNode extends Node {
 
   // Mapping from type-variables to Types.  Types have a scope lifetime like values.
-  private final HashMap<String,StructNode> _types; // user-typing type names
+  private final HashMap<String,TypeNil> _types; // user-typing type names
 
-  public ScopeNode( HashMap<String,StructNode> types,  Node ctl, Node mem, Node rez, Node ptr, StructNode dsp) {
+  public ScopeNode( HashMap<String,TypeNil> types,  Node ctl, Node mem, Node rez, Node ptr, StructNode dsp) {
     super(OP_SCOPE,ctl,mem,rez,ptr,dsp);
     _types = types;
     _live = RootNode.def_mem(this);
@@ -64,13 +64,12 @@ public class ScopeNode extends Node {
   }
 
   // Name to type lookup, or null
-  public StructNode get_type(String name) { return _types.get(name);  }
+  public TypeNil get_type(String name) { return _types.get(name);  }
 
   // Extend the current Scope with a new type; cannot override existing name.
-  public void add_type( String name, StructNode t ) {
+  public void add_type( String name, TypeNil t ) {
     assert _types.get(name)==null;
     _types.put( name, t );
-    add_def(t);                 // Hook so it does not die
   }
 
   public Set<String> typeNames() { return _types.keySet(); }
