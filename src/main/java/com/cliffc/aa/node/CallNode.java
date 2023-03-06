@@ -263,6 +263,12 @@ public class CallNode extends Node {
   // merge from that path.  Result tuple type:
   @Override public Type value() {
     if( _is_copy ) return _val; // Freeze until unwind
+
+    // CallEpi is dead from below, and not a copy - this whole path is dead.
+    // Lift to ANY and let DCE remove final uses.
+    if( _uses._len>0 && !_is_copy && !is_keep() && cepi()==null )
+      return Type.ANY;
+
     if( ctl()._val==Type.ALL ) return Type.ALL;
     // Result type includes a type-per-input, plus one for the function
     final Type[] ts = Types.get(_defs._len);

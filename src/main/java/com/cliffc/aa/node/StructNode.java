@@ -233,6 +233,7 @@ public class StructNode extends Node {
   @Override public Node ideal_reduce() {
     // Kill dead fields
     if( !is_prim() && _live instanceof TypeStruct live ) {
+      deps_add(this);           // If self-live lifts, self reduce makes progress
       Node progress=null;
       for( int i=0; i<_flds._len; i++ ) 
         if( in(i)!=Env.ANY && live.at_def(_flds.at(i)).above_center() )

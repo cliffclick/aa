@@ -2,6 +2,7 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.Util;
 import com.cliffc.aa.util.VBitSet;
 
@@ -10,6 +11,7 @@ import com.cliffc.aa.util.VBitSet;
 // no-named-field TypeStruct, and is not exposed at the language level.  With
 // mixed tuple lengths, tuples are infinitely extended with ANY/ALL.
 public class TypeTuple extends Type<TypeTuple> {
+  // High or low for the tuple as a whole
   boolean _any;
   public Type[] _ts; // The fixed known types
   protected TypeTuple init( boolean any, Type[] ts ) {
@@ -184,4 +186,23 @@ public class TypeTuple extends Type<TypeTuple> {
     return make0(_any,ts);
   }
 
+  public static TypeTuple fun_sig( Ary<Type> ary ) {
+    Type[] ts = Types.get(ary._len+3);
+    ts[0] = Type.ALL;           // Flag as is_fun_sig
+    ts[1] = Type.ALL;           // Flag as is_fun_sig
+    ts[2] = Type.ANY;           // DIsplay
+    System.arraycopy(ary._es,0,ts,3,ary._len);
+    return make0(false,ts);
+  }
+  // Treat this Tuple as a function signature; last type 
+  public boolean is_fun_sig() {
+    return _ts.length>3 && _ts[0]==Type.ALL && _ts[1]==Type.ALL;
+  }
+
+  public int nargs() { assert is_fun_sig(); return _ts.length-1; }
+  public Type ret()  { assert is_fun_sig(); return _ts[_ts.length-1]; }
+  public TypeFunPtr as_tfp() {
+    // DSP_IDX
+    return TypeFunPtr.make(_any,BitsFun.NALL,nargs(),_ts[2],ret());
+  }
 }

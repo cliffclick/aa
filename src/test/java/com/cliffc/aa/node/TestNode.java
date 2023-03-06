@@ -248,8 +248,8 @@ public class TestNode {
     test1monotonic(new    RetNode(_ins[0],mem,_ins[1],_ins[2],fun_plus)); // ctl,mem,val,rpc,fun
     test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],null));
     //                  ScopeNode has no inputs, and value() call is monotonic
-    test1monotonic(new AssertNode(_ins[1],_ins[2],TypeNil.XNIL   ,null, null));
-    test1monotonic(new AssertNode(_ins[1],_ins[2],TypeFlt.FLT64  ,null, null));
+    test1monotonic(new AssertNode(_ins[1],_ins[2],TypeNil.XNIL   ,null));
+    test1monotonic(new AssertNode(_ins[1],_ins[2],TypeFlt.FLT64  ,null));
 
     // TODO: Needs a prototype name
     //StructNode nnn2 = new StructNode(false,false,tname._name);

@@ -135,8 +135,7 @@ public class LoadNode extends Node {
         lphi.add_def(ld);
       }
       lphi._live = _live;
-      subsume(lphi.init());
-      return lphi;
+      return lphi.init();
     }
 
     return null;

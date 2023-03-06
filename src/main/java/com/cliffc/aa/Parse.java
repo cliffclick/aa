@@ -392,7 +392,7 @@ public class Parse implements Comparable<Parse> {
       // p? x : nontype ... part of trinary
       Parse badt = errMsg();    // Capture location in case of type error
       if( peek(":=") ) _x=oldx2; // Avoid confusion with typed assignment test
-      else if( peek(':') && (t=type(false,null))==null ) { // Check for typed assignment
+      else if( peek(':') && (t=type(null))==null ) { // Check for typed assignment
         if( _e.test_if() ) _x = oldx2; // Grammar ambiguity, resolve p?a:b from a:int
         else err_ctrl0("Missing type after ':'");
       }
@@ -452,7 +452,7 @@ public class Parse implements Comparable<Parse> {
     
     // Assert type if asked for
     if( t!=null )
-      ifex = gvn(new AssertNode(null, ifex, t, badf, _e));
+      ifex = gvn(new AssertNode(null, ifex, t, badf));
 
     // See if assigning over a forward-ref.
     int idx = scope().stk().find(tok);
@@ -961,13 +961,13 @@ public class Parse implements Comparable<Parse> {
     int oldx = _x;
     Parse bad = errMsg();
     if( !peek(':') ) { _x = oldx; return fact; }
-    Type t = type(false,null);
+    Type t = type(null);
     if( t==null ) { _x = oldx; return fact; } // No error for missing type, because can be ?: instead
     return typechk(fact,t,mem(),bad);
   }
   // Add a typecheck into the graph, with a shortcut if trivially ok.
   private Node typechk(Node x, Type t, Node mem, Parse bad) {
-    return t == null || x._val.isa(t) ? x : gvn(new AssertNode(mem,x,t,bad,_e));
+    return t == null || x._val.isa(t) ? x : gvn(new AssertNode(mem,x,t,bad));
   }
 
 
@@ -1128,7 +1128,7 @@ public class Parse implements Comparable<Parse> {
       Type t = TypeNil.SCALAR; // Untyped, most generic type
       Parse bad = errMsg();    // Capture location in case of type error
       if( peek(':') &&         // Has type annotation?
-          (t=type(true,null))==null ) { // Get type
+          (t=type(null))==null ) { // Get type
         // If no type, might be "{ x := ...}" or "{ fun arg := ...}" which can
         // be valid stmts, hence this may be a no-arg function.
         if( bads._len-1 <= 2 ) { _x=oldx; break; }
@@ -1177,7 +1177,7 @@ public class Parse implements Comparable<Parse> {
         TypeNil formal = (TypeNil)formals.at(i);
         Node parm = gvn(new ParmNode(i,fun,errmsg,TypeNil.SCALAR,Env.ALL_ESC));
         if( formal!=TypeNil.SCALAR )
-          parm = gvn(new AssertNode(mem,parm,formal,bads.at(i),e));
+          parm = gvn(new AssertNode(mem,parm,formal,bads.at(i)));
         frame.add_fld(ids.at(i),args_are_mutable,parm,bads.at(i));
       }
 
@@ -1335,36 +1335,38 @@ public class Parse implements Comparable<Parse> {
   }
 
   /*
-   *  type = tcon | tid | tvar | [?!]tptr | [?]tfun // "?" is nilable-ref, "!" is not-nil ref, missing is value-type
+   *  type =   A* => type           // Introduce a type variable
+   *  type = { A* => type }         // Introduce a type variable with explicit bounds
+   *  type = tcon | tvar | [?]tptr | [?]tfun // "?" is nilable-ref
    *  tptr = tary | tstruct | ttuple
-   *  tid  = type identifier         // NOT all-upper-case; LHS of type assignment
-   *  tvar = HM type variable        // ALL upper-case; scoped this type expr only
-   *  tcon = = ifex                  // Noticed extra '=', must bake down to a constant; usually for fcns
+   *  tvar = HM type variable        // Scoped; includes global types like 'flt32'
+   *  tcon = = ifex                  // Notice extra '=', must bake down to a constant; usually for fcns
    *  tfun = { [[type]* -> ]? type } // Mirrors func decls; ie. map=: {{A->B} [A] -> [B]}
    *  tary = [type]                  // Array types
    *  ttuple = ( [[type],]* )        // Tuple types are just a list of optional types;
    *                                 // the count of commas dictates the length, zero commas is zero length.
    *                                 // Tuple fields are always final.
    *  tstruct= [tid:]@{ [tfld;]* };  // Optional named type to extend, list of fields
-   *  tfld = id [:type | tcon]       // Field name, option type or const-expr
+   *  tfld = id [:type] [tcon]       // Field name, option type or const-expr
    */
-  private Type type(boolean allow_fref, StructNode proto) {
+  private Type type(StructNode proto) {
 
     // First character to split type out:
     return switch( skipWS() ) {
-    case '{' -> throw unimpl(); // Function parse
+    case '{' -> tfun();         // Function parse
     case '@' -> tstruct(proto); // Struct parse
     case '[' -> throw unimpl(); // Array parse
     case '(' -> ttuple();       // Tuple parse
     case '=' -> throw unimpl(); // Const ifex parse
-    case '?' -> throw unimpl(); //     Nilable-ref parse
-    case '!' -> throw unimpl(); // Not-nilable-ref parse
-    default  -> tid(allow_fref);// TID/TVAR parse
+    case '?' -> throw unimpl(); // Nilable-ref parse
+    default  -> tvar();         // TVAR parse
     };
   }
 
   // Parse a struct type.  Side-effect constant fields into proto.
-  // Disallows 'x := expr'
+  //   @{ [tflds;]* }
+  //   tfld = id [:type] [tcon]  // Field name, option type or const-expr
+  // Disallows 'x := expr' fields.
   private TypeMemPtr tstruct(StructNode proto) {
     if( !peek("@{") ) return null;
     // Parse fields
@@ -1373,27 +1375,31 @@ public class Parse implements Comparable<Parse> {
       String tok = token();
       if( tok==null ) break;
       tok = tok.intern();
-      // Parse the field type
-      Node val;  Type t;   Access access;
-      if( peek('=') ) {
-        access = Access.Final;
-        val = tcon();           // Arbitrary AA const-expr, not a type
-        t = val._val;           // Type from the parse-time node type.
-        Oper.make(tok,false);
-        if( val instanceof FunPtrNode fptr )
-          fptr.bind(tok);       // Debug only: give name to function
-      } else {
-        access = Access.RW;     // Arbitrary AA type, not const-expr
-        t = peek(':') ? type(true,null) : TypeNil.SCALAR;
-        val = Node.con(t);
-      }
-      // Insert the field into the structure.
-      proto.add_fld(tok.intern(),access, val,null);
-      if(  peek('}') ) break;          // End of struct,  no trailing semicolon?
-      if( !peek(';') ) throw unimpl(); // Not a type
-      if(  peek('}') ) break;          // End of struct, yes trailing semicolon?
+      // Get optional field type; get optional tcon
+      throw unimpl();
+      //// Parse the field type
+      //Node val;  Type t;   Access access;
+      //if( peek('=') ) {
+      //  access = Access.Final;
+      //  val = tcon();           // Arbitrary AA const-expr, not a type
+      //  t = val._val;           // Type from the parse-time node type.
+      //  Oper.make(tok,false);
+      //  if( val instanceof FunPtrNode fptr )
+      //    fptr.bind(tok);       // Debug only: give name to function
+      //} else {
+      //  access = Access.RW;     // Arbitrary AA type, not const-expr
+      //  t = peek(':') ? type(true,null) : TypeNil.SCALAR;
+      //  val = Node.con(t);
+      //}
+      //// Insert the field into the structure.
+      //proto.add_fld(tok.intern(),access, val,null);
+      //if(  peek('}') ) break;          // End of struct,  no trailing semicolon?
+      //if( !peek(';') ) throw unimpl(); // Not a type
+      //if(  peek('}') ) break;          // End of struct, yes trailing semicolon?
     }
-    return (TypeMemPtr)proto._val;
+    //return (TypeMemPtr)proto._val;
+    // ts._tptr field?
+    throw unimpl();
   }
 
   // Parse an const ifex.
@@ -1410,12 +1416,34 @@ public class Parse implements Comparable<Parse> {
     peek('(');
     TypeStruct ts = TypeStruct.malloc(false,"",Type.ALL,TypeFlds.EMPTY);
     while(true) {
-      Type t = type(false,null);
+      Type t = type(null);
       if( t==null ) { _x=oldx; return ts.free(null); }
       throw unimpl();
     }
   }
 
+  // Parse a type function:
+  // { types* -> type }
+  // { type }
+  private Type tfun() {
+    int oldx = _x;
+    peek('{');
+    Ary<Type> ts = new Ary<>(new Type[1],0);
+    Type arg = type(null), ret=null;
+    while( arg!=null ) {
+      ts.push(arg);
+      arg = type(null);
+    }
+    if( peek("->") )            // Explicit args/return list
+      ts.push(type(null));      // Push return type
+    else if( ts.len()>1 ) ts.push(null); // Too many types, fail out
+    if( peek('}') && ts.len()>1 ) ret = ts.pop();
+    if( ret==null )             // Not a function type
+      { _x=oldx;  return null; }
+    ts.push(ret);
+    return TypeTuple.fun_sig(ts);
+  }
+  
 
   // Type-id or type-var parse.
   // TODO: type-vars done as function syntax?
@@ -1423,21 +1451,17 @@ public class Parse implements Comparable<Parse> {
   // Example: List A = : @{ next:List?; val:A }  // 'A' is declared.  Problem: Deeply nested types STILL need wrappers to avoid ambiguity
   // Example: List = : A => @{ next:List?; val:A } // New BNF: toks* => t0 with toks as free t-vars; does not support nested "toks*=>tN" exprs
   // Example: List = : { A => @{ next:List?; val:A } } // New BNF: { toks* => t0 } with toks as free t-vars
-  // Less parens
-  // Example: MyType = :   A => @{ table:A[]; map:  B => { MyType {A->B} -> MyType(B) }  ; ... }
-  // More parens
-  // Example: MyType = : { A => @{ table:A[]; map:{ B => { MyType {A->B} -> MyType(B) } }; ... } }  
-  private Type tid(boolean allow_fref) {
+  // Less parens; A is captured in the 'MyType' type, and B is captured in the 'map' type
+  // Example: MyType = :   A => @{ table:A[]; map:  B => { MyType {A->B} -> MyType B }  ; ... }
+  // More parens; A is captured in the 'MyType' type, and B is captured in the 'map' type
+  // Example: MyType = : { A => @{ table:A[]; map:{ B => { MyType {A->B} -> MyType B } }; ... } }  
+  private Type tvar() {
+    int oldx = _x;
     String tok = token();
     if( tok==null ) return null;
-    // Shortcut for the two primitive types
-    tok = tok.intern();
-    Type t = _e.lookup_type(tok);
-    if( t != null ) return t;
-    if( !allow_fref ) // Forward-refs not allowed in this context
-      return null;    // SO no type here
-    String tname = (tok+":").intern();
-    return type_fref(tname,false); // None, so create
+    Type t = _e.lookup_type(tok.intern());
+    if( t==null ) { _x=oldx; return null; }
+    return t;
   }
 
   // Create a value forward-reference.  Must turn into a function call later.

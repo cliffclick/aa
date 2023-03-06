@@ -676,6 +676,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   public Node do_grow() {
     Node nnn = ideal_grow();
     if( nnn==null || nnn==this || is_dead() ) return nnn;
+    subsume(nnn);
     return Env.GVN.add_reduce(nnn.add_flow());
   }
 
@@ -688,6 +689,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( this instanceof ConNode    || // Already a constant
         this instanceof FunPtrNode || // Already a constant
         this instanceof ErrNode    || // Never touch an ErrNode
+        this instanceof AssertNode || // Never touch an AssertNode
         this instanceof FreshNode  || // These modify the TVars but not the constant flows
         (this instanceof StructNode st && !st.is_closed()) || // Struct is in-progress
         is_prim() )                 // Never touch a Primitive

@@ -154,10 +154,11 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public  static final TypeMemPtr EMTPTR = malloc(false,false,BitsAlias.EMPTY,TypeStruct.UNUSED).hashcons_free();
   public  static final TypeMemPtr DISP_SIMPLE= make(false,BitsAlias.NALL,TypeStruct.ISUSED); // closed display
   public  static final TypeMemPtr STRPTR = make_str(TypeInt.INT8);
+  public  static final TypeMemPtr STR_X  = make(STR_ALIAS,TypeStruct.ISUSED);
 
   static final Type[] TYPES = new Type[]{ISUSED0,EMTPTR,DISPLAY,DISPLAY_PTR};
   public static void init1( HashMap<String,TypeNil> types ) {
-    types.put("str",STRPTR);
+    types.put("str",STR_X);
   }
 
   @Override protected TypeMemPtr xdual() {

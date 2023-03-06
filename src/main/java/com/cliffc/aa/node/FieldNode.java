@@ -158,7 +158,6 @@ public class FieldNode extends Node implements Resolvable {
         Node lphi = new PhiNode(TypeNil.SCALAR,phi._badgc,phi.in(0));
         for( int i=1; i<phi.len(); i++ )
           lphi.add_def(Env.GVN.add_work_new(new FieldNode(phi.in(i),_fld,_clz,_bad)));
-        subsume(lphi);
         return lphi;
       }
     }

@@ -26,9 +26,11 @@ public class MProjNode extends ProjNode {
     // Fold across pure calls (most primitives)
     if( in(0) instanceof CallEpiNode cepi && cepi.is_all_wired() ) {
       boolean pure=true;
-      for( int i=0; i<cepi.nwired(); i++ )
-        if( cepi.wired(i).mem()!=null )
-          { pure=false; break; }
+      for( int i=0; i<cepi.nwired(); i++ ) {
+        RetNode ret = cepi.wired(i);
+        if( ret.mem()!=null )
+          { ret.deps_add(this); pure=false; break; }
+      }
       if( pure )
         return cepi.call().mem();
     }

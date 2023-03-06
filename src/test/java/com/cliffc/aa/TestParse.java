@@ -30,7 +30,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    testerr("{x:str -> x}(1)", "1 is not a *str:(int8)", 2);
+    test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", "4","int:4");
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
