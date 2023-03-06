@@ -1177,7 +1177,7 @@ public class Parse implements Comparable<Parse> {
         TypeNil formal = (TypeNil)formals.at(i);
         Node parm = gvn(new ParmNode(i,fun,errmsg,TypeNil.SCALAR,Env.ALL_ESC));
         if( formal!=TypeNil.SCALAR )
-          parm = gvn(new AssertNode(mem,parm,formal,errmsg,e));
+          parm = gvn(new AssertNode(mem,parm,formal,bads.at(i),e));
         frame.add_fld(ids.at(i),args_are_mutable,parm,bads.at(i));
       }
 
@@ -1611,8 +1611,8 @@ public class Parse implements Comparable<Parse> {
     Node ctrl = gvn(new CProjNode(cepi));
     set_ctrl(ctrl);
     set_mem(gvn(new MProjNode(Node.peek(cidx)))); // Return memory from all called functions
-    if( cepi._is_copy ) Env.GVN.add_flow(cepi);   // Clean out from inlining
-    return gvn(new ProjNode(Node.pop(cidx),REZ_IDX));
+    cepi = (CallEpiNode)Env.GVN.add_flow(Node.pop(cidx)); // Computes live once Keep is removed
+    return gvn(new ProjNode(cepi,REZ_IDX));
   }
 
   // Whack current control with a syntax error

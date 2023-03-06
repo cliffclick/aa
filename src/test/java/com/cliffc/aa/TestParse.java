@@ -30,7 +30,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    testerr("\"abc\":int", "*str:(97) is not a int64",5);
+    testerr("{x:str -> x}(1)", "1 is not a *str:(int8)", 2);
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -276,10 +276,10 @@ public class TestParse {
     testerr("1:str", "1 is not a *str:(int8)",1);
 
     test   ("{x:int -> x*2}(1)", "2","int:2"); // Types on parms
-    testerr("{x:str -> x}(1)", "1 is not a *str:(int8)", 13);
+    testerr("{x:str -> x}(1)", "1 is not a *str:(int8)", 2);
 
     // Type annotations on dead args are ignored
-    test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
+    test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", "4","int:4");
     testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *str",41);
     // Test that the type-check is on the variable and not the function.
     //test_obj("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x;y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",

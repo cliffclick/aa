@@ -49,12 +49,9 @@ public class BindFPNode extends Node {
     return _over ? TypeStruct.ISUSED : Type.ALL;
   }
   // Bind can be used by a Field, and so have a struct-liveness
-  @Override public boolean assert_live(Type live) {
-    return live==Type.ANY || live==Type.ALL || live instanceof TypeStruct;
-  }
+  @Override public boolean assert_live(Type live) { return live instanceof TypeStruct; }
 
   @Override public Node ideal_reduce() {
-
     // Check for early bind of an anonymous function which is not using the display.
     if( fp()._val instanceof TypeFunPtr tptr ) {
       int fidx = tptr.fidxs().abit();

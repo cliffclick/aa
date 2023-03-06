@@ -41,12 +41,15 @@ public class AssertNode extends Node {
   }
 
   @Override public Type live_use( Node def ) {
-    if( def==arg() ) return _live;                   // Alive as I am
-    if( _live == Type.ALL ) return TypeMem.ALLMEM;   // All possible pointers
+    if( def==arg() ) return _live; // Alive as I am
     Type ptr = arg()._val;
     if( !(ptr instanceof TypeMemPtr tmp) )
-      return ptr.oob(TypeMem.ALLMEM);
-    return tmp.above_center() ? TypeMem.ANYMEM : TypeMem.make(tmp._aliases,((TypeStruct)_live));
+      return ptr.oob(RootNode.def_mem(def));
+    return tmp.above_center() ? TypeMem.ANYMEM : TypeMem.make(tmp._aliases,TypeStruct.ISUSED);
+  }
+
+  @Override public boolean assert_live(Type live) {
+    return live.getClass() == arg()._live.getClass();
   }
 
   @Override public Node ideal_reduce() {
@@ -56,6 +59,8 @@ public class AssertNode extends Node {
       Type actual = arg().sharptr(mem());
       return actual.isa(_t) ? arg() : null;
     }
+    // Never a pointer to sharpen, drop memory
+    if( !targ.above_center() && mem()!=null ) return set_def(1,null);
     return null;
   }
   @Override public Node ideal_grow() {
