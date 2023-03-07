@@ -11,16 +11,16 @@ public class ErrMsg implements Comparable<ErrMsg> {
 
   // Error levels
   public enum Level {
+    Syntax,                   // Syntax
     ForwardRef,               // Forward refs
     ErrNode,                  // ErrNodes
-    Syntax,                   // Syntax
+    Assert,                   // Assert type errors
     Field,                    // Field naming errors
     UnresolvedCall,           // Unresolved calls
     TypeErr,                  // Type errors
     NilAdr,                   // Address might be nil on mem op
     BadArgs,                  // Unspecified primitive bad args
     AllTypeErr,               // Type errors, with one of the types All
-    Assert,                   // Assert type errors
     TrailingJunk,             // Trailing syntax junk
     MixedPrimGC,              // Mixed primitives & GC
   }

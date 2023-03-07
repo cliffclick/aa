@@ -67,6 +67,7 @@ public class RootNode extends Node {
     TypeMem tmem = mem._val instanceof TypeMem tmem0 ? tmem0 : mem._val.oob(TypeMem.ALLMEM);
     // All external aliases already escaped
     tmem = tmem.set(BitsAlias.EXTX,TypeStruct.ISUSED);
+    tmem = tmem.set(BitsAlias.STRX,TypeMemPtr.STRPTR._obj);
     
     // Reset for walking
     // Walk, finding escaped aliases and fidxs

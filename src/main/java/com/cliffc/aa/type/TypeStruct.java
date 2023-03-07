@@ -666,7 +666,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     if( is_top_clz() ) return sb.p("@{TOP}");
     if( is_int_clz() ) return sb.p("@{INT}");
     if( is_flt_clz() ) return sb.p("@{FLT}");
-    if( is_str_clz() ) return sb.p("@{STR}");
+    if( is_str_clz() ) return sb.p("str");
     if( is_math_clz()) return sb.p("@{MATH}");
     
     sb.p(_clz); // Includes a trailing ':' if not-empty

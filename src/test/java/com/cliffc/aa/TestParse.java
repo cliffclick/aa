@@ -30,7 +30,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", "4","int:4");
+    testerr("\"abc\":int", "*str:(97) is not a int64",5);
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -59,18 +59,18 @@ public class TestParse {
     // Simple no-arg anonymous function, being called
     test("{5}()", "5", "int:5");
     // TestParse.a_basic_01
-    test("{ x -> ( 3, x )}", "[56]{any,4 -> *[12](3, %[2,12][2,56]?) }", "{ A B -> *(int:3, B) }", null, null, "[12]", "[56]");
+    test("{ x -> ( 3, x )}", "[56]{any,4 -> *[11](3, %[2,11][2,56]?) }", "{ A B -> *(int:3, B) }", null, null, "[11]", "[56]");
     // TestParse.a_basic_02
-    test("{ z -> ((z 0), (z \"abc\")) }", "[56]{any,4 -> *[13](%[2,12,13][2,56]?, %[2,12,13][2,56]?) }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[12,13]", "[56]" );
+    test("{ z -> ((z 0), (z \"abc\")) }", "[56]{any,4 -> *[12](%[2,11,12][2,56]?, %[2,11,12][2,56]?) }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[11,12]", "[56]" );
 
     // TestParse.a_basic_05
     // example that demonstrates generic and non-generic variables:
     // 'g' is not-fresh in function 'f'.
-    // 'f' IS fresh in the body of 'g' pair.
+      // 'f' IS fresh in the body of 'g' pair.
     test("{ g -> f = { ignore -> g }; (f 3, f \"abc\")}",
-         "[56]{any,4 -> *[14](%[2,14][2,56]?, %[2,14][2,56]?) }",
+         "[56]{any,4 -> *[13](%[2,13][2,56]?, %[2,13][2,56]?) }",
          "{ A B -> *( B, B) }",
-         null,null,"[14]","[56]");
+         null,null,"[13]","[56]");
 
     
     // TestParse.g_overload_err_00
@@ -246,7 +246,7 @@ public class TestParse {
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)","int64","int:int64");
     test("f0 = { x -> x ? 1+(f0(x-1)) : 0 }; f0(2)", "2","int:2");
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))","*[14](nil,1,2)","*(int:int64,int:int64,int:int64)", null, null, "[14]", null);
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))","*[13](nil,1,2)","*(int:int64,int:int64,int:int64)", null, null, "[13]", null);
 
     // Co-recursion requires parallel assignment & type inference across a lexical scope
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", "1", "int:int64" );
@@ -273,10 +273,10 @@ public class TestParse {
     test   (" -1 :int1", "-1", "int:-1"); // parses as -(1:int)
     testerr("(-1):int1", "-1 is not a int1",4);
     testerr("\"abc\":int", "*str:(97) is not a int64",5);
-    testerr("1:str", "1 is not a *str:(int8)",1);
+    testerr("1:str", "1 is not a *str",1);
 
     test   ("{x:int -> x*2}(1)", "2","int:2"); // Types on parms
-    testerr("{x:str -> x}(1)", "1 is not a *str:(int8)", 2);
+    testerr("{x:str -> x}(1)", "1 is not a *str", 2);
 
     // Type annotations on dead args are ignored
     test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", "4","int:4");

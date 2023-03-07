@@ -53,7 +53,7 @@ public abstract class PrimNode extends Node {
   public static final StructNode ZSTR = new StructNode(0,false,null,"", Type.ALL);
   public static final NewNode PINT = new NewNode();
   public static final NewNode PFLT = new NewNode();
-  public static final NewNode PSTR = new NewNode();
+  public static final NewNode PSTR = new NewNode(BitsAlias.STRX);
 
   public static final ConNode  INT = new ConNode(TypeInt. INT64).init();
   public static final ConNode  FLT = new ConNode(TypeFlt. FLT64).init();
@@ -131,13 +131,13 @@ public abstract class PrimNode extends Node {
     for( PrimNode[] prims : INTS   ) for( PrimNode prim : prims ) allprims.push(prim);
     PRIMS = allprims.asAry();
 
-    // Math package
-    Env.STK_0.add_fld("math",Access.Final,make_math(rand),null).xval();
-
     // Build the int and float prototypes
     make_prim(ZFLT,"flt:",PFLT,FLTS);
     make_prim(ZINT,"int:",PINT,INTS);
     make_prim(ZSTR,"str:",PSTR,STRS);
+
+    // Math package
+    Env.STK_0.add_fld("math",Access.Final,make_math(rand),null).xval();
 
     
     Env.GVN.iter();

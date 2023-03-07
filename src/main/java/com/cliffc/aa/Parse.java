@@ -452,7 +452,7 @@ public class Parse implements Comparable<Parse> {
     
     // Assert type if asked for
     if( t!=null )
-      ifex = gvn(new AssertNode(null, ifex, t, badf));
+      ifex = gvn(new AssertNode(mem(), ifex, t, badf));
 
     // See if assigning over a forward-ref.
     int idx = scope().stk().find(tok);

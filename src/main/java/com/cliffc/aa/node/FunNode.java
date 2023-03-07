@@ -92,11 +92,6 @@ public class FunNode extends RegionNode {
   @Override public String xstr() { return name(); }
   // Inline longer info
   @Override public String str() { return name(); }
-  //// Name from fidx alone
-  //private static String name( int fidx, boolean debug) {
-  //  FunNode fun = find_fidx(fidx);
-  //  return fun==null ? name(null,null,fidx,-1,debug) : fun.name(debug);
-  //}
   // Name from FunNode
   String name() { return name(true); }
   public String name(boolean debug) {
@@ -108,51 +103,6 @@ public class FunNode extends RegionNode {
     if( debug ) name = name + "["+_fidx+"]"; // FIDX in debug
     return name;
   }
-  //static String name(String name, String bal, int fidx, int op_prec, boolean debug) {
-  //  if( op_prec >= 0 && name != null && bal!=null ) name = name+bal; // Primitives wrap
-  //  if( name==null ) name="";
-  //  if( debug ) name = name + "["+fidx+"]"; // FIDX in debug
-  //  return name;
-  //}
-  //
-  //// Can return nothing, or "name" or "[name0,name1,name2...]" or "[35]"
-  //public static SB names(BitsFun fidxs, SB sb, boolean debug ) {
-  //  int fidx = fidxs.abit();
-  //  if( fidx >= 0 ) return sb.p(name(fidx,debug));
-  //  if( fidxs==BitsFun.EMPTY ) return sb.p("[]");
-  //  // See if this is just one common name, common for overloaded functions
-  //  String s=null;
-  //  for( Integer ii : fidxs ) {
-  //    FunNode fun = find_fidx(ii);
-  //    if( fun!=null ) {
-  //      if( fun._name != null ) s = fun._name;
-  //      else if( !fun.is_dead() )
-  //        for( Node fptr : fun.ret()._uses ) // For all displays for this fun
-  //          if( fptr instanceof FunPtrNode ) {
-  //            String name = ((FunPtrNode)fptr)._name; // Get debug name
-  //            if( s==null ) s=name;                   // Capture debug name
-  //            else if( !Util.eq(s,name) )             // Same name is OK
-  //              { s=null; break; } // Too many different names
-  //          }
-  //      if( s==null ) break; // Unnamed fidx
-  //    }
-  //  }
-  //  if( s!=null )
-  //    sb.p(s);
-  //  // Make a list of the fidxs
-  //  if( debug ) {
-  //    int cnt = 0;
-  //    sb.p('[');
-  //    for( Integer ii : fidxs ) {
-  //      if( ++cnt == 5 ) break;
-  //      sb.p(ii).p(fidxs.above_center() ? '+' : ',');
-  //    }
-  //    if( cnt >= 5 ) sb.p("...");
-  //    else sb.unchar();
-  //    sb.p(']');
-  //  }
-  //  return sb;
-  //}
 
   // Debug only: make an attempt to bind name to a function
   public void bind( String tok ) {
@@ -565,6 +515,11 @@ public class FunNode extends RegionNode {
         for( Node use : ncepi.call()._uses )
           if( use._uses._len==0 ) Env.GVN.add_dead(use);
       }
+      // Find assert -> parm -> fun.
+      // Move errors to the single unique caller arg.
+      if( nn instanceof AssertNode a &&
+          a.arg() instanceof ParmNode p && p.in(0)==fun )
+        a._bad = path_call._badargs[p._idx-DSP_IDX];
     }
 
     // Retype memory, so we can everywhere lift the split-alias parents "up and out".

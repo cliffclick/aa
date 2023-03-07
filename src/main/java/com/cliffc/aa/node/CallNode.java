@@ -332,7 +332,7 @@ public class CallNode extends Node {
     // use the call input.  Post-Combo, all was wired, but dead Calls might be
     // unwinding.
     if( !_is_copy && (cepi()==null || !cepi().is_all_wired()) )
-      return _uses._len==0 || Combo.HM_FREEZE ? Type.ANY : Type.ALL;
+      return _uses._len==0 || (Combo.HM_FREEZE && err(true)==null) ? Type.ANY : Type.ALL;
     deps_add(def);
     // All wired, the arg is dead if the matching projection is dead
     int argn = _defs.find(def);
