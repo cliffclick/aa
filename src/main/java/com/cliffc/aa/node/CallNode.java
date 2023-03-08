@@ -96,7 +96,7 @@ public class CallNode extends Node {
     _rpc = BitsRPC.new_rpc(BitsRPC.ALLX); // Unique call-site index
     _unpacked=unpacked;         // Arguments are typically packed into a tuple and need unpacking, but not always
     _badargs = badargs;
-    _live=TypeMem.ALLMEM;
+    _live=RootNode.def_mem(null);
   }
 
   @Override public String xstr() { return (_is_copy ? "CopyCall" : (is_dead() ? "Xall" : "Call")); } // Self short name

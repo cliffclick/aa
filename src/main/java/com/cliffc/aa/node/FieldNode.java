@@ -5,6 +5,7 @@ import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.Util;
+import org.jetbrains.annotations.NotNull;
 
 import static com.cliffc.aa.AA.unimpl;
 
@@ -31,12 +32,13 @@ public class FieldNode extends Node implements Resolvable {
   public FieldNode(Node struct, String fld, boolean clz, Parse bad) {
     super(OP_FIELD,struct);
     // A plain "_" field is a resolving field
-    _fld = Util.eq(fld,"_") ? ("&"+_uid).intern() : fld;
+    _fld = resolve_fld_name(fld);
     _bad = bad;
     _clz = clz;
     assert !(clz && is_resolving()); // One or the other for now
   }
-
+  // A plain "_" field is a resolving field
+  private String resolve_fld_name(String fld) { return Util.eq(fld,"_") ? ("&"+_uid).intern() : fld; }
   @Override public String xstr() { return "."+(is_resolving() ? "_" : _fld); }   // Self short name
   String  str() { return xstr(); } // Inline short name
   @Override public boolean is_resolving() { return Resolvable.is_resolving(_fld); }
@@ -243,7 +245,7 @@ public class FieldNode extends Node implements Resolvable {
     case TypeFlt tf -> "flt:";
     case TypeMemPtr tmp -> { throw unimpl(); } // Fetch from tmp._obj._clz?
     case TypeStruct ts -> ts._clz;
-    case TypeNil tn -> tn==TypeNil.NIL ? "int:" : null;
+    case TypeNil tn -> tn==TypeNil.NIL || tn==TypeNil.XNIL ? "int:" : null;
     default -> null;
     };
   }
@@ -273,9 +275,18 @@ public class FieldNode extends Node implements Resolvable {
     if( errs==null ) return null;
     if( fast ) return ErrMsg.FAST;
     if( errs.len()>1 ) throw unimpl();
-    if( tvar(0) instanceof TVLeaf )
+    TV3 tv0 = tvar(0);
+    if( tv0 instanceof TVLeaf )
       return ErrMsg.unresolved(_bad,"Not a struct loading field "+_fld);
-    return tvar(0).as_struct().err_resolve(in(0),_bad, errs.at(0));
+    return tv0.as_struct().err_resolve(in(0),_bad, errs.at(0));
+  }
+
+  // clones during inlining change resolvable field names
+  @Override public @NotNull FieldNode copy(boolean copy_edges) {
+    FieldNode nnn = (FieldNode)super.copy(copy_edges);
+    if( nnn.is_resolving() ) nnn._fld = nnn.resolve_fld_name("_");
+    Env.GVN.add_flow(this);     // Alias changes flow
+    return nnn;
   }
 
   @Override public int hashCode() { return super.hashCode()+_fld.hashCode(); }

@@ -168,7 +168,7 @@ public abstract class PrimNode extends Node {
       else if( tformal==Type.ANY        ) nformal = Env.ANY;
       else if( tformal==Type.ALL        ) nformal = Env.ALL;
       else if( tformal==TypeFunPtr.THUNK) nformal = Env.THUNK;
-      else if( tformal==TypeMem.ALLMEM  ) nformal = Env.ALLMEM;
+      else if( tformal==TypeMem.ALLMEM  ) nformal = Env.MEM_0;
       else throw unimpl();
       add_def(new ParmNode(i,fun,null,tformal,nformal).init());
     }
@@ -566,14 +566,41 @@ public abstract class PrimNode extends Node {
 
   // Classic '&&' short-circuit.  Lazy in the RHS, so passed a 'thunk', a
   // zero-argument function to be evaluated if the LHS is true.
-  // TODO: Move to a (not yet made) NIL/SCAlAR class.
   public static class AndThen extends PrimNode {
     private static final TypeTuple ANDTHEN = TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, TypeInt.INT64, TypeFunPtr.THUNK); // {val tfp -> val }
     // Takes a value on the LHS, and a THUNK on the RHS.
     public AndThen() { super("_&&_",true/*lazy*/,ANDTHEN,TypeNil.SCALAR); _live = TypeMem.ALLMEM; }
     @Override public boolean is_mem() { return true; }
     @Override public TypeNil apply(TypeNil[] ts) { throw unimpl(); }
-    @Override public Type value() { return TypeTuple.RET; }
+
+    // This is basically the result of calling the RHS, meet'd with NIL.
+    @Override public Type value() {
+      if( len() <= ARG_IDX ) return _val;  // Freeze after expanding until death
+      Type mem = val(1);
+      Type lhs = val(2);
+      Type rhs = val(3);
+      // If any input is ANY, just stall till types fall to something reasonable.
+      if( val(0)==Type.ANY || mem==Type.ANY || lhs==Type.ANY || rhs==Type.ANY || lhs==TypeNil.XSCALAR )
+        return Type.ANY;
+      Type t = IfNode.truthy(lhs);
+      if( t==TypeTuple.IF_ANY )  return Type.ANY; // Still neither side executes
+      // Return a Tuple now.
+      // If the LHS is an optional nil, assume it WILL be nil and RHS never excutes.
+      if( t==TypeTuple.IF_FALSE )
+        return TypeTuple.make(Type.CTRL,mem,lhs); // Returns LHS (falsey)
+      // Only executes the RHS, never a nil
+      if( t==TypeTuple.IF_TRUE )
+        throw unimpl();
+      // Might be either nil or RHS
+
+      // Flaw here is several-fold:
+      // - as a minimum, need to call the RHS & properly type it.  Its part of call-graph now.
+      // - failure to inline && as part of Combo hurts analysis; all &&'s will now merge.
+      // So need to inline (via ideal_grow) the && as a force-inline 'primitive' during combo.
+      
+      
+      return TypeTuple.make(Type.CTRL,RootNode.def_mem(this),Type.ALL);
+    }
     @Override public Type live_use( Node def ) {  return def==in(1) ? _live : Type.ALL; }
     // Expect this to inline everytime
     @Override public Node ideal_grow() {
@@ -600,7 +627,7 @@ public abstract class PrimNode extends Node {
         Node rez = X.xform(new  ProjNode(cep,AA.REZ_IDX));
         // Region merging results
         Node reg = X.init(new RegionNode(null,fal,ccc));
-        Node phi = X.init(new PhiNode(Type.ALL,null,reg,Env.XNIL,rez ));
+        Node phi = X.init(new PhiNode(Type.ALL,null,reg,Env.NIL,rez ));
         Node phim= X.init(new PhiNode(TypeMem.ALLMEM,null,reg,mem,memc ));
         // Plug into self & trigger is_copy
         set_def(CTL_IDX,reg );
@@ -613,20 +640,34 @@ public abstract class PrimNode extends Node {
           memc.add_flow();
           cal.deps_add(dsp);
         }
+        //Env.GVN.revalive(iff,fal,tru,dsp,cal,cep,ccc,memc,rez,reg,phi,phim);
         return this;
       }
     }
 
-    // Pre-cook type: { A { -> A } -> A }
-    // Bind display to A
-    // Bind arg3 to { -> A } and return to A
+    // Pre-cook type: { A? { -> B } -> B? }
+    // Bind DSP_IDX to A?
+    // Bind ARG_IDX to { -> B } and return to B?
+    //@Override TV3 _set_tvar() {
+    //  // Bind DSP_IDX to A?
+    //  in(DSP_IDX).set_tvar().unify(new TVNil(new TVLeaf()),false);
+    //  // Bind ARG_IDX to { -> B } and return to B?
+    //  TV3 b = new TVLeaf();
+    //  TVLambda lam = new TVLambda(DSP_IDX,null,b);
+    //  in(ARG_IDX).set_tvar().unify(lam,false);
+    //  return new TVNil(b);
+    //}
+    // Pre-cook type: { A { -> B } -> B? }
+    // Bind DSP_IDX to A
+    // Bind ARG_IDX to { -> B } and return to B?
     @Override TV3 _set_tvar() {
-      TV3 a = in(DSP_IDX).set_tvar();
-      // Unify arg3 to a no-args lambda { -> A }
-      TVLambda lam = new TVLambda(DSP_IDX,null,a);
+      // Bind ARG_IDX to { -> B } and return to B?
+      TV3 b = new TVLeaf();
+      TVLambda lam = new TVLambda(DSP_IDX,null,b);
       in(ARG_IDX).set_tvar().unify(lam,false);
-      return a;
-    }
+      return new TVNil(b);
+    }    
+    
     // All work done in set_tvar, no need to unify
     @Override public boolean unify( boolean test ) { return false; }
 
@@ -649,7 +690,9 @@ public abstract class PrimNode extends Node {
     public OrElse() { super("_||_",true/*lazy*/,ORELSE,TypeNil.SCALAR); _live = TypeMem.ALLMEM; }
     @Override public boolean is_mem() { return true; }
     @Override public TypeNil apply(TypeNil[] ts) { throw unimpl(); }
-    @Override public Type value() { return TypeTuple.RET; }
+    @Override public Type value() {
+      return TypeTuple.make(Type.CTRL,RootNode.def_mem(this),Type.ALL);
+    }
     @Override public Type live_use( Node def ) {  return def==in(1) ? _live : Type.ALL; }
     // Expect this to inline everytime
     @Override public Node ideal_grow() {

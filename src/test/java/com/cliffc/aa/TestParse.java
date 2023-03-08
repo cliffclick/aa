@@ -30,7 +30,8 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",36);
+    test("x:=y:=0; x++ && y++; z=x++ && y++; (x,y,z)", // x++; x++; y++; (2,1,0)
+            "*[12](2, 1, nil)","*(int:int64,int:int64,A?)", null, null, "[12]", null);
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -203,18 +204,18 @@ public class TestParse {
 
   // Short-circuit tests
   @Test public void testParse01a() {
-    test("0 && 0", "xnil","A?");
+    test("0 && 0", "nil","A?");
     test("1 && 2", "int:2","int:2");
-    test("0 && 2", "xnil","A?");
-    test("0 || 0", "xnil","A?");
+    test("0 && 2", "nil","A?");
+    test("0 || 0", "nil","A?");
     test("0 || 2", "int:2","int:2");
     test("1 || 2", "int:1","int:1");
     test("0 && 1 || 2 && 3", "int:3","int:3");    // Precedence
 
     test("x:=y:=0; z=x++ && y++;(x,y,z)", // increments x, but it starts zero, so y never increments
-         "*[12](1, xnil,xnil)","*(int:int64,A?,B?)",null,null,"[12]",null);
+         "*[11](1, nil,nil)","*(int:int64,A?,B?)",null,null,"[11]",null);
     test("x:=y:=0; x++ && y++; z=x++ && y++; (x,y,z)", // x++; x++; y++; (2,1,0)
-            "*[13](2, 1, xnil)","*(int:int64,int:int64,A?)", null, null, "[13]", null);
+            "*[12](2, 1, nil)","*(int:int64,int:int64,A?)", null, null, "[12]", null);
     test("(x=1) && x+2", "int:3", "int:3"); // Def x in 1st position
 
     testerr("1 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x maybe alive

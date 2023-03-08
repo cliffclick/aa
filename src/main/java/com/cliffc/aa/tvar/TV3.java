@@ -366,9 +366,9 @@ abstract public class TV3 implements Cloneable {
   // This is fresh, and neither is a TVErr.
   boolean _fresh_unify_err(TV3 that, boolean test) {
     assert !(this instanceof TVErr) && !(that instanceof TVErr);
+    if( test ) return true;
     TVErr terr = new TVErr();
-    //return terr._unify_err(this) | terr._unify_err(that);
-    throw unimpl();
+    return terr._fresh_unify_err_fresh(this,test) | terr._unify_err(that);
   }
 
   boolean _fresh_missing_rhs(TV3 that, int i, boolean test) {

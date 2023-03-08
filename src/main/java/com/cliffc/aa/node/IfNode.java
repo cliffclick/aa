@@ -61,7 +61,15 @@ public class IfNode extends Node {
     if( in(0) instanceof ProjNode && in(0).in(0)==this )
       return TypeTuple.IF_ANY; // Test is dead cycle of self (during collapse of dead loops)
     Type pred = val(1);
+    return truthy(pred);
+  }
 
+  // Returns
+  //   TypeTuple.IF_FALSE - If always nil, 0:int, 0:flt
+  //   TypeTuple.IF_TRUE  - If nil never appears
+  //   TypeTuple.IF_ALL   - If cannot tell true or false
+  //   TypeTuple.IF_ANY   - If cannot be either true or false
+  public static TypeTuple truthy(Type pred) {
     // Handle predicates, especially XNIL and wrapped ints (TypeStruct with
     // perhaps constant fields).
     if( pred == TypeNil.NIL    ) return TypeTuple.IF_FALSE; // The One True Zero
