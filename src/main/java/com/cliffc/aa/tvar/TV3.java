@@ -582,7 +582,7 @@ abstract public class TV3 implements Cloneable {
   }
   public static void do_delay_resolve() {
     while( DELAY_RESOLVE.len() > 0 )
-      DELAY_RESOLVE.pop().trial_resolve_all();
+      ((TVStruct)DELAY_RESOLVE.pop().find()).trial_resolve_all();
   }
   
   // -----------------

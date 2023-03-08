@@ -37,16 +37,16 @@ public class AssertNode extends Node {
       if( actual.isa(t2) )  return targ;
     }
     // Value is capped to the assert value.
-    return targ.meet(t2).join(t2);
+    return targ.meet(t0).join(t0);
   }
 
   @Override public Type live_use( Node def ) {
     if( def==arg() ) return _live; // Alive as I am
     // Memory is alive for errors
-    BitsAlias aliases0 = _t instanceof TypeMemPtr tmp ? tmp._aliases : null;
-    BitsAlias aliases1 = arg()._val instanceof TypeMemPtr tmp ? tmp._aliases : null;
-    BitsAlias aliases2 = aliases0==null ? aliases1 : (aliases1==null ? aliases0 : aliases0.meet(aliases1));
-    return aliases2==null ? TypeMem.ANYMEM : TypeMem.make(aliases2,TypeStruct.ISUSED);
+    Type t = arg()._val;    
+    return t instanceof TypeMemPtr tmp
+      ? TypeMem.make(tmp._aliases,TypeStruct.ISUSED)
+      : TypeMem.ANYMEM;
   }
 
   @Override public boolean assert_live(Type live) {
@@ -54,21 +54,18 @@ public class AssertNode extends Node {
   }
 
   @Override public Node ideal_reduce() {
-    Type actual = arg()._val, t = _t;
+    Type actual = arg()._val;
     Node mem = mem();
     // Never a pointer to sharpen, drop memory
     if( mem!=null &&
-        !(_t     instanceof TypeMemPtr) && // No pointer in assert
         !(actual instanceof TypeMemPtr) && // No pointer in actual
         !actual.above_center() )           // Cannot fall to a pointer
       return set_def(1,null);
     // If have a memory, sharpen
-    if( mem!=null ) {
+    if( mem!=null )
       actual = mem._val.sharptr(actual);
-      t      = mem._val.sharptr(t);
-    }
     // If ISA, remove assert
-    return actual.isa(t) ? arg() : null;
+    return actual.isa(_t) ? arg() : null;
   }
   
   @Override public Node ideal_grow() {
@@ -140,11 +137,8 @@ public class AssertNode extends Node {
   // Check TypeNode for being in-error
   @Override public ErrMsg err( boolean fast ) {
     Type arg = arg()._val;
-    Type t = _t;
-    if( mem()!=null ) {
+    if( mem()!=null )
       arg = mem()._val.sharptr(arg);
-      t   = mem()._val.sharptr(_t );
-    }
-    return ErrMsg.asserterr(_bad,arg, t);
+    return ErrMsg.asserterr(_bad,arg, _t);
   }
 }

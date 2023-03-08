@@ -30,7 +30,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    testerr("\"abc\":int", "*str:(97) is not a int64",5);
+    testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",36);
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -273,35 +273,32 @@ public class TestParse {
     test   (" -1 :int1", "-1", "int:-1"); // parses as -(1:int)
     testerr("(-1):int1", "-1 is not a int1",4);
     testerr("\"abc\":int", "*str:(97) is not a int64",5);
-    testerr("1:str", "1 is not a *str",1);
+    testerr("1:str", "1 is not a *str:(int8)",1);
 
     test   ("{x:int -> x*2}(1)", "2","int:2"); // Types on parms
-    testerr("{x:str -> x}(1)", "1 is not a *str", 2);
+    testerr("{x:str -> x}(1)", "1 is not a *str:(int8)", 2);
 
     // Type annotations on dead args are ignored
     test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", "4","int:4");
-    testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *str",41);
+    testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *str:(int8)",41);
+    testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",36);
     // Test that the type-check is on the variable and not the function.
-    //test_obj("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x;y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
-    //         TypeStruct.make_test(TypeInt.con(4),TypeInt.con(4)));
-    //testerr("fun={x y -> x+y}; baz:{int @{x;y} -> int} = fun; (fun(2,3), baz(2,3))",
-    //        "3 is not a *@{x:=; y:=; ...}", 66);
-    //testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> foo(x,y)}; (fun(2,3), baz(2,3))",
-    //        "Unknown ref 'foo'", 41);
-    //// This test failed because the inner fun does not inline until GCP,
-    //// and then it resolves and lifts the DISPLAY (which after resolution
-    //// is no longer needed).  Means: cannot resolve during GCP and preserve
-    //// monotonicity.  Would like '.fun' to load BEFORE GCP.
-    //testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> fun(x,y)}; (fun(2,3), baz(2,3))",
-    //        "3 is not a *@{x:=; y:=; ...}", 69);
-    //
-    //testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",36);
-    //test("x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
-    //test("fun:{real->flt32}={x -> x}; fun(123 )", TypeInt.con(123 ));
-    //test("fun:{real->flt32}={x -> x}; fun(0.125)", TypeFlt.con(0.125));
-    //testerr("fun:{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32",3);
-    //
-    //// Named types
+    test   ("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x;y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
+            "*[12](4,4)", "*(A:int:B:int64,A)", null, null, "[12]", null);
+    testerr("fun={x y -> x+y}; baz:{int @{x;y} -> int} = fun; (fun(2,3), baz(2,3))",
+            "3 is not a *@{x:=Scalar; y:=Scalar; ...}", 66);
+    testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> foo(x,y)}; (fun(2,3), baz(2,3))",
+            "Unknown ref 'foo'", 41);
+    // This test failed because the inner fun does not inline until GCP,
+    // and then it resolves and lifts the DISPLAY (which after resolution
+    // is no longer needed).  Means: cannot resolve during GCP and preserve
+    // monotonicity.  Would like '.fun' to load BEFORE GCP.
+    testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> fun(x,y)}; (fun(2,3), baz(2,3))",
+            "3 is not a *@{x:=Scalar; y:=Scalar; ...}", 69);
+  }
+
+  @Test public void testParse03a() {
+    // Named types
     //test_named_tuple("A= :(       )" ); // Zero-length tuple
     //test_named_tuple("A= :(   ,   )", Type.SCALAR); // One-length tuple
     //test_named_tuple("A= :(   ,  ,)", Type.SCALAR  ,Type.SCALAR  );
