@@ -93,7 +93,7 @@ public class NewNode extends Node {
   // not done by default.
   @Override public boolean equals(Object o) {  return this==o; }
 
-  private static Ary<NewNode> NEWS = new Ary<>(new NewNode[]{null,});
+  private static final Ary<NewNode> NEWS = new Ary<>(new NewNode[]{null,});
   public static void reset_to_init0() { NEWS.clear(); }
   public static NewNode get( int alias ) {
     NewNode nnn = NEWS.atX(alias);

@@ -33,6 +33,7 @@ public class StoreNode extends Node {
     Type tval = rez==null ? Type.ANY : rez._val;  // Value
     if( !(tmem instanceof TypeMem    tm ) ) return tmem .oob(TypeMem.ALLMEM);
     if( !(tadr instanceof TypeMemPtr tmp) ) return tadr .oob(TypeMem.ALLMEM);
+    if( tmp._aliases.is_empty() ) return tm; // Stored at nothing
     TypeStruct tvs = tval instanceof TypeStruct ? (TypeStruct)tval : tval.oob(TypeStruct.ISUSED);
     
     //Node str = LoadNode.find_previous_struct(this, adr, tmp._aliases);
@@ -66,6 +67,7 @@ public class StoreNode extends Node {
 
     // Liveness for memory?
     if( def==mem() ) {
+      adr().deps_add(def);
       // Assume all above center aliases kill everything (will optimistically
       // kill what we need) to make uses go away
       if( tmp._aliases.above_center() ) {

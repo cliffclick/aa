@@ -59,6 +59,7 @@ public final class CallEpiNode extends Node {
     for( int i=0; i<nwired(); i++ )
       if( fidxs.test(wired(i)._fidx) ) // Verify each fidx is wired
         ncall++;
+    if( is_global() ) ncall++;      // Generic external function wired
     return ncall==fidxs.bitCount(); // All is wired
   }
 
@@ -327,13 +328,18 @@ public final class CallEpiNode extends Node {
     if( !is_all_wired() ) {
       throw unimpl();           // Worse-case return from future unwired called fcns
     } else {
+      if( is_global() ) {
+        tmem = tmem.meet(Env.ROOT.rmem());
+        trez = trez.meet(Env.ROOT.ext_caller());
+        tmem = tmem.meet(CallNode.emem(tcall)); // Also get pass-thru memory
+      }
       for( int i=0; i<nwired(); i++ ) { // For all wired calls
         RetNode ret = wired(i);
         if( !fidxs.test_recur(ret._fidx) ) continue;
         Type tret0 = ret._val;     // Get the called function return
         TypeTuple tret = (TypeTuple)(tret0 instanceof TypeTuple ? tret0 : tret0.oob(TypeTuple.RET));
         Type rmem = tret.at(MEM_IDX);
-        if( ret.mem()==null )
+        if( ret.mem()==null ) // Pure call just passes memory thru
           rmem = CallNode.emem(tcall);
         tmem = tmem.meet(rmem);
         trez = trez.meet(tret.at(REZ_IDX));

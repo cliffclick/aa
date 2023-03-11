@@ -60,18 +60,18 @@ public class TestParse {
     // Simple no-arg anonymous function, being called
     test("{5}()", "5", "int:5");
     // TestParse.a_basic_01
-    test("{ x -> ( 3, x )}", "[56]{any,4 -> *[11](3, %[2,11][2,56]?) }", "{ A B -> *(int:3, B) }", null, null, "[11]", "[56]");
+    test("{ x -> ( 3, x )}", "[57]{any,4 -> *[11](3, %[2,11][2,57]?) }", "{ A B -> *(int:3, B) }", null, null, "[11]", "[57]");
     // TestParse.a_basic_02
-    test("{ z -> ((z 0), (z \"abc\")) }", "[56]{any,4 -> *[12](%[2,11,12][2,56]?, %[2,11,12][2,56]?) }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[11,12]", "[56]" );
+    test("{ z -> ((z 0), (z \"abc\")) }", "[57]{any,4 -> *[12](%[2,11,12][2,57]?, %[2,11,12][2,57]?) }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[11,12]", "[57]" );
 
     // TestParse.a_basic_05
     // example that demonstrates generic and non-generic variables:
     // 'g' is not-fresh in function 'f'.
       // 'f' IS fresh in the body of 'g' pair.
     test("{ g -> f = { ignore -> g }; (f 3, f \"abc\")}",
-         "[56]{any,4 -> *[13](%[2,13][2,56]?, %[2,13][2,56]?) }",
+         "[57]{any,4 -> *[13](%[2,13][2,57]?, %[2,13][2,57]?) }",
          "{ A B -> *( B, B) }",
-         null,null,"[13]","[56]");
+         null,null,"[13]","[57]");
 
     
     // TestParse.g_overload_err_00
@@ -84,16 +84,16 @@ public class TestParse {
     testerr("{ x -> 1+x }", "Ambiguous, unable to resolve { int:int64 int:int64 -> int:int64 } and { int:int64 flt:nflt64 -> flt:flt64 }",8);
     testerr("{ x -> x+1 }", "No operator _+_",8);
     testerr("{x:flt y -> x+y}", "Ambiguous, unable to resolve { flt:flt64 flt:flt64 -> flt:flt64 } and { flt:flt64 int:int64 -> flt:flt64 }",13); // {Scalar Scalar -> Scalar}
-    test("{x:flt y:int -> x+y}", "[56]{any,5 -> flt64 }", "{ A flt:flt64 int:int64 -> flt:flt64 }", null, null, null, "[56]");
+    test("{x:flt y:int -> x+y}", "[57]{any,5 -> flt64 }", "{ A flt:flt64 int:int64 -> flt:flt64 }", null, null, null, "[57]");
 
     // error, missing a comma
     testerr("{ x -> ( 3 x )}", "A function is being called, but 3 is not a function",11);
 
     // TestParse.b_recursive_01
-    test("{ f -> (f f) }", "[56]{any,4 -> %[2][2,56]? }", "{A B:{C B -> D } -> D }", null, null, "[]", "[56]" );
+    test("{ f -> (f f) }", "[57]{any,4 -> %[2][2,57]? }", "{A B:{C B -> D } -> D }", null, null, "[]", "[57]" );
 
     // TestParse.b_recursive_05, Y combinator
-    test("{ f -> ({ x -> (f (x x))} { x -> (f (x x))})}", "[56]{any,4 -> %[2][2,56]? }", "{ A { B C -> C } -> C }", null, null, "[]", "[56]" );
+    test("{ f -> ({ x -> (f (x x))} { x -> (f (x x))})}", "[57]{any,4 -> %[2][2,57]? }", "{ A { B C -> C } -> C }", null, null, "[]", "[57]" );
 
   }
   

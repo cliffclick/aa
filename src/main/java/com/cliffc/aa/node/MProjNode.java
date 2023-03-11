@@ -18,13 +18,14 @@ public class MProjNode extends ProjNode {
   @Override public Type live_use( Node def ) { return _live; }
 
   @Override public Node ideal_reduce() {
+    if( is_prim() ) return null;
     // Fold dying calls
     Node mem = in(0).is_copy(MEM_IDX);
     if( mem != null )
       return mem;
 
     // Fold across pure calls (most primitives)
-    if( in(0) instanceof CallEpiNode cepi && cepi.is_all_wired() ) {
+    if( in(0) instanceof CallEpiNode cepi && cepi.is_all_wired() && !cepi.is_global()) {
       boolean pure=true;
       for( int i=0; i<cepi.nwired(); i++ ) {
         RetNode ret = cepi.wired(i);

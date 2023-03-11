@@ -2,6 +2,7 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeNil;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
@@ -79,7 +80,7 @@ public class TVNil extends TV3 {
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) {
     Type t = not_nil()._as_flow(dep);
-    throw unimpl();
+    return t.meet(TypeNil.NIL);
   }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {

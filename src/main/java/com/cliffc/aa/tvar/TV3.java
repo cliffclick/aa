@@ -104,7 +104,11 @@ abstract public class TV3 implements Cloneable {
   public TV3 find() {
     TV3 leader = _find0();
     // Additional read-barrier for TVNil to collapse nil-of-something
-    return leader instanceof TVNil tnil ? tnil.arg(0).find_nil(tnil) : leader;
+    if( !(leader instanceof TVNil tnil) ) return leader;
+    TV3 nnn = tnil.arg(0).find_nil(tnil);
+    if( nnn==leader ) return leader;
+    leader._find0().union(nnn);
+    return nnn;
   }
   public TV3 _find0() {
     if( _uf    ==null ) return this;// Shortcut, no rollup

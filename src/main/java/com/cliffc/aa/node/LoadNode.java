@@ -60,6 +60,7 @@ public class LoadNode extends Node {
     } else tptr=tptr0;
 
     if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
+    if( tptr._aliases.is_empty() ) return TypeMem.ANYMEM;
     // Demand memory produce the desired structs
     return TypeMem.make(tptr._aliases,(TypeStruct)_live);
   }

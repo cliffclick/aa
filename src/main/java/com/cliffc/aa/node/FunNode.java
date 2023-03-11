@@ -509,6 +509,11 @@ public class FunNode extends RegionNode {
             ncepi.wire0(ncepi.call(),xxxret.fun(),false);
           }
         }
+        // Force cloned body calls to not be root-called; will need to re-wire
+        if( ncepi.is_global() ) {
+          assert Env.ROOT._defs.find(ncepi.call()) == -1;
+          ncepi.set_def(1,null);
+        }
         // CEProjs from the Call never re-wire, as they are not uniquely
         // identified by input alone.  Other Projs DO rewire, if any target
         // function uses them.

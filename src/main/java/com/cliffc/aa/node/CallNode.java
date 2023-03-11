@@ -220,7 +220,7 @@ public class CallNode extends Node {
     // alive args still need to resolve.  Constants are an issue, because they
     // fold into the Parm and the Call can lose the matching DProj while the
     // arg is still alive.
-    if( !is_keep() && err(true)==null && cepi!=null && cepi.is_all_wired() ) {
+    if( !is_keep() && err(true)==null && cepi!=null && cepi.is_all_wired() && !cepi.is_global() ) {
       Node progress = null;
       for( int i=ARG_IDX; i<nargs(); i++ )
         if( ProjNode.proj(this,i)==null &&
@@ -313,7 +313,7 @@ public class CallNode extends Node {
   @Override public Type live_use(Node def) {
     Type tcall = _val;
     if( !(tcall instanceof TypeTuple) ) // Call is has no value (yet)?
-      return tcall.oob();
+      { deps_add(def); return tcall.oob(); }
     if( def==ctl() ) return Type.ALL;
     if( def==fdx() ) return Type.ALL;
     boolean is_keep = is_keep();
@@ -331,8 +331,11 @@ public class CallNode extends Node {
     // Check that all fidxs are wired.  If not wired, a future wired fidx might
     // use the call input.  Post-Combo, all was wired, but dead Calls might be
     // unwinding.
-    if( !_is_copy && (cepi()==null || !cepi().is_all_wired()) )
+    CallEpiNode cepi = cepi();
+    if( !_is_copy && (cepi==null || !cepi.is_all_wired()) ) {
+      if( cepi!=null ) cepi.deps_add(def);
       return _uses._len==0 || (Combo.HM_FREEZE && err(true)==null) ? Type.ANY : Type.ALL;
+    }
     deps_add(def);
     // All wired, the arg is dead if the matching projection is dead
     int argn = _defs.find(def);

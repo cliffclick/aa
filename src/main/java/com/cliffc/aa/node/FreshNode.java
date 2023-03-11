@@ -64,6 +64,7 @@ public class FreshNode extends Node {
   // Two FreshNodes are only equal, if they have compatible TVars
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
+    if( !super.equals(o) ) return false;
     if( !(o instanceof FreshNode frsh) ) return false;
     return (_tvar!=null && frsh._tvar!=null && tvar()==frsh.tvar()); // Pre-combo, must be the same Node
   }

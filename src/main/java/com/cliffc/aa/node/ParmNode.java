@@ -43,6 +43,7 @@ public class ParmNode extends PhiNode {
           if( ti != Type.ANY && _tvar!=null ) {
             Env.ROOT.deps_add(this); // Depends on Root
             ti = tvar().as_flow(this);
+            // TODO: Very expensive and rarely needed
             //_tvar.deps_add_deep(this); // Updates to tvar recompute flow
           }
         }
