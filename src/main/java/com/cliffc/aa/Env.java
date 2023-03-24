@@ -231,7 +231,6 @@ public class Env implements AutoCloseable {
       assert n._uid < Node._INIT0_CNT; //
     AA.reset();
     Node      .reset_to_init0();
-    CallNode  .reset_to_init0();
     GVN       .reset_to_init0();
     FunNode   .reset_to_init0();
     NewNode   .reset_to_init0();

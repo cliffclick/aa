@@ -30,8 +30,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    test("x:=y:=0; x++ && y++; z=x++ && y++; (x,y,z)", // x++; x++; y++; (2,1,0)
-            "*[12](2, 1, nil)","*(int:int64,int:int64,A?)", null, null, "[12]", null);
+    testerr("1 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x maybe alive
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -60,20 +59,19 @@ public class TestParse {
     // Simple no-arg anonymous function, being called
     test("{5}()", "5", "int:5");
     // TestParse.a_basic_01
-    test("{ x -> ( 3, x )}", "[57]{any,4 -> *[11](3, %[2,11][2,57]?) }", "{ A B -> *(int:3, B) }", null, null, "[11]", "[57]");
+    test("{ x -> ( 3, x )}", "[55]{any,4 -> *[11](3, %[2,11][2,55]?) }", "{ A B -> *(int:3, B) }", null, null, "[11]", "[55]");
     // TestParse.a_basic_02
-    test("{ z -> ((z 0), (z \"abc\")) }", "[57]{any,4 -> *[12](%[2,11,12][2,57]?, %[2,11,12][2,57]?) }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[11,12]", "[57]" );
+    test("{ z -> ((z 0), (z \"abc\")) }", "[55]{any,4 -> *[12](%[2,11,12][2,55]?, %[2,11,12][2,55]?) }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[11,12]", "[55]" );
 
     // TestParse.a_basic_05
     // example that demonstrates generic and non-generic variables:
     // 'g' is not-fresh in function 'f'.
       // 'f' IS fresh in the body of 'g' pair.
     test("{ g -> f = { ignore -> g }; (f 3, f \"abc\")}",
-         "[57]{any,4 -> *[13](%[2,13][2,57]?, %[2,13][2,57]?) }",
+         "[55]{any,4 -> *[13](%[2,13][2,55]?, %[2,13][2,55]?) }",
          "{ A B -> *( B, B) }",
-         null,null,"[13]","[57]");
+         null,null,"[13]","[55]");
 
-    
     // TestParse.g_overload_err_00
     testerr("( { x -> x*2 }, { x -> x*3 })._ 4", "Ambiguous, unable to resolve { C D -> E } and { F G -> H }",30);
 
@@ -84,16 +82,16 @@ public class TestParse {
     testerr("{ x -> 1+x }", "Ambiguous, unable to resolve { int:int64 int:int64 -> int:int64 } and { int:int64 flt:nflt64 -> flt:flt64 }",8);
     testerr("{ x -> x+1 }", "No operator _+_",8);
     testerr("{x:flt y -> x+y}", "Ambiguous, unable to resolve { flt:flt64 flt:flt64 -> flt:flt64 } and { flt:flt64 int:int64 -> flt:flt64 }",13); // {Scalar Scalar -> Scalar}
-    test("{x:flt y:int -> x+y}", "[57]{any,5 -> flt64 }", "{ A flt:flt64 int:int64 -> flt:flt64 }", null, null, null, "[57]");
+    test("{x:flt y:int -> x+y}", "[55]{any,5 -> flt64 }", "{ A flt:flt64 int:int64 -> flt:flt64 }", null, null, null, "[55]");
 
     // error, missing a comma
     testerr("{ x -> ( 3 x )}", "A function is being called, but 3 is not a function",11);
 
     // TestParse.b_recursive_01
-    test("{ f -> (f f) }", "[57]{any,4 -> %[2][2,57]? }", "{A B:{C B -> D } -> D }", null, null, "[]", "[57]" );
+    test("{ f -> (f f) }", "[55]{any,4 -> %[2][2,55]? }", "{A B:{C B -> D } -> D }", null, null, "[]", "[55]" );
 
     // TestParse.b_recursive_05, Y combinator
-    test("{ f -> ({ x -> (f (x x))} { x -> (f (x x))})}", "[57]{any,4 -> %[2][2,57]? }", "{ A { B C -> C } -> C }", null, null, "[]", "[57]" );
+    test("{ f -> ({ x -> (f (x x))} { x -> (f (x x))})}", "[55]{any,4 -> %[2][2,55]? }", "{ A { B C -> C } -> C }", null, null, "[]", "[55]" );
 
   }
   
@@ -194,7 +192,7 @@ public class TestParse {
     test   ("2 ? x=2 : y  ", "2", "int:2"); // off-side is constant-dead, so missing 'y'      is ignored
     testerr("x=1;2?(x=2):(x=3);x", "Cannot re-assign final field '.x' in @{x=1}",7);
     test   ("x=1;2?   2 :(x=3);x", "1", "int:1"); // Re-assigned allowed & ignored in dead branch
-    test   ("math.rand(2)?1:int:2:int","nint8", "int:int64"); // no ambiguity between conditionals and type annotations
+    test   ("math.rand(2)?1:int:2:int","nint8", "int:nint8"); // no ambiguity between conditionals and type annotations
     testerr("math.rand(2)?1: :2:int","missing expr after ':'",16); // missing type
     testerr("math.rand(2)?1::2:int","missing expr after ':'",15); // missing type
     test   ("math.rand(2)?1","int1","int:int1"); // Missing optional else defaults to nil
@@ -215,12 +213,12 @@ public class TestParse {
     test("x:=y:=0; z=x++ && y++;(x,y,z)", // increments x, but it starts zero, so y never increments
          "*[11](1, nil,nil)","*(int:int64,A?,B?)",null,null,"[11]",null);
     test("x:=y:=0; x++ && y++; z=x++ && y++; (x,y,z)", // x++; x++; y++; (2,1,0)
-            "*[12](2, 1, nil)","*(int:int64,int:int64,A?)", null, null, "[12]", null);
+            "*[12](2, 1, nil)","*(int:int64,int:int64,int:int64)", null, null, "[12]", null);
     test("(x=1) && x+2", "int:3", "int:3"); // Def x in 1st position
 
     testerr("1 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x maybe alive
     testerr("0 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x definitely not alive
-    test("math.rand(2) && (x=2;x*x) || 3 && 4", "int:int8", "int:int8"); // local use of x in short-circuit; requires unzip to find 4
+    test("math.rand(2) && (x=2;x*x) || 3 && 4", "int:int8", "int:int64"); // local use of x in short-circuit; requires unzip to find 4
   }
 
   @Test public void testParse02() {
@@ -247,11 +245,11 @@ public class TestParse {
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)","int64","int:int64");
     test("f0 = { x -> x ? 1+(f0(x-1)) : 0 }; f0(2)", "2","int:2");
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))","*[13](nil,1,2)","*(int:int64,int:int64,int:int64)", null, null, "[13]", null);
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))","*[13](nil,1,2)","*(int:int64,A:int:B:int64,A)", null, null, "[13]", null);
 
     // Co-recursion requires parallel assignment & type inference across a lexical scope
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", "1", "int:int64" );
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", "int1", "int:int64" );
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", "1", "int:1" );
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", "int1", "int:int1" );
 
     // This test merges 2 TypeFunPtrs in a Phi, and then fails to resolve.
     test("(math.rand(1) ? 2._+_ : 2._*_) ._ (3)","int64","int:int64"); // either 2+3 or 2*3, or {5,6} which is INT8.

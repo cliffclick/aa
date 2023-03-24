@@ -41,8 +41,6 @@ public class PhiNode extends Node {
     RegionNode r = (RegionNode) in(0);
     assert r._defs._len==_defs._len;
     if( r._val == Type.XCTRL ) return null; // All dead, c-prop will fold up
-    if( r instanceof FunNode fun && fun.noinline() )
-      return null; // Do not start peeling apart parameters to a no-inline function
     // If only 1 unique live input, return that
     Node live=null;
     for( int i=1; i<_defs._len; i++ ) {
@@ -59,10 +57,10 @@ public class PhiNode extends Node {
   @Override public Type value() {
     if( in(0)==null ) return Type.ALL; // Conservative, mid-construction
     Type ctl = val(0);
-    if( ctl != Type.CTRL ) return ctl.oob();
+    if( ctl != Type.CTRL && ctl!= Type.ALL ) return _t.dual(); //ctl.oob();
     RegionNode r = (RegionNode) in(0);
     assert r._defs._len==_defs._len;
-    Type t = Type.ANY;
+    Type t = _t.dual();
     for( int i=1; i<_defs._len; i++ ) {
       r.in(i).deps_add(this);
       if( r.val(i)!=Type.XCTRL && r.val(i)!=Type.ANY ) // Only meet alive paths

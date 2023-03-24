@@ -24,7 +24,7 @@ public interface Resolvable {
   // - 0  zero matching choices
   // - 1  exactly one choice; resolvable (and resolved if not testing)
   // - 2+ two or more choices; resolve is ambiguous
-  static Ary<TVLeaf> PAT_LEAFS = new Ary<TVLeaf>(new TVLeaf[1],0);
+  static Ary<TV3> PAT_LEAFS = new Ary<>(new TV3[1],0);
   default boolean trial_resolve( boolean outie, TV3 pattern, TVStruct lhs, TVStruct rhs, boolean test ) {
     assert !rhs.is_open() && is_resolving();
 
@@ -63,7 +63,8 @@ public interface Resolvable {
     return true;              // Progress
   }
 
-  static boolean add_pat_leaf(TVLeaf leaf) {
+  static boolean add_pat_leaf(TV3 leaf) {
+    assert leaf instanceof TVBase || leaf instanceof TVLeaf;
     if( PAT_LEAFS.find(leaf)== -1 )
       PAT_LEAFS.add(leaf);
     return true;

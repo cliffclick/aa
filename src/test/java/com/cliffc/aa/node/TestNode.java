@@ -6,11 +6,11 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.util.Util;
-import static com.cliffc.aa.type.TypeFld.Access;
-
 import org.junit.Test;
 
 import java.util.Arrays;
+
+import static com.cliffc.aa.type.TypeFld.Access;
 
 public class TestNode {
   // A private set of input nodes to feed into each tested Node - a hand-rolled
@@ -239,7 +239,7 @@ public class TestNode {
     set_type(2,TypeNil.SCALAR);  nnn1.add_fld("y",Access.Final,_ins[2],null);
     test1monotonic(nnn1);
     ((ConNode<Type>)_ins[1])._t = TypeNil.SCALAR; // ParmNode reads this for _alltype
-    test1monotonic(new   ParmNode( 1,(FunNode)_ins[0],null,null,(ConNode)_ins[1]).add_def(_ins[2]));
+    test1monotonic(new   ParmNode( 1,(FunNode)_ins[0],null,null).add_def((ConNode)_ins[1]).add_def(_ins[2]));
     test1monotonic(new    PhiNode(TypeNil.SCALAR,null,_ins[0],_ins[1],_ins[2]));
     for( PrimNode prim : PrimNode.PRIMS() )
       test1monotonic_prim(prim,mem);

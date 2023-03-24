@@ -10,6 +10,7 @@ import static com.cliffc.aa.AA.*;
 // Load a struct from memory.  Does it's own nil-check testing.
 public class LoadNode extends Node {
   private final Parse _bad;
+  private boolean _mid_grow;
 
   public LoadNode( Node mem, Node adr, Parse bad ) {
     super(OP_LOAD,null,mem,adr);
@@ -126,17 +127,21 @@ public class LoadNode extends Node {
     Node mem = mem();
     Node adr = adr();
     // Load from a memory Phi; split through in an effort to sharpen the memory.
-    // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
     // TODO: Hoist out of loops.
-    if( mem instanceof PhiNode mphi && adr instanceof NewNode && !(mphi instanceof ParmNode) ) {
-      Node lphi = new PhiNode(TypeNil.SCALAR,mphi._badgc,mphi.in(0));
-      for( int i=1; i<mphi._defs._len; i++ ) {
-        Node ld = Env.GVN.add_work_new(new LoadNode(mphi.in(i),adr,_bad).init());
-        ld._live = _live;
-        lphi.add_def(ld);
+    if( !_mid_grow && mem instanceof PhiNode mphi && adr instanceof NewNode ) {
+      _mid_grow=true;           // Prevent recursive trigger when calling nested xform
+      Node[] ns = new Node[mphi.len()];
+      for( int i=1; i<mphi.len(); i++ ) {
+        ns[i] = Env.GVN.xform(new LoadNode(mphi.in(i),adr,_bad));
+        ns[i].push();
       }
+      Node.pops(mphi.len()-1);
+      Node lphi = new PhiNode(TypeStruct.ISUSED,mphi._badgc,mphi.in(0));
+      for( int i=1; i<mphi.len(); i++ )
+        lphi.add_def(ns[i]);
       lphi._live = _live;
-      return lphi.init();
+      lphi.xval();
+      return lphi;
     }
 
     return null;
@@ -175,14 +180,31 @@ public class LoadNode extends Node {
         case CallNode     node -> mem = node.mem(); // Lifting out of a Call
         case RootNode     node -> { return null; }
         case PrimNode     prim -> { return null; }
-        case CallEpiNode  node -> {
-          mem = node.is_copy(MEM_IDX); // Skip thru a copy
+        case CallEpiNode  cepi -> {
+          mem = cepi.is_copy(MEM_IDX); // Skip thru a copy
           if( mem == null ) {
-            CallNode call = node.call();
+            CallNode call = cepi.call();
+            assert call.is_copy(0)==null;
+            // The load is allowed to bypass the call if the alias is not killed.
+            // Conservatively: the alias is not available to any called function,
+            // so its not in the reachable argument alias set and not globally escaped.
             BitsAlias esc_aliases = Env.ROOT.ralias();
             // Collides, might be use/def by call
             if( aliases.overlaps(esc_aliases) ) {
               Env.ROOT.deps_add(ldst); // Revisit if fewer escapes
+              return null;
+            }
+            // Compute direct call argument set
+            BitsAlias as = BitsAlias.EMPTY;
+            for( int i=DSP_IDX; i<call.nargs(); i++ ) {
+              Type targ = call.val(i);
+              if( targ instanceof TypeFunPtr tfp ) targ = tfp.dsp();
+              if( targ instanceof TypeMemPtr tmp ) as = as.meet(tmp.aliases());
+            }
+            // Check for overlap with the reachable aliases
+            TypeMem cmem = CallNode.emem((TypeTuple)call._val);
+            if( aliases.overlaps(as) || aliases.overlaps(cmem.all_reaching_aliases(as)) ) {
+              call.deps_add(ldst); // Revisit if fewer escapes
               return null;
             }
             // Peek through call
@@ -200,8 +222,9 @@ public class LoadNode extends Node {
       //  if( mem.in(0) instanceof FunNode && mem.in(0).is_copy(1)!=null ) mem = mem.in(1); // FunNode is dying, copy, so ParmNode is also
       //  else return null;
       //
-      } else if( mem instanceof PhiNode || // Would have to match on both sides, and Phi the results'
-                 mem instanceof ConNode) {
+      } else if( mem instanceof  PhiNode ||  // Would have to match on both sides, and Phi the results'
+                 mem instanceof ParmNode ||  // Would have to match all callers, after all is wired
+                 mem instanceof  ConNode) {
         return null;
       } else {
         throw unimpl(); // decide cannot be equal, and advance, or maybe-equal and return null

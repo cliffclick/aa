@@ -76,7 +76,7 @@ public class StoreNode extends Node {
         return live;
       }
       mem().deps_add(def);
-      // Precise update if its a single alias, and no value at alias is arriving here
+      // Precise update if it's a single alias, and no value at alias is arriving here
       int alias = tmp._aliases.abit();
       if( alias!=-1 && mem.at(alias).above_center() )
         return live.set(alias,TypeStruct.UNUSED); // Precise set, no longer demanded
@@ -105,7 +105,7 @@ public class StoreNode extends Node {
       if( tmp.above_center() && rez() != null )
         return Env.GVN.add_reduce(set_def(3,null)); // Try again
       // Same/same up/down
-      if( _live==mem._live && mem._val == _val ) {
+      if( _live.isa(mem._live) && mem._val == _val ) {
         // If dead from either above or below, we can remove
         if( tmp.above_center() ) return mem;
         TypeStruct ts0 = (_live instanceof TypeMem tm ? tm : _live.oob(TypeMem.ALLMEM)).ld(tmp);
@@ -116,20 +116,24 @@ public class StoreNode extends Node {
     }
     
     // Store of a Store, same address
-    if( mem instanceof StoreNode st && st.adr() == adr ) {
-      // Do not bypass a parallel writer
-      if( st.check_solo_mem_writer(this) &&
-          // And liveness aligns
-          _live.isa(mem._live) ) {
-        // Storing same-over-same, just use the first store
-        if( rez()==st.rez() ) return st;
-        // If not wiping out an error, wipe out the first store
-        if( st.rez().err(true)==null ) {
-          set_def(1,st.mem());
-          return this;
+    if( mem instanceof StoreNode st ) {
+      if( st.adr() == adr ) {
+        // Do not bypass a parallel writer
+        if( st.check_solo_mem_writer(this) &&
+            // And liveness aligns
+            _live.isa(mem._live) ) {
+          // Storing same-over-same, just use the first store
+          if( rez()==st.rez() ) return st;
+          // If not wiping out an error, wipe out the first store
+          if( st.rez().err(true)==null ) {
+            set_def(1,st.mem());
+            return this;
+          }
+        } else {
+          mem.deps_add(this);    // If become solo writer, check again
         }
       } else {
-        mem.deps_add(this);    // If become solo writer, check again
+        st.adr().deps_add(this);      // If address changes, check again
       }
     }
     
@@ -179,7 +183,7 @@ public class StoreNode extends Node {
       Node head2=null;
       if( mem instanceof StoreNode ) head2=mem;
       else if( mem instanceof MProjNode ) {
-        if( mem.in(0) instanceof CallEpiNode cepi ) head2 = cepi.call();
+        if( mem.in(0) instanceof CallEpiNode cepi && !cepi._is_copy ) head2 = cepi.call();
         else if( mem.in(0) instanceof NewNode nnn ) head2 = nnn;
       }
       // Check no extra readers/writers at the split point

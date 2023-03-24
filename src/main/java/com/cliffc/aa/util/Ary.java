@@ -38,6 +38,12 @@ public class Ary<E> implements Iterable<E> {
     range_check(0);
     return _es[_len-1];
   }
+  public void last(int i) {
+    range_check(i);
+    E tmp = _es[i];
+    _es[i] = _es[_len-1];
+    _es[_len-1] = tmp;
+  }
 
   /** @return remove and return last element */
   public E pop( ) {

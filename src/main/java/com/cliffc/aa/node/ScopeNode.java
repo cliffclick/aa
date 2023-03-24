@@ -74,12 +74,6 @@ public class ScopeNode extends Node {
 
   public Set<String> typeNames() { return _types.keySet(); }
 
-  @Override public Node ideal_reduce() {
-    Node ctrl = in(0).is_copy(0);
-    if( ctrl != null ) { set_ctrl(ctrl); return this; }
-    return null;
-  }
-
   // Produce a tuple of the return result and a summary of all escaping
   // functions, on behalf of the following CEProjs.
   @Override public Type value() { return Type.CTRL; }

@@ -115,12 +115,17 @@ public class FieldNode extends Node implements Resolvable {
     if( is_resolving() ) return null;
     
     // Back-to-back SetField/Field
-    if( in(0) instanceof SetFieldNode sfn && sfn.err(true)==null ) {
-      if( Util.eq(_fld, sfn._fld) ) {
-        if( sfn.val(1).isa(_val) ) return sfn.in(1); // Same field, use same
-        else sfn.in(1).deps_add(this);
+    if( in(0) instanceof SetFieldNode sfn ) {
+      if( sfn.err(true)==null ) {
+        if( Util.eq(_fld, sfn._fld) ) {
+          if( sfn.val(1).isa(_val) ) return sfn.in(1); // Same field, use same
+          else sfn.in(1).deps_add(this);
+        } else {
+          return Env.GVN.add_reduce(set_def(0, sfn.in(0))); // Unrelated field, bypass
+        }
       } else {
-        return Env.GVN.add_reduce(set_def(0, sfn.in(0))); // Unrelated field, bypass
+        // Depends on sfn.err which depends on sfn.in(0)
+        sfn.in(0).deps_add(this);
       }
     }
 
@@ -168,6 +173,12 @@ public class FieldNode extends Node implements Resolvable {
   }
 
   @Override public boolean has_tvar() { return true; }
+  
+  @Override public TV3 _set_tvar() {
+    if( is_resolving() )
+      TVField.FIELDS.put(_fld,this); // Track resolving field names
+    return new TVLeaf();
+  }
 
   @Override public boolean unify( boolean test ) {
     boolean progress = false;
@@ -181,9 +192,19 @@ public class FieldNode extends Node implements Resolvable {
         StructNode proto = clz_node(val(0)); // Existing prototypes for int/flt/named-clazz-types
         if( proto == null ) {            // Unknown inferred clazz
           if( test ) return true;        // Always progress
-          tv0 = new TVStruct(true, new String[]{_fld}, new boolean[]{true}, new TV3[]{tvar()}, true);
-          TVClz clz = new TVClz((TVStruct)tv0, new TVLeaf());
-          progress = leaf.unify(clz, test);
+          TVStruct obj = new TVStruct(true, new String[]{_fld}, new boolean[]{true}, new TV3[]{tvar()}, true);
+          TVClz clz = new TVClz(obj, new TVLeaf());
+          tv0.unify(clz, test);
+          tv0 = clz.clz();
+          progress = true;
+        } else {
+          tv0 = proto.tvar();
+        }
+      }
+      case TVNil nil -> {                    // Expand to a clazzed TV
+        StructNode proto = clz_node(val(0)); // Existing prototypes for int/flt/named-clazz-types
+        if( proto == null ) {                // Unknown inferred clazz
+          return false;                      // Stall until we get something better
         } else {
           tv0 = proto.tvar();
         }
@@ -259,10 +280,28 @@ public class FieldNode extends Node implements Resolvable {
   public static TVStruct clz_tv(Type t) {
     return (TVStruct)clz_node(t).tvar();
   }
+
+  private static TV3 CLZ;
+  boolean clz_lookup( boolean test ) {
+    StructNode proto = clz_node(val(0)); // Existing prototypes for int/flt/named-clazz-types
+    if( proto!=null )                    // Known clazz
+      { CLZ = proto.tvar(); return false; }
+
+    // Unknown inferred clazz
+    if( test ) return true;        // Always progress
+    TVStruct obj = new TVStruct(true, new String[]{_fld}, new boolean[]{true}, new TV3[]{tvar()}, true);
+    CLZ = new TVClz(obj, new TVLeaf());
+    tvar(0).unify(CLZ, test);
+    return true;
+  }
+
   
   private boolean try_resolve( TVStruct str, boolean test ) {
     // If struct is open, more fields might appear and cannot do a resolve.
-    if( str.is_open() ) return false;
+    if( str.is_open() ) {
+      str.deps_add(this);
+      return false;
+    }
     if( trial_resolve(true, tvar(), str, str, test) )
       return true;              // Resolve succeeded!
     // No progress, try again if self changes

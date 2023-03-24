@@ -65,7 +65,7 @@ public final class RetNode extends Node {
   @Override public Type value() {
     if( ctl()==null ) return _val; // No change if a copy
     Type ctl = ctl()._val;
-    if( ctl != Type.CTRL ) return ctl.oob(TypeTuple.RET);
+    if( ctl != Type.CTRL ) ctl = ctl.oob(Type.CTRL);
     Type mem = mem()==null ? TypeMem.ANYMEM : mem()._val;
     if( !(mem instanceof TypeMem) ) mem = mem.oob(TypeMem.ALLMEM);
     Type val = rez()._val;
@@ -80,11 +80,20 @@ public final class RetNode extends Node {
   @Override public boolean has_tvar() { return false; }
 
   @Override public Node ideal_reduce() {
+    if( is_prim() ) return null;
+    if( in(0)==null ) return null; // No users inlining; dead gensym
+    Node cc = fold_ccopy();     // Fold control copies
+    if( cc!=null ) return cc;
+    
+    // If the fun is a copy, then we are collapsing
+    Node cp = fun().is_copy(0);
+    if( cp!=null ) set_def(4,cp);
+
     // If control is dead, but the Ret is alive, we're probably only using the
     // FunPtr as a 'gensym'.  Nuke the function body.
     Node progress = null;
     if( !is_copy() ) {
-      if( ctl()._val == Type.XCTRL && !is_prim() && fun()._val ==Type.XCTRL ) {
+      if( ctl()._val == Type.XCTRL && fun()._val ==Type.XCTRL ) {
         set_def(4,null);          // We're a copy now!
         progress=this;
         Env.GVN.add_reduce_uses(this); // Following FunPtrs do not need their displays
@@ -207,8 +216,19 @@ public final class RetNode extends Node {
     return tback.isa(tenter);
   }
 
+  // Checks for sane Call Graph, similar to CallEpiNode.is_CG
+  boolean is_CG( boolean precise ) {
+    FunNode fun = fun();
+    for( Node use : _uses ) {
+      if( use instanceof CallEpiNode cepi ) {
+        throw unimpl();
+      }
+    }
 
-  @Override public Node is_copy(int idx) { throw com.cliffc.aa.AA.unimpl(); }
+    return true;
+  }
+
+  @Override public Node is_copy(int idx) { return is_copy() ? in(idx) : null; }
   boolean is_copy() { return _defs.len() <= 4 || !(in(4) instanceof FunNode) || fun()._fidx != _fidx; }
 
   // Find RetNode by fidx

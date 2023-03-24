@@ -177,6 +177,8 @@ public abstract class Node implements Cloneable, IntSupplier {
   public Node pop( ) { unelock(); Node n = _defs.pop(); unuse(n); return n; }
   // Remove Node at idx, auto-delete and preserve order.
   public Node remove(int idx) { unelock(); return unuse(_defs.remove(idx)); }
+  // Remove Node, auto-delete and preserve order.  Error if not found
+  public Node remove(Node x) { return remove(_defs.find(x)); }
 
   private Node unuse( Node old ) {
     if( old == null ) return this;
@@ -209,6 +211,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Kill a node; all inputs are null'd out; this may put more dead Nodes on
   // the dead worklist.  Return this for progress, null for no-progress.
   public Node kill( ) {
+    assert !is_prim();
     if( is_dead() ) return null;
     assert _uses._len==0;
     deps_work_clear();          // Put dependents on worklist
@@ -254,7 +257,6 @@ public abstract class Node implements Cloneable, IntSupplier {
     _deps.clear();
   }
 
-  
   Node( byte op ) { this(op,new Node[0]); }
   Node( byte op, Node... defs ) {
     _op   = op;
@@ -362,7 +364,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   }
   public boolean is_multi_head() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_IF || _op==OP_NEW || _op==OP_REGION || _op==OP_SPLIT || _op==OP_ROOT; }
   private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI || _op==OP_PROJ || _op==OP_CPROJ; }
-  boolean is_CFG() { return _op==OP_FUN || _op==OP_RET || _op==OP_IF || _op==OP_REGION || _op==OP_ROOT || _op==OP_CPROJ || _op==OP_SCOPE; }
+  boolean is_CFG() { return false; }
 
   public String dumprpo( boolean prims, boolean plive, boolean ptvar ) {
     Ary<Node> nodes = new Ary<>(new Node[1],0);
@@ -637,6 +639,13 @@ public abstract class Node implements Cloneable, IntSupplier {
     return null;                // No change
   }
 
+  // Fold control copies
+  Node fold_ccopy() {
+    Node cc = in(0).is_copy(0);
+    if( cc==null ) return null;
+    if( cc==this ) return Env.ANY;
+    return Env.GVN.add_reduce(set_def(0,cc));
+  }    
 
   // Change values at this Node directly.
   public Node do_flow() {
@@ -692,6 +701,7 @@ public abstract class Node implements Cloneable, IntSupplier {
         this instanceof AssertNode || // Never touch an AssertNode
         this instanceof FreshNode  || // These modify the TVars but not the constant flows
         (this instanceof StructNode st && !st.is_closed()) || // Struct is in-progress
+        is_mem() ||
         is_prim() )                 // Never touch a Primitive
       return false; // Already a constant, or never touch an ErrNode
     if( t instanceof TypeFunPtr tfp ) {
@@ -727,29 +737,24 @@ public abstract class Node implements Cloneable, IntSupplier {
       con._live = Type.ALL;     // Adding more liveness
     } else {                    // New constant
       con._val = t;             // Typed
-      if( Combo.HM_FREEZE ) con.set_tvar();
+      con._live = Combo.post() ? Type.ANY : Type.ALL;     // Not live yet
+      if( Combo.post() ) con.set_tvar();
       con._elock(); // Put in VALS, since if Con appears once, probably appears again in the same XFORM call
     }
     return Env.GVN.add_flow(con); // Updated live flows
   }
   
   // Forward reachable walk, setting types to ANY and making all dead.
-  public final void walk_initype(  ) {
-    if( Env.GVN.on_flow(this) ) return; // Been there, done that
-    Env.GVN.add_flow(this);             // On worklist and mark visited
-    if( this instanceof FreshNode frsh )
-      frsh.unelock();           // Remove from VALS; Fresh hits in VALs depends on tvar
+  public final void walk_initype( VBitSet visit ) {
+    if( visit.tset(_uid) ) return; // Been there, done that
+    Env.GVN.add_flow(this);        // On worklist and mark visited
     if( has_tvar() ) set_tvar();
-
+    if( this instanceof FunNode fun )
+      fun.set_unknown_callers();
     _val = _live = Type.ANY;  // Highest value
-    if( this instanceof FieldNode fld && fld.is_resolving() )
-      TVField.FIELDS.put(fld._fld,fld); // Track resolving field names
-    if( this instanceof ConNode && _tvar!=null )
-      _tvar.deps_add_deep(this); // Constant hash depends on tvar      
-    
     // Walk reachable graph
-    for( Node def : _defs ) if( def != null ) def.walk_initype();
-    for( Node use : _uses )                   use.walk_initype();
+    for( Node def : _defs ) if( def != null ) def.walk_initype(visit);
+    for( Node use : _uses )                   use.walk_initype(visit);
   }
   
   // Reset
@@ -933,9 +938,6 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Aliases that a MemJoin might choose between.  Not valid for nodes which do
   // not manipulate memory.
   //BitsAlias escapees() { throw unimpl("graph error"); }
-
-  // Return a node for a java Class.  Used by the primitives.
-  public Node clazz_node() { throw unimpl(); }
 
   // Walk a subset of the dominator tree, looking for the last place (highest
   // in tree) this predicate passes, or null if it never does.

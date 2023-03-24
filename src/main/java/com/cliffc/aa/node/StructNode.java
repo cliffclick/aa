@@ -181,12 +181,14 @@ public class StructNode extends Node {
           throw unimpl();        // TODO: Access input by field name
         } else {
           // Make field in the parent
-          parent.add_fld(fref._name,TypeFld.Access.RW,fref,_fld_starts.at(i)).xval();
-          // Stomp field locally to load from parent
-          FieldNode fld = new FieldNode(parent,fref._name,false,_fld_starts.at(i));
-          fld._val = val(i);
-          set_def(i,fld);
-          Env.GVN.add_work_new(fld);
+          if( !parent.is_prim() ) {
+            parent.add_fld(fref._name,TypeFld.Access.RW,fref,_fld_starts.at(i)).xval();
+            // Stomp field locally to load from parent
+            FieldNode fld = new FieldNode(parent,fref._name,false,_fld_starts.at(i));
+            fld._val = val(i);
+            set_def(i,fld);
+            Env.GVN.add_work_new(fld);
+          }
         }
       }
     }
@@ -231,8 +233,9 @@ public class StructNode extends Node {
   @Override boolean assert_live(Type live) { return live instanceof TypeStruct; }
 
   @Override public Node ideal_reduce() {
+    if( is_prim() ) return null;
     // Kill dead fields
-    if( !is_prim() && _live instanceof TypeStruct live ) {
+    if( _live instanceof TypeStruct live ) {
       deps_add(this);           // If self-live lifts, self reduce makes progress
       Node progress=null;
       for( int i=0; i<_flds._len; i++ ) 
@@ -264,7 +267,7 @@ public class StructNode extends Node {
       TVStruct rec = tvar().as_struct();      
       for( int i=0; i<len(); i++ ) {
         TV3 fld = rec.arg(_flds.at(i)); // Field lookup by string
-        if( fld!=null ) progress |= fld.unify(tvar(i),test);
+        if( fld!=null && in(i).has_tvar() ) progress |= fld.unify(tvar(i),test);
         if( test && progress ) return true;
       }
       

@@ -10,7 +10,10 @@ import static org.junit.Assert.assertTrue;
 public class TestLive {
   @Test public void testBasic() {
     Node fullmem = new ConNode<>(TypeMem.ALLMEM);
-    fullmem._val = fullmem._live = TypeMem.ALLMEM;
+    fullmem._val = TypeMem.ALLMEM;
+    fullmem._live = TypeMem.ANYMEM;
+    Env.KEEP_ALIVE._live = TypeMem.ANYMEM; // Post-combo
+    Env.MEM_0._live = TypeMem.ANYMEM;
 
     // Return the number '5' - should be alive with no special memory.
     Node rez = new ConNode<>(TypeInt.con(5));
@@ -25,7 +28,7 @@ public class TestLive {
     root.xliv();
 
     // Check liveness base case
-    assertEquals(TypeMem.ANYMEM,root._live);
+    assertEquals(TypeMem.EXTMEM,root._live);
 
     // Check liveness recursive back one step
     rez._live = rez.live();
@@ -38,6 +41,8 @@ public class TestLive {
     Node._INIT0_CNT = 1; // No prims
     // Always memory for the NewNode
     Node mmm = new ConNode<>(TypeMem.ANYMEM).init();
+    Env.KEEP_ALIVE._live = TypeMem.ANYMEM; // Post-combo
+    Env.MEM_0._live = TypeMem.ANYMEM;
 
     // Fields
     ConNode fdx = new ConNode(TypeInt.con(5)).init();
@@ -67,12 +72,15 @@ public class TestLive {
         assertTrue(n.live().isa(n._live));
       assertEquals(n._val,n.value());
     }
+    for( Node n : new Node[]{mmm,mem,root} ) {
+      n._live = TypeMem.ANYMEM;
+    }
 
     // Check liveness base case
     root.xliv();
     // Since simple forwards-flow, the default memory is known UNUSED.
     // However, we got provided at least one object.
-    TypeMem expected_live = ((TypeMem) mem._val).flatten_live_fields();
+    TypeMem expected_live = ((TypeMem) mem._val.meet(TypeMem.EXTMEM)).flatten_live_fields();
     assertEquals(root._live,expected_live);
 
     // Check liveness recursive back one step
@@ -81,7 +89,7 @@ public class TestLive {
     ptr.xliv();
     assertEquals(TypeMem.ALL,ptr._live);
     mmm.xliv();
-    assertEquals(TypeMem.ANYMEM,mmm._live); // Since ptr is scalar, all memory is alive
+    assertEquals(TypeMem.EXTMEM,mmm._live); // Since ptr is scalar, all memory is alive
     fdx.xliv();
     assertEquals(Type.ALL,fdx._live); // Since ptr is scalar, all memory is alive
     Combo.HM_FREEZE = false;          // Reset

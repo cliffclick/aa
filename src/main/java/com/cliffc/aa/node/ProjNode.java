@@ -20,7 +20,7 @@ public class ProjNode extends Node {
       return ct._ts[_idx];
     return c.oob();
   }
-  @Override Type live_use( Node def ) { assert def.is_mem(); return TypeMem.ANYMEM; }
+  @Override Type live_use( Node def ) { return def.is_mem() ? TypeMem.ANYMEM : _live; }
   
   // Strictly reducing
   @Override public Node ideal_reduce() {

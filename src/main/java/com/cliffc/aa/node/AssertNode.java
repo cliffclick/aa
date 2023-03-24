@@ -77,16 +77,16 @@ public class AssertNode extends Node {
       try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
         int nargs = tt.nargs();
         FunNode fun = new FunNode(nargs);
-        fun.add_def(X.xform(new CRProjNode(fun._fidx)));
+        int fidx = fun.push();  // Hook to keep alive
         fun = (FunNode)X.xform(fun);
-        Node rpc = X.xform(new ParmNode(0,fun,null,TypeRPC.ALL_CALL,Env.ALL_CALL));
+        Node rpc = X.xform(new ParmNode(0,fun,null,TypeRPC.ALL_CALL));
         // All the parms; types in the function signature
         Node[] args = new Node[nargs+1];
         args[CTL_IDX] = fun;            // Call control
-        args[MEM_IDX] = X.xform(new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM,Env.MEM_0  ));
-        args[DSP_IDX] = X.xform(new ParmNode(DSP_IDX,fun,null,TypeNil.SCALAR,Env.ALL_ESC));
+        args[MEM_IDX] = X.xform(new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM));
+        args[DSP_IDX] = X.xform(new ParmNode(DSP_IDX,fun,null,TypeNil.SCALAR));
         for( int i=ARG_IDX; i<nargs; i++ ) {
-          Node parm = X.xform(new ParmNode(i,fun,null,TypeNil.SCALAR,Env.ALL_ESC));
+          Node parm = X.xform(new ParmNode(i,fun,null,TypeNil.SCALAR));
           args[i] = X.xform(new AssertNode(args[MEM_IDX],parm,tt.at(i),_bad));
         }
         args[nargs] = arg();
@@ -100,6 +100,7 @@ public class AssertNode extends Node {
         Node chk    = X.xform(new AssertNode(postmem,val,tt.ret(),_bad));
         RetNode ret = (RetNode)X.xform(new RetNode(ctl,postmem,chk,rpc,fun));
         // Just the same Closure when we make a new TFP
+        Node.pop(fidx);
         return (X._ret=X.xform(new FunPtrNode(null,ret)));
       }
     }
@@ -128,7 +129,7 @@ public class AssertNode extends Node {
 
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
-    TV3 tv3 = TV3.from_flow(_t);
+    TV3 tv3 = TV3.from_flow(_t,true);
     arg().set_tvar().unify(tv3,false);
     return tv3;
   }

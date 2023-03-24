@@ -91,10 +91,10 @@ public class TestLift {
 
   // Make a new T2 triple struct
   private T2 make3(T2 t0, T2 t1, T2 t2) {
-    return T2.make_open_struct(FLDS3, new T2[]{t0.fresh(),t1.fresh(),t2.fresh()});
+    return T2.make_struct(FLDS3, new T2[]{t0.fresh(),t1.fresh(),t2.fresh()});
   }
   private T2 make_(T2 t0, T2 t1, T2 t2) {
-    return T2.make_open_struct(FLDS3, new T2[]{t0,t1,t2});
+    return T2.make_struct(FLDS3, new T2[]{t0,t1,t2});
   }
 
   // An attempt to make a smaller not-monotonic test case.
@@ -133,7 +133,7 @@ public class TestLift {
     TypeMemPtr ret2 = TypeMemPtr.make(false,B3,ts2);
     
     // Build rezt2 from HM.apply_lift
-    T2 x00 = T2.make_open_struct(FLDS1, new T2[]{frl.fresh()});
+    T2 x00 = T2.make_struct(FLDS1, new T2[]{frl.fresh()});
     
     // Call walk_types_out with ret1
     T2.WDUPS.clear(true);

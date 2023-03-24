@@ -37,6 +37,7 @@ public abstract class Exec {
     Env.ROOT.set_def(REZ_IDX,e._scope.rez ());
     Env.GVN.add_flow(Env.ROOT);
     Env.GVN.add_flow_uses(Env.ROOT);
+    Env.ROOT.deps_work_clear();
     e.close();      // No more fields added to the parse scope
 
     AA.LIFTING = false;

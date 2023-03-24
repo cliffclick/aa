@@ -7,8 +7,6 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Arrays;
-
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.Env.GVN;
 
@@ -118,9 +116,13 @@ public class CallNode extends Node {
   public Node fdx() { return in(nargs()); } // Function
   Node arg ( int x ) { assert x>=0; return _defs.at(x); }
   // Set arguments
-  void set_mem( Node mem) { set_def(MEM_IDX, mem); }
-  Node set_arg (int idx, Node arg) { assert idx>=DSP_IDX && idx <nargs(); return set_def(idx,arg); }
-  CallNode set_fdx( Node fun) { assert fun._val instanceof TypeFunPtr; set_def(nargs(), fun); return this; }
+  void set_xmem() { set_def(MEM_IDX, Env.ANY); }
+  void set_xarg(int idx) { assert idx>=DSP_IDX && idx <nargs();  set_def(idx, Env.ANY); }
+  void set_fdx(Node fun) {
+    assert fun._val instanceof TypeFunPtr;
+    set_def(nargs(), fun);
+    xval();                     // Recompute value
+  }
 
   // Add a bunch of utilities for breaking down a Call.value tuple:
   // takes a Type, upcasts to tuple, & slices by name.
@@ -141,10 +143,7 @@ public class CallNode extends Node {
                         ? tcall._ts[tcall.len()-1]
                         : t.oob(TypeFunPtr.GENERIC_FUNPTR));
   }
-  void set_ttfp(TypeFunPtr tfp) {
-    TypeTuple tt = (TypeTuple)_val;
-    tt.set(nargs(), tfp);
-  }
+  TypeFunPtr tfp() { return ttfp(_val); }
 
   // Clones during inlining all become unique new call sites.  The original RPC
   // splits into 2, and the two new children RPCs replace it entirely.  The
@@ -163,8 +162,11 @@ public class CallNode extends Node {
   }
 
   @Override public Node ideal_reduce() {
-    Node cc = in(0).is_copy(0);
-    if( cc!=null ) return set_def(0,cc);
+    if( is_prim() ) return null;
+    Node cc = fold_ccopy();
+    if( cc != null ) return cc;
+    if( _is_copy) return null;
+
     // When do I do 'pattern matching'?  For the moment, right here: if not
     // already unpacked a tuple, and can see the NewNode, unpack it right now.
     if( !_unpacked &&           // Not yet unpacked a tuple
@@ -195,9 +197,17 @@ public class CallNode extends Node {
     if( tctl(tcall)!=Type.CTRL ) { // Dead control (NOT dead self-type, which happens if we do not resolve)
       if( (ctl() instanceof ConNode) ) return null;
       // Kill all inputs with type-safe dead constants
-      set_mem(Env.ANY);
+      set_xmem();
       for( int i=ARG_IDX; i<_defs._len; i++ )
         set_def(i,Env.ANY);
+      CallEpiNode cepi = cepi();
+      if( cepi==null ) {
+        while( _uses._len>0 ) {
+          Node use = _uses.last();
+          assert use instanceof FunNode;
+          use.remove(use._defs.find(this));          
+        }
+      }
       return set_def(0,Env.XCTRL);
     }
 
@@ -209,24 +219,37 @@ public class CallNode extends Node {
 
     // Wire valid targets.
     CallEpiNode cepi = cepi();
-    if( cepi!=null && cepi.check_and_wire(false) ) {
-      Env.GVN.add_reduce(this); // Re-run for other progress
-      return this;              // Some wiring happened
-    }
+    if( cepi!=null && cepi.CG_wire() )
+      return Env.GVN.add_reduce(this); // Re-run for other progress
 
     // Check for dead args and trim; must be after all wiring is done because
     // unknown call targets can appear during GCP and use the args.  After GCP,
     // still must verify all called functions have the arg as dead, because
-    // alive args still need to resolve.  Constants are an issue, because they
-    // fold into the Parm and the Call can lose the matching DProj while the
-    // arg is still alive.
-    if( !is_keep() && err(true)==null && cepi!=null && cepi.is_all_wired() && !cepi.is_global() ) {
-      Node progress = null;
-      for( int i=ARG_IDX; i<nargs(); i++ )
-        if( ProjNode.proj(this,i)==null &&
-            !(should_con(val(i))) )        // Not already foldable
-          progress = set_arg(i,Env.ANY);   // Kill dead arg
-      if( progress != null ) return this;
+    // alive args still need to resolve.  
+    if( cepi!=null && ttfp(tcall)._fidxs != BitsFun.NALL && !is_keep() && err(true)==null ) {
+      // 1 bit for each argument, used to track arg usage
+      int abits = 0;
+      for( int i=DSP_IDX; i<nargs(); i++ ) if( in(i)!=Env.ANY ) abits |= (1<<i);
+      // Find arg uses
+      if( abits!=0 )
+        for( Node use : _uses ) {
+          if( use instanceof CallEpiNode ) continue;
+          if( use instanceof FunNode fun ) {
+            for( Node fuse : fun._uses )
+              if( fuse instanceof ParmNode parm ) {
+                abits &= ~(1<<parm._idx); // Arg is used
+                parm.deps_add(this);      // Arg dies, then this call improves
+              }
+          } else abits=0; // Root uses all
+          if( abits==0 ) break;
+        }
+      // If some args are unused, set to ANY
+      if( abits!=0 ) {
+        for( int i=DSP_IDX; i<nargs(); i++ )
+          if( (abits & (1<<i))!=0 )
+            set_xarg(i);
+        return this;
+      }
     }
     return null;
   }
@@ -243,7 +266,6 @@ public class CallNode extends Node {
     CallEpiNode cepi = cepi();
     if( cepi==null || !(mem._val instanceof TypeMem) ) return null;
     ProjNode cepim = ProjNode.proj(cepi,MEM_IDX); // Memory projection from CEPI
-    ProjNode cepid = ProjNode.proj(cepi,REZ_IDX); // Return projection from CEPI
     if( cepim == null ) return null;
     if( !(cepim._val instanceof TypeMem tmcepi) ) return null;
     if( !mem._val.isa(tmcepi) ) return null; // Call entry stale relative to exit
@@ -256,6 +278,16 @@ public class CallNode extends Node {
     return null;
   }
 
+  // During parse a Call will have no uses, no keep and no CEPI - because these
+  // are all being constructed; this Call is still alive.  After Combo, a dying
+  // Call might also have no CEPI (with or without uses).
+  private boolean dying(Node def) {
+    CallEpiNode cepi = cepi();
+    if( cepi!=null ) { cepi.deps_add(def) ; return false; }
+    if( _uses.find(GVNGCM.KEEP_ALIVE)!=-1 ) return false;
+    return Combo.post() || _uses._len>0; // Was wired once, so dying
+  }
+  
   // Pass thru all inputs directly - just a direct gather/scatter.  The gather
   // enforces SESE which in turn allows more precise memory and aliasing.  The
   // full scatter lets users decide the meaning; e.g. wired FunNodes will take
@@ -264,15 +296,15 @@ public class CallNode extends Node {
   @Override public Type value() {
     if( _is_copy ) return _val; // Freeze until unwind
 
-    // CallEpi is dead from below, and not a copy - this whole path is dead.
-    // Lift to ANY and let DCE remove final uses.
-    if( _uses._len>0 && !_is_copy && !is_keep() && cepi()==null )
-      return Type.ANY;
+    // CallEpi is dead from below and not a copy - this whole path is dead.
+    // Lift to ANY and let DCE remove final uses.  Complex test is to avoid
+    // killing a Call under construction during Parse: will have no uses, no
+    // Keep and no cepi (for a tiny short time).
+    if( dying(this) ) return Type.ANY;
 
-    if( ctl()._val==Type.ALL ) return Type.ALL;
     // Result type includes a type-per-input, plus one for the function
     final Type[] ts = Types.get(_defs._len);
-    ts[CTL_IDX] = ctl()._val;
+    ts[CTL_IDX] = ctl()._val.oob(Type.CTRL);
     // Not a memory to the call?
     Type mem = mem()==null ? TypeMem.ANYMEM : mem()._val;
     TypeMem tmem = mem instanceof TypeMem ? (TypeMem)mem : mem.oob(TypeMem.ALLMEM);
@@ -282,7 +314,11 @@ public class CallNode extends Node {
     Node fdx = fdx();
     TypeFunPtr tfx = switch( fdx._val ) {
     case TypeFunPtr tfx2 -> tfx2;
-    case TypeNil tn -> tn.oob(TypeFunPtr.GENERIC_FUNPTR).make_from(tn._fidxs);
+    case TypeNil tn -> {
+      int nargs = Combo.pre() ? 1
+        : (fdx.tvar() instanceof TVLambda lam ? lam.nargs() : -1);
+      yield TypeFunPtr.make(tn.above_center(),tn._fidxs,nargs,tn.oob(),tn.oob());
+    }
     default -> fdx._val.oob(TypeFunPtr.GENERIC_FUNPTR);
     };
     // Copy args for called functions.  FIDX is already refined.
@@ -294,26 +330,16 @@ public class CallNode extends Node {
     return TypeTuple.make(ts);
   }
 
-  // If this function is called by an external function, all its arguments
-  // escape.
-  public void check_global() {
-    BitsFun tfx = ttfp(_val).fidxs();
-    if( tfx.above_center() || !BitsFun.EXT.overlaps(tfx) ) return; // Not called externally
-    // One-time, wire to Root to enable flows of escapes
+  @Override public Type live() {
+    if( _is_copy ) return _live;
     CallEpiNode cepi = cepi();
-    if( cepi.len()>1 && cepi.in(1)==Env.ROOT ) return;
-    assert cepi.len()==1 || cepi.in(1)==null;
-    if( cepi.len()==1 ) cepi.add_def(Env.ROOT);
-    else cepi.set_def(1,Env.ROOT);
-    // Root changes value when Call does; Call gets more alive
-    Env.ROOT.add_def(this).add_flow();
-    add_flow();
+    if( cepi==null )  return dying(null) ? Type.ANY : RootNode.def_mem(null);
+    if( cepi._live==Type.ANY ) return Type.ANY;
+    return super.live();                        // Ok, take liveness from all users
   }
   
   @Override public Type live_use(Node def) {
-    Type tcall = _val;
-    if( !(tcall instanceof TypeTuple) ) // Call is has no value (yet)?
-      { deps_add(def); return tcall.oob(); }
+    if( _is_copy ) return def._live;
     if( def==ctl() ) return Type.ALL;
     if( def==fdx() ) return Type.ALL;
     boolean is_keep = is_keep();
@@ -327,22 +353,32 @@ public class CallNode extends Node {
     // which distinguish which function to call.  Cannot flip this during
     // Combo, as will break monotonicity.
     if( !LIFTING ) return Type.ALL;
-    
+
     // Check that all fidxs are wired.  If not wired, a future wired fidx might
-    // use the call input.  Post-Combo, all was wired, but dead Calls might be
+    // use the call input.  Post-Combo, all is wired, but dead Calls might be
     // unwinding.
-    CallEpiNode cepi = cepi();
-    if( !_is_copy && (cepi==null || !cepi.is_all_wired()) ) {
-      if( cepi!=null ) cepi.deps_add(def);
-      return _uses._len==0 || (Combo.HM_FREEZE && err(true)==null) ? Type.ANY : Type.ALL;
+    if( dying(def) ) return Type.ANY;
+    if( _uses.len()==1 ) return Type.ALL; // Not wired, assume the worst user
+
+    // Since wired, we can check all uses to see if this argument is alive.
+    Type t = Type.ANY;
+    for( Node use : _uses ) {
+      // The 3 allowed types are CallEpi, Root and Fun
+      if( use instanceof CallEpiNode ) continue;
+      if( use instanceof RootNode ) return Type.ALL;
+      FunNode fun = (FunNode)use;
+      // Find which argument#s are getting liveness computed
+      for( int idx=DSP_IDX; idx<len(); idx++ )
+        if( in(idx)==def ) {    // Can be repeats, so have to check all args
+          ParmNode parm = fun.parm(idx);
+          if( parm!=null ) {    // Parm is in use?
+            parm.deps_add(def);
+            t = t.meet(parm._live); // As alive as the using Parm
+            if( t == Type.ALL ) return Type.ALL;
+          }
+        }      
     }
-    deps_add(def);
-    // All wired, the arg is dead if the matching projection is dead
-    int argn = _defs.find(def);
-    ProjNode proj = ProjNode.proj(this, argn);
-    if( proj == null ) return Type.ANY;
-    proj.deps_add(def);    // If proj disappears, so does use of def
-    return proj._live;  // Pass through live
+    return t;
   }
 
 
@@ -429,8 +465,5 @@ public class CallNode extends Node {
     if( !super.equals(o) ) return false;
     if( !(o instanceof CallNode call) ) return false;
     return _rpc==call._rpc;
-  }
-  public Node[] parms() {
-    return _defs._len>= DSP_IDX ? Arrays.copyOf(_defs._es,_defs._len-1) : new Node[0]; // All defs, except the FIDX.
   }
 }

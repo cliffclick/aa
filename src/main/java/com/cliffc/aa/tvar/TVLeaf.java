@@ -15,8 +15,6 @@ public class TVLeaf extends TV3 {
   public TVLeaf() { }
   public TVLeaf( boolean is_copy ) { super(is_copy); }
 
-  private Ary<TVStruct> _delay_resolve;
-
   // Leafs never show up in errors
   @Override int eidx() { throw unimpl(); }
 
@@ -43,10 +41,12 @@ public class TVLeaf extends TV3 {
   @Override Type _as_flow( Node dep ) {
     if( Combo.HM_FREEZE ) return Env.ROOT.ext_scalar(dep);
     Combo.add_freeze_dep(dep);
+    deps_add(dep);
     return (AA.DO_HMT || !_use_nil) ? TypeNil.XSCALAR : TypeNil.AND_XSCALAR;
   }
 
   // -------------------------------------------------------------
+  private Ary<TVStruct> _delay_resolve;
   void delay_resolve(TVStruct tvs) {
     if( _delay_resolve==null ) _delay_resolve = new Ary<>(new TVStruct[1],0);
     if( _delay_resolve.find(tvs)== -1 )

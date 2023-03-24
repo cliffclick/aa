@@ -138,7 +138,6 @@ public abstract class PrimNode extends Node {
 
     // Math package
     Env.STK_0.add_fld("math",Access.Final,make_math(rand),null).xval();
-
     
     Env.GVN.iter();
 
@@ -148,38 +147,19 @@ public abstract class PrimNode extends Node {
   // Primitive wrapped as a simple function.
   // Fun Parm_dsp [Parm_y] prim Ret
   // No memory, no RPC.  Display is first arg.
-  private FunPtrNode as_fun( ) {
+  FunPtrNode as_fun( ) {
+    assert !_is_lazy;           // No lazy operators here
     // Lazily discover operators
-    if( is_oper() ) Oper.make(_name,_is_lazy);
-
-    FunNode fun = new FunNode(this,_name);
-    fun.add_def(new CRProjNode(fun._fidx).init()); // Need FIDX to make the default control
-    fun.init();                 // Now register with parser
-    if( _is_lazy ) add_def(fun); // Ctrl in slot 0
-    ParmNode rpc = new ParmNode(0,fun,null,TypeRPC.ALL_CALL,Env.ALL_CALL).init();
-    for( int i=_is_lazy ? MEM_IDX : DSP_IDX; i<_formals.len(); i++ ) {
-      // Make a Parm for every formal
-      Type tformal = _formals.at(i);
-      Node nformal;
-      if(      tformal==TypeInt.INT64   ) nformal =  INT;
-      else if( tformal==TypeFlt.FLT64   ) nformal =  FLT;
-      else if( tformal==TypeFlt.NFLT64  ) nformal = NFLT;
-      else if( tformal==TypeMemPtr.STRPTR)nformal =  STR;
-      else if( tformal==Type.ANY        ) nformal = Env.ANY;
-      else if( tformal==Type.ALL        ) nformal = Env.ALL;
-      else if( tformal==TypeFunPtr.THUNK) nformal = Env.THUNK;
-      else if( tformal==TypeMem.ALLMEM  ) nformal = Env.MEM_0;
-      else throw unimpl();
-      add_def(new ParmNode(i,fun,null,tformal,nformal).init());
-    }
+    if( is_oper() ) Oper.make(_name,false);
+    FunNode fun = new FunNode(this,_name).init();
+    ParmNode rpc = new ParmNode(0,fun,null,TypeRPC.ALL_CALL).init();
+    // Make a Parm for every formal
+    for(int i = DSP_IDX; i<_formals.len(); i++ )
+      add_def(new ParmNode(i,fun,null,_formals.at(i)).init());
     // The primitive, working on and producing wrapped prims
     init();
-    // If lazy, need control and memory results
-    Node zctrl = _is_lazy ? new CProjNode(this).init() : fun;
-    Node zmem  = _is_lazy ? new MProjNode(this).init() : null;
-    Node zrez  = _is_lazy ? new  ProjNode(this,REZ_IDX).init() : this;
     // Return the result
-    RetNode ret = new RetNode(zctrl,zmem,zrez,rpc,fun).init();
+    RetNode ret = new RetNode(fun,null/*no mem*/,this,rpc,fun).init();
     // FunPtr is UNBOUND here, will be bound when loaded thru a named struct to the Clazz.
     // Primitives all late-bind by default, so no BindFP here.
     return new FunPtrNode(_name,ret).init();
@@ -273,9 +253,7 @@ public abstract class PrimNode extends Node {
 
   static TV3 make_tvar(boolean is_copy, TypeNil rez) {
     if( rez==TypeNil.NIL ) throw unimpl();
-    TV3 tv3 = TV3.from_flow(rez);
-    //if( is_copy ) ((TVClz)tv3).rhs()._is_copy = true;
-    return tv3;
+    return TV3.from_flow(rez,is_copy);
   }
 
   // All work done in set_tvar, no need to unify
@@ -570,192 +548,72 @@ public abstract class PrimNode extends Node {
     private static final TypeTuple ANDTHEN = TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, TypeInt.INT64, TypeFunPtr.THUNK); // {val tfp -> val }
     // Takes a value on the LHS, and a THUNK on the RHS.
     public AndThen() { super("_&&_",true/*lazy*/,ANDTHEN,TypeNil.SCALAR); _live = TypeMem.ALLMEM; }
-    @Override public boolean is_mem() { return true; }
     @Override public TypeNil apply(TypeNil[] ts) { throw unimpl(); }
-
-    // This is basically the result of calling the RHS, meet'd with NIL.
-    @Override public Type value() {
-      if( len() <= ARG_IDX ) return _val;  // Freeze after expanding until death
-      Type mem = val(1);
-      Type lhs = val(2);
-      Type rhs = val(3);
-      // If any input is ANY, just stall till types fall to something reasonable.
-      if( val(0)==Type.ANY || mem==Type.ANY || lhs==Type.ANY || rhs==Type.ANY || lhs==TypeNil.XSCALAR )
-        return Type.ANY;
-      Type t = IfNode.truthy(lhs);
-      if( t==TypeTuple.IF_ANY )  return Type.ANY; // Still neither side executes
-      // Return a Tuple now.
-      // If the LHS is an optional nil, assume it WILL be nil and RHS never excutes.
-      if( t==TypeTuple.IF_FALSE )
-        return TypeTuple.make(Type.CTRL,mem,lhs); // Returns LHS (falsey)
-      // Only executes the RHS, never a nil
-      if( t==TypeTuple.IF_TRUE )
-        throw unimpl();
-      // Might be either nil or RHS
-
-      // Flaw here is several-fold:
-      // - as a minimum, need to call the RHS & properly type it.  Its part of call-graph now.
-      // - failure to inline && as part of Combo hurts analysis; all &&'s will now merge.
-      // So need to inline (via ideal_grow) the && as a force-inline 'primitive' during combo.
-      
-      
-      return TypeTuple.make(Type.CTRL,RootNode.def_mem(this),Type.ALL);
-    }
-    @Override public Type live_use( Node def ) {  return def==in(1) ? _live : Type.ALL; }
-    // Expect this to inline everytime
-    @Override public Node ideal_grow() {
-      // Do not expand the base primitive, only clones.  This allows the base
-      // primitive to inline as a primitive in all contexts.
-      if( is_prim() ) return null; // Do not expand the base primitive, only clones
-      if( len() <= ARG_IDX ) return null; // Already expanded
-      // Once inlined, replace with an if/then/else diamond.
-      Node ctl = in(CTL_IDX);
-      Node mem = in(MEM_IDX);
-      Node lhs = in(DSP_IDX);
-      Node rhs = in(ARG_IDX);
-      // Expand to if/then/else
-      try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
-        Node iff = X.xform(new IfNode(ctl,lhs));
-        Node fal = X.xform(new CProjNode(iff,0));
-        Node tru = X.xform(new CProjNode(iff,1));
-        // Call on true branch; if false do not call.
-        Node dsp = X.xform(new FP2DSPNode(rhs,null));
-        Node cal = X.xform(new CallNode(true,_badargs,tru,mem,dsp,rhs));
-        Node cep = X.xform(new CallEpiNode(cal));
-        Node ccc = X.xform(new CProjNode(cep));
-        Node memc= X.xform(new MProjNode(cep));
-        Node rez = X.xform(new  ProjNode(cep,AA.REZ_IDX));
-        // Region merging results
-        Node reg = X.init(new RegionNode(null,fal,ccc));
-        Node phi = X.init(new PhiNode(Type.ALL,null,reg,Env.NIL,rez ));
-        Node phim= X.init(new PhiNode(TypeMem.ALLMEM,null,reg,mem,memc ));
-        // Plug into self & trigger is_copy
-        set_def(CTL_IDX,reg );
-        set_def(MEM_IDX,phim);
-        set_def(REZ_IDX,phi );
-        while( _defs._len > ARG_IDX ) pop(); // Remove args, trigger is_copy
-        add_reduce_uses();
-        if( !(cep instanceof CallEpiNode cepi) || !cepi.is_all_wired() ) {
-          dsp.add_flow();
-          memc.add_flow();
-          cal.deps_add(dsp);
-        }
-        //Env.GVN.revalive(iff,fal,tru,dsp,cal,cep,ccc,memc,rez,reg,phi,phim);
-        return this;
-      }
-    }
-
-    // Pre-cook type: { A? { -> B } -> B? }
-    // Bind DSP_IDX to A?
-    // Bind ARG_IDX to { -> B } and return to B?
-    //@Override TV3 _set_tvar() {
-    //  // Bind DSP_IDX to A?
-    //  in(DSP_IDX).set_tvar().unify(new TVNil(new TVLeaf()),false);
-    //  // Bind ARG_IDX to { -> B } and return to B?
-    //  TV3 b = new TVLeaf();
-    //  TVLambda lam = new TVLambda(DSP_IDX,null,b);
-    //  in(ARG_IDX).set_tvar().unify(lam,false);
-    //  return new TVNil(b);
-    //}
-    // Pre-cook type: { A { -> B } -> B? }
-    // Bind DSP_IDX to A
-    // Bind ARG_IDX to { -> B } and return to B?
-    @Override TV3 _set_tvar() {
-      // Bind ARG_IDX to { -> B } and return to B?
-      TV3 b = new TVLeaf();
-      TVLambda lam = new TVLambda(DSP_IDX,null,b);
-      in(ARG_IDX).set_tvar().unify(lam,false);
-      return new TVNil(b);
-    }    
-    
-    // All work done in set_tvar, no need to unify
-    @Override public boolean unify( boolean test ) { return false; }
-
-    // Unify trailing result ProjNode with the AndThen directly.
-    @Override public boolean unify_proj( ProjNode proj, boolean test ) {
-      assert proj._idx==REZ_IDX;
-      return tvar().unify(proj.tvar(),test);
-    }
-    @Override public Node is_copy(int idx) {
-      return _defs._len>ARG_IDX ? null : in(idx);
+    @Override FunPtrNode as_fun() {
+      Oper.make(_name,_is_lazy);
+      FunNode fun = new FunNode(this,_name).init();
+      ParmNode rpc = new ParmNode(CTL_IDX,fun,null,TypeRPC.ALL_CALL).init();
+      ParmNode mem = new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM  ).init();
+      // Since looked-up in the INT clazz, display is integer
+      // TODO: Should be in the TypeNil.SCALAR lookup, the parent class of TypeInt.
+      // TODO: Nested clazz lookup.
+      ParmNode lhs = new ParmNode(DSP_IDX,fun,null,TypeInt.INT64   ).init();
+      ParmNode rhs = new ParmNode(ARG_IDX,fun,null,TypeFunPtr.THUNK).init();
+      Node iff = new IfNode(fun,lhs).init();
+      Node fal = new CProjNode(iff,0).init();
+      Node tru = new CProjNode(iff,1).init();
+      // Call on true branch; if false do not call.
+      Node dsp = new FP2DSPNode(rhs,null).init();
+      Node cal = new CallNode(true,_badargs,tru,mem,dsp,rhs).init();
+      Node cep = new CallEpiNode(cal).init();
+      Node ccc = new CProjNode(cep).init();
+      Node memc= new MProjNode(cep).init();
+      Node rez = new  ProjNode(cep,AA.REZ_IDX).init();
+      // Region merging results
+      Node reg = new RegionNode(null,fal,ccc).init();
+      Node phi = new PhiNode(Type.ALL,null,reg,Env.NIL,rez ).init();
+      Node phim= new PhiNode(TypeMem.ALLMEM,null,reg,mem,memc ).init();
+      // Plug into return
+      RetNode ret = new RetNode(reg,phim,phi,rpc,fun).init();
+      return new FunPtrNode(_name,ret).init();
     }
   }
 
   // Classic '||' short-circuit.  Lazy in the RHS, so passed a 'thunk', a
   // zero-argument function to be evaluated if the LHS is false.
-  // TODO: Move to a (not yet made) NIL/SCAlAR class.
   public static class OrElse extends PrimNode {
     private static final TypeTuple ORELSE = TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, TypeInt.INT64, TypeFunPtr.THUNK); // {val tfp -> val }
     // Takes a value on the LHS, and a THUNK on the RHS.
     public OrElse() { super("_||_",true/*lazy*/,ORELSE,TypeNil.SCALAR); _live = TypeMem.ALLMEM; }
-    @Override public boolean is_mem() { return true; }
+    //@Override public boolean is_mem() { return true; }
     @Override public TypeNil apply(TypeNil[] ts) { throw unimpl(); }
-    @Override public Type value() {
-      return TypeTuple.make(Type.CTRL,RootNode.def_mem(this),Type.ALL);
-    }
-    @Override public Type live_use( Node def ) {  return def==in(1) ? _live : Type.ALL; }
-    // Expect this to inline everytime
-    @Override public Node ideal_grow() {
-      // Do not expand the base primitive, only clones.  This allows the base
-      // primitive to inline as a primitive in all contexts.
-      if( is_prim() ) return null; // Do not expand the base primitive, only clones
-      if( len() <= ARG_IDX ) return null; // Already expanded
-      Node ctl = in(CTL_IDX);
-      Node mem = in(MEM_IDX);
-      Node lhs = in(DSP_IDX);
-      Node rhs = in(ARG_IDX);
-      // Expand to if/then/else
-      try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
-        // Expand to if/then/else
-        Node iff = X.xform(new IfNode(ctl,lhs));
-        Node fal = X.xform(new CProjNode(iff,0));
-        Node tru = X.xform(new CProjNode(iff,1));
-        // Call on false branch; if true do not call.
-        Node dsp = X.xform(new FP2DSPNode(rhs,null));
-        Node cal = X.xform(new CallNode(true,_badargs,fal,mem,dsp,rhs));
-        Node cep = X.xform(new CallEpiNode(cal));
-        Node ccc = X.xform(new CProjNode(cep));
-        Node memc= X.xform(new MProjNode(cep));
-        Node rez = X.xform(new  ProjNode(cep,AA.REZ_IDX));
-        // Region merging results
-        Node reg = X.init(new RegionNode(null,tru,ccc));
-        Node phi = X.init(new PhiNode(Type.ALL,null,reg,lhs,rez ));
-        Node phim= X.init(new PhiNode(TypeMem.ALLMEM,null,reg,mem,memc ));
-        // Plug into self & trigger is_copy
-        set_def(CTL_IDX,reg );
-        set_def(MEM_IDX,phim);
-        set_def(REZ_IDX,phi );
-        while( _defs._len > ARG_IDX ) pop(); // Remove args, trigger is_copy
-        add_reduce_uses();
-        if( !(cep instanceof CallEpiNode cepi) || !cepi.is_all_wired() ) {
-          dsp.add_flow();
-          memc.add_flow();
-          cal.deps_add(dsp);
-        }
-        return this;
-      }
-    }
-
-    // Pre-cook type: { A { -> A } -> A }
-    // Bind display to A
-    // Bind arg3 to { -> A } and return to A
-    @Override TV3 _set_tvar() {
-      TV3 a = in(DSP_IDX).set_tvar();
-      // Unify arg3 to a no-args lambda { -> A }
-      TVLambda lam = new TVLambda(DSP_IDX,null,a);
-      in(ARG_IDX).set_tvar().unify(lam,false);
-      return a;
-    }
-    // All work done in set_tvar, no need to unify
-    @Override public boolean unify( boolean test ) { return false; }
-
-    // Unify trailing result ProjNode with the AndThen directly.
-    @Override public boolean unify_proj( ProjNode proj, boolean test ) {
-      assert proj._idx==REZ_IDX;
-      return tvar().unify(proj.tvar(),test);
-    }
-    @Override public Node is_copy(int idx) {
-      return _defs._len>ARG_IDX ? null : in(idx);
+    @Override FunPtrNode as_fun() {
+      Oper.make(_name,_is_lazy);
+      FunNode fun = new FunNode(this,_name).init();
+      ParmNode rpc = new ParmNode(CTL_IDX,fun,null,TypeRPC.ALL_CALL).init();
+      ParmNode mem = new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM  ).init();
+      // Since looked-up in the INT clazz, display is integer
+      // TODO: Should be in the TypeNil.SCALAR lookup, the parent class of TypeInt.
+      // TODO: Nested clazz lookup.
+      ParmNode lhs = new ParmNode(DSP_IDX,fun,null,TypeInt.INT64   ).init();
+      ParmNode rhs = new ParmNode(ARG_IDX,fun,null,TypeFunPtr.THUNK).init();
+      Node iff = new IfNode(fun,lhs).init();
+      Node fal = new CProjNode(iff,0).init();
+      Node tru = new CProjNode(iff,1).init();
+      // Call on false branch; if true do not call.
+      Node dsp = new FP2DSPNode(rhs,null).init();
+      Node cal = new CallNode(true,_badargs,fal,mem,dsp,rhs).init();
+      Node cep = new CallEpiNode(cal).init();
+      Node ccc = new CProjNode(cep).init();
+      Node memc= new MProjNode(cep).init();
+      Node rez = new  ProjNode(cep,AA.REZ_IDX).init();
+      // Region merging results
+      Node reg = new RegionNode(null,tru,ccc).init();
+      Node phi = new PhiNode(Type.ALL,null,reg,lhs,rez ).init();
+      Node phim= new PhiNode(TypeMem.ALLMEM,null,reg,mem,memc ).init();
+      // Plug into return
+      RetNode ret = new RetNode(reg,phim,phi,rpc,fun).init();
+      return new FunPtrNode(_name,ret).init();
     }
   }
 

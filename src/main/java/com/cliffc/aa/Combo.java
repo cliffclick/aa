@@ -135,7 +135,7 @@ public abstract class Combo {
   public static boolean post  () { return  AA.LIFTING &&  HM_FREEZE; }
 
   public static void opto() {
-    Env.GVN.work_clear();       // Will be used as a worklist
+    assert Env.GVN.work_is_clear();
 
     // Set all values to ANY and lives to DEAD, their most optimistic types.
     // Set all type-vars to Leafs.
@@ -143,7 +143,7 @@ public abstract class Combo {
     PrimNode.ZFLT.set_tvar();
     PrimNode.ZSTR.set_tvar();
     RootNode.combo_def_mem();
-    Env.ROOT.walk_initype();
+    Env.ROOT.walk_initype(new VBitSet());
     assert Env.ROOT.more_work(false)==0; // Initial conditions are correct
 
     // Init
@@ -200,10 +200,8 @@ public abstract class Combo {
       // During Combo value flow, the exact fcn pointers appear,
       // and we require wiring to make these edges explicit.
       if( told != n._val ) {
-        for( Node use : n._uses )
-          if( use instanceof CallEpiNode cepi ) cepi.check_and_wire(true);
-        if( n instanceof CallEpiNode cepi ) cepi.check_and_wire(true);
-        if( n instanceof CallNode call ) call.check_global();
+        if( n instanceof CallNode call ) call.cepi().CG_wire();
+        if( n instanceof RootNode root ) root.CG_wire();
       }
       
       // Very expensive assert: everything that can make progress is on worklist

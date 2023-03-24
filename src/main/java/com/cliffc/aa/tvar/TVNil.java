@@ -30,32 +30,49 @@ public class TVNil extends TV3 {
 
   @Override boolean _unify_impl(TV3 that ) { return arg(0)._unify(that.arg(0),false); }
 
+  // U-F union; this is nilable and this becomes that.
+  // No change if only testing, and reports progress.
+  // Same as HM unify_nil.
   boolean _unify_nil( TV3 that, boolean test ) {
     if( test ) return true;     // Will make progress in all situations
     TVLeaf not_nil = not_nil();
+    assert !not_nil._may_nil; // might not be true under nested nilables, not required since copy strips nil
     not_nil._deps_work_clear();
     TV3 copy = that.copy().strip_nil();
-    _is_copy &= that._is_copy;
-    not_nil.union(copy);
-    if( that instanceof TVBase ) this.union(that); // Can reverse and turn into a Base
-    else that.union(this);      // Force 'that' to be nil-able version
-    return true;
+    _is_copy &= that._is_copy;  // Just and-mask in this
+    return not_nil.union(copy) | that.union(this);
   }
 
-  // same as HM w/nongen, except this & that reversed
-  boolean _unify_nil_r( TV3 that, boolean test ) {
+  // U-F union; this is nilable and a fresh copy of this unifies to that.
+  // No change if only testing, and reports progress.
+  // Same as HM.unify_nil.
+  //
+  // Example: Some number of PTRs point to THAT which points onward.
+  //   {PTR*} -->  THAT  --> {THAT._ARGS}
+  // We need the PTRs to "see thru" a Nil to pick up the possible-nil.
+  // Find_nil will actually install the nil on the PTRs' views, while direct
+  // pointers to THAT._ARGS will continue to see the not-nil flavor.
+  //   {PTR*} -->  {THAT>>COPY} --> {THAT.ARGS}  
+  boolean _unify_nil_l( TV3 that, boolean test ) {
+    assert !(that instanceof TVNil) && !not_nil()._may_nil;
+    return that.add_nil(test);
+  }
+
+  // U-F union; this is nilable and a fresh copy of that unifies to this.
+  // Handle cycles in the fresh side, by calling _fresh instead of copy.
+  // No change if only testing, and reports progress.
+  // Same as HM.unify_nil_r.
+  TV3 _unify_nil_r( TV3 that, boolean test ) {
     assert !(that instanceof TVNil);
-    if( test ) return true;     // Will make progress in all situations
+    if( test ) return that;     // Will make progress in all situations
     TVLeaf not_nil = not_nil();
-    not_nil._deps_work_clear();
+    assert !not_nil._may_nil; // might not be true under nested nilables, not required since copy strips nil
     // A shallow copy and fresh-unify fails if 'this' is cyclic, because the
     // shallow copy peels one part of the loop.
     TV3 copy = that._fresh().strip_nil();
     _is_copy &= that._is_copy;
     not_nil.union(copy);
-    if( that instanceof TVBase ) this.union(that); // Can reverse and turn into a Base
-    else that.union(this);      // Force 'that' to be nil-able version
-    return true;
+    return copy;
   }
 
 

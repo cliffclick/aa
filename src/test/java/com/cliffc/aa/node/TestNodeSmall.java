@@ -492,11 +492,11 @@ public class TestNodeSmall {
     NewNode dsp_file_ptr = new NewNode().init();
     Node dsp_file_mem = new StoreNode(mem,dsp_file_ptr,dsp_file,null).init();
     // Function header with nargs
-    FunNode fun = new FunNode("fact",ARG_IDX).add_def(ctl).add_def(ctl).init();
+    FunNode fun = new FunNode("fact",ARG_IDX).add_def(ctl).init();
     // Parms for the Fun.  Note that the default type is "weak" because the
     // file-level display can not yet know about "fact".
-    ParmNode parm_mem     = new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM,mem).add_def(dsp_file_mem).init();
-    ParmNode parm_dsp_ptr = new ParmNode(DSP_IDX,fun,null,dsp_file_ptr._val,(ConNode)Node.con(dsp_file_ptr._val)).add_def(dsp_file_ptr).init();
+    ParmNode parm_mem     = new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM).add_def(dsp_file_mem).init();
+    ParmNode parm_dsp_ptr = new ParmNode(DSP_IDX,fun,null,dsp_file_ptr._val).add_def(dsp_file_ptr).init();
     // Close the function up
     RetNode ret = new RetNode(fun,parm_mem,parm_dsp_ptr,rpc,fun).init();
     FunPtrNode fptr = new FunPtrNode(ret).init();
@@ -518,6 +518,7 @@ public class TestNodeSmall {
       Type nnn = n.value();
       assert nnn.isa(old);
     }
+    Env.GVN.work_clear();
 
     // Now run GCP to closure.  This is the key call being tested.
     AA.LIFTING = false;

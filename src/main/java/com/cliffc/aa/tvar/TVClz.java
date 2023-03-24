@@ -21,10 +21,27 @@ public class TVClz extends TV3 {
   @Override int eidx() { return TVErr.XCLZ; }
   @Override public TVClz as_clz() { return this; }
 
+  @Override TV3 strip_nil() {
+    _args[1] = rhs().copy().strip_nil();
+    _may_nil = false;
+    return this;
+  }
+  @Override boolean add_nil(boolean test) {
+    if( _may_nil && !rhs().add_nil(true) ) return false;
+    if( test ) return true;
+    _args[1] = rhs().copy();
+    _args[1].add_nil(true);
+    _may_nil = true;
+    return true;
+  }
+
+  
   // Keep the Clz wrapper, but find_nil the instance
   @Override TV3 find_nil( TVNil nil ) {
-    rhs().find_nil(nil);
-    return this;
+    TV3 nn = rhs().find_nil(nil);
+    if( nn == rhs() )
+      return this; // No change so just use same Clz
+    return new TVClz(clz(),nn);
   }
   
   // -------------------------------------------------------------

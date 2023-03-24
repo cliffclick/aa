@@ -17,7 +17,7 @@ import static com.cliffc.aa.AA.*;
 // Program execution start
 public class RootNode extends Node {
   // Inputs are:
-  // [program exit control, program exit memory, program exit value, escaping RetNodes... ]
+  // [program exit control, program exit memory, program exit value, escaping RetNodes and global CallNodes... ]
   public RootNode() { super(OP_ROOT, null, null, null); }
 
   @Override boolean is_CFG() { return true; }
@@ -55,7 +55,7 @@ public class RootNode extends Node {
   }
   
   // Output value is:
-  // [Ctrl, All_Mem_Minus_Dead, Rezult, [escaped_fidxs, escaped_aliases]]
+  // [Ctrl, All_Mem_Minus_Dead, Rezult, global_escaped_[fidxs, aliases]]
   @Override public TypeTuple value() {
     // Conservative final result.  Until Combo external calls can still wire, and escape arguments
     Node rez = in(REZ_IDX);
@@ -73,11 +73,17 @@ public class RootNode extends Node {
     // Walk, finding escaped aliases and fidxs
     escapes_reset(tmem);
     escapes(trez);
-    // Walk the global Calls also
+    // Walk the global Calls and Rets also
     for( int i=ARG_IDX; i<len(); i++ ) {
-      CallNode call = (CallNode)in(i);
-      for( int j=DSP_IDX; j<call.nargs(); j++ )
-        escapes(call.val(j));
+      if( in(i) instanceof CallNode call ) {
+        if( call.tfp()._fidxs.test(BitsFun.EXTX) )
+          for( int j=DSP_IDX; j<call.nargs(); j++ ) {
+            call.in(j).deps_add(this);
+            escapes(call.val(j));
+          }
+      } else {
+        escapes(((RetNode)in(i)).rez()._val);
+      }
     }
 
     // Roots value is all reachable alias memory shapes, plus all reachable
@@ -192,12 +198,7 @@ public class RootNode extends Node {
   public BitsFun matching_escaped_fidxs(TVLambda lam, Node dep) {
     // Caller result depends on escaping fidxs
     if( dep!=null ) deps_add(dep);
-    BitsFun fidxs = BitsFun.EMPTY;
-    // Toss in a generic nargs-correct external function which has !_is_copy.
-    FunNode fun = EXT_FUNS_BY_NARGS.atX(lam.nargs());
-    if( fun==null )
-      EXT_FUNS_BY_NARGS.setX(lam.nargs(),fun=new FunNode(" generic external lambda",BitsFun.new_fidx(BitsFun.EXTX),lam.nargs()));
-    fidxs = fidxs.set(fun._fidx);
+    BitsFun fidxs = BitsFun.EXT;
     // Cannot ask for trial_unify_ok until HM_FREEZE, because trials can fail
     // over time which runs the result backwards in GCP.
     if( Combo.HM_FREEZE )
@@ -220,6 +221,7 @@ public class RootNode extends Node {
     if( KILL_ALIASES.test(alias) ) return;
     KILL_ALIASES = KILL_ALIASES.set(alias);
     CACHE_DEF_MEM = CACHE_DEF_MEM.set(alias,TypeStruct.UNUSED);
+    Env.ROOT.add_flow();
     // Re-flow all dependents
     Env.GVN.add_flow(PROGRESS);
     PROGRESS.clear();
@@ -257,20 +259,73 @@ public class RootNode extends Node {
     if( def==in(CTL_IDX) ) return Type.ALL;
     if( def==in(MEM_IDX) ) return _live;
     if( def==in(REZ_IDX) ) return Type.ALL;
-    assert def instanceof CallNode;
+    assert def instanceof CallNode || def instanceof RetNode;
     return _live;               // Global calls take same memory as me
   }
 
+  // All escaping FIDXS are wired.  If Escapes is NALL, these edges are virtual.
+  boolean is_CG(boolean precise) {
+    BitsFun fidxs = rfidxs();
+    int non_prim_rets=0;
+    // All currently wired Calls and Rets are sensible
+    for( int i=ARG_IDX; i<len(); i++ ) {
+      if( in(i) instanceof RetNode ret ) {
+        if( !ret.is_prim() ) non_prim_rets++;
+        FunNode fun = ret.fun();
+        if( fun._defs.last() != this ) return false;
+        if( !rfidxs().test_recur(ret._fidx) ) return false;
+      } else {
+        CallNode call = (CallNode)in(i);
+        if( call.cepi()._defs.last()!=this ) return false;
+      }
+    }
+    if( fidxs.above_center() || fidxs==BitsFun.NALL )
+      return non_prim_rets==0; // If escapes is ALL, then all ret edges are virtual
+    // All fidxs are wired if precise.  Imprecise allows some new fidxs not yet wired.
+    if( precise )
+      for( int fidx : fidxs )
+        if( fidx != BitsAlias.EXTX && // External fidxs cannot be wired
+            _defs.find(RetNode.get(fidx)) < ARG_IDX )
+          return false;         // Has unwired fidx
+    return true;
+  }
+
+  public boolean CG_wire() {
+    assert is_CG(false);
+    boolean progress=false;
+
+    // Wire escaping fidxs: Root -> Ret... Fun -> Root
+    BitsFun fidxs = rfidxs();
+    if( fidxs!=BitsFun.NALL ) {
+      for( int fidx : fidxs ) {
+        if( fidx == BitsAlias.EXTX ) continue; // No wiring external functions
+        RetNode ret = RetNode.get(fidx);
+        if( _defs.find(ret) >= ARG_IDX ) continue; // Already wired
+        // Wire escaping
+        ret.fun().add_def(this).add_flow();
+        add_def(ret);
+        progress = true;
+      }
+    }
+    assert is_CG(true);
+    return progress;
+  }
+  
   @Override public Node ideal_reduce() {
+    if( in(0)==null ) return null;
+    Node cc = fold_ccopy();
+    if( cc!=null ) return cc;
     // See if the result can ever refer to local memory.
     Node rez = in(REZ_IDX);
-    if( rez!=null && in(MEM_IDX) != Env.XMEM &&
+    if( in(MEM_IDX) != Env.XMEM &&
         cannot_lift_to(rez._val,TypeMemPtr.ISUSED) &&
         cannot_lift_to(rez._val,TypeFunPtr.GENERIC_FUNPTR) ) {
       set_def(MEM_IDX,Env.XMEM);
       Env.XMEM.xliv();          // Added a new use
       return this;
     }
+    if( CG_wire() ) return this;
+    
     return null;
   }
 
@@ -299,8 +354,16 @@ public class RootNode extends Node {
     set_def(CTL_IDX,null);
     set_def(MEM_IDX,null);
     set_def(REZ_IDX,null);
-    while( len() > REZ_IDX+1 )
-      pop();
+    while( len() > REZ_IDX+1 ) {
+      Node n = _defs.last();
+      if( n instanceof CallNode call ) {
+        call.cepi().unwire(call,this,this);
+      } else if( n instanceof RetNode ret ) {
+        ret.fun().pop();
+        pop();
+      }
+      else throw unimpl();
+    }
     EXT_FUNS_BY_NARGS.clear();
     KILL_ALIASES = BitsAlias.EMPTY;
     CACHE_DEF_MEM = TypeMem.ALLMEM;

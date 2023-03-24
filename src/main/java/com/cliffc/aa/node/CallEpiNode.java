@@ -38,92 +38,46 @@ public final class CallEpiNode extends Node {
   @Override boolean is_CFG() { return !_is_copy; }
   @Override public boolean is_mem() { return true; }
   public CallNode call() { return (CallNode)in(0); }
-  // True if this calls an external function, and so escapes all arguments
-  boolean is_global() { return len()>1 && in(1)!=null; }
-  public int nwired() { return _defs._len-2; }
-  public RetNode wired(int x) { return (RetNode)in(x+2); }
-
-  // True if all Call value fidxs are wired.  Monotonic.  Always true if Call
-  // fidxs are above-center (no wiring required, these paths are never taken).
-  // Always false if Call fidxs are FULL or otherwise infinite.  Can be extra
-  // wired functions never called.  Post-Combo, must all be wired but dead
-  // paths can be trimmed.
-  public boolean is_all_wired() {
-    Type tc = call()._val;
-    BitsFun fidxs = CallNode.ttfp(tc).fidxs();
-    if( fidxs.above_center() ) return true; // No path is taken
-    if( fidxs==BitsFun.NALL ) return false; // Some unknown path is unwired
-    // Post-combo, was all wired but some dead paths may have been removed.
-    //if( AA.LIFTING && Combo.HM_FREEZE ) return true;
-    int ncall=0;
-    for( int i=0; i<nwired(); i++ )
-      if( fidxs.test(wired(i)._fidx) ) // Verify each fidx is wired
-        ncall++;
-    if( is_global() ) ncall++;      // Generic external function wired
-    return ncall==fidxs.bitCount(); // All is wired
-  }
-
 
   @Override public Node ideal_reduce() {
-    if( _is_copy ) return null;
+    if( _is_copy )
+      return fold_ccopy();
     CallNode call = call();
     Type tc = call._val;
     if( !(tc instanceof TypeTuple tcall) ) return null;
     if( CallNode.tctl(tcall) != Type.CTRL ) return null; // Call not executable
-    // Get calls resolved function.
-    BitsFun fidxs = CallNode.ttfp(tcall).fidxs();
 
-    // If the call's allowed functions excludes any wired, remove the extras
-    if( !fidxs.test(BitsFun.ALLX) ) { // Shortcut
-      for( int i = 0; i < nwired(); i++ ) {
-        RetNode ret = wired(i);
-        if( !fidxs.test_recur(ret.fidx()) ) { // Wired call not in execution set?
-          assert !BitsFun.is_parent(ret.fidx());
-          // Remove the edge.  Pre-GCP all CG edges are virtual, and are lazily
-          // and pessimistically filled in by ideal calls.  During the course
-          // of lifting types, some manifested CG edges are killed.
-          // Post-GCP all CG edges are manifest, but types can keep lifting
-          // and so CG edges can still be killed.
-          unwire(call,ret);
-          return Env.GVN.add_reduce(this); // Return with progress and go again
-        }
-      }
-    }
-
-    // See if we can wire any new fidxs directly between Call/Fun and Ret/CallEpi.
-    // This *adds* edges, but enables a lot of shrinking via inlining.
-    if( check_and_wire(false) ) return this;
+    // Add or remove Call Graph edges according to fidxs
+    if( CG_wire() ) return this;
 
     // The one allowed function is already wired?  Then directly inline.
     // Requires this calls 1 target, and the 1 target is only called by this.
-    if( nwired()==1 && fidxs.abit() != -1 ) { // Wired to 1 target
-      RetNode ret = wired(0);                 // One wired return
+    BitsFun fidxs = CallNode.ttfp(tcall).fidxs();
+    if( !unknown_callers() && nwired()==1 && wired(0) instanceof RetNode ret && !ret.is_prim() ) { // Wired to 1 target
+      assert fidxs.abit() == ret._fidx; // Correct call graph
       FunNode fun = ret.fun();
-      if( fun != null && fun._defs._len==2 && // Function is only called by 1 (and not the unknown caller)
-          call.err(true)==null &&             // And args are ok
+      if( fun != null && fun.len()==2 && !fun.unknown_callers(this) && // Function is only called by 1 (and not the unknown caller)
+          call.err(true)==null &&       // And args are ok
           call.mem().in(0) != call &&   // Dead self-recursive
-          fun.in(1)._uses._len==1 &&    // And only calling fun
+          fun.in(1)._uses._len==2 &&    // And only calling fun
           ret._live.isa(_live) &&       // Call and return liveness compatible
           !fun.noinline() ) {           // And not turned off
-        assert fun.in(1).in(0)==call;   // Just called by us
+        assert fun.in(1)==call;         // Just called by us
         int idx = Env.SCP_0._defs.find(ret);
         if( idx!=-1 ) Env.SCP_0.del(idx);
         Node rmem = ret.mem();
         if( rmem==null ) rmem = call.mem();  // Pure function memory is a copy of call
-        fun.set_is_copy();              // Collapse the FunNode into the Call
         Env.GVN.add_flow(call.fdx());   // FunPtr probably goes dead
+        call.deps_work_clear();         // Other args to call might go dead
+        fun.set_is_copy();              // Collapse the FunNode into the Call
         return set_is_copy(ret.ctl(), rmem, ret.rez()); // Collapse the CallEpi into the Ret
       }
     }
 
     if( call.err(true)!=null ) return null; // CallNode claims args in-error, do not inline
 
-    // Replace a resolved
-    Node fdx = call.fdx();
-    if( fdx instanceof FreshNode frsh ) fdx = frsh.id();
-
     // Only inline wired single-target function with valid args.  CallNode wires.
-    if( !is_all_wired() ) return null;
+    if( !is_CG(true) ) return null;
     int fidx = fidxs.abit();
     if( fidx <= 1 ) return null; // More than one choice
 
@@ -154,12 +108,12 @@ public final class CallEpiNode extends Node {
 
     // Check for zero-op body (id function)
     if( rrez instanceof ParmNode && rrez.in(CTL_IDX) == fun && cmem == rmem && inline )
-      return unwire(call,ret).set_is_copy(cctl,cmem,call.arg(((ParmNode)rrez)._idx)); // Collapse the CallEpi
+      return unwire(call,ret,fun).set_is_copy(cctl,cmem,call.arg(((ParmNode)rrez)._idx)); // Collapse the CallEpi
 
     // Check for constant body
     Type trez = rrez._val;
     if( trez.is_con() && rctl==fun && cmem == rmem && inline )
-      return unwire(call,ret).set_is_copy(cctl,cmem,Node.con(trez));
+      return unwire(call,ret,fun).set_is_copy(cctl,cmem,Node.con(trez));
 
     // Check for a 1-op body using only constants or parameters and no memory effects.
     boolean can_inline=!(rrez instanceof ParmNode) && rmem==cmem && inline;
@@ -172,14 +126,13 @@ public final class CallEpiNode extends Node {
     if( can_inline ) {
       Node irez = rrez.copy(false); // Copy the entire function body
       ProjNode proj = ProjNode.proj(this,REZ_IDX);
-      int path=1; while( fun.in(path).in(0)!=call ) path++;
       irez._live = proj==null ? Type.ALL : proj._live; // sharpen liveness to the call-site liveness
       for( Node in : rrez._defs )
-        irez.add_def((in instanceof ParmNode parm && parm.in(CTL_IDX) == fun) ? in.in(path) : in);
+        irez.add_def((in instanceof ParmNode parm && parm.in(CTL_IDX) == fun) ? call.arg(parm._idx) : in);
       if( irez instanceof PrimNode prim ) prim._badargs = call._badargs;
       GVN.add_work_new(irez);
       GVN.add_reduce(fun);
-      return unwire(call,ret).set_is_copy(cctl,cmem,irez);
+      return unwire(call,ret,fun).set_is_copy(cctl,cmem,irez);
     }
 
     // Check for a 1-op body that uses parms and returns ctrl and memory.
@@ -190,104 +143,28 @@ public final class CallEpiNode extends Node {
       if( rmem instanceof MProjNode && rmem.in(0)==prim &&
           rrez instanceof  ProjNode && rrez.in(0)==prim &&
           prim.in(CTL_IDX) == fun ) {
-        // Prim inputs all from Parms
-        for( int i=MEM_IDX; i<prim.len(); i++ )
-          if( !(prim.in(i) instanceof ParmNode && prim.in(i).in(0)==fun) )
-            { can_inline=false; break; }
-        if( can_inline ) {
-          Node prim2 = prim.copy(false);
-          prim2.add_def(cctl);
-          prim2.add_def(cmem);
-          for( int i=DSP_IDX; i<prim.len(); i++ )
-            prim2.add_def(ProjNode.proj(call,i));
-          prim2.init();
-          Node ctl2 = new CProjNode(prim2).init();
-          Node mem2 = new MProjNode(prim2).init();
-          Node rez2 = new  ProjNode(prim2,REZ_IDX).init();
-          Env.GVN.add_reduce(fun);
-          return unwire(call,ret).set_is_copy(ctl2,mem2,rez2);
-        }
+        //// Prim inputs all from Parms
+        //for( int i=MEM_IDX; i<prim.len(); i++ )
+        //  if( !(prim.in(i) instanceof ParmNode && prim.in(i).in(0)==fun) )
+        //    { can_inline=false; break; }
+        //if( can_inline ) {
+        //  Node prim2 = prim.copy(false);
+        //  prim2.add_def(cctl);
+        //  prim2.add_def(cmem);
+        //  for( int i=DSP_IDX; i<prim.len(); i++ )
+        //    prim2.add_def(ProjNode.proj(call,i));
+        //  prim2.init();
+        //  Node ctl2 = new CProjNode(prim2).init();
+        //  Node mem2 = new MProjNode(prim2).init();
+        //  Node rez2 = new  ProjNode(prim2,REZ_IDX).init();
+        //  Env.GVN.add_reduce(fun);
+        //  return unwire(call,ret,fun).set_is_copy(ctl2,mem2,rez2);
+        //}
+        throw unimpl();
       }
     }
 
-
     return null;
-  }
-
-  // Used during GCP and Ideal calls to see if wiring is possible.
-  // Return true if a new edge is wired
-  public boolean check_and_wire(boolean is_combo) {
-    if( !(_val instanceof TypeTuple) ) return false; // Collapsing
-    CallNode call = call();
-    Type tcall = call._val;
-    if( !(tcall instanceof TypeTuple) ) return false;
-    TypeFunPtr tfp = CallNode.ttfp(tcall);
-    if( tfp.is_full() ) {       // Error call
-      call.deps_add(call);      // If call-type changes, self can wire
-      return false;
-    }
-    if( tfp.above_center() )  return false; // Still choices to be made during GCP.
-
-    // Check all fidxs for being wirable
-    boolean progress = false;
-    for( int fidx : tfp.fidxs() ) { // For all fidxs
-      if( BitsFun.is_parent(fidx) ) continue; // Do not wire parents, as they will eventually settle out
-      RetNode ret = RetNode.get(fidx);        // Lookup, even if not wired
-      if( ret==null || ret.is_copy() ) continue; // Dead or RootNode.EXT_FIDX
-      if( _defs.find(ret) != -1 ) continue;   // Wired already
-      FunNode fun = ret.fun();
-      if( !CEProjNode.wired_arg_check(tcall,fun) ) continue; // Args fail basic sanity
-      progress=true;
-      wire1(call,fun,ret,is_combo); // Wire Call->Fun, Ret->CallEpi
-    }
-    if( progress && is_all_wired() )
-      add_reduce_uses(); // Progress on pure memory uses
-    return progress;
-  }
-
-  // Wire the call args to a known function, letting the function have precise
-  // knowledge of its callers and arguments.  
-  void wire1( CallNode call, Node fun, Node ret, boolean is_combo ) {
-    assert _defs.find(ret)==-1; // No double wiring
-    wire0(call,fun,is_combo);
-    if( len()==1 ) add_def(null); // Skip a slot for a future Root wire
-    // Wire self to the return
-    add_def(ret);
-    GVN.add_flow(this);
-    GVN.add_flow(call);
-    call.add_flow_defs();
-  }
-
-  // Wire without the redundancy check, or adding to the CallEpi
-  void wire0(CallNode call, Node fun, boolean is_combo) {
-    // Wire.  Bulk parallel function argument path add
-    Node cep = new CEProjNode(call);
-    cep  = is_combo ? cep.init1() : Env.GVN.init(cep);
-    fun.add_def(GVN.add_flow(cep));
-
-    // Add an input path to all incoming arg ParmNodes from the Call.  Cannot
-    // assert finding all args, because dead args may already be removed - and
-    // so there's no Parm/Phi to attach the incoming arg to.
-    for( Node arg : fun._uses ) {
-      if( arg.in(0) != fun || !(arg instanceof ParmNode parm) ) continue;
-      Node actual = switch( parm._idx ) {
-      case 0 -> new ConNode<>(TypeRPC.make(call._rpc)); // Always RPC is a constant
-      case MEM_IDX -> new MProjNode(call); // Memory into the callee
-      default -> parm._idx >= call.nargs() // Check for args present
-      ? Env.ALL  // Missing args, still wire (to keep FunNode neighbors) but will error out later.
-      : new ProjNode(call, parm._idx); // Normal args
-      };
-      actual = is_combo ? actual.init1() : Env.GVN.init(actual);
-      arg.add_def(actual);
-      actual.xliv();
-      if( arg._val.is_con() ) // Added an edge, value may change or go in-error
-        arg.add_flow_defs();  // So use-liveness changes
-    }
-
-    // Add matching control to function via a CallGraph edge.
-    GVN.add_flow(fun);
-    for( Node use : fun._uses ) GVN.add_flow(use);
-    if( fun instanceof FunNode ) GVN.add_inline((FunNode)fun);
   }
 
   // Merge call-graph edges, but the call-graph is not discovered prior to GCP.
@@ -297,9 +174,8 @@ public final class CallEpiNode extends Node {
   @Override public Type value() {
     if( _is_copy ) return _val; // A copy
     Type tin0 = val(0);
-    if( !(tin0 instanceof TypeTuple tcall) )
+    if( !(tin0 instanceof TypeTuple tcall) || call().len() != tcall.len() )
       return tin0.oob(TypeTuple.CALLE); // Weird stuff?
-    if( tcall._ts.length < ARG_IDX ) return tcall.oob(); // Weird stuff
 
     // Get Call result.  If the Call args are in-error, then the Call is called
     // and we flow types to the post-call.... BUT the bad args are NOT passed
@@ -312,39 +188,39 @@ public final class CallEpiNode extends Node {
     // If above_center (not resolved) or not all wired, can bail conservative
     BitsFun fidxs = tfptr.fidxs();
     if( fidxs.above_center() ) return TypeTuple.CALLE.dual();
-    if( !is_all_wired() ) {    // Unknown callers?
-      // Unknown callers call everything, touch everything.  Use Root memory.
-      Env.ROOT.deps_add(this);
-      TypeMem rmem = Env.ROOT.rmem();
-      Type cmem = CallNode.emem(tcall);
-      if( !Combo.HM_FREEZE ) Combo.add_freeze_dep(this);
-      Type rfuns = is_global() ? Env.ROOT.ext_caller() : Type.ALL;
-      return TypeTuple.make(Type.CTRL,rmem.meet(cmem),rfuns);
-    }
+    if( Combo.pre() &&           // In iter (not combo)
+        (fidxs==BitsFun.EMPTY || // Lifted to no functions
+         len()==1 ||             // Not wired (wireable?)
+         !is_CG(true)) )         // Unknown callers?
+      return TypeTuple.make(Type.CTRL,RootNode.def_mem(this),Type.ALL); // Unknown callers return e.g. error states
+      
+    assert is_CG(false);
 
-    // Compute call-return value from all callee returns
-    Type trez = Type.ANY;
-    Type tmem = TypeMem.ANYMEM;
-    if( !is_all_wired() ) {
-      throw unimpl();           // Worse-case return from future unwired called fcns
-    } else {
-      if( is_global() ) {
-        tmem = tmem.meet(Env.ROOT.rmem());
-        trez = trez.meet(Env.ROOT.ext_caller());
-        tmem = tmem.meet(CallNode.emem(tcall)); // Also get pass-thru memory
+    // Compute meet over wired called function returns
+    Type tmem = TypeMem.ANYMEM, rmem;
+    Type trez = Type.ANY, rrez;
+    int fidx;
+    boolean pre_call_mem = false;
+    for( int i=1; i<len(); i++ ) {
+      if( in(i) instanceof RetNode ret ) {
+        fidx = ret._fidx;
+        TypeTuple tret = ret._val instanceof TypeTuple tt ? tt : (TypeTuple)ret._val.oob(TypeTuple.RET);
+        rmem = tret.at(MEM_IDX);
+        rrez = tret.at(REZ_IDX);
+        pre_call_mem |= ret.in(MEM_IDX)==null; // 
+      } else {                  // Calling Root, taking Root return value
+        assert in(i)==Env.ROOT;
+        fidx = BitsFun.EXTX;
+        rmem = Env.ROOT.rmem();
+        rrez = Env.ROOT.ext_caller();
+        pre_call_mem = true;    // Root might not stomp anything
       }
-      for( int i=0; i<nwired(); i++ ) { // For all wired calls
-        RetNode ret = wired(i);
-        if( !fidxs.test_recur(ret._fidx) ) continue;
-        Type tret0 = ret._val;     // Get the called function return
-        TypeTuple tret = (TypeTuple)(tret0 instanceof TypeTuple ? tret0 : tret0.oob(TypeTuple.RET));
-        Type rmem = tret.at(MEM_IDX);
-        if( ret.mem()==null ) // Pure call just passes memory thru
-          rmem = CallNode.emem(tcall);
-        tmem = tmem.meet(rmem);
-        trez = trez.meet(tret.at(REZ_IDX));
-      }
+      if( !fidxs.test_recur(fidx) ) continue;
+      tmem = tmem.meet(rmem);
+      trez = trez.meet(rrez);
     }
+    if( pre_call_mem )         // Also meet pass-thru memory
+      tmem = tmem.meet(CallNode.emem(tcall)); 
 
     // Attempt to lift the result, based on HM types.  Walk the input HM type
     // and GCP flow type in parallel and create a mapping.  Then walk the
@@ -380,29 +256,21 @@ public final class CallEpiNode extends Node {
     throw unimpl();
   }
 
-  // Sanity check
-  boolean sane_wiring() {
-    CallNode call = call();
-    for( int i=0; i<nwired(); i++ ) {
-      RetNode ret = wired(i);
-      if( ret.is_copy() ) return true; // Abort check, will be misaligned until dead path removed
-      FunNode fun = ret.fun();
-      boolean found=false;
-      for( Node def : fun._defs )
-        if( def instanceof CEProjNode && def.in(0)==call )
-          { found=true; break; }
-      if( !found ) return false;
-    }
-    return true;
-  }
-
   @Override public Node is_copy(int idx) { return _is_copy ? in(idx) : null; }
+
+  CallEpiNode unwire(CallNode call, Node ret, Node fun) {
+    assert is_CG(true);
+    remove(_defs.find(ret));
+    fun.remove(fun._defs.find(call));
+    return this;
+  }
 
   private CallEpiNode set_is_copy( Node ctl, Node mem, Node rez ) {
     CallNode call = call();
     if( FunNode._must_inline == call._uid ) // Assert an expected inlining happens
       FunNode._must_inline = 0;
     call._is_copy=_is_copy=true;
+    call.pop();                 // Drop call fdx; other args need to be copied-thru
     Env.GVN.add_reduce_uses(call);
     Env.GVN.add_reduce_uses(this);
     while( _defs._len>0 ) pop();
@@ -412,25 +280,141 @@ public final class CallEpiNode extends Node {
     return this;
   }
 
-  CallEpiNode unwire(CallNode call, RetNode ret) {
-    assert sane_wiring();
-    if( !ret.is_copy() ) {
-      FunNode fun = ret.fun();
-      for( int i = 1; i < fun._defs._len; i++ ) // Unwire
-        if( fun.in(i).in(0) == call ) {
-          fun.set_def(i, Env.XCTRL);
-          Env.GVN.add_flow(fun);
-          for( Node use : fun._uses ) {
-            Env.GVN.add_flow(use); // Dead path, all Phis can lift
-            Env.GVN.add_flow_defs(use); // All Phi uses lose a use
-          }
-          break;
-        }
+  // Call Graph API:
+
+  // - After Combo, the CG is explicit.  All CallEpis have an edge to their
+  //   Call in slot 0, some edges to RetNodes in slots 1-n, and an edge to Root
+  //   if called externally.
+  // - Pre-Combo, if FDX is NALL all edges are implicit.  As FDX tightens up,
+  //   explicit CG edges are added - and remain conservatively correct forever.
+  // - If FDX includes BitsFun.EXTX, an edge to Root is added in the last position.
+  // - If any CG edge is explicit, all are.
+  //
+  
+  public int nwired() { return _defs._len-1; }
+  public Node wired(int x) { return _defs.at(x+1); }
+
+  // True if this CallEpi has virtual CG edges to other unknown callees.
+  // If any function is wired, all are.
+  boolean unknown_callers() { return len()==1; }
+  
+  // Checks for sane Call Graph, similar to RetNode.is_CG
+  public boolean is_CG(boolean precise) {
+    CallNode call = call();
+    BitsFun fidxs = call.tfp()._fidxs;
+    // Check back edges from CEPI to CALL
+    for( int i=1; i<len(); i++ ) {
+      if( fidxs.test(1) ) return false; // Wired, so not NALL
+      int fidx;
+      Node n = in(i);
+      if( n instanceof RetNode ret ) {
+        fidx = ret._fidx;
+        n = ret.fun();
+      } else {                  // Root is always last, if it appears at all
+        if( !(n instanceof RootNode) || i!=len()-1) return false;
+        fidx = BitsFun.EXTX;
+      }
+      if( (!LIFTING || precise) && // During Combo or after correcting during Iter, 
+          !fidxs.test(fidx) ) return false; // wired without matching fidx is an error
+      if( n._defs.find(call) == -1 ) return false; // Wired below but not above
     }
-    remove(_defs.find(ret));
-    Env.GVN.add_reduce(ret);
-    assert sane_wiring();
-    return this;
+    // Check forward edges from CALL to CEPI
+    for( Node use : call._uses ) {
+      if( use==this ) continue;
+      if( use instanceof FunNode fun ) use = fun.ret();
+      if( _defs.find(use) == -1 ) return false; // Wired above but not below
+    }
+    // If precise, check that every fidx is wired.  If not precise we might
+    // have fidxs not yet wired.
+    if( precise && !fidxs.above_center() && fidxs != BitsFun.NALL ) {
+      for( int fidx : fidxs ) {
+        if( fidx == BitsFun.EXTX ) {
+          if( _defs.last()!=Env.ROOT ) return false;
+        } else {
+          RetNode ret = RetNode.get(fidx);
+          if( !ret.is_copy() && _defs.find(ret)== -1 && ret.fun().nargs()==call.nargs())
+            return false;
+        }
+      }
+    }
+    
+    return true;                // Everything is OK
+  }
+
+  // Used during GCP and Ideal calls to see if wiring is possible.
+  // Return true if a new edge is wired
+  public boolean CG_wire() {
+    assert !_is_copy && is_CG(false);        // Might be imprecise, but conservatively correct
+    boolean progress = false;
+    
+    CallNode call = call();
+    TypeFunPtr tfp = call.tfp();
+    BitsFun fidxs = tfp._fidxs;
+    // Remove extra wires (mostly post-combo)
+    assert fidxs!=BitsFun.NALL || nwired()==0;
+    for( int i=1; i<len(); i++ ) {
+      call.deps_add(this);      // Call sharpens can remove
+      int fidx = in(i) instanceof RetNode ret ? ret._fidx : BitsFun.EXTX;
+      boolean ok_nargs = !(in(i) instanceof RetNode ret) || (call.nargs()==tfp.nargs() && tfp.nargs() == ret.fun().nargs());
+      if( fidxs.above_center() || !fidxs.test_recur(fidx) || !ok_nargs ) {
+        progress=true;
+        call.add_flow();
+        if( fidx==BitsFun.EXTX ) {
+          Env.ROOT.remove(call);
+          pop();                // Remove wire to Root
+        } else {
+          FunNode fun = ((RetNode)in(i)).fun();
+          fun.add_flow_uses();  // Parms merge fewer
+          Env.GVN.add_reduce(in(i)); // Fewer uses of Ret
+          fun.remove(call);     // Remove from Fun
+          remove(in(i));        // Remove from Ret
+        }
+      }
+    }
+
+    // Add missing wires
+    boolean vCG = unknown_callers(); // Has virtual CG edges
+    if( !fidxs.above_center() && fidxs!=BitsFun.NALL ) {
+      for( int fidx : fidxs ) {
+        Node ret,fun;
+        if( fidx == BitsFun.EXTX ) {
+          ret = fun = Env.ROOT;
+        } else {
+          RetNode ret2 = RetNode.get(fidx);
+          FunNode fun2 = ret2.fun();
+          if( fun2==null ) continue; // Broken function
+          if( call.nargs() != tfp.nargs() || tfp.nargs() != fun2.nargs() )
+            continue; // Mismatched
+          ret = ret2; fun = fun2;
+        }
+        if( _defs.find(ret) != -1  ) continue; // Already present
+        assert vCG || !Combo.pre(); // Only add 1 time when going from virtual to concrete Call Graph; during Combo edges are added lazily
+        progress = true;
+        // Add edge from CallEpi to Ret
+        add_def(ret);
+        fun.add_def(call).add_flow();
+        fun.add_flow_uses();    // Parms have new inputs
+        // Swap so ROOT remains last
+        if(     in(    len()-2)==Env.ROOT )     _defs.last(    _defs._len-2);
+        if( fun.in(fun.len()-2)==Env.ROOT ) fun._defs.last(fun._defs._len-2);
+        if( fun instanceof FunNode fun2 ) Env.GVN.add_inline(fun2);
+        assert !unknown_callers(); // Only add 1 time when going from virtual to concrete Call Graph
+      }
+    } else {
+      call.deps_add(this);      // Call type sharpens, can wire
+      call.deps_add(call);      // Call type sharpens, can wire
+    }
+    if( progress ) call.add_flow().add_flow_defs(); // Call, args may change liveness
+    assert is_CG(true );        // Precise
+    return progress;            // 
+  }
+
+
+  @Override public Type live() {
+    if( _is_copy ) return _live; // Freeze in place if dying
+    Type live = super.live();
+    if( live instanceof TypeMem ) return live;
+    return live.oob(TypeMem.ALLMEM);
   }
 
   // Compute local contribution of use liveness to this def.  If the call is
@@ -458,6 +442,15 @@ public final class CallEpiNode extends Node {
   }
 
   @Override public boolean has_tvar() { return true; }
+  @Override public TV3 _set_tvar() {
+    while( nwired()>0 ) {
+      Node w = del(1), fun=w;
+      if( w instanceof RetNode ret ) fun = ret.fun();
+      fun.remove(fun._defs.find(call()));      
+    }
+    assert is_CG(false);
+    return new TVLeaf();
+  }
 
   // Same as HM.Apply.unify
   @Override public boolean unify( boolean test ) {
@@ -505,27 +498,10 @@ public final class CallEpiNode extends Node {
     return progress;
   }
 
-  private boolean bad_arg_cnt(boolean test) {
-    TV3 self = tvar();
-    if( self instanceof TVErr ) return false;
-    if( !test ) {
-      //self._err = "Bad argument count";
-      //self.add_deps_work(work); // Error removes apply_lift
-      throw unimpl();
-    }
-    return true;
-  }
-
   // Unify trailing result ProjNode with the CallEpi directly.
   @Override public boolean unify_proj( ProjNode proj, boolean test ) {
     assert proj._idx==REZ_IDX;
     return tvar().unify(proj.tvar(),test);
   }
-
-  // Return the set of updatable memory - including everything reachable from
-  // every call argument (including the display), and any calls reachable from
-  // there, transitively through memory.
-  //
-  // In practice, just the no-escape aliases
-  //@Override BitsAlias escapees() { return BitsAlias.FULL; }
+  
 }

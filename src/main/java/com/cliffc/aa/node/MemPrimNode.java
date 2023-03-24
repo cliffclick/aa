@@ -50,28 +50,6 @@ public abstract class MemPrimNode extends PrimNode {
   public abstract static class ReadPrimNode extends MemPrimNode {
     public ReadPrimNode( String name, TypeTuple formals, TypeNil ret ) { super(name,formals,ret); }
 
-    @Override public FunPtrNode clazz_node( ) {
-      try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
-        assert _defs._len==0 && _uses._len==0;
-        FunNode  fun = ( FunNode) X.xform(new  FunNode(this,"TODO"));
-        //ParmNode rpc = (ParmNode) X.xform(new ParmNode(TypeRPC.ALL_CALL,null,fun,0      ,"rpc"));
-        //Node mem     =            X.xform(new ParmNode(TypeMem.MEM     ,null,fun,MEM_IDX," mem"));
-        //add_def(null);              // Control for the primitive in slot 0
-        //add_def(mem );              // Memory  for the primitive in slot 1
-        //while( len() < _sig._formals.nargs() ) add_def(null);
-        //for( TypeFld arg : _sig._formals )
-        //  if( arg._order!=MEM_IDX ) // Already handled MEM_IDX
-        //    set_def(arg._order,X.xform(new ParmNode(arg._t.simple_ptr(), null, fun, arg._order, arg._fld)));
-        //Node nnn = X.xform(this);
-        //// Functions return the set of *modified* memory.  ReadPrimNodes do not modify
-        //// memory.
-        //RetNode ret = (RetNode)X.xform(new RetNode(fun,mem,nnn,rpc,fun));
-        //// No closures are added to primitives
-        //return (X._ret = (FunPtrNode)X.xform(new FunPtrNode(_name,ret)));
-        throw unimpl();
-      }
-    }
-
     // The only memory required here is what is needed to support the Load
     @Override public Type live_use( Node def ) {
       //if( def==adr() ) return TypeMem.ALIVE;
@@ -164,26 +142,6 @@ public abstract class MemPrimNode extends PrimNode {
   //  WritePrimNode( String name, TypeStruct formals, Type ret ) { super(name,formals,ret); }
   //  @Override public boolean is_mem() { return true; }
   //
-  //  @Override public FunPtrNode clazz_node( ) {
-  //    try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
-  //      assert _defs._len==0 && _uses._len==0;
-  //      FunNode  fun = ( FunNode) X.xform(new  FunNode(_name,this).add_def(Env.SCP_0)); // Points to ScopeNode only
-  //      ParmNode rpc = (ParmNode) X.xform(new ParmNode( 0     ,"rpc" ,fun,Env.ALL_CALL,null));
-  //      //ParmNode mem = (ParmNode) X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-  //      //fun._bal_close = bal_close();
-  //      //fun._java_fun = true;
-  //      //add_def(null);              // Control for the primitive in slot 0
-  //      //add_def(mem );              // Memory  for the primitive in slot 1
-  //      //while( len() < _sig._formals.nargs() ) add_def(null);
-  //      //for( TypeFld arg : _sig._formals.flds() )
-  //      //  set_def(arg._order,X.xform(new ParmNode(arg._order,arg._fld,fun, (ConNode)Node.con(arg._t.simple_ptr()),null)));
-  //      //// Write prims return both a value and memory.
-  //      //MemPrimNode prim = (MemPrimNode)X.xform(this);
-  //      //RetNode ret = (RetNode)X.xform(new RetNode(fun,prim,prim.rez(),rpc,fun));
-  //      //return (X._ret = new FunPtrNode(_name,ret));
-  //      throw unimpl();
-  //    }
-  //  }
   //
   //  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   //  // The only memory required here is what is needed to support the Load

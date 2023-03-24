@@ -1,12 +1,11 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.*;
 
 import java.util.function.Predicate;
-
-import static com.cliffc.aa.AA.unimpl;
 
 // Constant value nodes; no computation needed.  Hashconsed for unique
 // constants, except for XNIL.  XNIL allows for a TV3 typevar Nilable-Leaf with
@@ -17,6 +16,8 @@ public class ConNode<T extends Type> extends Node {
     super(OP_CON,Env.ROOT);
     _t=t;
     _live = is_mem() ? TypeMem.ALLMEM : Type.ALL;
+    if( !Combo.pre() && has_tvar() )
+      _tvar = TV3.from_flow(_t,true);
   }
   @Override public String xstr() {
     return _t==null ? "(null)" : _t.toString();
@@ -33,8 +34,10 @@ public class ConNode<T extends Type> extends Node {
   }
 
   @Override public TV3 _set_tvar() {
-    unelock(); // Hash now depends on TVars
-    return TV3.from_flow(_t);
+    unelock();                  // Hash now depends on TVars
+    TV3 tv = TV3.from_flow(_t,true);
+    tv.deps_add_deep(this);     // Constant hash depends on tvar      
+    return tv;
   }
   
   @Override public boolean unify( boolean test ) { return false; }
@@ -49,7 +52,7 @@ public class ConNode<T extends Type> extends Node {
     int hash = _t.hashCode();
     // Two NILs are typically different because their TV3s are different.
     // Also, vary two TMPs or TFPs might vary (but not e.g. Scalar)
-    if( _tvar!=null && equals_uses_tvar() )
+    if( _tvar!=null && has_tvar() )
       hash ^= _tvar._uid;
     return hash;
   }
@@ -57,28 +60,13 @@ public class ConNode<T extends Type> extends Node {
     if( this==o ) return true;
     if( !(o instanceof ConNode con) ) return false;
     if( _t!=con._t ) return false;
+    if( _tvar!=null ) return tvar()==con.tvar();
     // Prior to Combo we must assume two NILs will unify to different TV3
-    // types and thus must remain seperate.  After Combo they can fold together
+    // types and thus must remain separate.  After Combo they can fold together
     // if they have the same TVars.
-    if( _tvar==null && equals_uses_tvar() ) return false;
-    
-    // Check TVars, if they exist.  This allows combining ConNodes with TVars
-    // pre-Combo, except for NIL.  E.g. all ints (or floats) are alike to TV3.
-    if( _tvar==null ) {
-      if( con._tvar!=null ) _tvar=con._tvar;
-      return true;
-    }
-    if( tvar()==con.tvar() ) return true;
-    if( !equals_uses_tvar() ) return true;
-    //
-    throw unimpl();
+    return !has_tvar();
   }
   
   @Override Node walk_dom_last( Predicate<Node> P) { return null; }
-  @SuppressWarnings({"unused","unchecked"}) // Found as java_class_node in _prims.aa
-  public static class PI extends ConNode {
-    public PI() { super(TypeFlt.PI); }
-    @Override public Node clazz_node( ) { return Env.GVN.init(this); }
-  }
 }
 

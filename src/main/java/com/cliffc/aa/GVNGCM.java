@@ -87,7 +87,8 @@ public class GVNGCM {
     _work_inline.clear();
     ITER_CNT = ITER_CNT_NOOP = 0;
   }
-  void work_clear() { _work_flow.clear(); _work_dead.clear(); _work_reduce.clear(); }
+  public void work_clear() { _work_flow.clear(); _work_dead.clear(); _work_reduce.clear(); }
+  boolean work_is_clear() { return _work_flow.isEmpty() && _work_dead.isEmpty() && _work_reduce.isEmpty(); }
 
   // Keep a Node reference alive for later.  Strongly asserted as a stack
   public static int push( Node n ) { KEEP_ALIVE.add_def(n); return KEEP_ALIVE._defs._len; }
@@ -134,7 +135,7 @@ public class GVNGCM {
     assert AA.once_per() || Env.ROOT.more_work(true) == 0; // Initial conditions are correct
     //assert Env.ROOT.no_more_ideal(); // Has side-effects of putting things on worklist
     while( true ) {
-      cnt++; assert cnt < 15000; // Catch infinite ideal-loops
+      cnt++; assert cnt < 20000; // Catch infinite ideal-loops
       Node n, m;
       if( false ) ;
       else if( (n=_work_dead  .pop())!=null ) m = n._uses._len == 0 ? n.kill() : null;
@@ -217,8 +218,7 @@ public class GVNGCM {
       n.xval(); // Set value before reduce
       Node x = (n instanceof RegionNode || n instanceof PhiNode) ? null : n.do_reduce();   // Attempt to reduce
       Node y = x==null ? n : x;
-      add_flow(y);              // Liveness is yet to be computed
-      return y;
+      return add_work_new(y);
     }
     public Node init( Node n ) {
       assert _tmps._len<16;             // Time for a BitSet

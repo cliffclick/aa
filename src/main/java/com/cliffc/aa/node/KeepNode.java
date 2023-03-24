@@ -15,6 +15,11 @@ public class KeepNode extends Node {
     if( def instanceof     LoadNode ) return TypeStruct.ISUSED;
     if( def instanceof    FieldNode fld && fld._val instanceof TypeStruct )
       return TypeStruct.ISUSED; // Fields from CLAZZes can return Struct overloads
+    if( def instanceof      PhiNode phi ) {
+      if( phi._t==TypeNil.SCALAR ) return Type.ALL;
+      if( phi._t==TypeMem.ALLMEM ) return phi._t;
+      if( phi._t==TypeStruct.ISUSED ) return phi._t;
+    }
     return Type.ALL;
   }
   @Override public boolean equals(Object o) { return this==o; }

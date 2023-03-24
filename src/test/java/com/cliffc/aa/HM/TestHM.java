@@ -29,11 +29,9 @@ public class TestHM {
     JIG=true;
 
     DO_HMT=true;
-    DO_GCP=true;
-    RSEED=1;
-    //b_recursive_02();
-    //b_recursive_03();
-    b_recursive_04();
+    DO_GCP=false;
+    RSEED=0;
+    a_basic_02();
   }
 
   private void _run0s( String prog, String rprog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -48,9 +46,10 @@ public class TestHM {
     Type gcp = Type.valueOf(frez_gcp);
     
     // Check expected types for HMT and GCP
-    if( gcp    !=null )  if( gcp != syn.flow_type() ) System.err.println(gcp + " =!= " + syn.flow_type());
+    Type rflow = null;
+    if( gcp    !=null )  if( gcp != (rflow=syn.flow_type()) ) System.err.println(gcp + " =!= " + rflow);
     if( rez_hm !=null )  if( !stripIndent(rez_hm).equals(stripIndent(syn._hmt.p())) ) System.err.println(rez_hm+" =!= "+syn._hmt.p());
-    if( gcp    !=null )  assertEquals(gcp,syn.flow_type());
+    if( gcp    !=null )  assertEquals(gcp,rflow);
     if( rez_hm !=null )  assertEquals(stripIndent(rez_hm),stripIndent(syn._hmt.p()));
 
     // Track expected Root escapes
@@ -114,11 +113,18 @@ public class TestHM {
          "[17]", "[30]" );
   }
   @Test public void a_basic_02() {
+    run( "{ z -> (pair (z 0) (z 5)) }" ,
+          "{ { int8 -> A } -> *( A, A ) }",
+          "[30]{any,3 ->*[17](_, Scalar, Scalar) }",
+          "[17]", "[8,30]" );
+  }
+  @Test public void a_basic_02a() {
     run( "{ z -> (pair (z 0) (z \"abc\")) }" ,
           "{ { *str:(97)? -> A } -> *( A, A ) }",
           "[30]{any,3 ->*[17](_, Scalar, Scalar) }",
-          "[17]", "[7,30]" );
+          "[17]", "[8,30]" );
   }
+  
   // Because {y->y} is passed in, all 'y' types must agree.
   // This unifies 3 and 5 which results in 'nint8'
   @Test public void a_basic_03() {
@@ -175,7 +181,7 @@ public class TestHM {
           // "  A:{ A -> B }"
           "{ A:{ A -> B } -> B }",
           "[29]{any,3 ->Scalar }",
-          null, "[7,29]" );
+          null, "[8,29]" );
   }
   // Obscure factorial-like
   @Test public void b_recursive_02() {
@@ -212,7 +218,7 @@ public class TestHM {
          "{{ A -> A } -> A }",
          "[31]{any,3 -> ~Scalar }",
          "[31]{any,3 -> Scalar }",
-         null, "[7,31]");
+         null, "[8,31]");
   }
   @Test public void b_recursive_06() {
     run("f0 = { f -> (if (rand 2) 1 (f (f0 f) 2))}; f0",
@@ -221,7 +227,7 @@ public class TestHM {
         "{ { %int64 2 -> %int64 } -> %int64 }",
         "[31]{any,3 ->int64 }",
         "[31]{any,3 ->int64 }",
-        null,"[7,31]");
+        null,"[8,31]");
   }
   @Test public void b_recursive_07() {
     run("I = {x->x};"+
@@ -232,7 +238,7 @@ public class TestHM {
         "test",
         "{ { A:{A->A} -> {A->B} } -> B }",
         "[33]{any,3 ->Scalar }",
-        null,"[7,29,30,31,33]");
+        null,"[8,29,30,31,33]");
   }
 
   // Test incorrect argument count
@@ -284,20 +290,20 @@ public class TestHM {
     run( "{ f g -> (f g)}",
           "{ { A -> B } A -> B }",
           "[29]{any,4 ->Scalar }",
-          null,"[7,29]");
+          null,"[8,29]");
   }
   // Function composition
   @Test public void c_composition_02() {
     run( "{ f g -> { arg -> (g (f arg))} }",
           "{ { A -> B } { B -> C } -> { A -> C } }",
           "[30]{any,4 ->[29]{any,3 ->Scalar } }",
-          null,"[7,8,29,30]");
+          null,"[8,9,29,30]");
   }
 
   @Test public void c_composition_03() {
     run("x = { y -> (x (y y))}; x",
          "{ A:{ A -> A } -> B }", "[29]{any,3 ->~Scalar }",
-         null,"[7,29]");
+         null,"[8,29]");
   }
 
   // Stacked functions ignoring all function arguments
@@ -376,7 +382,7 @@ map ={fun parg -> (fun (cdr parg))};
 """,
          "{ { nint8 -> A } -> *( A, A) }",
          "[35]{any,3 ->*[17](_, Scalar, Scalar) }",
-         "[17]","[7,35]" );
+         "[17]","[8,35]" );
   }
 
 
@@ -545,7 +551,7 @@ map ={fun parg -> (fun (cdr parg))};
   // pass in a field 'a'... and still no error.  Fixed.
   @Test public void d_struct_err_05() {
     run("f = { p1 p2 -> (if p2.a p1 p2)}; (f @{a=2} @{b=2.3f})",
-         "%*@{ a= Missing field a: 2 }",
+         "%*@{ a= Missing field a: int8 }",
          "*[17,18](_)",
          "[17,18]",null);
   }
@@ -566,8 +572,8 @@ map ={fun parg -> (fun (cdr parg))};
         "@{f=f;res1=res1;res2=res2}",
 
         "*@{ f    =  { A:%*@{ a=B?;... } A -> A };"+
-        "    res1 = %*@{ a = Missing field a: 2};"+
-        "    res2 = %*@{ a=nint8; b=nflt32 }"+
+        "    res1 = %*@{ a = Missing field a: int8};"+
+        "    res2 = %*@{ a=int8; b=nflt32 }"+
         "}",
         "*[21]@{_; f=[30]{any,4 -> PA:*[5,6,17,18,19,20](_) }; res1=PA; res2=PA}",
         "[5,6,17,18,19,20,21]","[30]");
@@ -587,7 +593,7 @@ map ={fun parg -> (fun (cdr parg))};
     run("map = { fcn lst -> @{ n1 = (map fcn lst.n0); v1 = (fcn lst.v0) } }; map",
         "{ { A -> B } C:*@{ n0 = C; v0 = A; ...} -> D:*@{ n1 = D; v1 = B} }",
         "[29]{any,4 ->PA:*[17]@{_; n1=PA; v1=Scalar} }",
-        "[5,17]","[7,29]");
+        "[5,17]","[8,29]");
   }
 
   // Recursive linked-list discovery, with nil.  Note that the output memory
@@ -598,7 +604,7 @@ map ={fun parg -> (fun (cdr parg))};
         "map = { fcn lst -> (if lst ({_lst -> @{ n1=(map fcn _lst.n0); v1=(fcn _lst.v0) }} (notnil lst)) 0) }; map",
         "{ { A -> B } C:*@{ n0 = C; v0 = A; ...}? -> D:%*@{ n1 = D; v1 = B}? }",null,
         "[32]{any,4 ->PA:*[17]@{_; n1=PA; v1=Scalar}? }",null,
-        "[5,17]","[7,32]");
+        "[5,17]","[8,32]");
   }
   // Recursive linked-list discovery, applied
   @Test public void e_recur_struct_02() {
@@ -1508,7 +1514,7 @@ list_str0 = ((ListStr) 17   );
         "*@{ a = nint8; b = *( ); bool = *@{ false = A:%*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:%*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:%*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
         "*[23]@{_; a=nint8 ; b=*[21,22](_); bool=*[20]@{_; false=PA:*[18,19]@{_; and=[29,32]{any,3 -> Scalar }; or=[30,33]{any,3 -> Scalar }; then=[31,34]{any,4 -> Scalar }}; force=[38]{any,3 -> PA }; true=PA}}",
         "*[23]@{_; a=Scalar; b=Scalar     ; bool=*[20]@{_; false=PA:*[18,19]@{_; and=[29,32]{any,3 -> Scalar }; or=[30,33]{any,3 -> Scalar }; then=[31,34]{any,4 -> Scalar }}; force=[38]{any,3 -> PA }; true=PA}}",
-        "[17,18,19,20,21,22,23]","[7,8,29,30,31,32,33,34,38]"
+        "[17,18,19,20,21,22,23]","[8,9,29,30,31,32,33,34,38]"
         );    
   }
 
@@ -1560,7 +1566,7 @@ boolSub ={b ->(if b ({_b -> true}(notnil b)) false)};
              "}"+
          "}",
         "*[20]@{_; false=PB:*[18,19]@{_; and=[29,33]{any,3 -> Scalar }; not=[31,35]{any,3 -> PA:*[18]@{_; and=[29]{any,3 -> Scalar }; not=[31]{any,3 -> PA }; or=[30]{any,3 -> PA }; then=[32]{any,4 -> Scalar }} }; or=[30,34]{any,3 -> Scalar }; then=[32,36]{any,4 -> Scalar }}; true=PB}",
-        "[17,18,19,20]","[7,8,29,30,31,32,33,34,35,36]");
+        "[17,18,19,20]","[8,9,29,30,31,32,33,34,35,36]");
   }
 
   @Test public void x_peano_02() {
@@ -1602,7 +1608,7 @@ all
   true=PC
 }
 """,
-        "[17,18,19]","[7,8,29,30,31,32,36]");
+        "[17,18,19]","[8,9,29,30,31,32,36]");
   }
 
   // Full on Peano arithmetic.
@@ -1756,7 +1762,7 @@ three =(n.s two);
         "}"+
         "",
         gcp_rez, gcp_rez,
-       "[5,6,17,18,19,20,21,22,23,24]","[5,6,7,8,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43]");
+       "[5,6,17,18,19,20,21,22,23,24]","[8,9,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43]");
   }
 
   // Regression during the HM/GCP Apply lift.
@@ -1887,7 +1893,7 @@ all
   s=[50]{any,3 ->
     PA:*[21]@{_;
       add_=[49]{any,3 -> PA };
-      pred=[47]{any,3 -> PB:*[5,6,7,20,21]@{add_=[4,5,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> Scalar }; pred=[4,5,7,8,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> PB }; succ=[4,5,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> PB }; zero=[4,5,7,8,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> PC }} };
+      pred=[47]{any,3 -> PB:*[5,6,7,20,21]@{add_=[5,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> Scalar }; pred=[5,8,9,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> PB }; succ=[5,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> PB }; zero=[5,8,9,29,30,31,33,34,40,41,42,46,47,48,49,50]{any,3 -> PC }} };
       succ=[48]{any,3 -> PA };
       zero=[46]{any,3 -> PC }
     }
@@ -1910,7 +1916,7 @@ all
 }
 """,
         "[5,6,7,17,18,19,20,21,22]",
-        "[5,6,7,8,29,30,31,32,33,34,35,40,41,42,46,47,48,49,50]"
+        "[8,9,29,30,31,32,33,34,35,40,41,42,46,47,48,49,50]"
          );
   }
 

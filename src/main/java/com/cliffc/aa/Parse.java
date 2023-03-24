@@ -590,6 +590,8 @@ public class Parse implements Comparable<Parse> {
       
       Env.GVN.add_unuse(t_scope);
       Env.GVN.add_unuse(f_scope);
+      Env.GVN.add_unuse(t_stk_now);
+      Env.GVN.add_unuse(f_stk_now);
     }
     Env.GVN.iter();
     return Node.pop(rez_x);
@@ -706,14 +708,14 @@ public class Parse implements Comparable<Parse> {
   private Node _lazy_expr(Oper op) {
     int rhsx = _x;
     FunNode fun = new FunNode(ARG_IDX); // ctrl, mem, display
-    init(fun.add_def(init(new CRProjNode(fun._fidx))));
-    int fun_idx = fun.push();
+    int fun_idx = fun.push();           // Keep alive
+    fun.xval();
     NewNode outer_dsp = scope().ptr();
     
     // Build Parms for system incoming values
-    int rpc_idx = init(new ParmNode(CTL_IDX,fun,null,TypeRPC.ALL_CALL,Env.ALL_CALL)).push();
-    Node dsp    = init(new ParmNode(DSP_IDX,fun,null,outer_dsp._tptr ,outer_dsp   ));
-    Node mem    = init(new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM  ,Env.MEM_0   ));
+    int rpc_idx = init(new ParmNode(CTL_IDX,fun,null,TypeRPC.ALL_CALL)).push();
+    Node dsp    = init(new ParmNode(DSP_IDX,fun,null,outer_dsp._tptr ));
+    Node mem    = init(new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM  ));
     int bptr_idx;
     try( Env e = new Env(_e, fun, 1, fun, mem, dsp, null) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
@@ -736,13 +738,13 @@ public class Parse implements Comparable<Parse> {
       // Standard return; function control, memory, result, RPC.  Plus a hook
       // to the function for faster access.
       Node xrpc = Node.pop(rpc_idx);
-      Node xfun = Node.pop(fun_idx); assert xfun == fun;
       RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,xrpc,fun));
 
       _e = e._par;            // Pop nested environment
-      // The FunPtr builds a real display; any up-scope references are passed in now.
       Node fptr = gvn(new FunPtrNode(ret));
+      // The Bind builds a real display; any up-scope references are passed in now.
       Node bind = gvn(new BindFPNode(fptr,scope().ptr(),false));
+      Node xfun = Node.pop(fun_idx); assert xfun == fun;
       bptr_idx = bind.push();   // Return function; close-out and DCE 'e'
 
       // Extra variables in the short-circuit are not available afterwards.
@@ -752,7 +754,7 @@ public class Parse implements Comparable<Parse> {
         String msg = "'"+fname+"' not defined prior to the short-circuit";
         Parse bad = errMsg(rhsx);
         Node err = gvn(new ErrNode(ctrl(),bad,msg));
-        do_store(null,err,Access.Final,fname,bad,TypeNil.SCALAR,bad);
+        do_store(null,err,Access.Final,fname,bad,null,bad);
       }
     }
     return Node.pop(bptr_idx);
@@ -942,7 +944,7 @@ public class Parse implements Comparable<Parse> {
     Node overplus = gvn(new FieldNode(n,"_+_",true,bad)); // Plus operator overload
     Node plus = gvn(new FieldNode(overplus,"_",false,bad)); // Resolve overload
     Node inc = con(TypeInt.con(d));
-    Node sum = do_call0(false,errMsgs(_x-2,_x,_x), args(Node.peek(nidx),inc,plus));
+    Node sum = do_call0(true,errMsgs(_x-2,_x,_x), args(Node.peek(nidx),inc,plus));
     Node stf = gvn(new SetFieldNode(tok,Access.RW,Node.peek(ld_x),sum,bad));
     // Active memory for the chosen scope, after the call to plus
     scope().replace_mem(new StoreNode(mem(),ptr,stf,bad));
@@ -1154,13 +1156,13 @@ public class Parse implements Comparable<Parse> {
 
     // Build the FunNode header
     FunNode fun = new FunNode(formals.len());
-    init(fun.add_def(init(new CRProjNode(fun._fidx))));
     int fun_idx = fun.push();
+    fun.xval();
 
     // Build Parms for system incoming values
-    int rpc_idx = init(new ParmNode(CTL_IDX,fun,null,TypeRPC.ALL_CALL   ,Env.ALL_CALL)).push();
-    Node dsp    = init(new ParmNode(DSP_IDX,fun,null,formals.at(DSP_IDX),scope().ptr()));
-    Node mem    = init(new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM,Env.MEM_0 ));
+    int rpc_idx = init(new ParmNode(CTL_IDX,fun,null,TypeRPC.ALL_CALL   )).push();
+    Node dsp    = init(new ParmNode(DSP_IDX,fun,null,formals.at(DSP_IDX)));
+    Node mem    = init(new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM     ));
 
     // Increase scope depth for function body.
     int bptr_idx;
@@ -1175,7 +1177,7 @@ public class Parse implements Comparable<Parse> {
       assert fun==_e._fun && fun==_e._scope.ctrl();
       for( int i=ARG_IDX; i<formals.len(); i++ ) { // User parms start
         TypeNil formal = (TypeNil)formals.at(i);
-        Node parm = gvn(new ParmNode(i,fun,errmsg,TypeNil.SCALAR,Env.ALL_ESC));
+        Node parm = gvn(new ParmNode(i,fun,errmsg,TypeNil.SCALAR));
         if( formal!=TypeNil.SCALAR )
           parm = gvn(new AssertNode(mem,parm,formal,bads.at(i)));
         frame.add_fld(ids.at(i),args_are_mutable,parm,bads.at(i));
@@ -1193,13 +1195,14 @@ public class Parse implements Comparable<Parse> {
       // Standard return; function control, memory, result, RPC.  Plus a hook
       // to the function for faster access.
       Node xrpc = Node.pop(rpc_idx);
-      Node xfun = Node.pop(fun_idx); assert xfun == fun;
+      Node xfun = Node.peek(fun_idx); assert xfun == fun;
       RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,xrpc,fun));
       
       _e = e._par;            // Pop nested environment; pops nongen also
       Node fptr = gvn(new FunPtrNode(ret));
       // Anonymous functions early-bind
       Node bind = gvn(new BindFPNode(fptr,scope().ptr(),false));
+      Node.pop(fun_idx);        // Now FunNode thinks it is being used
       bptr_idx = bind.push();   // Return function; close-out and DCE 'e'
     }
     return Node.pop(bptr_idx);

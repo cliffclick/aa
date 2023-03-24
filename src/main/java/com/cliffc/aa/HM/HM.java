@@ -1120,10 +1120,10 @@ public class HM {
       EXT_DEPS.clear();
       EXTS.clear();
       // Default, external 1,2,3 arg functions
-      EXTS.push(null);
       EXTS.push(new EXTLambda(T2.make_fun(T2.make_leaf()),null));
       EXTS.push(new EXTLambda(T2.make_fun(T2.make_leaf(),T2.make_leaf()),null));
       EXTS.push(new EXTLambda(T2.make_fun(T2.make_leaf(),T2.make_leaf(),T2.make_leaf()),null));
+      EXTS.push(new EXTLambda(T2.make_fun(T2.make_leaf(),T2.make_leaf(),T2.make_leaf(),T2.make_leaf()),null));
     }
     public static BitsAlias ext_aliases() { return EXT_ALIASES; }
     public static BitsFun   ext_fidxs  () { return EXT_FIDXS  ; }
@@ -1458,7 +1458,7 @@ public class HM {
     }
 
     @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
-      T2 hmt = T2.make_open_struct(null,null);
+      T2 hmt = T2.make_struct(null,null);
       prep_tree_impl(par, nongen, work, T2.make_ptr(hmt));
       int cnt = 1;              // One for self
       if( _ids.length!=0 ) hmt._args = new NonBlockingHashMap<>();
@@ -1757,7 +1757,7 @@ public class HM {
       super(FLDS,
             var1=T2.make_leaf(),
             var2=T2.make_leaf(),
-            T2.make_ptr(T2.make_open_struct(FLDS,new T2[]{var1,var2})));
+            T2.make_ptr(T2.make_struct(FLDS,new T2[]{var1,var2})));
       _alias = BitsAlias.new_alias(BitsAlias.INTX);
       ALIASES.setX(_alias,this);
     }
@@ -1797,7 +1797,7 @@ public class HM {
             var1=T2.make_leaf(),
             var2=T2.make_leaf(),
             var3=T2.make_leaf(),
-            T2.make_ptr(T2.make_open_struct(FLDS,new T2[]{var1,var2,var3})));
+            T2.make_ptr(T2.make_struct(FLDS,new T2[]{var1,var2,var3})));
       _alias = BitsAlias.new_alias(BitsAlias.INTX);
       ALIASES.setX(_alias,this);
     }
@@ -1941,7 +1941,7 @@ public class HM {
       // If the arg is already nil-checked, can be a nilable of a nilable.
       if( arg.is_nil() && ret.is_nil() )
         return arg.unify(ret,work);
-      // Unify with arg with a nilable version of the ret.
+      // Unify with arg with a nilable version of ret.
       return T2.make_nil(ret).find().unify(arg,work);
     }
     @Override Type apply( Type[] flows) {
@@ -2261,8 +2261,8 @@ public class HM {
       assert t2.is_fun();
       return t2;
     }
-    // A struct with fields
-    static T2 make_open_struct( String[] ids, T2[] flds ) {
+    // A closed struct with fields
+    static T2 make_struct(String[] ids, T2[] flds ) {
       NonBlockingHashMap<String,T2> args = ids==null ? null : new NonBlockingHashMap<>();
       if( ids!=null )
         for( int i=0; i<ids.length; i++ )
@@ -2282,7 +2282,7 @@ public class HM {
     }
     static T2 make_str(TypeMemPtr flow) {
       assert flow.is_str();
-      T2 t2str = make_open_struct(new String[]{"str:","0"},new T2[]{make_leaf(),make_base(flow._obj.get("0")._t)});
+      T2 t2str = make_struct(new String[]{"str:","0"},new T2[]{make_leaf(),make_base(flow._obj.get("0")._t)});
       return make_ptr(t2str);
     }
 
@@ -2329,9 +2329,9 @@ public class HM {
       // Nested nilable-and-not-leaf, need to fixup the nilable
       if( n.is_base() ) {
         // If used as a not-nil, it might be nil and need a nil-check
-        _tflow = _use_nil ? n._tflow.meet(TypeNil.XNIL) : n._tflow;
+        _tflow = n._tflow.meet(TypeNil.NIL);
         if( !_is_copy ) _tflow = _tflow.widen();
-        if( n._eflow!=null ) _eflow = n._eflow.meet(TypeNil.XNIL);
+        if( n._eflow!=null ) _eflow = n._eflow.meet(TypeNil.NIL);
         if( !n._is_copy ) clr_cp();
       }
       if( n.is_ptr() ) {
@@ -2366,7 +2366,7 @@ public class HM {
     boolean add_may_nil(boolean may, Work work) {
       if( !may || _may_nil ) return false; // No change
       if( work==null ) return true; // Will be progress
-      if(_use_nil ) unify_errs("May be nil",work);
+      if( _use_nil ) unify_errs("May be nil",work);
       return (_may_nil=true);   // Progress
     }
     // Set use_nil flag.  Return progress flag.
@@ -2374,7 +2374,7 @@ public class HM {
     boolean add_use_nil(boolean use, Work work) {
       if( !use || _use_nil ) return false; // No change
       if( work==null ) return true; // Will be progress
-      if(_may_nil ) unify_errs("May be nil",work);
+      if( _may_nil ) unify_errs("May be nil",work);
       return (_use_nil=true);   // Progress
     }
     
@@ -2402,7 +2402,7 @@ public class HM {
       for( int i=Lambda.ARGNAMES.length-1; i>=0; i-- )
         if( arg(Lambda.ARGNAMES[i])!=null )
           return i+1;
-      throw unimpl();
+      return 0;
     }
 
     // -----------------
@@ -2438,7 +2438,6 @@ public class HM {
         // all escaping fidxs that are compatible
         BitsFun fidxs = Root.matching_escaped_fidxs(this);
         if( _may_nil ) fidxs = fidxs.set(0);
-        if( _use_nil ) throw unimpl();
         Type tfun = ADUPS.get(_uid);
         if( tfun != null ) return tfun;  // TODO: Returning recursive flow-type functions
         ADUPS.put(_uid, TypeNil.XSCALAR);
@@ -2534,7 +2533,7 @@ public class HM {
       if( err==null || err.equals(_err) ) return false;
       if( _err!=null ) {
         if( _err.compareTo(err) < 0 ) return false;
-        _err = err;             // Pick lexigraphically smallest error
+        _err = err;             // Pick lexicographically the smallest error
         return true;
       }
       if( work==null ) return true;  // Would be progress
@@ -2579,29 +2578,50 @@ public class HM {
     }
 
 
-    // U-F union; that is nilable and this becomes that.
+    // U-F union; this is nilable and this becomes that.
     // No change if only testing, and reports progress.
     boolean unify_nil(T2 that, Work<Syntax> work) {
-      assert !is_nil() && that.is_nil();
+      assert is_nil() && !that.is_nil();
       if( work==null ) return true; // Will make progress;
-      T2 leaf = that.arg("?");  assert leaf.is_leaf();
+      T2 leaf = arg("?");  assert leaf.is_leaf();
+      assert !leaf._may_nil;
       leaf.add_deps_work(work);
-      T2 copy = copy().strip_nil();
-      that._is_copy &= this._is_copy;
-      return leaf.union(copy,work) | _union(that,work);
+      T2 copy = that.copy().strip_nil();
+      _is_copy &= that._is_copy; // Just and-mask in this
+      // A little cheaty here: union NIL and THAT means we run find_nil on that.
+      return leaf._union(copy,work) | union(that,work);
     }
-    // U-F union; that is nilable and a fresh copy of this becomes that.  No
+
+    // U-F union; this is nilable and a fresh copy of this becomes that.  No
     // change if only testing, and reports progress.  Handle cycles in the
     // fresh side.
     boolean unify_nil(T2 that, Work<Syntax> work, VStack nongen) {
-      assert !is_nil() && that.is_nil();
+      assert this.is_nil() && !that.is_nil();
+      assert !arg("?")._may_nil;
+      Type t0 = that._tflow==null ? null : that._tflow.meet(TypeNil.NIL);
+      Type e0 = that._eflow==null ? null : that._eflow.meet(TypeNil.NIL);
+      if( t0==that._tflow && e0==that._eflow && that._may_nil ) return false;
+      if( work==null ) return true;
+      that.add_may_nil(true,work);
+      that._tflow = t0;
+      that._eflow = e0;
+      return true;              // Progress!
+    }
+    
+    // U-F union; this is nilable and a fresh copy of that unifies to this.  No
+    // change if only testing, and reports progress.  Handle cycles in the
+    // fresh side.
+    boolean unify_nil_r(T2 that, Work<Syntax> work, VStack nongen) {
+      assert this.is_nil() && !that.is_nil();
       if( work==null ) return true; // Will make progress;
-      T2 leaf = that.arg("?");  assert leaf.is_leaf();
-      // A shallow copy and fresh-unify fails if 'this' is cyclic, because the
+      T2 leaf = this.arg("?");  assert leaf.is_leaf();
+      assert !leaf._may_nil; // might not be true under nested nilables, not required since copy strips nil
+      // A shallow copy and fresh-unify fails if 'that' is cyclic, because the
       // shallow copy peels one part of the loop.
-      T2 copy = _fresh(nongen).strip_nil();
-      copy._unify(leaf,work);
-      return vput(that,true);
+      T2 copy = that._fresh(nongen).strip_nil();
+      _is_copy &= that._is_copy;
+      leaf._union(copy,work);
+      return vput(copy,true);
     }
 
     // -----------------
@@ -2637,8 +2657,8 @@ public class HM {
         return _uid<that._uid ? that.union(this,work) : this.union(that,work);
 
       // Special case for nilable union something
-      if( this.is_nil() && !that.is_nil() ) return that.unify_nil(this,work);
-      if( that.is_nil() && !this.is_nil() ) return this.unify_nil(that,work);
+      if( this.is_nil() && !that.is_nil() ) return this.unify_nil(that,work);
+      if( that.is_nil() && !this.is_nil() ) return that.unify_nil(this,work);
 
       // Two unrelated overloads not allowed.  To equal overloads unify normally.
       boolean progress=false;
@@ -2750,11 +2770,11 @@ public class HM {
 
       // Special handling for nilable
       if( this.is_nil() && !that.is_nil() )
-        // Since arg("?") is always a leaf, no structure change to RHS.
-        return vput(that,false);
+        // Since arg("?") is always a leaf, only structure change to RHS is to add nil.
+        return vput(that,unify_nil(that,work,nongen));
       // That is nilable and this is not
       if( that.is_nil() && !this.is_nil() )
-        return unify_nil(that,work,nongen);
+        return that.unify_nil_r(this,work,nongen);
 
       // Two unrelated overloads not allowed.  To equal overloads unify normally.
       boolean progress = false;
@@ -3254,8 +3274,10 @@ public class HM {
     private SB str_ptr(SB sb, VBitSet visit, VBitSet dups, boolean debug, Type flow) {
       T2 obj = _args==null ? null : _args.get("*");
       str0(sb.p('*'),visit,obj,dups,debug);
-      return str_post_nil(sb);
+      if( _may_nil ) sb.p(_use_nil ? "?!" : "?"); // May  be a nil
+      return sb;
     }
+    
     private SB str_fun(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
       sb.p("{ ");
       for( int i=0; i<Lambda.ARGNAMES.length; i++ ) {
@@ -3292,9 +3314,6 @@ public class HM {
       if( sep ) sb.unchar();
       sb.p(!is_tup ? "}" : ")");
       return sb;
-    }
-    private SB str_post_nil(SB sb) {
-      return _may_nil ? sb.p(_use_nil ? "!?" : "?") : sb;
     }
 
     // Pick a nice tvar name.  Generally: "A" or "B" or "V123" for leafs,

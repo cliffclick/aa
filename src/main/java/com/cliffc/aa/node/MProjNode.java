@@ -1,5 +1,7 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
+import com.cliffc.aa.type.BitsFun;
 import com.cliffc.aa.type.Type;
 
 import static com.cliffc.aa.AA.MEM_IDX;
@@ -22,20 +24,26 @@ public class MProjNode extends ProjNode {
     // Fold dying calls
     Node mem = in(0).is_copy(MEM_IDX);
     if( mem != null )
-      return mem;
+      return mem==this ? Env.ANY : mem;
 
     // Fold across pure calls (most primitives)
-    if( in(0) instanceof CallEpiNode cepi && cepi.is_all_wired() && !cepi.is_global()) {
-      boolean pure=true;
-      for( int i=0; i<cepi.nwired(); i++ ) {
-        RetNode ret = cepi.wired(i);
-        if( ret.mem()!=null )
-          { ret.deps_add(this); pure=false; break; }
+    if( in(0) instanceof CallEpiNode cepi ) {
+      CallNode call = cepi.call();
+      if( call.tfp()._fidxs!=BitsFun.NALL && cepi.nwired()>0 ) {
+        boolean pure=true;
+        for( int i=0; i<cepi.nwired(); i++ ) {
+          Node w = cepi.wired(i);
+          if( w instanceof RetNode ret ) {
+            if( ret.mem()!=null ) { ret.deps_add(this); pure=false;  break; }
+          } else { pure=false;  break; }
+        }      
+        if( pure )
+          return call.mem();
+      } else {
+        call.deps_add(this);    // Call sharpens, can fold
       }
-      if( pure )
-        return cepi.call().mem();
     }
-    
+
     return null;
   }
 }

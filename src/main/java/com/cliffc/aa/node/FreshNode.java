@@ -47,19 +47,20 @@ public class FreshNode extends Node {
 
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
+    unelock();                  // Adding a tvar changes equals
     if( len()>1 ) {
       _nongen = new TV3[len() - 1];
       for (int i = 1; i < len(); i++)
         _nongen[i - 1] = in(i).set_tvar();
     }
-    return new TVLeaf();
+    TV3 tv = new TVLeaf();
+    tv.deps_add_deep(this);
+    return tv;
   }
     
   @Override public boolean unify( boolean test ) {
     TV3 fresh = id().tvar();
-    if( fresh instanceof TVLeaf) // Shortcut
-      return fresh.deps_add_deep(this);
-    return fresh.fresh_unify(tvar(),nongen(),test);
+    return fresh.fresh_unify(this,tvar(),nongen(),test);
   }
   // Two FreshNodes are only equal, if they have compatible TVars
   @Override public boolean equals(Object o) {

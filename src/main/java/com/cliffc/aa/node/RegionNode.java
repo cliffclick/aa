@@ -8,7 +8,6 @@ import java.util.function.Predicate;
 // Merge results.  Supports many merging paths; used by FunNode and LoopNode.
 public class RegionNode extends Node {
   public RegionNode( Node... ctrls) { super(OP_REGION,ctrls); }
-  RegionNode( byte op ) { super(op,(Node)null); } // For FunNodes
   @Override boolean is_CFG() { return is_copy(0)==null; }
 
   @Override public Node ideal_reduce() {
@@ -18,24 +17,18 @@ public class RegionNode extends Node {
     // Fold control-folded paths
     for( int i=1; i<_defs._len; i++ ) {
       Node cc = in(i).is_copy(0);
-      if( cc!=null && cc != this ) return set_def(i,cc);
+      if( cc!=null && cc != this ) return Env.GVN.add_reduce(set_def(i,cc));
     }
 
     // Look for dead paths.  If found, cut dead path out of all Phis and this
     // Node, and return-for-progress.
     for( int i=1; i<_defs._len; i++ ) {
       Node cin = in(i);
-      if( cin._val==Type.XCTRL && // Dead control flow input
-        // Keep dead input for primitives from Root, so prim is alive for next test
-        !(cin instanceof CRProjNode && is_prim()) ) {
+      if( cin._val==Type.XCTRL ) { // Dead control flow input
         for( Node phi : _uses )
           if( phi instanceof PhiNode )
             Env.GVN.add_flow(phi.remove(i));
-        unwire(i);
         remove(i);
-        if( this instanceof FunNode &&   // Trigger inline single caller
-            len()==2 && in(1).in(0) instanceof CallNode call )
-          Env.GVN.add_reduce(call.cepi());
         return Env.GVN.add_reduce(this); // Progress
       } else
         cin.deps_add(this);   // Revisit if becomes XCTRL
@@ -45,11 +38,6 @@ public class RegionNode extends Node {
     if( _defs._len==2 ) {              // Exactly 1 live path
       // If only 1 live path and no Phis then return 1 live path.
       for( Node phi : _uses ) if( phi instanceof PhiNode ) return null;
-      // Single input FunNodes can NOT inline to their one caller,
-      // unless the one caller only also calls the one FunNode.
-      // Wait for the FunNode to be declared dead.
-      if( in(0)==null && this instanceof FunNode )
-        return null;            // I am not yet dead
       // Self-dead-cycle is dead in value() call
       return in(1)==this ? null : in(1);
     }
@@ -109,14 +97,15 @@ public class RegionNode extends Node {
     return this;
   }
 
-  void unwire(int idx) { }
-
   @Override public Type value() {
     if( in(0)==this )           // is_copy
       return _defs._len>=2 ? val(1) : Type.XCTRL;
     for( int i=1; i<_defs._len; i++ ) {
-      if( in(i)==this ) continue; // Ignore self-loop
-      Type c = val(i);
+      Node n = in(i), x;
+      if( n==this ) continue; // Ignore self-loop
+      while( (x=n.is_copy(0))!=null )
+        n=x;
+      Type c = n._val;
       if( c == Type.CTRL || c == Type.ALL )
         return Type.CTRL;
     }
@@ -136,7 +125,7 @@ public class RegionNode extends Node {
       if( n != null ) return n;
     }
     // Experimental stronger version
-    if( _defs._len==3 && !(this instanceof FunNode) ) {
+    if( _defs._len==3 ) {
       Node n1 = in(1).walk_dom_last(P);
       Node n2 = in(2).walk_dom_last(P);
       if( n1 != null && n1==n2 ) return n1;

@@ -13,10 +13,14 @@ public class IfNode extends Node {
   @Override boolean is_CFG() { return is_copy(0)==null; }
 
   @Override public Node ideal_reduce() {
+    Node cc = fold_ccopy();
+    if( cc!=null ) return cc;
     Node ctl = in(0);
     Node tst = in(1);
-    if( ctl._val == Type.XCTRL && in(1)!=Env.ANY )
+    if( ctl._val == Type.XCTRL && tst!=Env.ANY )
       return set_def(1,Env.ANY); // Kill test; control projections fold up other ways
+    else ctl.deps_add(this);
+    
     // Binary test vs 0?
     if( tst._defs._len==3 &&
         (tst.val(1)==TypeNil.NIL || tst.val(2)==TypeNil.NIL) ) {
@@ -57,7 +61,7 @@ public class IfNode extends Node {
     // If the input excludes   both, we can return ANY:   {ANY,ANY}
     // If the input includes   both, we can return both:  {CONTROL,CONTROL}
     Type ctrl = val(0);
-    if( ctrl!=Type.CTRL && ctrl != Type.ALL ) return TypeTuple.IF_ANY; // Test is dead
+    if( ctrl.above_center() ) return TypeTuple.IF_ANY; // Test is dead
     if( in(0) instanceof ProjNode && in(0).in(0)==this )
       return TypeTuple.IF_ANY; // Test is dead cycle of self (during collapse of dead loops)
     Type pred = val(1);
@@ -74,7 +78,9 @@ public class IfNode extends Node {
     // perhaps constant fields).
     if( pred == TypeNil.NIL    ) return TypeTuple.IF_FALSE; // The One True Zero
     if( pred == TypeInt.ZERO   ) return TypeTuple.IF_FALSE; // 
-    if( pred == TypeFlt.con(0) ) return TypeTuple.IF_FALSE; // 
+    if( pred == TypeFlt.con(0) ) return TypeTuple.IF_FALSE; //
+    if( pred == TypeNil.XSCALAR) return TypeTuple.IF_ANY;   // TODO: cleanup
+    if( pred == Type.ANY       ) return TypeTuple.IF_ANY;   // TODO: cleanup
     if( !TypeNil.NIL.isa(pred) ) return TypeTuple.IF_TRUE;  // missing zero, so TRUE
 
     // Handle e.g. TMP and TFP nil checks
@@ -88,9 +94,11 @@ public class IfNode extends Node {
   @Override public Node is_copy(int idx) {
     if( is_prim() ) return null;
     if( !(_val instanceof TypeTuple tt) ) return null;
-    if( tt==TypeTuple.IF_ANY ) return Env.XCTRL;
+    if( tt.above_center() ) return Env.XCTRL;
     if( tt==TypeTuple.IF_TRUE  && idx==1 ) return in(0);
     if( tt==TypeTuple.IF_FALSE && idx==0 ) return in(0);
+    Node proj = ProjNode.proj(this,idx);
+    if( proj!=null ) deps_add(proj);
     return null;
   }
 }

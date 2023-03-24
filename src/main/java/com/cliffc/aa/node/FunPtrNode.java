@@ -1,8 +1,9 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
-import com.cliffc.aa.tvar.*;
+import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.TVLambda;
+import com.cliffc.aa.tvar.TVLeaf;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.*;
@@ -77,14 +78,16 @@ public final class FunPtrNode extends Node {
 
   @Override public Type live_use( Node ret ) {
     assert ret instanceof RetNode;
-    // Pre-combo, Ret is alive because unwired caller.
-    if( Combo.pre() ) return RootNode.def_mem(ret);    
+    // Pre-combo, Ret is alive because unwired caller may yet appear and demand
+    // all memory
+    FunNode fun = xfun();
+    if( fun==null ) return TypeMem.ANYMEM; // Dead, no memory demand
+    if( fun.unknown_callers(this) ) return RootNode.def_mem(ret);    
     // During/post-combo, Ret is alive only if called or escaped.
     Env.ROOT.deps_add(ret);
-    FunNode fun = xfun();
-    if( fun!=null && Env.ROOT.rfidxs().test(fun._fidx) ) // Escaped
-      return Env.ROOT._live;             // Whatever Root requires, we do also
-    return TypeMem.ANYMEM;               // Dead, no memory demand
+    if( Env.ROOT.rfidxs().test(fun._fidx) ) // Escaped
+      return Env.ROOT._live;    // Whatever Root requires, we do also
+    return TypeMem.ANYMEM;      // Dead, no memory demand
   }
   
   @Override public Node ideal_reduce() {
@@ -100,7 +103,9 @@ public final class FunPtrNode extends Node {
   @Override public boolean has_tvar() { return true; }
 
   @Override public TV3 _set_tvar() {
-    return new TVLambda(nargs(),new TVLeaf(),ret().rez().set_tvar());
+    Node rez = ret().rez();
+    if( rez==null ) return new TVLeaf(); // Happens for broken Lambdas
+    return new TVLambda(nargs(),new TVLeaf(),rez.set_tvar());
   }
 
   // Implements class HM.Lambda unification.
