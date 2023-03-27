@@ -20,11 +20,11 @@ public class TVErr extends TV3 {
   static final int XNIL=5;
   static final int XPTR=6;
   static final int XMAX=7;
-
-  // Specific error messages
-  Ary<String> _msgs;
   
-  public TVErr() { super(false,new TV3[XMAX]); }
+  // Errors other than structural unify errors.
+  public Ary<String> _errs;
+
+  public TVErr() { super(false,new TV3[XMAX+10]); }
 
   @Override public TVStruct as_struct() { return (TVStruct)arg(XSTR); }
   @Override public TVLambda as_lambda() { return (TVLambda)arg(XFUN); }
@@ -58,7 +58,7 @@ public class TVErr extends TV3 {
       else ecp._unify(arg(x),false);
     }
     that._uf = this;            // That is crushed into this
-    return true;
+    return true;                // Always progress
   }
 
   // This is fresh and an Err and that is not.
@@ -86,17 +86,8 @@ public class TVErr extends TV3 {
   }
 
   // Make this tvar an error and add an error message
-  @Override public boolean unify_err(boolean test) { return false; }
+  @Override public boolean unify_err(String msg, TV3 extra, boolean test) { return false; }
   
-  // Add an error message
-  public boolean err_msg(String msg, boolean test) {
-    if( _msgs!=null && _msgs.find(msg)!= -1 ) return false;
-    if( test ) return true;
-    if( _msgs==null ) _msgs = new Ary<>(new String[1],0);
-    _msgs.push(msg);
-    return true;
-  }
-
   // -------------------------------------------------------------
   // Union/merge subclass specific bits
   @Override public void _union_impl(TV3 that) {
@@ -126,33 +117,65 @@ public class TVErr extends TV3 {
     }
     return tv._as_flow(dep);
   }
-  
+
+    
+  // Add an error message
+  public boolean err(String err, TV3 extra, boolean test) {
+    assert !unified();
+    if( err==null ) return false;
+    err = err.intern();
+    int idx;
+    if( _errs!=null && (idx=_errs.find(err))!= -1 ) // Prior error?
+      return extra!=null && extra.unify(_args[idx+XMAX],test); // Also progress if unify progresses
+    if( test ) return true;
+    if( _errs==null ) _errs = new Ary<>(new String[1],0);
+    _args[_errs._len+XMAX] = extra;
+    _errs.push(err);
+    return true;
+  }
+
   // Defining type, vs failed unification
   public String toString(Type tdef) {
     if( tdef instanceof TypeStruct ts && _args[XFUN]!=null )
       return "A function is being called, but "+tdef+" is not a function";
     return toString();
   }
-  
+
+  // Printing errors!
+  // Format with no  types: [err0,err1,...]   "Expected 3 args but found 4; expected foo but found bar"
+  // Format with one type : [err0 in t0]      "Missing field .y in @{x=3}"
+  // Format with 2+  types: [Cannot unify t0 and t1...]
+  // Format with 2+  types: [err0, cannot unify t0 and t1...]
+
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
-    int cnt=0; for( int i=0; i<XMAX; i++ ) if( _args[i]!=null ) cnt++;
-    sb.p("[");
-    if( _msgs!=null ) {
-      for( String msg : _msgs )
-        sb.p(msg).p(", ");
+    if( debug ) sb.p("[");
+    if( _errs!=null ) {
+      for( int i=0; i<_errs._len; i++ ) {
+        String msg = _errs.at(i);
+        int idx = msg.indexOf('%');
+        if( idx==-1 ) sb.p(msg);
+        else {
+          sb.p(msg.substring(0,idx));
+          _args[i+XMAX]._str(sb,visit,dups,debug);
+          sb.p(msg.substring(idx+1));
+        }
+        sb.p(", ");
+      }
       sb.unchar(2);
     }
+    int cnt=0; for( int i=0; i<XMAX; i++ ) if( _args[i]!=null ) cnt++;
     if( cnt>0 ) {
       if( cnt>1 ) {
-        if( _msgs==null ) sb.p("Cannot unify ");
+        if( _errs==null ) sb.p("Cannot unify ");
         else sb.p(", cannot unify ");
-      } else sb.p(", ");
+      } // If exactly 1 choice, assume a prior message has detail info
       for( int i=0; i<XMAX; i++ )
         if( _args[i]!=null )
           _args[i]._str(sb,visit,dups,debug).p(" and ");
       sb.unchar(5);
     }
-    return sb.p("]");
+    if( debug ) sb.p("]");
+    return sb;
   }
 
 }

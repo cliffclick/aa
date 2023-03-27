@@ -252,7 +252,7 @@ public class StructNode extends Node {
   @Override TV3 _set_tvar() {
     TVStruct ts = new TVStruct(_flds);
     for( int i=0; i<len(); i++ )
-      ts.set_pin_fld(i,new TVLeaf());
+      ts.set_pin_fld(i,new TVLeaf(_accesses.at(i)==TypeFld.Access.Final));
     if( _clz.isEmpty() ) return ts;
     // Explicit clazz representation
     StructNode proto = Env.PROTOS.get(_clz);
@@ -290,15 +290,5 @@ public class StructNode extends Node {
     }
     return progress;
   }
-  //// Extra fields are unified with ERR since they are not created here:
-  //// error to load from a non-existing field
-  //private boolean check_fields(TV3 rec) {
-  //  //if( rec._args != null )
-  //  //  for( String id : rec._args.keySet() )
-  //  //    if( !Util.eq(id," def") && _ts.find(id)==-1 && !rec.arg(id).is_err() )
-  //  //      return false;
-  //  //return true;
-  //  throw unimpl();
-  //}
   
 }

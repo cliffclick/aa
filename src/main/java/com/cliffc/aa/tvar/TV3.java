@@ -70,9 +70,6 @@ abstract public class TV3 implements Cloneable {
   
   // Nodes to put on a worklist, if this TV3 is modified.
   UQNodes _deps;
-
-  // Errors other than structural unify errors.
-  public Ary<String> _errs;
   
   //
   TV3() { this(true,(TV3[])null); }
@@ -80,7 +77,6 @@ abstract public class TV3 implements Cloneable {
     _uf = null;
     _args = args;
     _deps = null;               // Dependends lazily added, and they come and go as Combo executes
-    _errs = null;               // Errors lazily added
     _is_copy = is_copy;         // Most things are is_copy
     _may_nil = false;           // Really only TVNil starts out may_nil
     _use_nil = false;
@@ -138,12 +134,6 @@ abstract public class TV3 implements Cloneable {
   public TV3 debug_arg( int i ) { return _args[i].debug_find(); }
 
   public int len() { return _args.length; }  
-
-  void err(String msg) {
-    if( _errs==null ) _errs = new Ary<>(new String[1],0);
-    if( _errs.find(msg)== -1 ) _errs.push(msg);
-  }
-  
   
   abstract int eidx();
   public TVStruct as_struct() { throw unimpl(); }
@@ -156,6 +146,13 @@ abstract public class TV3 implements Cloneable {
 
   TV3 strip_nil() { _may_nil = false; return this; }
   boolean add_nil(boolean test) { throw unimpl(); }
+
+  // Clear is_copy, and report progress
+  boolean clr_cp() {
+    if( !_is_copy ) return false;
+    _is_copy = false;
+    return true;
+  }
   
   // -----------------
   // U-F union; this becomes that; returns 'that'.
@@ -163,7 +160,7 @@ abstract public class TV3 implements Cloneable {
   boolean union(TV3 that) {
     if( this==that ) return false;
     assert !unified() && !that.unified(); // Cannot union twice
-    that._is_copy &= _is_copy;  // Both must be is_copy to keep is_copy
+    if( !_is_copy ) that.clr_cp(); // Both must be is_copy to keep is_copy
     that._may_nil |= _may_nil;
     that._use_nil |= _use_nil;
     if( that._may_nil && that._use_nil ) throw unimpl();
@@ -261,10 +258,12 @@ abstract public class TV3 implements Cloneable {
   abstract boolean _unify_impl(TV3 that);
 
   // Make this tvar an error
-  public boolean unify_err(boolean test) {
+  public boolean unify_err(String msg, TV3 extra, boolean test) {
     if( test ) return true;
     assert DUPS.isEmpty();
-    new TVErr()._unify_err(this);
+    TVErr err = new TVErr();
+    err._unify_err(this);
+    err.err(msg,extra,false);
     DUPS.clear();
     return true;
   }
@@ -308,10 +307,15 @@ abstract public class TV3 implements Cloneable {
 
     // LHS leaf, RHS is unchanged but goes in the VARS
     if( this instanceof TVLeaf ) {
-      // Record that the LHS is Fresh'd against the RHS.  If the LHS changes in
-      // the future, we'll need to re-Fresh agains the RHS.
-      if( !test ) add_delay_fresh();
-      return vput(that,false);
+      boolean bad_cp = !_is_copy && that._is_copy;
+      if( !test ) {
+        // Fix _is_copy in that
+        if( bad_cp ) that.clr_cp();
+        // Record that the LHS is Fresh'd against the RHS.  If the LHS changes in
+        // the future, we'll need to re-Fresh agains the RHS.
+        add_delay_fresh();
+      }
+      return vput(that,bad_cp);
     }
     if( that instanceof TVLeaf ) // RHS is a tvar; union with a deep copy of LHS
       return test || vput(that,that.union(_fresh()));
@@ -321,8 +325,8 @@ abstract public class TV3 implements Cloneable {
     if( !(this instanceof TVNil) && that instanceof TVNil nil ) return vput(nil._unify_nil_r(this,test),true);
 
     // Special handling for Base SCALAR, which can "forget" pointers
-    if( that instanceof TVBase base && base._t==TypeNil.SCALAR && this instanceof TVPtr ptr )
-      return false;             // No change to 'that'
+    if( that instanceof TVBase base && base._t==TypeNil.SCALAR && this instanceof TVPtr )
+      throw unimpl(); // return false;             // No change to 'that'
     
     // Two unrelated classes make an error
     if( getClass() != that.getClass() )
@@ -335,8 +339,7 @@ abstract public class TV3 implements Cloneable {
     // Progress on parts
     if( !_is_copy && that._is_copy ) {
       if( test ) return true;
-      that._is_copy = false;
-      progress = true;
+      progress = that.clr_cp();
     }
     if( _may_nil && !that._may_nil ) {
       if( test ) return true;
@@ -700,10 +703,6 @@ abstract public class TV3 implements Cloneable {
       sb.p(':');                        // V123:followed_by_type_descr
     } else {
       if( visit.tset(_uid) ) return sb;  // Internal missing dup bug?
-    }
-    if( _errs!=null ) {
-      for( String err : _errs ) sb.p(err).p(':');
-      sb.unchar();
     }
     return _str_impl(sb,visit,dups,debug);    
   }

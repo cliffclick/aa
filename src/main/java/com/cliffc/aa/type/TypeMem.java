@@ -360,7 +360,7 @@ public class TypeMem extends Type<TypeMem> {
     TypeStruct[] tos = new TypeStruct[Math.max(_pubs.length,aliases.max()+1)];
     tos[1] = TypeStruct.UNUSED;
     for( int i=2; i<tos.length; i++ )
-      tos[i] = aliases.test_recur(i) ? at(i) : null;
+      tos[i] = aliases.test_recur(i) ? TypeStruct.ISUSED : null;
     return make0(tos);
   }
 

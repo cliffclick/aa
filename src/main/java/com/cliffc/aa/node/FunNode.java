@@ -11,6 +11,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Predicate;
 
 import static com.cliffc.aa.AA.*;
 
@@ -568,4 +569,7 @@ public class FunNode extends Node {
     return in(0)==this ? in(1) : null;
   }
   void set_is_copy() { set_def(0,this); Env.GVN.add_reduce_uses(this); }
+
+  @Override Node walk_dom_last( Predicate<Node> P) { return null; }
+
 }

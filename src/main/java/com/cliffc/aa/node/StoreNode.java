@@ -99,7 +99,7 @@ public class StoreNode extends Node {
 
     // Is this Store dead from below?
     if( mem==this ) return null; // Dead self-cycle
-    if( tmp!=null && mem._val instanceof TypeMem memval ) {
+    if( tmp!=null && mem._val instanceof TypeMem ) {
       // Address is high, do not bother storing.  Kill stored thing.
       // Keep the store op until values are monotonic.
       if( tmp.above_center() && rez() != null )

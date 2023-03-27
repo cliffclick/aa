@@ -49,6 +49,14 @@ public class TVBase extends TV3 {
     b._may_nil = true;
     return b;
   }
+
+  // Clear is_copy, and report progress
+  @Override boolean clr_cp() {
+    if( !_is_copy ) return false;
+    _t = _t.widen();
+    _is_copy = false;
+    return true;
+  }
   
   // -------------------------------------------------------------
   @Override void _union_impl(TV3 t) {

@@ -30,7 +30,7 @@ public class TVClz extends TV3 {
     if( _may_nil && !rhs().add_nil(true) ) return false;
     if( test ) return true;
     _args[1] = rhs().copy();
-    _args[1].add_nil(true);
+    _args[1].add_nil(false);
     _may_nil = true;
     return true;
   }
@@ -43,7 +43,14 @@ public class TVClz extends TV3 {
       return this; // No change so just use same Clz
     return new TVClz(clz(),nn);
   }
-  
+
+  // Clear is_copy, and report progress
+  @Override boolean clr_cp() {
+    boolean progress = _is_copy;
+    _is_copy = false;
+    return progress | rhs().clr_cp();
+  }
+
   // -------------------------------------------------------------
   @Override void _union_impl(TV3 that) { }
 

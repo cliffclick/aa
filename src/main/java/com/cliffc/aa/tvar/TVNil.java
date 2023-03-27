@@ -39,7 +39,7 @@ public class TVNil extends TV3 {
     assert !not_nil._may_nil; // might not be true under nested nilables, not required since copy strips nil
     not_nil._deps_work_clear();
     TV3 copy = that.copy().strip_nil();
-    _is_copy &= that._is_copy;  // Just and-mask in this
+    if( !that._is_copy ) clr_cp(); // Just and-mask in this
     return not_nil.union(copy) | that.union(this);
   }
 
@@ -70,7 +70,7 @@ public class TVNil extends TV3 {
     // A shallow copy and fresh-unify fails if 'this' is cyclic, because the
     // shallow copy peels one part of the loop.
     TV3 copy = that._fresh().strip_nil();
-    _is_copy &= that._is_copy;
+    if( !that._is_copy ) clr_cp(); // Just and-mask in this
     not_nil.union(copy);
     return copy;
   }

@@ -5,9 +5,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVLambda;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.AryInt;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 
 import java.util.function.Predicate;
 
@@ -174,8 +172,9 @@ public class RootNode extends Node {
     // Structs escape all public fields
     if( t instanceof TypeStruct ts )
       for( TypeFld fld : ts )
-        // Root widens all non-final fields
-        _escapes(fld._access== TypeFld.Access.Final ? fld._t : TypeNil.SCALAR);
+        if( !Util.eq(fld._fld,"^") ) // Displays in structs are private by default
+          // Root widens all non-final fields
+          _escapes(fld._access== TypeFld.Access.Final ? fld._t : TypeNil.SCALAR);
   }
 
   // Given a TV3, mimic a matching flow Type from all possible escaping
@@ -250,9 +249,9 @@ public class RootNode extends Node {
       }
     if( live==Type.ANY ) return live;
     TypeMem mem = (TypeMem)live;
-    // Liveness for return value
-    TypeMem mem2 = rmem().slice_reaching_aliases(ralias()).flatten_live_fields();
-    return mem.meet(mem2.meet(TypeMem.EXTMEM));
+    // Liveness for return value: All reaching aliases plus their escapes are alive.
+    TypeMem rlive = TypeMem.make(ralias(),TypeStruct.make(TypeFld.ANY_DSP));
+    return mem.meet(rlive);
   }
 
   @Override public Type live_use(Node def) {

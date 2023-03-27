@@ -2764,7 +2764,8 @@ public class HM {
       if( nongen_in(nongen) ) return vput(that,_unify(that,work));
 
       // LHS leaf, RHS is unchanged but goes in the VARS
-      if( this.is_leaf() ) return vput(that,that.unify_errs(_err,work));
+      if( this.is_leaf() && (_is_copy || !that._is_copy) )
+        return vput(that,that.unify_errs(_err,work));
       if( that.is_leaf() )  // RHS is a tvar; union with a deep copy of LHS
         return work==null || vput(that,that.union(_fresh(nongen),work));
 

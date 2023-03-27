@@ -184,7 +184,20 @@ public class FieldNode extends Node implements Resolvable {
     boolean progress = false;
 
     TV3 tv0 = tvar(0);          // If an instance field, need the input struct
-    // Clazz fields do clazz lookups, expect clazz structures
+    // Clazz fields do clazz lookups, expect clazz structures.
+    // - if a TVClz, we got the clz
+    // - if a TVLeaf, try a prototype lookup from the flow type; if that works use the prototype
+    //                else unify to a pending clz
+    // - if a TVNil , try a prototype lookup from the flow type; if that works use the prototype
+    //                else stall
+    // - if a TVErr , try a clz (repeat above), or a nil (repeat), or a leaf
+    //
+    // Else do an instance lookup
+    // - if a TVStruct, use it
+    // - if a TVErr   , get the struct
+    // - else unify with TVStruct (handles Leafs, or forces TVErr with Struct)
+    //
+    // With struct in-hand, proceed to resolve & do lookup
     if( _clz ) {
       switch( tv0 ) {
       case TVClz clz -> tv0 = clz.clz(); // Clazz part from a clazzed TV
@@ -192,31 +205,44 @@ public class FieldNode extends Node implements Resolvable {
         StructNode proto = clz_node(val(0)); // Existing prototypes for int/flt/named-clazz-types
         if( proto == null ) {            // Unknown inferred clazz
           if( test ) return true;        // Always progress
+          progress = true;
           TVStruct obj = new TVStruct(true, new String[]{_fld}, new boolean[]{true}, new TV3[]{tvar()}, true);
           TVClz clz = new TVClz(obj, new TVLeaf());
           tv0.unify(clz, test);
           tv0 = clz.clz();
-          progress = true;
         } else {
           tv0 = proto.tvar();
         }
       }
       case TVNil nil -> {                    // Expand to a clazzed TV
         StructNode proto = clz_node(val(0)); // Existing prototypes for int/flt/named-clazz-types
-        if( proto == null ) {                // Unknown inferred clazz
-          return false;                      // Stall until we get something better
-        } else {
-          tv0 = proto.tvar();
+        if( proto == null ) return false;    // Unknown inferred clazz, stall until we get something better
+        tv0 = proto.tvar();
+      }
+      case TVErr err -> {
+        if( err.as_clz()!=null ) tv0 = err.as_clz().clz(); // Try a CLZ
+        else {
+          // Try the NIL (repeat clz_node lookup)
+          // Treat as Leaf; make a Clz, unify and use it
+          throw unimpl();
         }
       }
-      case TVErr err -> { return false; }
       default -> throw unimpl();
       };
+      
+    } else {                    // ----------------------
+      // Instance field lookup
+      
+      // Errors have a struct to unify against
+      if( tv0 instanceof TVErr terr ) {
+        tv0 = terr.as_clz();
+        if( tv0==null ) {
+          tv0 = terr.as_struct();
+          if( tv0 == null ) throw unimpl(); // make a Leaf inside the TVerr.struct, and then next steps will force TVStruct
+        }
+      }
+      if( tv0 instanceof TVClz clz ) tv0 = clz.rhs();
     }
-
-    // Errors have a struct to unify against
-    if( tv0 instanceof TVErr terr )
-      tv0 = terr.as_struct();
 
     // Still not a struct?  Make one, add field
     TVStruct str;
@@ -228,7 +254,7 @@ public class FieldNode extends Node implements Resolvable {
         inst.add_fld(_fld,Oper.is_oper(_fld),tvar());
       progress = tv0.unify(str=inst,test);
     }
-    
+
     // If resolving, cannot do a field lookup.  Attempt resolve first.
     if( is_resolving() ) {
       if( Combo.HM_AMBI ) return false; // Failed earlier, can never resolve
@@ -252,7 +278,7 @@ public class FieldNode extends Node implements Resolvable {
     // If the field is resolved, and not in struct and not in proto and the
     // struct is closed, then the field is missing.
     if( !str.is_open() )
-      return tvar().unify_err(test) | ((TVErr)tvar()).err_msg(("Missing field "+_fld).intern(),test);
+      return tvar().unify_err(resolve_failed_msg(),tvar(0),test);
 
     // Add the field, make progress
     if( !test ) str.add_fld(_fld,_clz,tvar());
@@ -310,16 +336,62 @@ public class FieldNode extends Node implements Resolvable {
   }
 
   @Override public ErrMsg err( boolean fast ) {
-    Ary<String> errs = tvar()._errs;
-    if( errs==null ) return null;
+    if( !(tvar() instanceof TVErr tverr) ) return null;
+    Ary<String> errs = tverr._errs;
+    if( errs==null ) return null; // Even if an error here, somebody else will report
     if( fast ) return ErrMsg.FAST;
-    if( errs.len()>1 ) throw unimpl();
     TV3 tv0 = tvar(0);
     if( tv0 instanceof TVLeaf )
-      return ErrMsg.unresolved(_bad,"Not a struct loading field "+_fld);
-    return tv0.as_struct().err_resolve(in(0),_bad, errs.at(0));
+      //return ErrMsg.unresolved(_bad,"Not a struct loading field "+_fld);
+      throw unimpl();
+    return new ErrMsg(_bad,tverr.p(),ErrMsg.Level.Field);
   }
 
+  // Build a sane error message for a failed resolve.
+  //   @{x=7}.y            Unknown field '.y' in @{x= int8}          - LHS   known, no  clazz, field not found in instance, instance yes struct
+  //   "abc".y             Unknown field '.y' in "abc"               - LHS   known, yes clazz, field not found in either  , not pinned, report instance
+  //   "abc"&1             Unknown operator '_&_' in str:            - LHS   known, yes clazz, field not found in either  , yes pinned, report clazz
+  //   { x -> x+1 }        Unable to resolve operator '_+_' "        - LHS unknown, no  clazz but pinned field
+  //   { x -> 1+x }                                                  - LHS   known, yes clazz, ambiguous, report choices and match
+  //                       Ambiguous, matching choices ({ int:int64 int:int64 -> int:int64 }, { int:int64 flt:nflt64 -> flt:flt64 }) vs { int:1 A -> B }
+  //   ( { x -> x*2 }, { x -> x*3 })._ 4                             - LHS   known, no  clazz, ambiguous, report choices and match
+  //                       Ambiguous, matching choices ({ A B -> C }, { D E -> F }) vs { G int:4 -> H }
+  public String resolve_failed_msg() {
+    FieldNode fldn = this;
+    String fld = null;          // Overloaded field name
+    // If overloaded field lookup, reference field name in message
+    if( is_resolving() ) {
+      if( in(0) instanceof FieldNode xfld ) {
+        fldn = xfld;            // Use parent field
+        fld = fldn._fld;        // Overloaded field name
+      }
+    } else fld = _fld;
+    boolean oper = fld!=null && Oper.is_oper(fld); // Is an operator?
+    if( oper && !_clz ) {
+      String clz = FieldNode.clz_str(fldn.val(0));
+      if( clz!=null ) fld = clz+fld; // Attempt to be clazz specific operator
+    }
+    TVStruct tvs = match_tvar() instanceof TVStruct tv0 ? tv0 : null;
+    String err, post;
+    if( !is_resolving() ) { err = "Unknown"; post=" in %: "; }
+    else if( tvs!=null && ambi(tvar(),tvs) ) { err = "Ambiguous, matching choices %"; post = " vs "; }
+    else if( tvs==null || tvs.len()==0 ) { err = "Unable to resolve"; post=": "; }
+    else { err = "No choice % resolves"; post=": "; }
+    if( fld!=null )
+      err += (oper ? " operator '" : " field '.")+fld+"'";
+    err += post;
+    return err;
+  }
+  
+  // True if ambiguous (more than one match), false if no matches.
+  private boolean ambi(TV3 self, TVStruct tvs) {
+    for( int i=0; i<tvs.len(); i++ )
+      if( !Resolvable.is_resolving(tvs.fld(i)) &&
+          self.trial_unify_ok(tvs.arg(i),false) )
+        return true;
+    return false;
+  }
+  
   // clones during inlining change resolvable field names
   @Override public @NotNull FieldNode copy(boolean copy_edges) {
     FieldNode nnn = (FieldNode)super.copy(copy_edges);

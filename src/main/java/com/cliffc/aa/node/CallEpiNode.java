@@ -492,7 +492,7 @@ public final class CallEpiNode extends Node {
 
     
     if( tnargs > nargs )  // Missing arguments
-      progress |= tvar().unify_err(test) | ((TVErr)tvar()).err_msg(("Passing "+cnargs+" arguments to a function taking "+tnargs+" arguments").intern(),test);
+      progress |= tvar().unify_err("Passing "+cnargs+" arguments to a function taking "+tnargs+" arguments",tfun,test);
     if( cnargs > nargs ) throw unimpl(); // Too many arguments
     
     return progress;

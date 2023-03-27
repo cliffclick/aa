@@ -437,7 +437,8 @@ public class Parse implements Comparable<Parse> {
     return ifex;
   }
 
-  // Assign into display, changing an existing def
+  // Assign into display, changing an existing def.
+  // The scope of the assignment is 'scope', or null to create in the local scope.
   private Node do_store(ScopeNode scope, Node ifex, Access mutable, String tok, Parse badf, Type t, Parse badt ) {
     if( ifex instanceof FunPtrNode fptr )
       fptr.bind(tok);           // Debug only: give name to function
@@ -464,12 +465,11 @@ public class Parse implements Comparable<Parse> {
 
     // Load the display/stack-frame for the defining scope.
     Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
-    Node mem = mem();
-    Node stk = gvn(new LoadNode(mem,ptr,badf));
+    Node stk = gvn(new LoadNode(mem(),ptr,badf));
     // Build a new display/stack-frame
     Node stk2 = gvn(new SetFieldNode(tok,mutable,stk,Node.peek(iidx),badf));
-    // Store into the local scope (NOT defining scope)
-    Node st = new StoreNode(mem,ptr,stk2,badf);
+    // Store into the defining scope (not necessarily local scope)
+    Node st = new StoreNode(mem(),ptr,stk2,badf);
     scope().replace_mem(st);
     if( mutable==Access.Final ) Oper.make(tok,false);
     return Node.pop(iidx);
@@ -830,12 +830,16 @@ public class Parse implements Comparable<Parse> {
         // Store or load against memory
         if( peek(":=") || peek_not('=','=')) {
           Access fin = _buf[_x-2]==':' ? Access.RW : Access.Final;
-          Node stmt = stmt(false);
-          if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+tok+"'");
-          //else scope().replace_mem( new StoreNode(mem(),castnn,n=stmt.keep(),fin,tok ,errMsg(tok_start)));
-          //skipWS();
-          //return n.unkeep();
-          throw unimpl();       // SetField before Store
+          n = stmt(false);
+          if( n == null )
+            return err_ctrl2("Missing stmt after assigning field '."+tok+"'");
+          Parse bad = errMsg(fld_start);
+          int nidx = n.push();
+          int cidx = castnn.push();
+          Node ld = gvn(new LoadNode(mem(),castnn,null));
+          Node sf = gvn(new SetFieldNode(tok,fin,ld,n,bad));
+          scope().replace_mem( new StoreNode(mem(),Node.pop(cidx),sf,bad));
+          return Node.pop(nidx);
         } else {
           boolean is_oper = Oper.is_oper(tok);
           Parse bad = errMsg(fld_start);
@@ -1094,15 +1098,14 @@ public class Parse implements Comparable<Parse> {
       stmts(true);              // Create local vars-as-fields
       require('}',oldx);        // Matched closing }
       assert ctrl() != e._scope;
-      StructNode stk = e._scope.stk();
+      StructNode stk = e._scope.stk(); // The Env stack frame is the actual struct
       stk.close();
+      pidx = e._scope.ptr().push();
       e._par._scope.set_ctrl(ctrl()); // Carry any control changes back to outer scope
       e._par._scope.set_mem (mem ()); // Carry any memory  changes back to outer scope
       _e = e._par;                    // Pop nested environment
-      pidx = stk.push();              // A pointer to the constructed object
     } // Pop lexical scope around struct
-    //return Node.pop(pidx);
-    throw unimpl(); // return ptr not struct
+    return Node.pop(pidx);      // Return the pointer
   }
 
   /** Parse an anonymous function; the opening '{' already parsed.  After the

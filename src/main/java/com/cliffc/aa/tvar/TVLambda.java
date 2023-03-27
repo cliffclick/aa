@@ -47,7 +47,7 @@ public class TVLambda extends TV3 {
     for( int i=DSP_IDX; i<Math.min(nargs,tnargs); i++ )
       arg(i)._unify(that.arg(i),false);
     if( nargs != tnargs )
-      that.err("Expected "+tnargs+" but found "+nargs);
+      that.unify_err("Expected "+tnargs+" but found "+nargs,that,false);
     return true;
   }
   

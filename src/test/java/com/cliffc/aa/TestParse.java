@@ -30,7 +30,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    testerr("1 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x maybe alive
+    testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y' in @{x=1}",19);
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -73,15 +73,18 @@ public class TestParse {
          null,null,"[13]","[55]");
 
     // TestParse.g_overload_err_00
-    testerr("( { x -> x*2 }, { x -> x*3 })._ 4", "Ambiguous, unable to resolve { C D -> E } and { F G -> H }",30);
+    testerr("( { x -> x*2 }, { x -> x*3 })._ 4", "Ambiguous, matching choices ({ A B -> C }, { D E -> F }) vs { G int:4 -> H }",30);
 
     // Variations on a simple wrapped add.  Requires full annotations to type -
     // because in fact it is all ambiguous and cannot be typed without seeing all
     // the usages.
-    testerr("{ x y -> x+y }", "No operator _+_",10);
-    testerr("{ x -> 1+x }", "Ambiguous, unable to resolve { int:int64 int:int64 -> int:int64 } and { int:int64 flt:nflt64 -> flt:flt64 }",8);
-    testerr("{ x -> x+1 }", "No operator _+_",8);
-    testerr("{x:flt y -> x+y}", "Ambiguous, unable to resolve { flt:flt64 flt:flt64 -> flt:flt64 } and { flt:flt64 int:int64 -> flt:flt64 }",13); // {Scalar Scalar -> Scalar}
+    testerr("{ x -> x+1 }", "Unable to resolve operator '_+_': { A int:1 -> B }",8);       // LHS is not known, unknown clazz, oper (pinned, no clazz to report)
+    testerr("{ x -> 1+x }", "Ambiguous, matching choices ({ int:int64 int:int64 -> int:int64 }, { int:int64 flt:nflt64 -> flt:flt64 }) vs { int:1 A -> B }",8);
+    testerr("{ x y -> x+y }", "Unable to resolve operator '_+_': { A B -> C }",10);
+    testerr("( { x -> x*2 }, { x -> x*3 })._ 4", "Ambiguous, matching choices ({ A B -> C }, { D E -> F }) vs { G int:4 -> H }",30);
+    testerr("@{x=7}.y",  "Unknown field '.y' in @{x= A}: ",7); // LHS is known, not a clazz, field not found in instance
+    testerr("\"abc\".y", "Unknown field '.y' in str:(A): ",6);  // LHS is known, has clazz, field not found in either, field is not oper (not pinned)
+    testerr("\"abc\"&1", "Unknown operator '_&_' in str:(int:97): ( ..., )",5); // LHS is known, has clazz, field not found in either, field it oper (pinned, so report clazz)
     test("{x:flt y:int -> x+y}", "[55]{any,5 -> flt64 }", "{ A flt:flt64 int:int64 -> flt:flt64 }", null, null, null, "[55]");
 
     // error, missing a comma
@@ -225,7 +228,7 @@ public class TestParse {
     // Anonymous function definition.  Note: { x -> x&1 }; 'x' can be any struct with an operator '_&_'.
     test("{x:int -> x&1}","[55]{any,4 -> int1 }","{A int:int64 -> int:int64}",null,null,null,"[55]");
     test("{5}()", "5", "int:5"); // No args nor -> required; this is simply a function returning 5, being executed
-    testerr("{x:flt y -> x+y}", "Ambiguous, unable to resolve { flt:flt64 flt:flt64 -> flt:flt64 } and { flt:flt64 int:int64 -> flt:flt64 }",13); // {Scalar Scalar -> Scalar}
+    testerr("{x:flt y -> x+y}", "Ambiguous, matching choices ({ flt:flt64 flt:flt64 -> flt:flt64 }, { flt:flt64 int:int64 -> flt:flt64 }) vs { flt:flt64 A -> B }",13); // {Scalar Scalar -> Scalar}
 
     // Function execution and result typing
     test("x=3; andx={y -> x & y}; andx(2)", "2", "int:2"); // trivially inlined; capture external variable
@@ -238,8 +241,8 @@ public class TestParse {
     test("x=3; mul2={x -> x*2}; mul2(2.1)", "4.2","flt:4.2"); // must inline to resolve overload {*}:Flt with I->F conversion
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", "10.2","flt:10.2"); // Mix of types to mul2(), mix of {*} operators
     test("sq={x -> x*x}; sq 2.1", "4.41","flt:4.41"); // No () required for single args
-    testerr("sq={x -> x&x}; sq(\"abc\")", "No operator str:_&_",10);
-    testerr("sq={x -> x*x}; sq(\"abc\")", "No operator str:_*_",10);
+    testerr("sq={x -> x&x}; sq(\"abc\")", "Unknown operator '_&_' in str:(int:97): ( ..., )",10);
+    testerr("sq={x -> x*x}; sq(\"abc\")", "Unknown operator '_*_' in str:(int:97): ( ..., )",10);
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)","6","int:6");
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)","int64","int:int64");
@@ -296,35 +299,16 @@ public class TestParse {
             "3 is not a *@{x:=Scalar; y:=Scalar; ...}", 69);
   }
 
-  @Test public void testParse03a() {
-    // Named types
-    //test_named_tuple("A= :(       )" ); // Zero-length tuple
-    //test_named_tuple("A= :(   ,   )", Type.SCALAR); // One-length tuple
-    //test_named_tuple("A= :(   ,  ,)", Type.SCALAR  ,Type.SCALAR  );
-    //test_named_tuple("A= :(flt,   )", TypeFlt.FLT64 );
-    //test_named_tuple("A= :(flt,int)", TypeFlt.FLT64,TypeInt.INT64);
-    //test_named_tuple("A= :(   ,int)", Type.SCALAR  ,TypeInt.INT64);
-    //
-    //test("A= :(str?, int); A( \"abc\",2 )",
-    //     (ignore-> TypeMemPtr.make(29,TypeStruct.make_test("A:",TypeMemPtr.make(17,TypeStruct.EMPTY),TypeInt.con(2)))),
-    //     null, "(*\"abc\",2)");
-    //test("A= :(str?, int); A( (\"abc\",2) )",
-    //     (ignore-> TypeMemPtr.make(18,TypeStruct.make_test("A:",TypeMemPtr.make(17,TypeStruct.EMPTY),TypeInt.con(2)))),
-    //     null, "(*\"abc\",2)");
-    //testerr("A= :(str?, int)?","Named types are never nil",16);
-    throw unimpl();
-  }
-
   @Test public void testParse04() {
     // simple anon struct tests
     testerr("a=@{x=1.2;y}; x", "Unknown ref 'x'",14);
     testerr("a=@{x=1;x=2}.x", "Cannot re-assign final field '.x' in @{x=1}",8);
-    test   ("a=@{x=1.2;y;}; a.x", TypeFlt.con(1.2)); // standard "." field naming; trailing semicolon optional
-    test   ("x=@{n:=1;v:=2}; x.n := 3; x", "*@{n:=3; v:=2}","@{n=3, v=2}");
+    test   ("a=@{x=1.2;y;}; a.x", "1.2", "flt:1.2"); // standard "." field naming; trailing semicolon optional
+    test   ("x=@{n:=1;v:=2}; x.n := 3; x", "*[10]@{_; n:=3; v:=2}","*@{n=int:int64; v=int:int64}", null, null, "[10]", null);
     testerr("(a=@{x=0;y=0}; a.)", "Missing field name after '.'",17);
-    testerr("a=@{x=0;y=0}; a.x=1; a","Cannot re-assign final field '.x' in @{x=0; y=0}",16);
-    test   ("a=@{x=0;y=1}; b=@{x=2}  ; c=math.rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2; structs can be partially merged
-    testerr("a=@{x=0;y=1}; b=@{x=2}; c=math.rand(1)?a:b; c.y",  "Unknown field '.y' in @{x=int8}",46);
+    testerr("a=@{x=0;y=0}; a.x=1; a","Cannot re-assign final field '.x' in @{x=nil; y=nil}",16);
+    test   ("a=@{x=0;y=1}; b=@{x=2}  ; c=math.rand(1)?a:b; c.x", "int8", "int:int8"); // either 0 or 2; structs can be partially merged
+    testerr("a=@{x=0;y=1}; b=@{x=2}; c=math.rand(1)?a:b; c.y",  "Unknown field '.y' in @{x= A:int:B:int8}: ",46);
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y' in @{x=1}",19);
     test   ("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1;y=2})", TypeInt.con(5));     // passed in to func
     test   ("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1;y=2;z=3})", TypeInt.con(5)); // extra fields OK
@@ -356,23 +340,6 @@ public class TestParse {
     test("(1,\"abc\").1", TypeStruct.ISUSED);
 
     test   ("math.rand(1)?@{}","@{^=@{^=*[5]()?}}","@{^=@{^=A}?}?");
-
-    // Named type variables
-    //test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(82),4, TypeMemPtr.NO_DISP, TypeFlt.FLT64.set_name("gal:")));
-    //test("gal=:flt; 3==gal(2)+1", "int:1");
-    //test("gal=:flt; tank:gal = gal(2)", TypeInt.con(2).set_name("gal:"));
-    //// test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
-    //testerr ("gal=:flt; tank:gal = gal(2)+1", "3 is not a gal:flt64",14);
-    //
-    //test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    //test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    //testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*@{x=1; y=2} is not a *Point:@{x:=; y:=}",55);
-    //testerr ("Point=:@{x;y}; Point((0,1))", "*(0, 1) is not a *Point:@{x:=; y:=}",21);
-    //testerr("x=@{n: =1;}","Missing type after ':'",7);
-    //testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
-    //test("x=@{n}",(ignore->TypeMemPtr.make(14,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",TypeNil.NIL,Access.RW)))),
-    //     null,"@{n=0}");
-    throw unimpl();
   }
 
   @Test public void testParse05() {
@@ -391,6 +358,41 @@ public class TestParse {
       a = math.rand(1) ? 0 : @{x=1}; // a is nil or a struct
       b = math.rand(1) ? 0 : @{c=a}; // b is nil or a struct
       b ? (b.c ? b.c.x : 0) : 0      // Nil-safe field load""", TypeInt.BOOL); // Nested nil-safe field load
+  }
+
+  @Test public void testParse03a() {
+    // Named types
+    //test_named_tuple("A= :(       )" ); // Zero-length tuple
+    //test_named_tuple("A= :(   ,   )", Type.SCALAR); // One-length tuple
+    //test_named_tuple("A= :(   ,  ,)", Type.SCALAR  ,Type.SCALAR  );
+    //test_named_tuple("A= :(flt,   )", TypeFlt.FLT64 );
+    //test_named_tuple("A= :(flt,int)", TypeFlt.FLT64,TypeInt.INT64);
+    //test_named_tuple("A= :(   ,int)", Type.SCALAR  ,TypeInt.INT64);
+    //
+    //test("A= :(str?, int); A( \"abc\",2 )",
+    //     (ignore-> TypeMemPtr.make(29,TypeStruct.make_test("A:",TypeMemPtr.make(17,TypeStruct.EMPTY),TypeInt.con(2)))),
+    //     null, "(*\"abc\",2)");
+    //test("A= :(str?, int); A( (\"abc\",2) )",
+    //     (ignore-> TypeMemPtr.make(18,TypeStruct.make_test("A:",TypeMemPtr.make(17,TypeStruct.EMPTY),TypeInt.con(2)))),
+    //     null, "(*\"abc\",2)");
+    //testerr("A= :(str?, int)?","Named types are never nil",16);
+
+    // Named type variables
+    //test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(82),4, TypeMemPtr.NO_DISP, TypeFlt.FLT64.set_name("gal:")));
+    //test("gal=:flt; 3==gal(2)+1", "int:1");
+    //test("gal=:flt; tank:gal = gal(2)", TypeInt.con(2).set_name("gal:"));
+    //// test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
+    //testerr ("gal=:flt; tank:gal = gal(2)+1", "3 is not a gal:flt64",14);
+    //
+    //test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
+    //test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
+    //testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*@{x=1; y=2} is not a *Point:@{x:=; y:=}",55);
+    //testerr ("Point=:@{x;y}; Point((0,1))", "*(0, 1) is not a *Point:@{x:=; y:=}",21);
+    //testerr("x=@{n: =1;}","Missing type after ':'",7);
+    //testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
+    //test("x=@{n}",(ignore->TypeMemPtr.make(14,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",TypeNil.NIL,Access.RW)))),
+    //     null,"@{n=0}");
+    throw unimpl();
   }
 
   @Test public void testParse06() {

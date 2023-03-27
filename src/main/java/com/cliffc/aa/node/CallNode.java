@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.TVErr;
 import com.cliffc.aa.tvar.TVLambda;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
@@ -316,7 +317,11 @@ public class CallNode extends Node {
     case TypeFunPtr tfx2 -> tfx2;
     case TypeNil tn -> {
       int nargs = Combo.pre() ? 1
-        : (fdx.tvar() instanceof TVLambda lam ? lam.nargs() : -1);
+        : (switch( fdx.tvar() ) {
+          case TVLambda lam -> lam.nargs();
+          case TVErr err -> err.as_lambda().nargs();
+          default -> -1;
+          });
       yield TypeFunPtr.make(tn.above_center(),tn._fidxs,nargs,tn.oob(),tn.oob());
     }
     default -> fdx._val.oob(TypeFunPtr.GENERIC_FUNPTR);

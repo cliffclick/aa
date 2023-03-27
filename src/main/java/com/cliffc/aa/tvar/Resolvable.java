@@ -1,7 +1,6 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.node.Node;
 import com.cliffc.aa.node.FieldNode;
 import com.cliffc.aa.util.Ary;
 
@@ -74,21 +73,11 @@ public interface Resolvable {
   // otherwise force unification on all choices which will trigger an error on
   // each choice.
   default void resolve_failed() {
-    String err = match_tvar() instanceof TVStruct tvs && ambi(tvar(),tvs)
-      ? "Ambiguous"
-      : "No field resolves";
-    tvar().err(err);
-    Env.GVN.add_flow((Node)this);
-    ((FieldNode)this).deps_work_clear();
+    FieldNode fld = (FieldNode)this;
+    String msg = fld.resolve_failed_msg();
+    tvar().unify_err(msg,match_tvar(),false);
+    Env.GVN.add_flow(fld);
+    fld.deps_work_clear();
   }
-  // True if ambiguous (more than one match), false if no matches.
-  private boolean ambi(TV3 self, TVStruct tvs) {
-    for( int i=0; i<tvs.len(); i++ )
-      if( !is_resolving(tvs.fld(i)) &&
-          self.trial_unify_ok(tvs.arg(i),false) )
-        return true;
-    return false;
-  }
-
   
 }

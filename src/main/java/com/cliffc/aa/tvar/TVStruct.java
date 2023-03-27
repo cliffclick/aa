@@ -1,9 +1,6 @@
 package com.cliffc.aa.tvar;
 
-import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Oper;
-import com.cliffc.aa.Parse;
-import com.cliffc.aa.node.FieldNode;
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.*;
@@ -281,27 +278,6 @@ public class TVStruct extends TV3 {
     return true;
   }
   
-  public ErrMsg err_resolve(Node in0, Parse loc, String msg) {
-    if( msg.equals("No field resolves") ) {
-      if( in0 instanceof FieldNode fld ) {
-        if( Oper.is_oper(fld._fld) ) {
-          String clz = FieldNode.clz_str(fld.val(0));
-          return ErrMsg.unresolved(loc,"No operator "+(clz==null?"":clz)+fld._fld);
-        }
-        else throw unimpl();
-      }
-      return ErrMsg.unresolved(loc,msg);
-    }
-    SB sb = new SB().p(msg).p(", unable to resolve ");
-    VBitSet dups = get_dups();
-    VBitSet visit = new VBitSet();
-    for( int i=0; i<len(); i++ )
-      if( !Resolvable.is_resolving(_flds[i]) )
-        arg(i)._str(sb,visit,dups,false).p(" and ");
-    return ErrMsg.unresolved(loc,sb.unchar(5).toString());
-  }
-
-  
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) { throw unimpl(); }  
   public boolean is_int_clz() { return  Util.find(_flds,"!_" ) >= 0; }
@@ -315,11 +291,9 @@ public class TVStruct extends TV3 {
     if( _args==null ) sb.p(", ");
     else {
       for( int idx : sorted_flds() ) {
-        String  fld = _flds[idx];
-        boolean pin = _pins[idx];
-        // Skip resolved field names in a tuple
-        if( !is_tup || Resolvable.is_resolving(fld) || !pin )
-          sb.p(fld).p(pin?"#":"").p("= ");
+        if( !debug && Util.eq("^",_flds[idx]) ) continue; // Displays are private by default
+        if( !is_tup )                                     // Skip tuple field names
+          sb.p(_flds[idx]).p(debug && _pins[idx] ? "#":"").p("= ");
         if( _args[idx] == null ) sb.p("_");
         else _args[idx]._str(sb,visit,dups,debug);
         sb.p(is_tup ? ", " : "; ");

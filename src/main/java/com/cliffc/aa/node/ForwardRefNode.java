@@ -39,7 +39,7 @@ public class ForwardRefNode extends Node {
   @Override public boolean has_tvar() { return true; }
   @Override public TVErr _set_tvar() {
     TVErr e = new TVErr();
-    e.err_msg(("Unknown ref '"+_name+"'").intern(),false);
+    e.err("Unknown ref '"+_name+"'",null,false);
     return e;
   }
   
