@@ -152,6 +152,7 @@ public class TVStruct extends TV3 {
       boolean pinned = thsi._pins[i];
       int ti = Util.find(that._flds,key);
       if( ti == -1 ) {          // Missing field in that
+        assert !Resolvable.is_resolving(key);
         //if( Resolvable.is_resolving(key) ) continue; // Do not add or remove until resolved
         if( open || Resolvable.is_resolving(key) )
           that.add_fld(key,pinned,fthis);   // Add to RHS
@@ -171,6 +172,7 @@ public class TVStruct extends TV3 {
     for( int i=0; i<that._max; i++ ) {
       String key = that._flds[i];
       if( thsi.arg(key)==null ) {                    // Missing field in this
+        assert !Resolvable.is_resolving(key);
         if( Resolvable.is_resolving(key) ) continue; // Do not remove until resolved
         if( is_open() ) thsi.add_fld(key,that._pins[i],that.arg(i)); // Add to LHS
         else thsi.del_fld(key); // Drop from RHS

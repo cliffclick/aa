@@ -29,9 +29,9 @@ public class TestHM {
     JIG=true;
 
     DO_HMT=true;
-    DO_GCP=false;
+    DO_GCP=true;
     RSEED=0;
-    a_basic_02();
+    g_overload_18(); // T/F/0
   }
 
   private void _run0s( String prog, String rprog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -777,7 +777,7 @@ con12=(fun 1.2f);
   @Test public void f_gcp_hmt_00() {
     run("pred = 0; s1 = @{ x=\"abc\" }; s2 = @{ y=3.4f }; (if pred s1 s2).y",
         "pred = 0; s1 = @{ x=\"abc\" }; s2 = @{ y=3.4f }; (if pred ({_pred -> s1}(notnil pred)) s2).y",
-        "3.4f", "Missing field y in %*(): 3.4f",
+        "3.4f", "Missing field y in %*()",
         "3.4f", "3.4f",
         null,null);
   }
@@ -1015,11 +1015,11 @@ loop = { name cnt ->
         "[19]","[37]");
   }
 
-  // Explicit overload argument
+  // Explicit overload argument.  External caller must supply correctly typed fields with any name.
   @Test public void g_overload_05() {
     run("{ x -> (x._ x._.v)}",
         "{ x -> (x._ x._.v)}",
-        "{*@{&17 = %Unresolved field &17: { A:Unresolvedfield&19 -> B:Unresolvedfield&17}; &19 = %Unresolvedfield&19:*@{v=A;...};...}->B}",
+        "{ *@{ &17= {A->B}; &19= *@{v=A;...}; ...} -> B }",
         "[29]{any,3 -> Scalar }",
         "[5]","[29]");
   }
@@ -1052,7 +1052,7 @@ loop = { name cnt ->
   @Test public void g_overload_err_08() {
     run("{ ptr -> (ptr._.x ptr._.x) }",
         "{ ptr -> (ptr._.x ptr._.x) }",
-        "{*@{&17 = %Unresolvedfield &17: *@{ x = Unresolvedfield&17: { A:Unresolvedfield&20 -> B:Unresolvedfield&17};...};&20 = %Unresolvedfield&20:*@{x=A;...};...}->B}",
+        "{ *@{ &17= *@{ x= { A -> B }; ...}; &20= *@{ x= A; ...}; ...} -> B }",
         "[29]{any,3 -> Scalar }",
         "[5]", "[29]");
   }
@@ -1070,8 +1070,8 @@ loop = { name cnt ->
   @Test public void g_overload_err_09() {
     run("{ ptr -> (ptr.x._ ptr.x._) }",
         "{ ptr -> (ptr.x._ ptr.x._) }",
-        "{*@{x=*@{&18=%Unresolvedfield&18:{A:%Unresolvedfield&21->B:Unresolvedfield&18};&21=A;...};...}->B}",
-        "[29]{any,3 -> ~Scalar }",
+        "{ *@{x= *@{ &18= { A -> B }; &21= A; ...};...} -> B }",
+        "[29]{any,3 -> Scalar }",
         "[5]","[29]");
   }
 
@@ -1113,8 +1113,27 @@ loop = { name cnt ->
         "[17]",null);
   }
 
-  // 'lite' needs to be told to take an overload with syntax
+  // Test polymorphic uses of overload; in both cases the correct overload is field 1
   @Test public void g_overload_12() {
+    run("f = { ptr -> ptr._.x };"+ 
+        "(pair (f (pair 1 @{x=2})) (f (triple 3 @{x=4} \"abc\")))",
+        "*( 2, 4)",
+        "*[17](_, 0=nint8, 1=nint8)",
+        "[17]",null);
+  }
+
+  // Test polymorphic uses of overload; both cases conflict, so this is not resolvable.
+  @Test public void g_overload_13() {
+    run("f = { ptr -> ptr._.x };"+
+        "(pair (f (pair 1 @{x=2})) (f (pair @{x=2} 1)))",
+        "Unresolvedfield&17:*(Unresolvedfield&17:2,Unresolvedfield&17:2)",
+        "*[17](_, 0=Scalar, 1=Scalar)",
+        "[17]",null);
+  }
+
+
+  // 'lite' needs to be told to take an overload with syntax
+  @Test public void g_overload_14() {
     run("color = { hex name -> (pair hex name )};"+
         "red  = (color 123 \"red\" );"+
         "blue = (color 456 \"blue\");"+
@@ -1133,10 +1152,11 @@ loop = { name cnt ->
         "*[18](_, 0=PA:*[17](_, int64, *[4]str:(nint8)?), 1=PA)",
         "[17,18]",null);
   }
+
   // Test case here is trying to get HM to do some overload resolution.
   // Without, many simple int/flt tests in main AA using HM alone fail to find
   // a useful type.
-  @Test public void g_overload_13() {
+  @Test public void g_overload_15() {
     run("""
 fwrap = { ff ->
   @{ _*_ = (pair
@@ -1184,10 +1204,21 @@ con2_1 = (fwrap 2.1f);
         "A:*@{_*_=*( {*@{i=int64;...}->A}, {B:*@{_*_=*( {*@{i=int64;...}->B}, {*@{f=flt64;...}->B}); f=%flt64}->A});f=%flt64}",
         "PA:*[18]@{_; _*_=*[17](_, [32]{any,3 -> PA }, [34]{any,3 -> PA }); f=flt64}",
         "[5,6,17,18]","[32,34]");
+
+    // FWRAP AND IWRAP NOT DEFINED RIGHT.
+    // BECAUSE FWRAP.MUL TAKES A 'Y' WHICH HAS ONLY A '.F' FIELD AND NOT A FULL FWRAP.
+//fwrap = { ff ->
+//  @{ _*_ = (pair
+//       { y -> (fwrap (f* ff (i2f y.i))) }
+//       { y -> (fwrap (f* ff      (fwrap y.f).f )) }  // Experiment to force something?  Still does not force y to be an fwrap...
+//     );
+//     f = ff
+//   }
+//};
   }
 
   // Recursive structs.  More like what main AA will do with wrapped primitives.
-  @Test public void g_overload_14() {
+  @Test public void g_overload_16() {
     String hm_rez = "*("+
       "A:*@{_*_=*({B:*@{_*_=*({*@{i=int64;...}->B},{*@{f=flt64;...}->C:*@{_*_=*({*@{i=int64;...}->C},{*@{f=flt64;...}->C});f=%flt64}});i=%int64}->A},{*@{f=flt64;...}->A});f=%flt64},"+
       "D:*@{_*_=*({E:*@{_*_=*({*@{i=int64;...}->E},{*@{f=flt64;...}->F:*@{_*_=*({*@{i=int64;...}->F},{*@{f=flt64;...}->F});f=%flt64}});i=%int64}->D},{*@{f=flt64;...}->G:*@{_*_=*({*@{i=int64;...}->G},{*@{f=flt64;...}->G});f=%flt64}});i=%int64},"+
@@ -1249,7 +1280,7 @@ mul2 = { x -> (x._*_.0 con2)};
 
   // Recursive structs, in a loop.  Test of recursive int wrapper type ("occurs
   // check") in a loop.
-  @Test public void g_overload_15() {
+  @Test public void g_overload_17() {
     run("""
 fwrap = { ff ->
   @{ f = ff;
@@ -1309,10 +1340,41 @@ fact = { n -> (if n.is0 c1 (n.mul.0 (fact n.sub1))) };
         "A:%*@{i=%int64;is0=%int64;mul=*({A->A},{*@{f=flt64;...}->B:*@{f=%flt64;mul=*({*@{i=int64;...}->B},{*@{f=flt64;...}->B})}});sub1=A}",
         "A:%*@{i=%int64;is0=%int64;mul=*({A->A},{*@{f=flt64;...}->B:*@{f=%flt64;mul=*({*@{i=int64;...}->B},{*@{f=flt64;...}->B})}});sub1=A}",
         "PA:*[20]@{_; i=int64; is0=int1; mul=*[19](_, [39]{any,3 -> PA }, [42]{any,3 -> PB:*[18]@{_; f=flt64; mul=*[17](_, [32]{any,3 -> PB }, [34]{any,3 -> PB })} }); sub1=PA}",
-
         "PA:*[20]@{_; i=int64; is0=int1; mul=*[19](_, [39]{any,3 -> PA }, [42]{any,3 -> PB:*[18]@{_; f=flt64; mul=*[17](_, [32]{any,3 -> PB }, [34]{any,3 -> PB })} }); sub1=PA}",
         "[5,6,7,8,17,18,19,20]","[32,34,39,42]");
   }
+
+  // Recursive structs.  More like what main AA will do with wrapped primitives.
+  @Test public void g_overload_18() {
+            run("""
+fwrap = { ff ->
+  @{ _*_ = (pair
+       { y -> (fwrap (f* ff (i2f y.i))) }
+       { y -> (fwrap (f* ff      y.f)) }
+     );
+     f = ff
+   }
+};
+iwrap = { ii ->
+  @{ _*_ = (pair
+       { y -> (iwrap (i*      ii  y.i)) }
+       { y -> (fwrap (f* (i2f ii) y.f)) }
+     );
+     i = ii
+   }
+};
+
+c2 = (iwrap 2);
+sq = { x ->
+  (x._*_._ x)
+};
+(sq c2)
+""",
+                "A:*@{_*_=*({A A -> A },{*@{f=flt64;...}->B:*@{_*_=*({*@{i=int64;...}->B},{*@{f=flt64;...}->B});f=%flt64}});i=%int64}",
+                "PA:*[18,20]@{_; _*_=*[17,19](_, [32,38]{any,3 -> PA }, [34,41]{any,3 -> PB:*[18]@{_; _*_=*[17](_, [32]{any,3 -> PB }, [34]{any,3 -> PB }); f=flt64} })}",
+                "[5,6,7,8,17,18,19,20]", "[32,34,38,41]");
+  }
+
 
   // Ambiguous overload, {int->int}, cannot select.
   // Parent of overload is Apply, so
@@ -1350,7 +1412,7 @@ fz = (if (rand 2) fx fy);
   @Test public void g_overload_err_03() {
     run("{ x -> (x._ x._.v)}",
         "{ x -> (x._ x._.v )}",
-        "{*@{ &17 = %Unresolved field &17: { A:Unresolved field &19 -> B:Unresolved field &17 }; &19 = %Unresolvedfield &19: *@{v=A;...};...}->B}",
+        "{ *@{ &17= { A -> B }; &19= *@{ v=A; ...}; ...} -> B }",
         "[29]{any,3 ->Scalar }",
         "[5]","[29]");
   }

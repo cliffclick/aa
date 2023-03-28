@@ -267,9 +267,9 @@ public class HM {
             // If the ptr is a full struct, then do not re-print the missing
             // field when printing the ptr type.
             boolean miss2 = ptr.is_ptr() && ((rec=ptr.arg("*"))!=null ) && rec.is_obj();
-            if( miss2 )  bad = rec._args.remove(fld._id); // Remove bad field
+            if( miss2 && rec._args!=null )  bad = rec._args.remove(fld._id); // Remove bad field
             self._err = miss_fld(fld._id)+" in "+ptr.p();
-            if( miss2 )  rec._args.put(fld._id,bad); // Put it back after printing
+            if( miss2 && bad!=null )  rec._args.put(fld._id,bad); // Put it back after printing
           }
         }
         return null;
@@ -1188,12 +1188,23 @@ public class HM {
     void add_ambi_work(Work<Syntax> work) {
       for( Field fld : Field.FIELDS.values() )
         if( Field.is_resolving(fld._id) ) {
-          fld.find().unify_errs("Unresolved field "+fld._id,work);
-          fld.find().clr_cp(work);
+          T2 t2 = fld.find();
+          if( fld._fresh_matches!=null && fld._fresh_matches._len==1 ) {
+            // Exactly one kind of uses of this polymorphic field.
+            fld._id = fld._fresh_matches.at(0);
+          } else {
+            // If field is open and no uses then allow it: the overload field
+            // only applies to external structs, which resolve then.  If the
+            // field is closed or has 2+ uses disallow.
+            T2 rec = fld._ptr.find().arg("*");
+            if( !rec.is_open() || fld._fresh_matches != null ) {
+              t2.unify_errs("Unresolved field "+fld._id,work);
+              t2.clr_cp(work);
+            }
+          }
+          work.addAll(t2._deps);
           work.add(fld);        // Type changes as well
-          work.addAll(fld.find()._deps);
         }
-
     }
 
     void add_freeze_work(Work<Syntax> work) {
@@ -1219,7 +1230,7 @@ public class HM {
     static BitsAlias matching_escaped_aliases(T2 t2) {
       BitsAlias aliases = BitsAlias.EMPTY;
       for( int alias : EXT_ALIASES )
-        if( t2.trial_unify_ok(ALIASES.at(alias).t2(),false) )
+        if( t2.trial_unify_ok(ALIASES.at(alias).t2(),false,null,true) )
           aliases = aliases.set(alias); // Compatible escaping alias
       return aliases;
     }
@@ -1237,7 +1248,7 @@ public class HM {
         for( int fidx : EXT_FIDXS ) {
           Func fun = Lambda.FUNS.get(fidx);
           // Dunno (yet), since trial_unify_ok can pass, then filter as HM proceeds
-          if( t2.trial_unify_ok(fun.as_fun(),false) )
+          if( t2.trial_unify_ok(fun.as_fun(),false,null,true) )
             fidxs = fidxs.set(fidx); // Compatible escaping fidx
         }
       return fidxs;
@@ -1492,8 +1503,10 @@ public class HM {
     private static final HashMap<String,Field> FIELDS = new HashMap<>();
     static void reset() { FIELDS.clear(); }
     
-    String _id;
-    final Syntax _ptr;
+    String _id;                 // Field label, or "_" if being inferred
+    final Syntax _ptr;          // Points to a struct with fields
+    Ary<String> _fresh_matches; // Fresh-unify potential matches, expect exactly 1 but errors will have more
+    
     Field( String id, Syntax str ) {
       _ptr = str;
       if( id==null ) FIELDS.put(id=("&"+_uid).intern(),this);
@@ -1527,13 +1540,20 @@ public class HM {
         rec._open = true;
         rec._is_obj = true;
         if( rec._args==null ) rec._args = new NonBlockingHashMap<>();
+        assert rec._delay_resolve == null;
       }
       assert rec.is_obj();
 
       // Attempt resolve
-      if( is_resolving() && !rec.is_open() ) {
-        progress = trial_resolve(find(), rec, rec, work);
-        if( progress && work==null ) return true;
+      if( is_resolving() ) {
+        String lab = trial_resolve(find(), rec, work!=null);
+        if( lab!=null ) {
+          // Field can be resolved
+          if( work==null ) return true; // Progress
+          progress=true;
+          _id = lab;                    // Change field label
+          work.add(this);               // On worklist, GCP at least can update
+        }
       }
       
       // Look up field
@@ -1542,22 +1562,17 @@ public class HM {
       if( fld!=null )           // Unify against a pre-existing field
         return (self.unify_errs(ptr._err,work) & fld.unify(self, work)) | progress;
 
-      // If field is doing overload resolution, inject even if rec is closed
-      if( is_resolving() ) {
-        if( work==null ) return true;
-        rec._args.put(_id,self);
-        rec.push_update(this);
-        rec.merge_deps(self,work);
-        return true;
+      // If field must be there, and it is not, then it is missing.  
+      if( !rec.is_open() ) {
+        if( is_resolving() ) return false; // Stall until resolve
+        return self.unify_miss_fld(_id,work);
       }
-      
-      // If field must be there, and it is not, then it is missing
-      if( !rec.is_open() )
-        self.unify_miss_fld(_id,work);
 
       // Add the field
       return work==null || rec.add_fld(_id,self,work);
     }
+
+      
     @Override void add_hm_work( @NotNull Work<Syntax> work) {
       work.add(_par);
       work.add(_ptr);
@@ -1611,63 +1626,65 @@ public class HM {
       prep_tree_impl(par, nongen, work, T2.make_leaf());
       return _ptr.prep_tree(this,nongen,work)+1;
     }
-    // Attempt to resolve all unresolved labels in a struct
-    static boolean trial_resolve_all(T2 obj, Work<Syntax> work) {
-      if( obj._args==null || !obj.is_obj() ) return false;
     
-      // If already resolved, just update-in-place
-      boolean progress = false;
-      for( String key : obj._args.keySet() ) {
-        if( !is_resolving(key) ) continue;
-        Field fld = FIELDS.get(key);
-        if( fld.is_resolving() ) {
-          if( !obj.is_open() ) // More fields possible, so trial_resolve cannot be tried
-            progress |= trial_resolve(key,obj.arg(key),obj,obj,work); // Attempt resolve
-        } else {
-          // key is resolving, but Field is already resolved
-          if( work==null ) continue; // Make no changes, but do not declare progress: this is a lazy update
-          T2 old = obj._args.remove(key); // Remove resolving key
-          T2 t2 = obj.arg(fld._id);       // Get resolved label, if any
-          if( t2==null ) obj._args.put(fld._id,old); // Insert resolved-label, even if obj is open, since this is a label replacement
-          else progress |= old.find().unify(t2,work); // Unify into existing (fold labels together)
-        }
+    // Attempts resolve a field; if so updates 'obj' accordingly.  In the
+    // normal "unify" case (as opposed to "fresh-unify"), we attempt a
+    // trial_unify_ok with the pattern against each match choice and count
+    // successful unifications.  We require the match choices to be closed lest
+    // new choices appear later.  Once a unify fails it will never succeed
+    // again, but a successful unify might fail later if it has Leafs which can
+    // expand.  Once we end up with 1 unify on a closed set of choices we can
+    // take it (infer the Field label to that match), again might fail later
+    // with NO choices, but we will never succeed on another choice.
+    //
+    // In the case of a fresh-unify, the situation is a little different: we
+    // will force changes on the fresh-unify LABELS, but not on the TYPES.
+    // Within the FRESH side, we will try the normal resolve; suppose this
+    // fails.  Same for the OTHER side.  An example case here might be
+    // an overload in a LET being used against choices:
+    //   x = { ptr -> (ptr._ ptr._.v) }; // X: { (&17 = { A -> B };  &19 = @{ v = A } ) -> B }
+    // Inside the LET, there's no forcing function on the overloaded ptr field choices.
+    // Using X:
+    //   ( x (@{v = 3}, { z -> z*z }) )
+    // Here the FRESH use of 'x' demands field &19 match the field '0=@{v=3}'
+    // and field &17 match the field '1={z -> z*z }'.
+    //
+    // This means we match the fresh overload pattern against the other sides
+    // choices, and if the other side is closed, and we have a single match we
+    // can infer the fresh-side labels.
+    String trial_resolve(T2 pat, T2 rec, boolean test) {
+      assert rec.is_obj() && is_resolving();
+      // Record is open; must delay until it closes since new fields can appear
+      // at any time.
+      if( rec.is_open() ) {
+        rec.add_delay_resolve(this);
+        return null;
       }
-      
-      return progress;
-    }
-    
-    // Attempts resolve a field; if so updates 'obj' accordingly.
-    static boolean trial_resolve(String key, T2 pat, T2 lhs, T2 rhs, Work<Syntax> work) { return FIELDS.get(key).trial_resolve(pat,lhs, rhs, work); }
-    boolean trial_resolve(T2 pat, T2 lhs, T2 rhs, Work<Syntax> work) {
-      assert lhs.is_obj() && rhs.is_obj() && !rhs.is_open() && is_resolving();
 
       // Not yet resolved.  See if there is exactly 1 choice.
       String lab = null;
-      for( String id : rhs._args.keySet() ) {
+      for( String id : rec._args.keySet() ) {
         if( is_resolving(id) ) continue;
-        if( pat.trial_unify_ok(rhs.arg(id),true) ) {
+        if( pat.trial_unify_ok(rec.arg(id),true,this,test) ) {
           if( lab==null ) lab=id;   // No choices yet, so take this one
-          else {                    // Ambiguous (yet)
-            pat.push_update(this);  // Revisit if changes
-            pat.merge_deps(rhs,work);
-            // Either cannot resolve (yet), or too late and will never resolve
-            return false;
-          }
+          // Ambiguous choices
+          else return null;
         }
       }
-      if( lab==null ) return false; // No match, so error and never resolves
-      // Field can be resolved
-      if( work==null ) return true; // Singleton match
-      boolean old = lhs._args.remove(_id)!=null;   // Remove old label
-      T2 prior = lhs.arg(lab);      // Get prior matching lhs label, if any
-      if( prior==null ) {
-        if( !old ) throw unimpl(); // No old unresolved label, no old resolved label
-        lhs._args.put(lab,pat);
-      } else prior.unify(pat,work); // Merge pattern and prior label in LHS
-      _id=lab;                  // Change field label
-      work.add(this);           // On worklist, GCP at least can update
-      return true;              // Progress
+      return lab;               // Either null (no choices, or the listed choice)
     }
+
+    boolean fresh_trial_resolve( T2 pat, T2 rec, boolean test ) {
+      String lab = trial_resolve(pat,rec,test);
+      if( lab==null ) return false; // No progress
+      // Add to success list
+      if( _fresh_matches==null ) _fresh_matches = new Ary<>(new String[1],0);
+      if( _fresh_matches.find(lab)!=-1 ) return false;
+      if( test ) return true;
+      _fresh_matches.push(lab);
+      return true;
+    }
+
     
     @Override boolean more_work(Work<Syntax> work) {
       if( !more_work_impl(work) ) return false;
@@ -2190,6 +2207,9 @@ public class HM {
     // Dependent (non-local) tvars to revisit
     Ary<Syntax> _deps;
 
+    // Dependent (non-local) tvars that are stalling a resolve
+    Ary<Syntax> _delay_resolve;
+    
     // The only Constructor
     private T2(NonBlockingHashMap<String,T2> args) { _args = args; }
 
@@ -2205,6 +2225,7 @@ public class HM {
       t._is_copy = _is_copy;
       t._err = _err;
       t._deps = _deps==null ? null : _deps.deepCopy();
+      t._delay_resolve = _delay_resolve==null ? null : _delay_resolve.deepCopy();
       return t;
     }
 
@@ -2483,6 +2504,9 @@ public class HM {
       // Merge all the hard bits
       that.add_may_nil(_may_nil,work);
       that.add_use_nil(_use_nil,work);
+      if( this._delay_resolve != null ) { work.addAll(this._delay_resolve); this._delay_resolve.clear(); }
+      if( that._delay_resolve != null ) { work.addAll(that._delay_resolve); that._delay_resolve.clear(); }
+        
       if( _is_obj ) {
         assert !that._use_nil && !that._may_nil; // Structs care not for nil-ness
         that._open = that._is_obj ? (that._open & _open) : _open;
@@ -2522,6 +2546,7 @@ public class HM {
       _is_copy = true;
       _err  = null;
       _deps = null;
+      _delay_resolve = null;
       assert unified();
       return true;
     }
@@ -2685,14 +2710,11 @@ public class HM {
     // Structural recursion unification.  Always progress.
     static void unify_flds( T2 thsi, T2 that, Work<Syntax> work ) {
       if( thsi._args==that._args ) return;  // Already equal (and probably both nil)
-      if( Field.trial_resolve_all(thsi,null) ) thsi=thsi.find();
-      assert !Field.trial_resolve_all(that,null); // TODO: need a test case
       
       for( String key : thsi._args.keySet() ) {
         T2 fthis = thsi.arg(key); // Field of this
         T2 fthat = that.arg(key); // Field of that
         if( fthat==null ) {       // Missing field in that
-          if( Field.is_resolving(key) ) continue; // Do not add or remove until resolved
           if( that.is_open() ) that.add_fld(key,fthis,work); // Add to RHS
           else                 thsi.del_fld(key, work); // Remove from LHS
         } else fthis._unify(fthat, work);
@@ -2704,7 +2726,6 @@ public class HM {
       if( that._args!=null )
         for( String key : that._args.keySet() ) {
           if( thsi.arg(key)==null ) { // Missing field in this
-            if( Field.is_resolving(key) ) continue; // Do not add or remove until resolved
             if( thsi.is_open() )  thsi.add_fld(key,that.arg(key),work); // Add to LHS
             else                  that.del_fld(key, work);              // Drop from RHS
           }
@@ -2825,68 +2846,87 @@ public class HM {
 
     private static boolean fresh_unify_flds(T2 thsi, T2 that, VStack nongen, Work<Syntax> work, boolean progress) {
       assert !thsi.unified() && !that.unified();
-      // Attempt resolve and unresolved fields
-      while( Field.trial_resolve_all(thsi,work) || Field.trial_resolve_all(that,work) ) {
-        progress=true;
-        thsi = thsi.find();
-        that = that.find();
-      }
       
       boolean missing = thsi.size()!= that.size();
       if( thsi._args != null )
         for( String key : thsi._args.keySet() ) {
           T2 lhs = thsi.arg(key);
           T2 rhs = that.arg(key);
-          // Attempt a fresh cross-T2 resolve
+          if( rhs==null ) missing=true;
+          
+          // Force a resolving key into the RHS
           if( rhs==null && Field.is_resolving(key) ) {
-            if( that.is_open() ) continue;  // Open RHS allows more fields which might add choices
+            // Check for Field being resolved, even if this key is not
             Field fld = Field.FIELDS.get(key);
-            if( !fld.trial_resolve(lhs,thsi,that,work) ) continue;
-            if( work==null ) return true;
-            progress = true;
-            // Updated LHS args and RHS key
-            key=fld._id;
-            lhs = thsi.arg(key);
-            rhs = that.arg(key);
-          }
+            if( fld.is_resolving() ) {
+              // Attempt resolve; add to success labels
+              progress |= fld.fresh_trial_resolve(lhs,that,work==null);
+              // Act "as if" the resolving key is each success field label, in turn.
+              // If this is only one, we're just acting like we've resolved.
+              // If this is many, we're in-error and just collecting a uniform error.
+              if( fld._fresh_matches!=null )
+                for( String lab : fld._fresh_matches )
+                  progress |= thsi.fresh_unify_1_fld(that,nongen,lab,lhs,that.arg(lab),work);
+            } else {
+              // Fixup already-resolved; change key name, merge if needed
+              if( work==null ) return true;
+              progress = true;
+              T2 fresh_id = thsi._args.remove(key);
+              if( fresh_id!=null ) fresh_id.find()._unify(lhs,work);
+              thsi._args.put(key=fld._id,lhs);
+              thsi.fresh_unify_1_fld(that,nongen,key,lhs,that.arg(key),work);
+            }
 
-          if( rhs==null ) {         // No RHS to unify against
-            missing = true;         // Might be missing RHS
-            thsi.merge_deps(that,work);
-            if( thsi.is_open() || that.is_open() || lhs.is_err() || (thsi.is_fun() && that.is_fun()) ) {
-              if( work==null ) return true; // Will definitely make progress
-              T2 nrhs = lhs._fresh(nongen); // New RHS value
-              if( !that.is_open() ) {
-                nrhs._err = miss_fld(key); // TODO: merge errors
-                thsi.add_deps_work(work);
-              }
-              progress |= that.add_fld(key,nrhs,work);
-            } // Else neither side is open, field is not needed in RHS
           } else {
-            progress |= lhs._fresh_unify(rhs,nongen,work);
+            progress |= thsi.fresh_unify_1_fld(that,nongen,key,lhs,rhs,work);
           }
           thsi=thsi.find();
-          that=that.find();
+          that=that.find(); 
+            
           if( progress && work==null ) return true;
         }
+      
       // Fields in RHS and not the LHS are also merged; if the LHS is open we'd
       // just copy the missing fields into it, then unify the structs (shortcut:
       // just skip the copy).  If the LHS is closed, then the extra RHS fields
       // are removed.
       if( missing && thsi.is_obj() && !thsi.is_open() && that._args!=null )
         for( String key : that._args.keySet() ) { // For all fields in RHS
-          if( Field.is_resolving(key) ) continue;
           if( thsi.arg(key)==null && !that.arg(key).is_err()) {   // Missing in LHS
             if( work == null ) return true;    // Will definitely make progress
             progress |= that.del_fld(key,work);
           }
         }
       // If LHS is closed, close RHS
-      if( thsi.is_obj() && that._open && !thsi._open) { progress = true; that._open = false; }
-      if( progress && work!=null ) that.add_deps_work(work);
+      if( thsi.is_obj() && that._open && !thsi._open )
+        { progress = true; if( work!=null ) that._open = false; }
+      if( progress && work!=null ) {
+        that.add_deps_work(work);
+        if( that._delay_resolve!=null ) { work.addAll(that._delay_resolve); that._delay_resolve.clear(); }
+      }
       return progress;
     }
 
+
+    private boolean fresh_unify_1_fld( T2 that, VStack nongen, String key, T2 lhs, T2 rhs, Work<Syntax> work ) {
+      if( rhs!=null ) 
+        return lhs._fresh_unify(rhs,nongen,work);
+      
+      merge_deps(that,work);
+      // If neither side is open, field is not needed in RHS
+      if( !(is_open() || that.is_open() || lhs.is_err() || (is_fun() && that.is_fun()) ) )
+        return false;
+        
+      if( work==null ) return true; // Will definitely make progress
+      T2 nrhs = lhs._fresh(nongen); // New RHS value
+      if( !that.is_open() ) {
+        nrhs._err = miss_fld(key); // TODO: merge errors
+        add_deps_work(work);
+      }
+      return that.add_fld(key,nrhs,work);
+    }
+
+    
     // Return a fresh copy of 'this'
     T2 fresh() {
       assert VARS.isEmpty();
@@ -2918,22 +2958,24 @@ public class HM {
     }
 
     // Do a trial unification between this and that.  Report back if any error
-    // happens.  No change to either side, this is a trial only.
+    // happens.  No change to either side, this is a trial only.  The extra
+    // field disallows extra fields at the top-level, and is used by the field
+    // lookup for external aliases.
     private static final NonBlockingHashMapLong<T2> TDUPS = new NonBlockingHashMapLong<>();
-    private boolean trial_unify_ok(T2 that, boolean extras) {
+    private boolean trial_unify_ok(T2 that, boolean extras, Syntax fld, boolean test) {
       TDUPS.clear();
-      return _trial_unify_ok(that, extras);
+      return _trial_unify_ok(that, extras,fld,test);
     }
-    private boolean _trial_unify_ok(T2 that, boolean extras) {
+    private boolean _trial_unify_ok(T2 that, boolean extras, Syntax fld, boolean test) {
       assert !unified() && !that.unified();
       long duid = dbl_uid(that._uid);
       if( TDUPS.putIfAbsent(duid,this)!=null )
         return true;                    // Visit only once, and assume will resolve
       if( this==that )     return true; // No error
-      if( this.is_leaf() ) return true; // No error
-      if( that.is_leaf() ) return true; // No error
+      if( this.is_leaf() ) return this._trial_unify_leaf(fld,test); // No error
+      if( that.is_leaf() ) return that._trial_unify_leaf(fld,test); // No error
       if( this.is_base() && that.is_base() ) // Bases must match
-        return _tflow.getClass()==that._tflow.getClass();
+        return _tflow.getClass()==that._tflow.getClass() && _trial_unify_leaf(fld,test) && that._trial_unify_leaf(fld,test);
 
       // Same basic tvar class checks children
       if( is_fun() != that.is_fun() ||
@@ -2949,13 +2991,14 @@ public class HM {
           if( Util.eq(id,RET) ) continue; // Do not unify based on return types
           T2 lhs = this.arg(id);
           T2 rhs = that.arg(id);
-          if( rhs!=null && !lhs._trial_unify_ok(rhs,extras) ) return false;
+          if( rhs!=null && !lhs._trial_unify_ok(rhs,extras,fld,test) ) return false;
           if( id.endsWith(":") && (lhs==null || rhs==null) ) return false; // Class tags are not 'extra fields', must match exactly
         }
 
       // Allow unification with extra fields.  The normal unification path
       // will not declare an error, it will just remove the extra fields.
-      return  (extras || this.mismatched_child(that)) && (that.mismatched_child(this));
+      //return  (extras || this.mismatched_child(that)) && (that.mismatched_child(this));
+      return (that.is_open() || this.mismatched_child(that)) && ((extras && this.is_open()) || that.mismatched_child(this));
     }
 
     // True if 'this' has extra children and 'that' does not allow extras
@@ -2967,6 +3010,16 @@ public class HM {
       return true;
     }
 
+    // If we unified because same leaf or same base, then need to re-test
+    // resolve if the leaf/base expands.  Always returns true.  If not testing,
+    // add the Field to the delay_resolve list.
+    private boolean _trial_unify_leaf(Syntax fld, boolean test) {
+      assert is_leaf() || is_base();
+      if( test ) return true;
+      add_delay_resolve(fld);
+      return true;
+    }
+    
     // -----------------
     private static final VBitSet ODUPS = new VBitSet();
 
@@ -3088,7 +3141,7 @@ public class HM {
             // fail because 'nope' is not in RHS and RHS is not open.  But 'nope'
             // might later be removed (e.g. by normal unifying these two types)
             // so allow for it now.          
-            if( t2.trial_unify_ok(this,true) )
+            if( t2.trial_unify_ok(this,true,apply,test) )
               tj = tj.join(T2.T2MAP.get(t2));
             t2.push_update(apply); // If t2 loses is_copy, need to recheck here
             Root.NEW_LEAF_DEPS.add(apply);
@@ -3196,6 +3249,16 @@ public class HM {
     }
 
 
+    // -----------------
+    // Wait until an open record closes before we can resolve
+    boolean add_delay_resolve(Syntax fld) {
+      //assert is_leaf() || is_base() || (is_obj() && is_open());
+      if( _delay_resolve==null ) _delay_resolve = new Ary<>(new Syntax[1],0);
+      if( _delay_resolve.find(fld)== -1 )
+        _delay_resolve.push(fld);
+      return false;
+    }
+    
     // -----------------
     // Glorious Printing
 
@@ -3307,7 +3370,7 @@ public class HM {
           if( Util.eq(fld,RET) ) continue;   // Function return   , happens if unifying fcns and structs
           if( Util.eq(fld,is_clz)) continue; // Clazz marker name, not currently used
           // Skip field names in a tuple
-          str0(is_tup && !Field.is_resolving(fld) ? sb.p(' ') : sb.p(' ').p(fld).p(" = "),visit,get(fld),dups,debug).p(is_tup ? ',' : ';');
+          str0(is_tup ? sb.p(' ') : sb.p(' ').p(fld).p(" = "),visit,get(fld),dups,debug).p(is_tup ? ',' : ';');
           sep=true;
         }
       }

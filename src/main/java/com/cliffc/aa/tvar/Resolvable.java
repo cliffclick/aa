@@ -26,12 +26,14 @@ public interface Resolvable {
   static Ary<TV3> PAT_LEAFS = new Ary<>(new TV3[1],0);
   default boolean trial_resolve( boolean outie, TV3 pattern, TVStruct lhs, TVStruct rhs, boolean test ) {
     assert !rhs.is_open() && is_resolving();
+    assert lhs==rhs;
 
     // Not yet resolved.  See if there is exactly 1 choice.
     PAT_LEAFS.clear();
     String lab = null;
     for( int i=0; i<rhs.len(); i++ ) {
       String id = rhs.fld(i);
+      assert !is_resolving(id);
       if( !is_resolving(id) && pattern.trial_unify_ok(rhs.arg(id),false) ) {
         if( lab==null ) lab=id;   // No choices yet, so take this one
         else {
@@ -50,6 +52,7 @@ public interface Resolvable {
 
     String old_fld = resolve(lab);      // Change field label
     boolean old = lhs.del_fld(old_fld); // Remove old label from lhs, if any
+    assert !old;
     TV3 prior = lhs.arg(lab);           // Get prior matching lhs label, if any
     if( prior==null ) {
       assert old;               // Expect an unresolved label
