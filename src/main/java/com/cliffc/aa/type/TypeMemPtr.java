@@ -107,7 +107,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public static TypeMemPtr make(boolean any, boolean haz_nil, BitsAlias aliases, TypeStruct obj ) {
     return malloc(any,haz_nil,aliases,obj).hashcons_free();
   }
-  static TypeMemPtr make(boolean any, boolean nil, boolean sub, BitsAlias aliases, TypeStruct obj ) {
+  public static TypeMemPtr make(boolean any, boolean nil, boolean sub, BitsAlias aliases, TypeStruct obj ) {
     return malloc(any,nil,sub,aliases,obj).hashcons_free();
   }
   TypeMemPtr malloc_from(TypeStruct obj) {
