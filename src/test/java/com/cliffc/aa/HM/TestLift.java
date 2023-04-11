@@ -75,13 +75,13 @@ public class TestLift {
 
     T2 x3_ = make_(x0_,x1_,x2_);
 
-    // Call walk_types_out with ret1
+    // Call hm_apply_lift with ret1
     T2.WDUPS.clear(true);
-    Type lift1 = x3_.walk_types_out(ret1,apply,true);
+    Type lift1 = x3_.hm_apply_lift(ret1,apply,true);
 
-    // Call walk_types_out with ret2
+    // Call hm_apply_lift with ret2
     T2.WDUPS.clear(true);
-    Type lift2 = x3_.walk_types_out(ret2,apply,true);
+    Type lift2 = x3_.hm_apply_lift(ret2,apply,true);
 
     // Check monotonic
     assertTrue(ret1 .isa(ret2 ));
@@ -102,13 +102,13 @@ public class TestLift {
   //  Type ret1 = TMP->anything
   //  Type ret2 = Scalar
   //  T2 t2 = FCN
-  //  t2.walk_types_out(ret1) crosses a FCN and a TMP; has to return something higher than a FCN.
-  //  t2.walk_types_out(ret2) lifts the Scalar to a FCN.
-  // Implies, e.g. walk_types_out goes away, just compute "t2.as_flow()" and join(ret1) or join(ret2).
+  //  t2.hm_apply_lift(ret1) crosses a FCN and a TMP; has to return something higher than a FCN.
+  //  t2.hm_apply_lift(ret2) lifts the Scalar to a FCN.
+  // Implies, e.g. hm_apply_lift goes away, just compute "t2.as_flow()" and join(ret1) or join(ret2).
   //
   @Test public void testLift2() {
     Type dummy = TypeMemPtr.ISUSED0;
-    // Setup to call walk_types_out and confirm monotonicity.
+    // Setup to call hm_apply_lift and confirm monotonicity.
     HM.reset();
     Apply apply = null;
     Triple triple = new Triple();
@@ -135,13 +135,13 @@ public class TestLift {
     // Build rezt2 from HM.apply_lift
     T2 x00 = T2.make_struct(FLDS1, new T2[]{frl.fresh()});
     
-    // Call walk_types_out with ret1
+    // Call hm_apply_lift with ret1
     T2.WDUPS.clear(true);
-    Type lift1 = x00.walk_types_out(ret1,apply,true);
+    Type lift1 = x00.hm_apply_lift(ret1,apply,true);
     
-    // Call walk_types_out with ret2
+    // Call hm_apply_lift with ret2
     T2.WDUPS.clear(true);
-    Type lift2 = x00.walk_types_out(ret2,apply,true);
+    Type lift2 = x00.hm_apply_lift(ret2,apply,true);
     
     // Check monotonic
     assertTrue(ret1 .isa(ret2 ));
