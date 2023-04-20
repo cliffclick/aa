@@ -50,6 +50,22 @@ public class TestParse {
 
   // Some HM related type tests
   @Test public void testParse99() {
+    // TestParse.b_recursive_06
+    test("fun = { fx -> math.rand(2) ? 1 : fx(fun(fx),2) }; fun",
+         "[55]{any,4 -> %[2][2,55]? }",
+         // Expect field fun=A to be dead.
+         // Expect display alive to find math.rand.  Not printing it, but part of type.
+         // Expect E to be dead, and not printing it.
+         // Printer bug, 'I:'  no need to print.
+         // Expect escaped function 'fun' to also escape external 'fx'
+         // Expect escaped 'fx' to be widened to { int int -> int }
+         
+         //"A:{*@{fun=A} D:{E F:int:G:1 H:int:I:2-> F     } -> F     }",
+         "    {            {    int64     int64  -> int64 } -> int64 }");
+    // FIXED: Expect test to fail for not mentioning escaped 'fx' - requires both
+    // - No bug, FX is external, escaped under FIDX#2 already.
+
+    
     test("1", "1", "int:1");
     // Simple primitive expansion, pre-combo
     test("1+2", "3", "int:3");
@@ -93,11 +109,16 @@ public class TestParse {
     // TestParse.b_recursive_01
     test("{ f -> (f f) }", "[55]{any,4 -> %[2][2,55]? }", "{A B:{C B -> D } -> D }", null, null, "[]", "[55]" );
 
+    // TestParse.b_recursive_02
+    test("fun = { fx x -> x ? fx( fun(fx,x-1) ) : 1 }; fun(2._*_._, 99)",
+            "int:int64",
+            "int:int64");
+
     // TestParse.b_recursive_05, Y combinator
     test("{ f -> ({ x -> (f (x x))} { x -> (f (x x))})}", "[55]{any,4 -> %[2][2,55]? }", "{ A { B C -> C } -> C }", null, null, "[]", "[55]" );
 
   }
-  
+
   @Test public void testParse00() {
     test("1", "1", "int:1");
     // Unary operator

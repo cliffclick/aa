@@ -12,9 +12,8 @@ import static com.cliffc.aa.AA.unimpl;
 
 public class TVLeaf extends TV3 {
 
-  public TVLeaf() { }
-  public TVLeaf( boolean is_copy ) { super(is_copy); }
-
+  @Override boolean can_progress() { return false; }
+  
   // Leafs never show up in errors
   @Override int eidx() { throw unimpl(); }
 
@@ -32,11 +31,14 @@ public class TVLeaf extends TV3 {
   }
 
   // Leafs have no subclass specific parts to union.
-  @Override void _union_impl(TV3 that) { }
+  @Override public boolean _union_impl(TV3 that) { return false; }
 
   // Always unifies
   @Override boolean _trial_unify_ok_impl( TV3 tv3, boolean extras ) { return true; }
 
+  // Never unifies
+  @Override boolean _exact_unify_impl( TV3 tv3 ) { return false; }
+  
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) {
     if( Combo.HM_FREEZE ) return Env.ROOT.ext_scalar(dep);
@@ -44,15 +46,6 @@ public class TVLeaf extends TV3 {
     deps_add(dep);
     return (AA.DO_HMT || !_use_nil) ? TypeNil.XSCALAR : TypeNil.AND_XSCALAR;
   }
+  @Override void _widen() { }
 
-  // -------------------------------------------------------------
-  private Ary<TVStruct> _delay_resolve;
-  void delay_resolve(TVStruct tvs) {
-    if( _delay_resolve==null ) _delay_resolve = new Ary<>(new TVStruct[1],0);
-    if( _delay_resolve.find(tvs)== -1 )
-      _delay_resolve.push(tvs);
-  }
-
-  @Override void move_delay_resolve() { DELAY_RESOLVE.addAll(_delay_resolve); }
-  
 }

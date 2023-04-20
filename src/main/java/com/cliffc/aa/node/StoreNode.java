@@ -35,7 +35,7 @@ public class StoreNode extends Node {
     if( !(tadr instanceof TypeMemPtr tmp) ) return tadr .oob(TypeMem.ALLMEM);
     if( tmp._aliases.is_empty() ) return tm; // Stored at nothing
     TypeStruct tvs = tval instanceof TypeStruct ? (TypeStruct)tval : tval.oob(TypeStruct.ISUSED);
-    
+
     //Node str = LoadNode.find_previous_struct(this, adr, tmp._aliases);
     //boolean precise = adr instanceof NewNode nnn && (nnn.rec()==str); // Precise is replace, imprecise is MEET
     // TODO: THIS IS A LIE
@@ -83,6 +83,8 @@ public class StoreNode extends Node {
       // Imprecise update, cannot dataflow kill alias going backwards
       return live;
     }
+    // Address changes liveness, the rez can be more live
+    if( rez()!=null ) adr().deps_add(rez());
 
     // Demanded struct; if ptr just any/all else demand struct
     TypeStruct ts = live.ld(tmp);
@@ -114,7 +116,7 @@ public class StoreNode extends Node {
       mem.deps_add(this);   // Input address changes, check reduce
       deps_add(this);       // Our   address changes, check reduce
     }
-    
+
     // Store of a Store, same address
     if( mem instanceof StoreNode st ) {
       if( st.adr() == adr ) {
@@ -136,7 +138,7 @@ public class StoreNode extends Node {
         st.adr().deps_add(this);      // If address changes, check again
       }
     }
-    
+
     //// Escape a dead MemSplit
     //if( mem instanceof MProjNode && mem.in(0) instanceof MemSplitNode msp &&
     //    msp.join()==null ) {
@@ -213,7 +215,7 @@ public class StoreNode extends Node {
   }
 
   @Override public boolean unify( boolean test ) { return false; }
-  
+
   @Override public ErrMsg err( boolean fast ) {
     Type tadr = adr()._val;
     Type tmem = mem()._val;

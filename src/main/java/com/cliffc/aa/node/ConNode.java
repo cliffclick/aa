@@ -17,7 +17,7 @@ public class ConNode<T extends Type> extends Node {
     _t=t;
     _live = is_mem() ? TypeMem.ALLMEM : Type.ALL;
     if( !Combo.pre() && has_tvar() )
-      _tvar = TV3.from_flow(_t,true);
+      _tvar = TV3.from_flow(_t);
   }
   @Override public String xstr() {
     return _t==null ? "(null)" : _t.toString();
@@ -35,7 +35,7 @@ public class ConNode<T extends Type> extends Node {
 
   @Override public TV3 _set_tvar() {
     unelock();                  // Hash now depends on TVars
-    TV3 tv = TV3.from_flow(_t,true);
+    TV3 tv = TV3.from_flow(_t);
     tv.deps_add_deep(this);     // Constant hash depends on tvar      
     return tv;
   }

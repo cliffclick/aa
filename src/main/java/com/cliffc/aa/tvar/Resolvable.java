@@ -23,7 +23,10 @@ public interface Resolvable {
   // - 0  zero matching choices
   // - 1  exactly one choice; resolvable (and resolved if not testing)
   // - 2+ two or more choices; resolve is ambiguous
+  
+  // "Pattern leafs" are just any TV3 that, if it changes might effect the match outcome.
   static Ary<TV3> PAT_LEAFS = new Ary<>(new TV3[1],0);
+  
   default boolean trial_resolve( boolean outie, TV3 pattern, TVStruct lhs, TVStruct rhs, boolean test ) {
     assert !rhs.is_open() && is_resolving();
     assert lhs==rhs;
@@ -41,7 +44,7 @@ public interface Resolvable {
           // and will never resolve.  Record all pattern leaves in the RHS
           // delay list which may later expand and force the resolve.
           while( PAT_LEAFS._len>0 )
-            PAT_LEAFS.pop().delay_resolve(rhs);
+            PAT_LEAFS.pop().add_delay_resolve(rhs);
           return false;
         }
       }
@@ -66,7 +69,6 @@ public interface Resolvable {
   }
 
   static boolean add_pat_leaf(TV3 leaf) {
-    assert leaf instanceof TVBase || leaf instanceof TVLeaf;
     if( PAT_LEAFS.find(leaf)== -1 )
       PAT_LEAFS.add(leaf);
     return true;

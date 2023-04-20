@@ -24,12 +24,14 @@ public class TVErr extends TV3 {
   // Errors other than structural unify errors.
   public Ary<String> _errs;
 
-  public TVErr() { super(false,new TV3[XMAX+10]); }
+  public TVErr() { super(new TV3[XMAX+10]); }
 
   @Override public TVStruct as_struct() { return (TVStruct)arg(XSTR); }
   @Override public TVLambda as_lambda() { return (TVLambda)arg(XFUN); }
   @Override public TVClz    as_clz   () { return (TVClz   )arg(XCLZ); }
   @Override public TVNil    as_nil   () { return (TVNil   )arg(XNIL); }
+
+  @Override boolean can_progress() { throw unimpl(); }
 
   @Override int eidx() { throw unimpl(); }
 
@@ -90,11 +92,12 @@ public class TVErr extends TV3 {
   
   // -------------------------------------------------------------
   // Union/merge subclass specific bits
-  @Override public void _union_impl(TV3 that) {
+  @Override public boolean _union_impl(TV3 that) {
     if( !(that instanceof TVErr err) ) {
       TV3 err_part = arg(that.eidx());
       if( err_part == null ) _args[that.eidx()] = that;
       else err_part._union_impl(that);
+      throw unimpl();
     } else {
       throw unimpl();
     }
@@ -104,6 +107,9 @@ public class TVErr extends TV3 {
     throw unimpl();
   }
   
+  // -------------------------------------------------------------
+  @Override boolean _exact_unify_impl( TV3 tv3 ) { throw unimpl(); }
+
   // -------------------------------------------------------------
   // If there's exactly one type, we can as_flow it.  Otherwise, ambiguous and
   // not sure what to do.
@@ -118,6 +124,7 @@ public class TVErr extends TV3 {
     return tv._as_flow(dep);
   }
 
+  @Override void _widen() { throw unimpl(); }
     
   // Add an error message
   public boolean err(String err, TV3 extra, boolean test) {

@@ -243,6 +243,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   Ary<Node> _deps;
   // Add a dep
   void deps_add(Node dep) {
+    assert dep!=null;
     if( _deps==null ) _deps = new Ary<>(new Node[1],0);
     if( _deps.find(dep)==-1 ) _deps.push(dep);
   }
@@ -383,7 +384,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     }
     typebs.clr();
     hmt_bs.clr();
-    
+
     // Dump in reverse post order
     SB sb = new SB();
     Node prior = null;
@@ -645,7 +646,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( cc==null ) return null;
     if( cc==this ) return Env.ANY;
     return Env.GVN.add_reduce(set_def(0,cc));
-  }    
+  }
 
   // Change values at this Node directly.
   public Node do_flow() {
@@ -719,7 +720,7 @@ public abstract class Node implements Cloneable, IntSupplier {
         if( use instanceof ParmNode )
           return false;
     }
-    
+
     return true;
   }
 
@@ -743,7 +744,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     }
     return Env.GVN.add_flow(con); // Updated live flows
   }
-  
+
   // Forward reachable walk, setting types to ANY and making all dead.
   public final void walk_initype( VBitSet visit ) {
     if( visit.tset(_uid) ) return; // Been there, done that
@@ -756,7 +757,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     for( Node def : _defs ) if( def != null ) def.walk_initype(visit);
     for( Node use : _uses )                   use.walk_initype(visit);
   }
-  
+
   // Reset
   public final void walk_reset( VBitSet visit ) {
     assert is_prim();

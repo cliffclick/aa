@@ -10,8 +10,10 @@ import static com.cliffc.aa.AA.unimpl;
  */
 public class TVField extends TV3 {
   
-  public TVField( TV3 ptr ) { super(true,ptr); }
-  
+  public TVField( TV3 ptr ) { super(ptr); }
+
+  @Override boolean can_progress() { throw unimpl(); }
+
   @Override int eidx() { throw unimpl(); }
 
   // Unresolved field names; typically "&nnn" where `nnn` is the FieldNode id
@@ -19,13 +21,18 @@ public class TVField extends TV3 {
   public static void reset_to_init0() { FIELDS.clear(); }
 
   // -------------------------------------------------------------
-  @Override void _union_impl(TV3 that) {
+  @Override public boolean _union_impl(TV3 that) {
     throw unimpl();
   }
   
   @Override boolean _unify_impl(TV3 that ) { throw unimpl(); }
 
   // -------------------------------------------------------------
+
+  @Override boolean _exact_unify_impl( TV3 tv3 ) { throw unimpl(); }
+
+  // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) { throw unimpl(); }
+  @Override void _widen() { throw unimpl(); }
 
 }

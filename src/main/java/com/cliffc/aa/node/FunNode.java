@@ -125,21 +125,25 @@ public class FunNode extends Node {
   @Override boolean is_CFG() { return is_copy(0)==null; }
 
   public int nargs() { return _nargs; }
-  
+
   // True if more unknown callers may appear on a Fun, Parm, Call, CallEpi, Ret.
   // One-shot transition from having unknown callers to not having.
+  // Note that Root is a known caller.
+  // CNC: Might want to consider a known Root as also an unknown caller
   private boolean _unknown_callers = true;
   public boolean unknown_callers( Node dep) {
     if( _unknown_callers && dep!=null ) deps_add(dep);
     return _unknown_callers;
   }
+  // Checks the unknown caller situation, and one-shot transits from having
+  // unknown-callers to all-callers-known.
   public boolean set_unknown_callers() {
     if( !_unknown_callers || _unknown_callers() ) return false;
     _unknown_callers=false;   // One-shot transition
     deps_work_clear();        // Folks who depend on it get touched
     return true;              // Progress
   }
-  
+
   private boolean _unknown_callers() {
     if( is_keep() || is_prim() ) return true;     // Still alive
     if( is_copy(0)!=null ) return false;          // Copy collapsing
@@ -147,7 +151,7 @@ public class FunNode extends Node {
     FunPtrNode fptr = fptr();
     if( fptr == null ) return false; // Need a funptr to have a new unknown caller
     if( all_uses_are_wired(fptr) ) return false;
-    // TODO: No way to track unwired 
+    // TODO: No way to track unwired
     return Combo.pre();
   }
 
@@ -166,7 +170,7 @@ public class FunNode extends Node {
       if( call.in(i)==fptr )
         return false;           // Use as an arg
     assert call.fdx()==fptr;    // Used to directly call
-    return true;    
+    return true;
   }
 
   @Override public Type value() {
@@ -186,12 +190,12 @@ public class FunNode extends Node {
     if( in(0)==this && _uses._len==1 ) return Env.ANY; // Kill lonely self cycle
     if( set_unknown_callers() ) return this;
     Node progress=null;
-    for( int i=1; i<len(); i++ ) 
+    for( int i=1; i<len(); i++ )
       if( val(i).above_center() )  Env.GVN.add_unuse(progress = del(i));
       else  in(i).deps_add(this);
     return progress==null ? null : this;
   }
-  
+
   @Override public Type live_use( Node def ) {
     if( in(0)==this ) return _live; // Dead self-copy
     if( def instanceof RootNode ) throw unimpl();
@@ -202,7 +206,7 @@ public class FunNode extends Node {
     mem.deps_add(def);
     return mem._live; // Pass through mem liveness
   }
-  
+
   // ----
   // Graph rewriting via general inlining.  All other graph optimizations are
   // already done.
@@ -323,7 +327,7 @@ public class FunNode extends Node {
 
           // if( false) {
         //  fdx.deps_add(this);
-        //  return -1; 
+        //  return -1;
         //}
         //if( tfp.test(_fidx) ) self_recursive = true; // May be self-recursive
         //if( fdx instanceof FunPtrNode fpn ) {
@@ -486,11 +490,11 @@ public class FunNode extends Node {
       if( e.getKey() instanceof MemSplitNode memsplit )
         //memsplit.split_alias(e.getValue(),aliases);
         throw unimpl();
-    
+
     // Rewire all unwired calls.
     for( CallEpiNode cepi : unwireds ) {
       // Load before changing edges (and hash)
-      CallEpiNode cepi2 = (CallEpiNode)map.get(cepi);      
+      CallEpiNode cepi2 = (CallEpiNode)map.get(cepi);
       boolean progress = cepi.CG_wire();
       assert progress;
       // Check for an unwired call in the body - this musta been a recursive

@@ -206,7 +206,7 @@ public class FieldNode extends Node implements Resolvable {
         if( proto == null ) {            // Unknown inferred clazz
           if( test ) return true;        // Always progress
           progress = true;
-          TVStruct obj = new TVStruct(true, new String[]{_fld}, new boolean[]{true}, new TV3[]{tvar()}, true);
+          TVStruct obj = new TVStruct(new String[]{_fld}, new boolean[]{true}, new TV3[]{tvar()}, true);
           TVClz clz = new TVClz(obj, new TVLeaf());
           tv0.unify(clz, test);
           tv0 = clz.clz();
@@ -249,7 +249,7 @@ public class FieldNode extends Node implements Resolvable {
     if( tv0 instanceof TVStruct str0 ) str = str0;
     else {
       if( test ) return true;
-      TVStruct inst = new TVStruct(true, new String[]{}, new TV3[]{}, true);
+      TVStruct inst = new TVStruct(new String[]{}, new TV3[]{}, true);
       if( !is_resolving() )
         inst.add_fld(_fld,Oper.is_oper(_fld),tvar());
       progress = tv0.unify(str=inst,test);
@@ -315,7 +315,7 @@ public class FieldNode extends Node implements Resolvable {
 
     // Unknown inferred clazz
     if( test ) return true;        // Always progress
-    TVStruct obj = new TVStruct(true, new String[]{_fld}, new boolean[]{true}, new TV3[]{tvar()}, true);
+    TVStruct obj = new TVStruct(new String[]{_fld}, new boolean[]{true}, new TV3[]{tvar()}, true);
     CLZ = new TVClz(obj, new TVLeaf());
     tvar(0).unify(CLZ, test);
     return true;

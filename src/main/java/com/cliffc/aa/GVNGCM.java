@@ -68,7 +68,7 @@ public class GVNGCM {
     return n;
   }
   public void add_flow( Ary<Node> ary ) { for( Node n : ary ) add_flow(n); }
-  
+
   public Node pop_flow() { return _work_flow.pop(); }
   public int flow_len() { return _work_flow.len(); }
 
@@ -105,7 +105,7 @@ public class GVNGCM {
     assert n._uses._len==0;     // New to GVN
     n._val = n.value();
     // Any new nodes made post-Combo-HM need a TVar
-    if( Combo.HM_FREEZE && n.has_tvar() ) 
+    if( Combo.HM_FREEZE && n.has_tvar() )
       n.set_tvar();
     add_work_new(n);
     return n;
@@ -121,7 +121,7 @@ public class GVNGCM {
     // Node, and thus be able to compute liveness.
     return add_flow(pop(idx));
   }
-  
+
   // During start-up, ~2000 total iterations, something like 95% of which are
   // no-ops.  Also, about 500 nodes for primitives, and each hits flow, reduce,
   // mono and grow worklists (so 4 times) for no-progress.
@@ -147,7 +147,7 @@ public class GVNGCM {
       else break;
       if( m == null ) ITER_CNT_NOOP++;     // No progress profiling
       else n.deps_work_clear();            // Progress; deps on worklist
-      //assert Env.ROOT.more_work(true) == 0;
+      assert Env.ROOT.more_work(true) == 0;
       //assert Env.ROOT.no_more_ideal();
     }
     assert AA.once_per() || Env.ROOT.more_work(true)==0;

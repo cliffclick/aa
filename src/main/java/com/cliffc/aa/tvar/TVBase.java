@@ -10,15 +10,20 @@ import static com.cliffc.aa.AA.unimpl;
 
 public class TVBase extends TV3 {
   public Type _t;  
-  private TVBase( boolean is_copy, Type t ) {
-    super(is_copy, (TV3[]) null);
+  private TVBase( Type t ) {
     assert t!=Type.ALL;
     _t = t;
   }
-  public static TV3 make( boolean is_copy, Type t) {
-    return t==Type.ALL ? new TVLeaf(is_copy) : new TVBase(is_copy,t);
+  public static TV3 make( Type t) {
+    return t==Type.ALL ? new TVLeaf() : new TVBase(t);
   }
 
+  @Override boolean can_progress() {
+    if( _t instanceof TypeInt ) return _t!=TypeInt.INT64;
+    if( _t instanceof TypeFlt ) return _t!=TypeFlt.FLT64;
+    throw unimpl();
+  }
+  
   @Override int eidx() {
     if( _t instanceof TypeInt ) return TVErr.XINT;
     if( _t instanceof TypeFlt ) return TVErr.XFLT;
@@ -30,38 +35,26 @@ public class TVBase extends TV3 {
     _may_nil = false;
     return this;
   }
-  @Override boolean add_nil(boolean test) {
-    Type t = _t.meet(TypeNil.NIL);
-    if( test ) return t!=_t || !_may_nil;
-    _t = t;
-    return (_may_nil = true);
-  }
 
   // Convert the leader nil into a base+NIL, widened if the leader is not a
   // copy.
   @Override TV3 find_nil( TVNil nil ) {
     Type t = _t.meet(TypeNil.NIL);
-    if( !nil._is_copy ) t = t.widen(); // Widen if leader is a not a copy
-    if( t==_t && _may_nil && (!_is_copy || nil._is_copy) )
+    if( t==_t && _may_nil )
       return this;
-    // Need a new base, because either t or is_copy or may_nil changes
-    TVBase b = new TVBase(_is_copy & nil._is_copy,t);
-    b._may_nil = true;
+    // Need a new base, because may_nil changes
+    TVBase b = new TVBase(t);
+    b.add_may_nil(false);
     return b;
-  }
-
-  // Clear is_copy, and report progress
-  @Override boolean clr_cp() {
-    if( !_is_copy ) return false;
-    _t = _t.widen();
-    _is_copy = false;
-    return true;
   }
   
   // -------------------------------------------------------------
-  @Override void _union_impl(TV3 t) {
+  @Override public boolean _union_impl(TV3 t) {
     TVBase that = (TVBase)t;    // Invariant when called
-    that._t = that._t.meet(_t);
+    Type type = that._t.meet(_t);
+    if( type == that._t ) return false;
+    that._t = type;
+    return true;
   }
   
   @Override boolean _unify_impl(TV3 t ) { return true; }
@@ -74,7 +67,7 @@ public class TVBase extends TV3 {
     if( t==base._t ) return false;
     if( !test ) {
       base._t = t;
-      base.move_delay_fresh();  // Any Fresh base updates need to rerun
+      base.move_delay();        // Any Fresh base updates need to rerun
     }
     return true;
   }
@@ -88,17 +81,21 @@ public class TVBase extends TV3 {
     return Resolvable.add_pat_leaf(this);
   }
 
-  // -------------------------------------------------------------
-  private Ary<TVStruct> _delay_resolve;
-  void delay_resolve(TVStruct tvs) {
-    if( _delay_resolve==null ) _delay_resolve = new Ary<>(new TVStruct[1],0);
-    if( _delay_resolve.find(tvs)== -1 )
-      _delay_resolve.push(tvs);
+  // Unifies if same and cannot fall
+  @Override boolean _exact_unify_impl( TV3 tv3 ) {
+    TVBase base = (TVBase)tv3;
+    return _t == base._t;
   }
 
-  @Override void move_delay_resolve() { DELAY_RESOLVE.addAll(_delay_resolve); }
- 
+  
   // -------------------------------------------------------------
-  @Override Type _as_flow( Node dep ) { return _t; }  
+  @Override Type _as_flow( Node dep ) { return _t; }
+  @Override void _widen() {
+    Type tw = _t.widen();
+    if( tw == _t ) return;
+    _t = tw;
+    //if( WORK!=null ) add_deps_work(WORK);
+    throw unimpl();
+  }
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) { return sb.p(_t); }  
 }

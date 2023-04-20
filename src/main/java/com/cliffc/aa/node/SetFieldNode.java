@@ -85,8 +85,8 @@ public class SetFieldNode extends Node {
   @Override public boolean has_tvar() { return true; }
   
   @Override public TV3 _set_tvar() {
-    TV3 rec  = new TVStruct(true,new String[]{_fld},new TV3[]{new TVLeaf()    },true);
-    TV3 self = new TVStruct(true,new String[]{_fld},new TV3[]{in(1).set_tvar()},true);
+    TV3 rec  = new TVStruct(new String[]{_fld},new TV3[]{new TVLeaf()    },true);
+    TV3 self = new TVStruct(new String[]{_fld},new TV3[]{in(1).set_tvar()},true);
     in(0).set_tvar().unify(rec,false);
     return self;
   }

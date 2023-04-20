@@ -297,8 +297,11 @@ public class TypeMem extends Type<TypeMem> {
   public TypeStruct ld( TypeMemPtr ptr ) {
     if( ptr._nil )
       return TypeStruct.UNUSED; // Loading from nil
-    if( ptr._aliases == BitsAlias.EMPTY )
-      return ptr._obj.oob(TypeStruct.ISUSED);
+    if( ptr._aliases == BitsAlias.EMPTY ) {
+      // If aliases are added, we'll fall
+      return TypeStruct.UNUSED;
+      //return ptr._obj.oob(TypeStruct.ISUSED);
+    }
     if( this==ALLMEM ) return TypeStruct.ISUSED;
     if( this==ANYMEM ) return TypeStruct.UNUSED;
     return ld(_pubs,ptr._aliases);

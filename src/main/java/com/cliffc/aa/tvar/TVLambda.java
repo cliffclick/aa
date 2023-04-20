@@ -14,7 +14,7 @@ import static com.cliffc.aa.AA.*;
 public class TVLambda extends TV3 {
 
   public TVLambda( int nargs, TV3 dsp, TV3 ret ) {
-    super(true,new TV3[nargs]);
+    super(new TV3[nargs]);
     // Slot 0/CTL_IDX is reserved for the return.
     // Slot 1/MEM_IDX is unused.
     // Slot 2/DSP_IDX is for the display/self/this argument
@@ -29,16 +29,15 @@ public class TVLambda extends TV3 {
   public TV3 dsp() { return arg(DSP_IDX); }
   public int nargs() { return len(); }
   public TVLambda clr_dsp() { _args[DSP_IDX] = new TVLeaf(); return this; }
-  
+
+  @Override boolean can_progress() { return false; }
+
   @Override int eidx() { return TVErr.XFUN; }
 
   @Override TV3 find_nil(TVNil nil) { return this; }
 
   // -------------------------------------------------------------
-  @Override void _union_impl( TV3 tv3) {
-    //assert _uid > tv3._uid;
-    // No subparts to union
-  }
+  @Override public boolean _union_impl( TV3 tv3) { return false; }
 
   @Override boolean _unify_impl(TV3 tv3 ) {
     TVLambda that = (TVLambda)tv3; // Invariant when called
@@ -63,9 +62,11 @@ public class TVLambda extends TV3 {
     return true;                // Unify will work
   }
 
+  @Override boolean _exact_unify_impl( TV3 tv3 ) { throw unimpl(); }
+
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) {
-    // All escaping fidxs may match here.
+    // Compatible escaped fidxs
     BitsFun fidxs = Env.ROOT.matching_escaped_fidxs(this,dep);
     if( _may_nil ) fidxs = fidxs.set(0);
     if( _use_nil ) throw unimpl();
@@ -76,6 +77,7 @@ public class TVLambda extends TV3 {
     Type rez = ret()._as_flow(dep);
     return TypeFunPtr.makex(false,fidxs,nargs(),dsp,rez);
   }
+  @Override void _widen() { throw unimpl(); }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     sb.p("{ ");

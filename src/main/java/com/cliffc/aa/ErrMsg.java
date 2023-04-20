@@ -51,7 +51,6 @@ public class ErrMsg implements Comparable<ErrMsg> {
     return new ErrMsg(loc,sb.toString(),lvl);
   }
   public static ErrMsg typerr( Parse loc, Type actual, Type t0mem, Type[] expecteds ) {
-    TypeMem tmem = t0mem instanceof TypeMem ? (TypeMem)t0mem : null;
     SB sb = actual.str(new SB(), false, false);
     sb.p( expecteds.length==1 ? " is not a " : " is none of (");
     for( Type expect : expecteds ) expect.str(sb, false, false).p(',');

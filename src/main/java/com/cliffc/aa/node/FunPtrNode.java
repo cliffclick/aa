@@ -76,13 +76,15 @@ public final class FunPtrNode extends Node {
     return TypeFunPtr.make(ret._fidx,nargs(),Type.ANY,tret.at(REZ_IDX));
   }
 
+  // FunPtrs return RetNode liveness for memory
   @Override public Type live_use( Node ret ) {
     assert ret instanceof RetNode;
     // Pre-combo, Ret is alive because unwired caller may yet appear and demand
     // all memory
     FunNode fun = xfun();
     if( fun==null ) return TypeMem.ANYMEM; // Dead, no memory demand
-    if( fun.unknown_callers(this) ) return RootNode.def_mem(ret);    
+    if( fun.unknown_callers(this) || fun._defs.last() instanceof RootNode )
+      return RootNode.def_mem(ret);
     // During/post-combo, Ret is alive only if called or escaped.
     Env.ROOT.deps_add(ret);
     if( Env.ROOT.rfidxs().test(fun._fidx) ) // Escaped

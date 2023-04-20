@@ -100,10 +100,8 @@ public class CastNode extends Node {
     }
     
     // Already an expanded nilable with ptr
-    if( maynil instanceof TVPtr && notnil instanceof TVPtr )
-    //  return maynil.arg("*").unify(notnil.arg("*"),test);
-      // TODO: suspicious, thing this should be the default
-      throw unimpl();
+    if( maynil instanceof TVPtr mptr && notnil instanceof TVPtr nptr )
+      return nptr.load().unify(nptr.load(),test);
 
     // Can be nilable of nilable; fold the layer
     if( maynil instanceof TVNil && notnil instanceof TVNil )

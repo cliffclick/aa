@@ -39,7 +39,7 @@ public abstract class PrimNode extends Node {
     super(OP_PRIM);
     _name = name;
     _is_lazy = is_lazy;
-    int fidx = BitsFun.new_fidx();
+    int fidx = BitsFun.new_fidx(BitsFun.EXTX);
     for( int i=DSP_IDX; i<formals._ts.length; i++ ) assert formals._ts[i] instanceof TypeNil || formals._ts[i]==Type.ANY;
     _formals = formals;
     _ret = ret;
@@ -51,9 +51,11 @@ public abstract class PrimNode extends Node {
   public static final StructNode ZINT = new StructNode(0,false,null,"", Type.ALL);
   public static final StructNode ZFLT = new StructNode(0,false,null,"", Type.ALL);
   public static final StructNode ZSTR = new StructNode(0,false,null,"", Type.ALL);
-  public static final NewNode PINT = new NewNode();
-  public static final NewNode PFLT = new NewNode();
+  public static final StructNode ZMATH= new StructNode(0,false,null,"", Type.ALL);
+  public static final NewNode PINT = new NewNode(BitsAlias.new_alias(BitsAlias.EXTX));
+  public static final NewNode PFLT = new NewNode(BitsAlias.new_alias(BitsAlias.EXTX));
   public static final NewNode PSTR = new NewNode(BitsAlias.STRX);
+  public static final NewNode PMATH= new NewNode(BitsAlias.new_alias(BitsAlias.EXTX));
 
   public static final ConNode  INT = new ConNode(TypeInt. INT64).init();
   public static final ConNode  FLT = new ConNode(TypeFlt. FLT64).init();
@@ -189,14 +191,13 @@ public abstract class PrimNode extends Node {
 
   // Build and install match package
   private static NewNode make_math(PrimNode rand) {
-    StructNode math = new StructNode(0,false,null,"",Type.ALL);
-    math.add_fld("pi",Access.Final,con(TypeFlt.PI),null);
-    math.add_fld(rand._name,Access.Final,rand.as_fun(),null);
-    math.close().init();
-    NewNode ptr = new NewNode(); Env.GVN.add_flow(ptr); // Type depends on uses
-    StoreNode mem = new StoreNode(Env.SCP_0.mem(),ptr,math,null).init();
+    ZMATH.add_fld("pi",Access.Final,con(TypeFlt.PI),null);
+    ZMATH.add_fld(rand._name,Access.Final,rand.as_fun(),null);
+    ZMATH.close().init();
+    Env.GVN.add_flow(PMATH); // Type depends on uses
+    StoreNode mem = new StoreNode(Env.SCP_0.mem(),PMATH,ZMATH,null).init();
     Env.SCP_0.set_mem(mem);
-    return ptr;
+    return PMATH;
   }
   
   // Apply uses the same alignment as the arguments, ParmNodes, _formals.
@@ -244,16 +245,16 @@ public abstract class PrimNode extends Node {
     // primitive with a clazz reference
     for( int i=DSP_IDX; i<_formals.len(); i++ )
       if( _formals.at(i)!=Type.ANY )
-        in(i-DSP_IDX).set_tvar().unify(make_tvar(true,(TypeNil)_formals.at(i)),false);
+        in(i-DSP_IDX).set_tvar().unify(make_tvar((TypeNil)_formals.at(i)),false);
     // Return is some primitive, and is typically never a copy
-    return make_tvar(false,_ret);
+    return make_tvar(_ret);
   }
 
   // Make a wrapped TV3
 
-  static TV3 make_tvar(boolean is_copy, TypeNil rez) {
+  static TV3 make_tvar(TypeNil rez) {
     if( rez==TypeNil.NIL ) throw unimpl();
-    return TV3.from_flow(rez,is_copy);
+    return TV3.from_flow(rez);
   }
 
   // All work done in set_tvar, no need to unify
@@ -269,6 +270,21 @@ public abstract class PrimNode extends Node {
     }
     return null;
   }
+
+  // Set escaping primitives into memory
+  static TypeMem escaped_primitive_memory( Node def, TypeMem tmem ) {
+    tmem = tmem.set(BitsAlias.EXTX,TypeStruct.ISUSED);
+    tmem = tmem.set(BitsAlias.STRX,TypeMemPtr.STRPTR._obj);
+    tmem = tmem.set(PINT ._alias,TypeStruct.as_struct(ZINT ._val));
+    tmem = tmem.set(PFLT ._alias,TypeStruct.as_struct(ZFLT ._val));
+    tmem = tmem.set(PMATH._alias,TypeStruct.as_struct(ZMATH._val));
+    ZINT .deps_add(def);
+    ZFLT .deps_add(def);
+    ZMATH.deps_add(def);
+    return tmem;
+  }
+
+  
   // Prims are equal for same-name-same-signature (and same inputs).
   // E.g. float-minus of x and y is NOT the same as int-minus of x and y
   // despite both names being '-'.

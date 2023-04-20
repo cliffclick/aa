@@ -91,6 +91,7 @@ public class PhiNode extends Node {
   // All inputs unify
   @Override public boolean unify( boolean test ) {
     if( !(in(0) instanceof RegionNode r) ) return false; // Dying
+    if( val(0) != Type.CTRL && val(0)!= Type.ALL ) return false; // Control is dead
     if( !has_tvar() ) return false; // Memory not part of HM
     boolean progress = false;
     for( int i=1; i<_defs._len; i++ ) {

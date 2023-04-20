@@ -46,7 +46,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   // Roughly a tree-shaped clazz designation.  A colon-separated list of clazz
   // names, which may be empty.  Parent clazzes on the left, child on the
   // right.  Used by Field lookups for final constant fields kept in the clazz
-  // and not here. 
+  // and not here.
   public String _clz;
 
   // Default value
@@ -314,7 +314,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   //@Override TypeStruct make_from( boolean any, boolean nil, boolean sub ) { return make( any,nil,sub,_clz,_def,_flds); }
 
 
-  
+
   // Possibly allocated.  No fields specified.  All fields are possible and
   // might be ALL (error).  The worst possible result.
   public static final TypeStruct ISUSED = make(TypeFlds.EMPTY);
@@ -390,7 +390,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   private static final Ary<TypeFld> FLDS = new Ary<>(new TypeFld[1],0);
   private TypeStruct flat_meet( TypeStruct that, String clz, Type def, boolean any ) {
     TypeFld[] flds2 = TypeFlds.get(this.len()+that.len());
-    int i=0, j=0, k=0;    
+    int i=0, j=0, k=0;
     while( i<this.len() && j<that.len() ) {
       TypeFld fld0 = this._flds[i], fld1 = that._flds[j];
       String    s0 = fld0._fld    ,   s1 = fld1._fld;
@@ -401,7 +401,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     }
     for( ; i<this.len(); i++ )  k = add_fld(flds2,k,this._flds[i]._fld,def,this._flds[i],that._def);
     for( ; j<that.len(); j++ )  k = add_fld(flds2,k,that._flds[j]._fld,def,that._flds[j],this._def);
-    
+
     // Sorted, dups and defaults removed.
     TypeFld[] flds = TypeFlds.get(k);
     System.arraycopy(flds2,0,flds,0,k);
@@ -411,7 +411,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
                  _sub & that._sub,
                  clz, def, TypeFlds.hash_cons(flds));
   }
-  
+
   private static int add_fld(TypeFld[] flds2, int k, String fld, Type def, TypeFld fld0, Type odef) {
     return add_fld(flds2,k,fld,def,fld0._t.meet(odef),fld0._access);
   }
@@ -420,7 +420,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
       flds2[k++] = TypeFld.make(fld,t,access);
     return k;
   }
-  
+
   private static void add_fldc(TypeFld fld) { add_fldc(fld._fld,fld._access); }
   private static void add_fldc(String fld, Access access) { FLDS.push(TypeFld.malloc(fld,null,access)); }
 
@@ -646,7 +646,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     // use short-cut printing.
     if( (Util.eq("int:",_clz) || Util.eq("flt:",_clz)) && get(".")!=null )
       return;
-    
+
     for( int i=0; i<len(); i++ ) // DO NOT USE iter syntax, else toString fails when the iter pool exhausts during a debug session
       if( get(i)!=null )
         get(i)._str_dups(visit,dups,ucnt);
@@ -668,10 +668,10 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     if( is_flt_clz() ) return sb.p("@{FLT}");
     if( is_str_clz() ) return sb.p("str");
     if( is_math_clz()) return sb.p("@{MATH}");
-    
+
     sb.p(_clz); // Includes a trailing ':' if not-empty
     if( _clz.isEmpty() && dups.get(_uid)!=null )  sb.p(':');
-    
+
     boolean is_tup = is_tup();
     sb.p(is_tup ? "(" : "@{");
     // Set the indent flag once for the entire struct.  Indent if any field is complex.
@@ -708,7 +708,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   boolean is_str_clz () { return _clz.isEmpty() && _flds.length>0 && Util.eq("#_" ,_flds[0]._fld); }
   boolean is_math_clz() { return _clz.isEmpty() && _flds.length>0 && Util.eq("pi" ,_flds[0]._fld); }
 
-  
+
   // e.g. (), (^=any), (^=any,"abc"), (3.14), (3.14,"abc",:=123)
   // @{}, @{x=3.14; y="abc"; z:=123}
   static TypeStruct valueOf(Parse P, String dup, boolean any, boolean is_tup ) {
@@ -723,7 +723,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     char close = is_tup ? ')' : '}';
     if( P.peek(close) ) return ts;
 
-    int fld_num = 0; 
+    int fld_num = 0;
     while(true) {
       if( P.peek("...") ) { assert any; break; }
       if( P.peek('$') )
@@ -734,7 +734,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
         //   label:=type (yielding a TypeFld); label can be a number; or
         //   type (yielding a "fld_num=" type TypeFld) or
         // Handling of leading DUP: handled by general parser:
-        //   DUP:label:=type (yielding a TypeFld) or 
+        //   DUP:label:=type (yielding a TypeFld) or
         //   DUP:type (yielding a "fld_num=" type TypeFld) or
         : (TypeFld)P.type(null,false,is_tup ? fld_num : -1/*must find a label*/);
       if( is_tup && fld._fld.equals(""+fld_num) ) fld_num++; // Used up a field num
@@ -781,9 +781,14 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
         : _flds[i].make_from(TypeNil.SCALAR, Access.bot());
     return make_from(flds);
   }
-  
+
   // Flatten fields for LIVE: only need a per-field any/all indication
   public TypeStruct flatten_live_fields() {
+    boolean change=false;
+    for( TypeFld fld : _flds )
+      if( fld._t != Type.ANY || fld._t != Type.ALL )
+        { change = true; break; }
+    if( !change ) return this;
     TypeFld[] flds = TypeFlds.get(len());
     for( int i=0; i<_flds.length; i++ )
       flds[i] = _flds[i].make_from(_flds[i]._t==Type.ANY ? Type.ANY : Type.ALL, Access.bot());
@@ -815,6 +820,10 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     return fidxs;
   }
 
+  public static TypeStruct as_struct( Type t ) {
+    return t instanceof TypeStruct ts ? ts : t.oob(ISUSED);
+  }
+  
   // Used for assertions
   @Override boolean intern_check1() {
     for( TypeFld fld : this )

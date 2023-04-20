@@ -252,7 +252,7 @@ public class StructNode extends Node {
   @Override TV3 _set_tvar() {
     TVStruct ts = new TVStruct(_flds);
     for( int i=0; i<len(); i++ )
-      ts.set_pin_fld(i,new TVLeaf(_accesses.at(i)==TypeFld.Access.Final));
+      ts.set_pin_fld(i,new TVLeaf());
     if( _clz.isEmpty() ) return ts;
     // Explicit clazz representation
     StructNode proto = Env.PROTOS.get(_clz);

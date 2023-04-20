@@ -26,13 +26,13 @@ public class TVStruct extends TV3 {
 
   private int _max;             // Max set of in-use flds/args
   
-  public TVStruct( Ary<String> flds ) { this(true,flds.asAry(),new TV3[flds.len()]);  }
+  public TVStruct( Ary<String> flds ) { this(flds.asAry(),new TV3[flds.len()]);  }
   // Made from a StructNode; fields are known, so this is closed
-  public TVStruct( boolean is_copy, String[] flds, TV3[] tvs ) { this(is_copy,flds,tvs,false); }
+  public TVStruct( String[] flds, TV3[] tvs ) { this(flds,tvs,false); }
   // Made from a Field or SetField; fields are unknown so this is open
-  public TVStruct( boolean is_copy, String[] flds, TV3[] tvs, boolean open ) { this(is_copy,flds,pins(flds),tvs,open); }
-  public TVStruct( boolean is_copy, String[] flds, boolean[] pins, TV3[] tvs, boolean open ) {
-    super(is_copy,tvs);
+  public TVStruct( String[] flds, TV3[] tvs, boolean open ) { this(flds,pins(flds),tvs,open); }
+  public TVStruct( String[] flds, boolean[] pins, TV3[] tvs, boolean open ) {
+    super(tvs);
     _flds = flds;
     _pins = pins;
     _open = open;
@@ -40,6 +40,8 @@ public class TVStruct extends TV3 {
     assert tvs.length==_max;
   }
 
+  @Override boolean can_progress() { throw unimpl(); }
+  
   // Used during cyclic construction
   public void set_pin_fld(int i, TV3 fld) { _args[i] = fld; _pins[i] = true; }
   public boolean is_pinned(String fld) { return _pins[Util.find(_flds,fld)]; }
@@ -63,7 +65,7 @@ public class TVStruct extends TV3 {
     _pins[_max] = pinned;
     _max++;
     // Changed struct shape, move delayed-fresh updates to now
-    move_delay_fresh();
+    move_delay();
     return true;
   }
 
@@ -74,7 +76,7 @@ public class TVStruct extends TV3 {
     _flds[idx] = _flds[_max-1];
     _max--;
     // Changed struct shape, move delayed-fresh updates to now
-    move_delay_fresh();
+    move_delay();
     return true;
   }
   // Remove field; true if something got removed
@@ -134,9 +136,12 @@ public class TVStruct extends TV3 {
   @Override public TVStruct as_struct() { return this; }
 
   // -------------------------------------------------------------
-  @Override void _union_impl( TV3 tv3 ) {
-    //assert _uid > tv3._uid;
-    if( tv3 instanceof TVStruct ts ) ts._open &= _open;
+  @Override public boolean _union_impl( TV3 tv3 ) {
+    TVStruct ts = (TVStruct)tv3; // Invariant when called
+    boolean x = ts._open & _open;
+    if( x==ts._open ) return false;
+    ts._open = x;
+    return true;
   }
 
   @Override boolean _unify_impl( TV3 tv3 ) {
@@ -279,13 +284,21 @@ public class TVStruct extends TV3 {
         return false;          // Trial unification failed
     return true;
   }
-  
+
+  @Override boolean _exact_unify_impl( TV3 tv3 ) {
+    TVStruct ts = (TVStruct)tv3;
+    return (!_open && !ts._open ) &&  // Both are closed (no adding unmatching fields)
+      Arrays.equals(_flds,ts._flds) && // And all fields match
+      Arrays.equals(_pins,ts._pins);
+  }
+
   // -------------------------------------------------------------
-  @Override Type _as_flow( Node dep ) { throw unimpl(); }  
+  @Override Type _as_flow( Node dep ) { throw unimpl(); }
+  @Override void _widen() { throw unimpl(); }
+  
   public boolean is_int_clz() { return  Util.find(_flds,"!_" ) >= 0; }
   public boolean is_flt_clz() { return  Util.find(_flds,"sin") >= 0; }
   public boolean is_str_clz() { return  Util.find(_flds,"#_" ) >= 0; }
-
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     boolean is_tup = _max==0 || Character.isDigit(_flds[0].charAt(0));

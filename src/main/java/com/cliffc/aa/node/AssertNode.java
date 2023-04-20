@@ -129,7 +129,7 @@ public class AssertNode extends Node {
 
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
-    TV3 tv3 = TV3.from_flow(_t,true);
+    TV3 tv3 = TV3.from_flow(_t);
     arg().set_tvar().unify(tv3,false);
     return tv3;
   }

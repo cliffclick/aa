@@ -18,15 +18,16 @@ import static com.cliffc.aa.AA.unimpl;
  */
 public class TVNil extends TV3 {
   
-  public TVNil( TV3 tv3 ) { super(true,tv3); _may_nil = true; }
+  public TVNil( TV3 tv3 ) { super(true,tv3); }
   public TVLeaf not_nil() { return (TVLeaf)arg(0); }
 
+  @Override boolean can_progress() { return false; }
   @Override int eidx() { return TVErr.XNIL; }
   @Override public TVNil as_nil() { return this; }
   
   // -------------------------------------------------------------
   // No sub-parts to union
-  @Override void _union_impl(TV3 that) { }
+  @Override public boolean _union_impl(TV3 that) { return false; }
 
   @Override boolean _unify_impl(TV3 that ) { return arg(0)._unify(that.arg(0),false); }
 
@@ -39,8 +40,7 @@ public class TVNil extends TV3 {
     assert !not_nil._may_nil; // might not be true under nested nilables, not required since copy strips nil
     not_nil._deps_work_clear();
     TV3 copy = that.copy().strip_nil();
-    if( !that._is_copy ) clr_cp(); // Just and-mask in this
-    return not_nil.union(copy) | that.union(this);
+    return not_nil.union(copy) | union(that);
   }
 
   // U-F union; this is nilable and a fresh copy of this unifies to that.
@@ -55,7 +55,7 @@ public class TVNil extends TV3 {
   //   {PTR*} -->  {THAT>>COPY} --> {THAT.ARGS}  
   boolean _unify_nil_l( TV3 that, boolean test ) {
     assert !(that instanceof TVNil) && !not_nil()._may_nil;
-    return that.add_nil(test);
+    return that.add_may_nil(test);
   }
 
   // U-F union; this is nilable and a fresh copy of that unifies to this.
@@ -70,7 +70,6 @@ public class TVNil extends TV3 {
     // A shallow copy and fresh-unify fails if 'this' is cyclic, because the
     // shallow copy peels one part of the loop.
     TV3 copy = that._fresh().strip_nil();
-    if( !that._is_copy ) clr_cp(); // Just and-mask in this
     not_nil.union(copy);
     return copy;
   }
@@ -93,12 +92,15 @@ public class TVNil extends TV3 {
     }
     return false;
   }
-  
+
+  @Override boolean _exact_unify_impl( TV3 tv3 ) { throw unimpl(); }
+
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) {
     Type t = not_nil()._as_flow(dep);
     return t.meet(TypeNil.NIL);
   }
+  @Override void _widen() { throw unimpl(); }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     return _args[0]._str(sb,visit,dups,debug).p('?');

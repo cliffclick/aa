@@ -28,10 +28,10 @@ public class TestHM {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_HMT=true;
+    DO_HMT=false;
     DO_GCP=true;
     RSEED=0;
-    c_composition_err_01(); // T/T/0   { g -> (if (g 1) (g \"abc\") (g \"def\") ) }
+    b_recursive_06();
   }
 
   private void _run0s( String prog, String rprog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {

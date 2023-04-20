@@ -14,10 +14,11 @@ import static com.cliffc.aa.AA.unimpl;
  */
 public class TVClz extends TV3 {
   
-  public TVClz( TVStruct clz, TV3 rhs ) { super(true,clz,rhs); }
+  public TVClz( TVStruct clz, TV3 rhs ) { super(clz,rhs); }
   public TVStruct clz() { return (TVStruct)arg(0); }
   public TV3      rhs() { return           arg(1); }
 
+  @Override boolean can_progress() { return false; }
   @Override int eidx() { return TVErr.XCLZ; }
   @Override public TVClz as_clz() { return this; }
 
@@ -26,12 +27,12 @@ public class TVClz extends TV3 {
     _may_nil = false;
     return this;
   }
-  @Override boolean add_nil(boolean test) {
-    if( _may_nil && !rhs().add_nil(true) ) return false;
+  @Override boolean add_may_nil(boolean test) {
+    if( _may_nil && !rhs().add_may_nil(true) ) return false;
     if( test ) return true;
     _args[1] = rhs().copy();
-    _args[1].add_nil(false);
-    _may_nil = true;
+    _args[1].add_may_nil(false);
+    add_may_nil(false);
     return true;
   }
 
@@ -44,15 +45,8 @@ public class TVClz extends TV3 {
     return new TVClz(clz(),nn);
   }
 
-  // Clear is_copy, and report progress
-  @Override boolean clr_cp() {
-    boolean progress = _is_copy;
-    _is_copy = false;
-    return progress | rhs().clr_cp();
-  }
-
   // -------------------------------------------------------------
-  @Override void _union_impl(TV3 that) { }
+  @Override public boolean _union_impl(TV3 that) { return false; }
 
   @Override boolean _unify_impl(TV3 t ) {
     TVClz clz = (TVClz)t;       // Invariant when called
@@ -70,7 +64,9 @@ public class TVClz extends TV3 {
       clz()._trial_unify_ok(clz.clz(),extras) &&
       rhs()._trial_unify_ok(clz.rhs(),extras);
   }
-  
+
+  @Override boolean _exact_unify_impl( TV3 tv3 ) { throw unimpl(); }
+
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) {
     TVStruct clz = arg(0).as_struct();
@@ -84,6 +80,7 @@ public class TVClz extends TV3 {
     // TODO: Add clazz to structs
     return rhs;
   }
+  @Override void _widen() { throw unimpl(); }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     TVStruct clz = arg(0).as_struct();

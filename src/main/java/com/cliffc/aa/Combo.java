@@ -165,7 +165,7 @@ public abstract class Combo {
     add_ambi_work();
     assert Env.ROOT.more_work(false)==0;
     work_cnt += main_work_loop(3);
-    
+
     // Pass 4: H-M types freeze, escaping function args are assumed called with lowest H-M compatible
     // GCP types continue to run downhill.
     HM_FREEZE = true;
@@ -203,9 +203,9 @@ public abstract class Combo {
         if( n instanceof CallNode call ) call.cepi().CG_wire();
         if( n instanceof RootNode root ) root.CG_wire();
       }
-      
+
       // Very expensive assert: everything that can make progress is on worklist
-      //assert Env.ROOT.more_work(false)==0;
+      assert Env.ROOT.more_work(false)==0;
     }
     return cnt;
   }
