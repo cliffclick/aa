@@ -518,7 +518,7 @@ public class TestNodeSmall {
       Type nnn = n.value();
       assert nnn.isa(old);
     }
-    Env.GVN.work_clear();
+    Env.GVN.reset_to_init0();
 
     // Now run GCP to closure.  This is the key call being tested.
     AA.LIFTING = false;

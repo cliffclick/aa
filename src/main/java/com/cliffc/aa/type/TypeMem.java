@@ -483,14 +483,23 @@ public class TypeMem extends Type<TypeMem> {
 
   // Whole object Set at an alias.
   public TypeMem set( int alias, TypeStruct obj ) {
-    if( at(alias)==obj ) return this; // Shortcut
+    if( at(alias)==obj && _set_fast(alias) )
+      return this; // Shortcut
     int max = Math.max(_pubs.length,alias+1);
     TypeStruct[] tos = Arrays.copyOf(_pubs,max);
     tos[0] = null;
+    for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
+      if( kid < max ) tos[kid] = null;
     tos[alias] = obj;
     return make0(tos);
   }
-
+  private boolean _set_fast(int alias ) {
+    for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
+      if( kid < _pubs.length && _pubs[kid]!=null )
+        return false;           // Need to clean up
+    return true;
+  }
+  
 
   // Struct store into a conservative set of aliases.
   // 'precise' is replace, imprecise is MEET.

@@ -272,7 +272,7 @@ public abstract class PrimNode extends Node {
   }
 
   // Set escaping primitives into memory
-  static TypeMem escaped_primitive_memory( Node def, TypeMem tmem ) {
+  static TypeMem primitive_memory( Node def, TypeMem tmem ) {
     tmem = tmem.set(BitsAlias.EXTX,TypeStruct.ISUSED);
     tmem = tmem.set(BitsAlias.STRX,TypeMemPtr.STRPTR._obj);
     tmem = tmem.set(PINT ._alias,TypeStruct.as_struct(ZINT ._val));

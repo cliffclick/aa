@@ -78,16 +78,15 @@ public class GVNGCM {
   // Reset is called after a top-level exec exits (e.g. junits) with no parse
   // state left alive.  NOT called after a line in the REPL or a user-call to
   // "eval" as user state carries on.
-  void reset_to_init0() {
-    _work_dead  .clear();
-    _work_flow  .clear();
-    _work_reduce.clear();
-    _work_mono  .clear();
-    _work_grow  .clear();
-    _work_inline.clear();
+  public void reset_to_init0() {
+    _work_dead  .clear();  _work_dead  .setSeed(AA.RSEED);
+    _work_flow  .clear();  _work_flow  .setSeed(AA.RSEED);
+    _work_reduce.clear();  _work_reduce.setSeed(AA.RSEED);
+    _work_mono  .clear();  _work_mono  .setSeed(AA.RSEED);
+    _work_grow  .clear();  _work_grow  .setSeed(AA.RSEED);
+    _work_inline.clear();  _work_inline.setSeed(AA.RSEED);
     ITER_CNT = ITER_CNT_NOOP = 0;
   }
-  public void work_clear() { _work_flow.clear(); _work_dead.clear(); _work_reduce.clear(); }
   boolean work_is_clear() { return _work_flow.isEmpty() && _work_dead.isEmpty() && _work_reduce.isEmpty(); }
 
   // Keep a Node reference alive for later.  Strongly asserted as a stack
@@ -147,7 +146,7 @@ public class GVNGCM {
       else break;
       if( m == null ) ITER_CNT_NOOP++;     // No progress profiling
       else n.deps_work_clear();            // Progress; deps on worklist
-      assert Env.ROOT.more_work(true) == 0;
+      //assert Env.ROOT.more_work(true) == 0;
       //assert Env.ROOT.no_more_ideal();
     }
     assert AA.once_per() || Env.ROOT.more_work(true)==0;

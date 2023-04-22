@@ -30,6 +30,7 @@ public class TVLambda extends TV3 {
   public int nargs() { return len(); }
   public TVLambda clr_dsp() { _args[DSP_IDX] = new TVLeaf(); return this; }
 
+  @Override public TVLambda as_lambda() { return this; }
   @Override boolean can_progress() { return false; }
 
   @Override int eidx() { return TVErr.XFUN; }
@@ -62,7 +63,7 @@ public class TVLambda extends TV3 {
     return true;                // Unify will work
   }
 
-  @Override boolean _exact_unify_impl( TV3 tv3 ) { throw unimpl(); }
+  @Override boolean _exact_unify_impl( TV3 tv3 ) { return true; }
 
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) {

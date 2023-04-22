@@ -404,13 +404,11 @@ public class CallNode extends Node {
   @Override public ErrMsg err( boolean fast ) {
     // Expect a function pointer
     TypeFunPtr tfp = ttfp(_val);
-    if( tfp.is_full() || tfp.is_empty() )
+    if( tfp.is_empty() )
       return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"A function is being called, but "+fdx()._val+" is not a function");
 
     BitsFun fidxs = tfp.fidxs();
     if( fidxs.above_center() ) return null; // Not resolved (yet)
-    if( fidxs.is_empty() ) // This is an unresolved call
-      throw unimpl();
 
     // bad-arg-count
     if( tfp.nargs() != nargs() ) {
@@ -427,6 +425,7 @@ public class CallNode extends Node {
       Ary<Type> ts=null;
       for( int fidx : fidxs ) {
         if( fidx==0 ) continue;
+        if( BitsFun.EXT.test_recur(fidx) ) continue; // External callers have args forced via H-M types elsewhere
         for( int kid=fidx; kid!=0; kid = tree.next_kid(fidx,kid) ) {
           RetNode ret = RetNode.get(kid);
           if( ret==null || ret.is_copy() ) continue;
@@ -442,7 +441,7 @@ public class CallNode extends Node {
         }
       }
       if( ts!=null )
-        return ErrMsg.typerr(_badargs[j-ARG_IDX+1],actual, mem()._val,ts.asAry());
+        return ErrMsg.typerr2(_badargs[j-ARG_IDX+1],actual,ts.asAry());
     }
 
     return null;

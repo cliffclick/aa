@@ -15,8 +15,8 @@ public abstract class AA {
   public static final int REZ_IDX=2; // Result from returns, same as DSP_IDX
   public static final int ARG_IDX=3; // Start of user-visible args
 
-  public static int RSEED;              // Global random seed for worklist draws
-  public static boolean DO_GCP, DO_HMT; // Global type-precision controllers
+  public static int RSEED=0;    // Global random seed for worklist draws
+  public static boolean DO_GCP=true, DO_HMT = true; // Global type-precision controllers
   public static boolean LIFTING = true; // Global type-phase
 
 
@@ -34,7 +34,7 @@ public abstract class AA {
     System.out.println(ABV.toString());
     // Command line program
     if( args.length > 0 ) {
-      TypeEnv te = Exec.go(Env.TOP,"args",String.join(" ",args),1,true,true);
+      TypeEnv te = Exec.go(Env.TOP,"args",String.join(" ",args));
       if( te._errs!=null ) System.out.println(te._errs);
       else {
         System.out.println(te._hmt.toString());

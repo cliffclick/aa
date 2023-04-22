@@ -47,7 +47,7 @@ public class ParmNode extends Node {
         t = Combo.pre() ? RootNode.def_mem(this) : Env.ROOT.rmem();
         Env.ROOT.deps_add(this); // Depends on Root
       } else if( _t==TypeFunPtr.THUNK ) {
-        t = TypeFunPtr.make(false,false,false,Env.ROOT.rfidxs(),3,Env.ROOT.ext_caller(),Env.ROOT.ext_caller());
+        t = TypeFunPtr.make(false,false,true,Env.ROOT.rfidxs(),3,Env.ROOT.ext_caller(),Env.ROOT.ext_caller());
       } else if( _tvar==null || is_prim() ) {
         t = _t;
       } else {

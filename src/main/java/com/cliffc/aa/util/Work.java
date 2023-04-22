@@ -7,8 +7,8 @@ import java.util.function.IntSupplier;
 // Supports psuedo random pop.
 @SuppressWarnings("unchecked")
 public class Work<E extends IntSupplier> extends BitSetSparse {
-  private final Ary<Object> _work = new Ary<>(new Object[1],0);
-  private final int _rseed;     // Psuedo-random draw
+  private final Ary<E> _work = new Ary(new Object[1],0);
+  private int _rseed;           // Psuedo-random draw
   private int _idx;             // Next item to get
   public Work() { this(123); }  // Default seed
   public Work(int rseed) { _rseed = rseed; }
@@ -18,6 +18,11 @@ public class Work<E extends IntSupplier> extends BitSetSparse {
     if( e!=null && !tset(e.getAsInt()) )
       _work.push(e);
     return e;
+  }
+  public void setSeed(int rseed ) {
+    assert _work.isEmpty();
+    _rseed = rseed;
+    _idx = 0;
   }
   @Override public Work clear() {
     super.clear();
@@ -33,18 +38,25 @@ public class Work<E extends IntSupplier> extends BitSetSparse {
   public E pop() {
     if( _work._len==0 ) return null;
     _idx = (_idx+_rseed)&((1<<30)-1);
-    E e = (E)_work.del( _idx % _work._len );
+    E e = _work.del( _idx % _work._len );
     clr(e.getAsInt());
     return e;
   }
   public E pop_last() {
     if( _work._len==0 ) return null;
-    E e = (E)_work.pop();
+    E e = _work.pop();
     clr(e.getAsInt());
     return e;
   }
   // Get/delete "idx"th elements; error if OOB.
-  public E at(int idx) { return (E)_work.at(idx); }
-  public void del(int idx) { clr(((E)_work.del(idx)).getAsInt()); }
+  public E at(int idx) { return _work.at(idx); }
+  public void del(int idx) { clr((_work.del(idx)).getAsInt()); }
   public String print_work() { return _work.toString(); }
+  @Override public String toString() {
+    if( _set.size()==0 ) return "[]";
+    SB sb = new SB().p('[');
+    for( E e : _work )
+      sb.p(e.getAsInt()).p(',');
+    return sb.unchar().p(']').toString();
+  }
 }

@@ -302,9 +302,9 @@ public final class CallEpiNode extends Node {
   public boolean is_CG(boolean precise) {
     CallNode call = call();
     BitsFun fidxs = call.tfp()._fidxs;
+    if( fidxs==BitsFun.NALL ) return true; // Some kind of error condition
     // Check back edges from CEPI to CALL
     for( int i=1; i<len(); i++ ) {
-      if( fidxs.test(1) ) return false; // Wired, so not NALL
       int fidx;
       Node n = in(i);
       if( n instanceof RetNode ret ) {
@@ -326,7 +326,7 @@ public final class CallEpiNode extends Node {
     }
     // If precise, check that every fidx is wired.  If not precise we might
     // have fidxs not yet wired.
-    if( precise && !fidxs.above_center() && fidxs != BitsFun.NALL ) {
+    if( precise && !fidxs.above_center() ) {
       for( int fidx : fidxs ) {
         if( fidx == BitsFun.EXTX ) {
           if( _defs.last()!=Env.ROOT ) return false;
@@ -350,8 +350,8 @@ public final class CallEpiNode extends Node {
     CallNode call = call();
     TypeFunPtr tfp = call.tfp();
     BitsFun fidxs = tfp._fidxs;
+    if( fidxs==BitsFun.NALL ) return false;
     // Remove extra wires (mostly post-combo)
-    assert fidxs!=BitsFun.NALL || nwired()==0;
     for( int i=1; i<len(); i++ ) {
       call.deps_add(this);      // Call sharpens can remove
       int fidx = in(i) instanceof RetNode ret ? ret._fidx : BitsFun.EXTX;
@@ -485,6 +485,7 @@ public final class CallEpiNode extends Node {
       TV3 actual = call.tvar(i);
       progress |= actual.unify(formal,test);
       if( progress && test ) return true;
+      tfun = tfun.find().as_lambda();
     }
 
     // Check for progress on the return

@@ -128,10 +128,9 @@ public class FunNode extends Node {
 
   // True if more unknown callers may appear on a Fun, Parm, Call, CallEpi, Ret.
   // One-shot transition from having unknown callers to not having.
-  // Note that Root is a known caller.
-  // CNC: Might want to consider a known Root as also an unknown caller
+  // At Combo, all callers are known and stay known: even Root is a known caller.
   private boolean _unknown_callers = true;
-  public boolean unknown_callers( Node dep) {
+  public boolean unknown_callers( Node dep ) {
     if( _unknown_callers && dep!=null ) deps_add(dep);
     return _unknown_callers;
   }
@@ -145,8 +144,8 @@ public class FunNode extends Node {
   }
 
   private boolean _unknown_callers() {
-    if( is_keep() || is_prim() ) return true;     // Still alive
-    if( is_copy(0)!=null ) return false;          // Copy collapsing
+    if( is_keep() || is_prim() ) return true; // Still alive
+    if( is_copy(0)!=null ) return false;      // Copy collapsing
     // Can only track if we can follow all uses of FunPtr
     FunPtrNode fptr = fptr();
     if( fptr == null ) return false; // Need a funptr to have a new unknown caller

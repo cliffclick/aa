@@ -38,12 +38,12 @@ public class RootNode extends Node {
       : (_val.above_center() ? BitsFun.NALL.dual() : BitsFun.NALL);
   }
 
-  // Used by TV3 as_flow for a external Leaf value.
+  // Used by TV3 as_flow for an external Leaf value.
   public TypeNil ext_scalar(Node dep) {
     assert Combo.HM_FREEZE;
     return (TypeNil)(_val instanceof TypeTuple tt
                      ? tt.at(3)
-                     : _val.oob(TypeNil.INTERNAL));
+                     : _val.oob(TypeNil.EXTERNAL));
   }
   // Used by CallEpiNode for the return type of unknown external functions
   public TypeNil ext_caller() {
@@ -63,8 +63,8 @@ public class RootNode extends Node {
     // Conservative final memory
     Node mem = in(MEM_IDX);
     TypeMem tmem = mem._val instanceof TypeMem tmem0 ? tmem0 : mem._val.oob(TypeMem.ALLMEM);
-    // All primitive aliases already escaped
-    tmem = PrimNode.escaped_primitive_memory(this,tmem);
+    // All primitive aliases have sharper types
+    tmem = PrimNode.primitive_memory(this,tmem);
 
     // Reset for walking
     escapes_reset(tmem);
@@ -74,8 +74,10 @@ public class RootNode extends Node {
     for( int i=ARG_IDX; i<len(); i++ ) {
       if( in(i) instanceof CallNode call ) {
         // If Call is calling an externally defined function then all args escape
-        if( call.tfp()._fidxs.overlaps(BitsFun.EXT) )
-          escapes(call);
+        if( call.tfp()._fidxs.overlaps(BitsFun.EXT) ) {
+          for( int j=DSP_IDX; j<call.nargs(); j++ )
+            escapes( call.arg(j) );
+        }
       } else
         // If function may be reached from Root, the return escapes.
         escape_ret((RetNode)in(i));
@@ -102,19 +104,17 @@ public class RootNode extends Node {
   // This cycle fcn->mem->ptr->struct->fcn requires a worklist algo.
 
   private static final VBitSet EVISIT = new VBitSet();
-  //private static final AryInt ALIASES = new AryInt();
-  //// Results computed here, and modified at each call.
+  // Results computed here, and modified at each call.
   private static BitsAlias EXT_ALIASES;
   private static BitsFun   EXT_FIDXS  ;
           static TypeMem   EXT_MEM    ;
 
   // Called before computing to reset state
   private static void escapes_reset(TypeMem tmem) {
-    EXT_MEM = tmem;             // Memory escaping, plus escaped primitives
     EVISIT.clear();
-    //  ALIASES.clear();
-    EXT_ALIASES = BitsAlias.EMPTY;
-    EXT_FIDXS   = BitsFun  .EMPTY;
+    EXT_MEM = tmem;             // Memory escaping, plus escaped primitives
+    EXT_ALIASES = BitsAlias.EXT;
+    EXT_FIDXS   = BitsFun  .EXT;
     // Kill the killed
     for( int alias : KILL_ALIASES )
       EXT_MEM = EXT_MEM.set(alias,TypeStruct.UNUSED);
@@ -133,64 +133,60 @@ public class RootNode extends Node {
   private void escapes( Node n ) {
     n.deps_add(this);
     _escapes(n._val);
-  //  while( !ALIASES.isEmpty() )
-  //    _escapes(EXT_MEM.at(ALIASES.pop()));
   }
   private static void _escapes( Type t ) {
     if( EVISIT.tset(t._uid) ) return;
     switch( t ) {
-
-    case TypeStruct ts: {
-      assert ts._fidxs==BitsFun.EMPTY && ts._aliases==BitsAlias.EMPTY;
-      if( ts._def!=Type.ALL )
-        _escapes(ts._def); // TODO: BIG CHEAT, NEED external memory to use e.g. Root escapes
-      for( TypeFld fld : ts )
-        // Root widens all non-final fields
-        _escapes(fld._access== TypeFld.Access.Final ? fld._t : TypeNil.SCALAR);
-      break;
-    }
-
-    case TypeNil tn:
-      if( tn==TypeNil.XNIL ) return;
-      if( !tn._aliases.above_center() ) {
-        // Add to the set of escaped aliases
-        for( int alias : tn._aliases ) {
-          if( EXT_ALIASES.test_recur(alias) ) continue; // Never seen before escape
-          if( KILL_ALIASES.test_recur(alias) ) continue; // Already dead
-          EXT_ALIASES = EXT_ALIASES.set(alias);
-          // TODO: walk the memory for this escaped alias?
+      case TypeStruct ts -> {
+        assert ts._fidxs == BitsFun.EMPTY && ts._aliases == BitsAlias.EMPTY;
+        if( ts._def != Type.ALL )
+          _escapes(ts._def); // TODO: BIG CHEAT, NEED external memory to use e.g. Root escapes
+        for( TypeFld fld : ts )
+          // Root widens all non-final fields
+          _escapes(fld._access == TypeFld.Access.Final ? fld._t : TypeNil.SCALAR);
+      }
+      case TypeNil tn -> {
+        if( tn == TypeNil.XNIL) return;
+        if( !tn._aliases.above_center()) {
+          // Add to the set of escaped aliases
+          for( int alias : tn._aliases) {
+            if( KILL_ALIASES.test_recur(alias)) continue; // Already dead
+            if(  EXT_ALIASES.test_recur(alias)) continue; // Never seen before escape
+            EXT_ALIASES = EXT_ALIASES.set(alias);
+            // TODO: walk the memory for this escaped alias?
+          }
+        }
+        if( !tn._fidxs.above_center()) {
+          // Walk all escaped function args, and call them (like an external
+          // Apply might) with the most conservative flow arguments possible.
+          for( int fidx : tn._fidxs) {
+            if( EXT_FIDXS.test_recur(fidx)) continue; // Never seen before escape
+            EXT_FIDXS = EXT_FIDXS.set(fidx);
+            RetNode ret = RetNode.get(fidx);
+            if( ret != null ) escape_ret(ret);
+          }
+          // The return (but not inputs, so not display) also escapes
+          if( tn instanceof TypeFunPtr tfp)
+            _escapes(tfp._ret);
         }
       }
-      if( !tn._fidxs.above_center() ) {
-        // Walk all escaped function args, and call them (like an external
-        // Apply might) with the most conservative flow arguments possible.
-        for( int fidx : tn._fidxs ) {
-          if( EXT_FIDXS.test_recur(fidx) ) continue; // Never seen before escape
-          EXT_FIDXS = EXT_FIDXS.set(fidx);
-          RetNode ret = RetNode.get(fidx);
-          if( ret != null ) escape_ret(ret);
-        }
-        // The return (but not inputs, so not display) also escapes
-        if( tn instanceof TypeFunPtr tfp )
-          _escapes(tfp._ret);
+      case TypeTuple tup -> {
+        for( Type tt : tup._ts )
+          _escapes(tt);
       }
-      break;
-
-    case TypeTuple tup:
-      for( Type tt : tup._ts )
-        _escapes(tt);
-      break;
-
-    case TypeMem mem: {
-      TypeStruct[] tss = mem.alias2objs();
-      for( int i=1; i<tss.length; i++ )
-        if( tss[i]!=null ) _escapes(tss[i]);
-      break;
-    }
-
-    default:
-      if( t== Type.ALL ) throw unimpl();
-      assert t.getClass() == Type.class;
+      case TypeMem mem -> {
+        TypeStruct[] tss = mem.alias2objs();
+        for( int i = 1; i < tss.length; i++ )
+          if( tss[i] != null ) {
+            _escapes(tss[i]);
+            if( BitsAlias.INT.test_recur(i) && EXT_MEM.at(i)!=tss[i] )
+              EXT_MEM = EXT_MEM.set(i,(TypeStruct)EXT_MEM.at(i).meet(tss[i]));
+          }
+      }
+      default -> {
+        if( t == Type.ALL ) throw unimpl();
+        assert t.getClass() == Type.class;
+      }
     }
   }
   static void escape_ret(RetNode ret) {
@@ -200,8 +196,8 @@ public class RootNode extends Node {
       _escapes(ret._val);
   }
 
-  // Given a TV3, mimic a matching flow Type from all possible escaping
-  // aliases.  Escaped functions might be called with these aliases.
+  // Given a TV3, mimic a matching flow Type from all possible internal
+  // escaping aliases.  Escaped functions might be called with these aliases.
   public BitsAlias matching_escaped_aliases(TV3 tv3, Node dep) {
     // Caller result depends on escaping fidxs
     if( dep!=null ) deps_add(dep);
@@ -209,15 +205,14 @@ public class RootNode extends Node {
     if( ralias==BitsAlias.NALL ) return BitsAlias.NALL;
     BitsAlias aliases = BitsAlias.EMPTY;
     for( int alias : ralias )
-      if( alias>BitsAlias.EXTX && !BitsAlias.EXT.test_recur(alias) && // No external aliases, they already escaped
+      if( alias>BitsAlias.EXTX && !BitsAlias.EXT.test_recur(alias) &&
           tv3.exact_unify_ok(NewNode.get(alias).tvar()) )
         aliases = aliases.set(alias); // Compatible escaping alias
     return aliases;
   }
 
-  //static private final Ary<FunNode> EXT_FUNS_BY_NARGS = new Ary<>(new FunNode[1],0);
-  //// Given a TV3 lam, mimic a matching flow TypeFunPtr from all possible
-  //// escaping fidxs.  Escaped functions might be called from Root.
+  // Given a TV3 lam, mimic a matching flow TypeFunPtr from all possible
+  // internal but escaping fidxs.  Escaped functions might be called from Root.
   public BitsFun matching_escaped_fidxs(TVLambda lam, Node dep) {
     // Caller result depends on escaping fidxs
     if( dep!=null ) deps_add(dep);
@@ -273,6 +268,8 @@ public class RootNode extends Node {
     // Liveness for return value: All reaching aliases plus their escapes are alive.
     BitsAlias ralias = ralias();
     if( ralias==BitsAlias.EMPTY ) return mem;
+    if( ralias.above_center() ) return mem;
+    if( ralias.test(BitsAlias.ALLX) ) return TypeMem.ALLMEM;
     TypeMem rlive = TypeMem.make(ralias,TypeStruct.make(TypeFld.ANY_DSP));
     return mem.meet(rlive);
   }
@@ -306,7 +303,7 @@ public class RootNode extends Node {
     // All fidxs are wired if precise.  Imprecise allows some new fidxs not yet wired.
     if( precise )
       for( int fidx : fidxs )
-        if( fidx != BitsAlias.EXTX && // External fidxs cannot be wired
+        if( fidx != BitsFun.EXTX && // External fidxs cannot be wired
             _defs.find(RetNode.get(fidx)) < ARG_IDX )
           return false;         // Has unwired fidx
     return true;
@@ -320,12 +317,13 @@ public class RootNode extends Node {
     BitsFun fidxs = rfidxs();
     if( fidxs!=BitsFun.NALL ) {
       for( int fidx : fidxs ) {
-        if( fidx == BitsAlias.EXTX ) continue; // No wiring external functions
+        if( fidx == BitsFun.EXTX ) continue; // No wiring external functions
         RetNode ret = RetNode.get(fidx);
         if( _defs.find(ret) >= ARG_IDX ) continue; // Already wired
         // Wire escaping
         ret.fun().add_def(this).add_flow();
         add_def(ret);
+        add_flow(); // Recompute root values to include function return memory
         progress = true;
       }
     }
@@ -386,7 +384,6 @@ public class RootNode extends Node {
       }
       else throw unimpl();
     }
-    //EXT_FUNS_BY_NARGS.clear();
     KILL_ALIASES = BitsAlias.EMPTY;
     CACHE_DEF_MEM = TypeMem.ALLMEM;
     PROGRESS.clear();

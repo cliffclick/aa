@@ -2,7 +2,6 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.node.FunPtrNode;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeStruct;
 import com.cliffc.aa.util.SB;
 
@@ -50,7 +49,7 @@ public class ErrMsg implements Comparable<ErrMsg> {
     if( actual==Type.ALL && lvl==Level.TypeErr ) lvl=Level.AllTypeErr; // ALLs have failed earlier, so this is a lower priority error report
     return new ErrMsg(loc,sb.toString(),lvl);
   }
-  public static ErrMsg typerr( Parse loc, Type actual, Type t0mem, Type[] expecteds ) {
+  public static ErrMsg typerr2( Parse loc, Type actual, Type[] expecteds ) {
     SB sb = actual.str(new SB(), false, false);
     sb.p( expecteds.length==1 ? " is not a " : " is none of (");
     for( Type expect : expecteds ) expect.str(sb, false, false).p(',');
@@ -101,4 +100,3 @@ public class ErrMsg implements Comparable<ErrMsg> {
     return (_loc==null ? 0 : _loc.hashCode())+_msg.hashCode()+_lvl.hashCode();
   }
 }
-

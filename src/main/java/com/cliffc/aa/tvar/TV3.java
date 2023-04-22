@@ -703,15 +703,18 @@ abstract public class TV3 implements Cloneable {
     return _exact_unify_ok(tv3);
   }
   boolean _exact_unify_ok(TV3 tv3) {
+    if( this==tv3 ) return true;
     assert !unified() && !tv3.unified();
     long duid = dbl_uid(tv3);
     if( EXHIT.get(duid) != null ) return true;
     EXHIT.put(duid,"");
-    if( this==tv3 ) return true;
-    if( len()!=tv3.len() ) return false;
+    if( getClass() != tv3.getClass() ) return false;
     if( !_exact_unify_impl(tv3) ) return false;
+    if( _args==tv3._args ) return true;
+    if( _args==null || tv3._args==null ) return false;
+    if( len()!=tv3.len() ) return false;
     for( int i=0; i<len(); i++ )
-      if( !arg(i)._exact_unify_ok(tv3.arg(i)) )
+      if( arg(i)!=null && !arg(i)._exact_unify_ok(tv3.arg(i)) )
         return false;
     return true;
   }

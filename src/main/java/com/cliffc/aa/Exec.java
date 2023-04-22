@@ -11,22 +11,19 @@ public abstract class Exec {
   // Parse and type a file-level string.  Reset back to Env.<clinit> when done.
   // Suitable for repeated tests
   public static TypeEnv file( String src, String str, int rseed, boolean do_gcp, boolean do_hmt ) { // Execute string
-
-    TypeEnv te = go(Env.TOP,src,str,rseed,do_gcp,do_hmt);
-
-    // Kill, cleanup and reset for another parse
-    Env.top_reset();            // Hard reset
-
-    return te;
-  }
-
-  // Parse and type a string.  Can be nested.  In theory, will be eval() someday.
-  // In theory, can keep the result node and promote them for the REPL.
-  public static TypeEnv go( Env top, String src, String str, int rseed, boolean do_gcp, boolean do_hmt ) { // Execute string
     AA.RSEED = rseed;
     AA.DO_GCP = do_gcp;
     AA.DO_HMT = do_hmt;
     AA.LIFTING = true;
+    // Kill, cleanup and reset for another parse
+    Env.top_reset();            // Hard reset
+
+    return go(Env.TOP,src,str);
+  }
+
+  // Parse and type a string.  Can be nested.  In theory, will be eval() someday.
+  // In theory, can keep the result node and promote them for the REPL.
+  public static TypeEnv go( Env top, String src, String str ) { // Execute string
     Env e = Env.FILE = new Env(top,null,0,top._scope.ctrl(),top._scope.mem(),top._scope.ptr(), null);
     // Parse a program
     ErrMsg err = new Parse(src,false,e,str).prog();

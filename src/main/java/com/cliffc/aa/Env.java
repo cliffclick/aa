@@ -184,8 +184,7 @@ public class Env implements AutoCloseable {
     // Promote forward refs to the next outer scope
     StructNode stk = _scope.stk();
     assert stk.is_closed();
-    ScopeNode pscope = _par._scope;
-    stk.promote_forward(pscope.stk());
+    stk.promote_forward( _par._scope.stk());
     for( String tname : _scope.typeNames() ) {
       TypeNil t = _scope.get_type(tname);
       //if( t.is_forward_type() )
@@ -209,6 +208,7 @@ public class Env implements AutoCloseable {
     Node.init0(); // Record end of primitives
     GVN.init0();
     FunNode.init0();
+    NewNode.init0();
     BitsAlias.init0();
     BitsFun  .init0();
     BitsRPC  .init0();
@@ -220,7 +220,7 @@ public class Env implements AutoCloseable {
     ROOT.reset();
     TV3.reset_to_init0();
     Node.VALS.clear();          // Clean out hashtable
-    GVN.work_clear();
+    GVN.reset_to_init0();
     VBitSet visit = new VBitSet();
     ROOT.walk_reset(visit);          // Clean out any wired prim calls
     KEEP_ALIVE.walk_reset(visit);    // Clean out any wired prim calls

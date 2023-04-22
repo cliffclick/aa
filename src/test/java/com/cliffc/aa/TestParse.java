@@ -29,8 +29,14 @@ public class TestParse {
 
     DO_GCP=true;
     DO_HMT=false;
-    RSEED=0;
-    testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y' in @{x=1}",19);
+    RSEED=2;
+    test("fun = { fx x -> x ? fx( fun(fx,x-1) ) : 1 }; fun(2._*_._, 99)",
+            "int:int64",
+            "int:int64");
+    RSEED=2;
+    test("fun = { fx x -> x ? fx( fun(fx,x-1) ) : 1 }; fun(2._*_._, 99)",
+            "int:int64",
+            "int:int64");
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -50,22 +56,6 @@ public class TestParse {
 
   // Some HM related type tests
   @Test public void testParse99() {
-    // TestParse.b_recursive_06
-    test("fun = { fx -> math.rand(2) ? 1 : fx(fun(fx),2) }; fun",
-         "[55]{any,4 -> %[2][2,55]? }",
-         // Expect field fun=A to be dead.
-         // Expect display alive to find math.rand.  Not printing it, but part of type.
-         // Expect E to be dead, and not printing it.
-         // Printer bug, 'I:'  no need to print.
-         // Expect escaped function 'fun' to also escape external 'fx'
-         // Expect escaped 'fx' to be widened to { int int -> int }
-         
-         //"A:{*@{fun=A} D:{E F:int:G:1 H:int:I:2-> F     } -> F     }",
-         "    {            {    int64     int64  -> int64 } -> int64 }");
-    // FIXED: Expect test to fail for not mentioning escaped 'fx' - requires both
-    // - No bug, FX is external, escaped under FIDX#2 already.
-
-    
     test("1", "1", "int:1");
     // Simple primitive expansion, pre-combo
     test("1+2", "3", "int:3");
@@ -77,16 +67,16 @@ public class TestParse {
     // TestParse.a_basic_01
     test("{ x -> ( 3, x )}", "[55]{any,4 -> *[11](3, %[2,11][2,55]?) }", "{ A B -> *(int:3, B) }", null, null, "[11]", "[55]");
     // TestParse.a_basic_02
-    test("{ z -> ((z 0), (z \"abc\")) }", "[55]{any,4 -> *[12](%[2,11,12][2,55]?, %[2,11,12][2,55]?) }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[11,12]", "[55]" );
+    test("{ z -> ((z 0), (z \"abc\")) }", "[55]{any,4 -> *[12](%[2,5,11,12][2,55]?, %[2,5,11,12][2,55]?) }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[5,11,12]", "[55]" );
 
     // TestParse.a_basic_05
     // example that demonstrates generic and non-generic variables:
     // 'g' is not-fresh in function 'f'.
       // 'f' IS fresh in the body of 'g' pair.
     test("{ g -> f = { ignore -> g }; (f 3, f \"abc\")}",
-         "[55]{any,4 -> *[13](%[2,13][2,55]?, %[2,13][2,55]?) }",
+         "[55]{any,4 -> *[13](%[2,5,13][2,55]?, %[2,5,13][2,55]?) }",
          "{ A B -> *( B, B) }",
-         null,null,"[13]","[55]");
+         null,null,"[5,13]","[55]");
 
     // TestParse.g_overload_err_00
     testerr("( { x -> x*2 }, { x -> x*3 })._ 4", "Ambiguous, matching choices ({ A B -> C }, { D E -> F }) vs { G int:4 -> H }",30);
@@ -117,6 +107,22 @@ public class TestParse {
     // TestParse.b_recursive_05, Y combinator
     test("{ f -> ({ x -> (f (x x))} { x -> (f (x x))})}", "[55]{any,4 -> %[2][2,55]? }", "{ A { B C -> C } -> C }", null, null, "[]", "[55]" );
 
+    // TestParse.b_recursive_06
+    test("fun = { fx -> math.rand(2) ? 1 : fx(fun(fx),2) }; fun",
+         "[55]{any,4 -> %[2][2,55]? }",
+         // Expect field fun=A to be dead.
+         // Expect display alive to find math.rand.  Not printing it, but part of type.
+         // Expect E to be dead, and not printing it.
+         // Printer bug, 'I:'  no need to print.
+         // Expect escaped function 'fun' to also escape external 'fx'
+         // Expect escaped 'fx' to be widened to { int int -> int }
+         
+         //"A:{*@{fun=A} D:{E F:int:G:1 H:int:I:2-> F     } -> F     }",
+         "    {            {    int64     int64  -> int64 } -> int64 }");
+    // FIXED: Expect test to fail for not mentioning escaped 'fx' - requires both
+    // - No bug, FX is external, escaped under FIDX#2 already.
+
+    
   }
 
   @Test public void testParse00() {
