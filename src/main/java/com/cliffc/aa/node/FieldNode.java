@@ -230,15 +230,17 @@ public class FieldNode extends Node implements Resolvable {
       default -> throw unimpl();
       };
       
-    } else {                    // ----------------------
+    } else {
+      // ----------------------
       // Instance field lookup
       
       // Errors have a struct to unify against
       if( tv0 instanceof TVErr terr ) {
-        tv0 = terr.as_clz();
-        if( tv0==null ) {
-          tv0 = terr.as_struct();
-          if( tv0 == null ) throw unimpl(); // make a Leaf inside the TVerr.struct, and then next steps will force TVStruct
+        tv0 = terr.as_clz();      // If TVErr has a Clz, take it, fetch RHS
+        if( tv0==null ) {         // No CLZ
+          tv0 = terr.as_struct(); // If TVErr has a Struct, take it
+          if( tv0 == null )       // Force struct under error
+            tv0 = terr.make_struct();
         }
       }
       if( tv0 instanceof TVClz clz ) tv0 = clz.rhs();

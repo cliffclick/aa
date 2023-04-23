@@ -25,7 +25,13 @@ public class ProjNode extends Node {
   // Strictly reducing
   @Override public Node ideal_reduce() {
     Node c = in(0).is_copy(_idx);
-    if( c != null ) return c==this ? Env.ANY : c; // Happens in dying loops
+    if( c != null ) {
+      if( c==this ) return Env.ANY; // Happens in dying loops
+      // Folding IF control flow against a half CopyCal, might need to fold again
+      if( is_CFG() && c._live instanceof TypeMem )
+        return null;            // Stall till parent folds
+      return c; 
+    }
     return null;
   }
 

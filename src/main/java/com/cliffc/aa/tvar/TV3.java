@@ -727,14 +727,14 @@ abstract public class TV3 implements Cloneable {
   // not rollup edges, so that debug printing does not have any side effects.
   public VBitSet get_dups() { return _get_dups(new VBitSet(),new VBitSet()); }
   public VBitSet _get_dups(VBitSet visit, VBitSet dups) {
-    if( visit.tset(_uid) && dups.tset(debug_find()._uid) )
-      return dups;
+    if( visit.tset(_uid) )
+      { dups.set(debug_find()._uid); return dups; }
     if( !unified() && this instanceof TVClz clz && clz.arg(0) instanceof TVStruct clzz &&
         (clzz.is_int_clz() || clzz.is_flt_clz() || clzz.is_str_clz()) )
       return clz.rhs()._get_dups(visit,dups);
     if( _uf!=null )
       _uf._get_dups(visit,dups);
-    if( _args != null )
+    else if( _args != null )
       for( TV3 tv3 : _args )  // Edge lookup does NOT 'find()'
         if( tv3!=null )
           tv3._get_dups(visit,dups);

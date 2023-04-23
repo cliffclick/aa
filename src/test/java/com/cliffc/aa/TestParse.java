@@ -27,16 +27,25 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_GCP=true;
-    DO_HMT=false;
-    RSEED=2;
-    test("fun = { fx x -> x ? fx( fun(fx,x-1) ) : 1 }; fun(2._*_._, 99)",
-            "int:int64",
-            "int:int64");
-    RSEED=2;
-    test("fun = { fx x -> x ? fx( fun(fx,x-1) ) : 1 }; fun(2._*_._, 99)",
-            "int:int64",
-            "int:int64");
+    DO_GCP=false;
+    DO_HMT=true;
+    RSEED=0;
+    // TestParse.b_recursive_06
+    test("fun = { fx -> math.rand(2) ? 1 : fx(fun(fx),2) }; fun",
+         "[55]{any,4 -> %[2,5][2,55]? }",
+         // Expect field fun=A to be dead.
+         // Expect B to be dead, and not printing it.
+         // Expect escaped function 'fun' to also escape external 'fx'
+         // Expect escaped 'fx' to be widened to { int int -> int }
+         // Alias#9 is alive at Root AND in KILL_ALIAS
+
+         //"A:{ *@{fun=A} {B C:int:1 int:2 -> C     } -> C     }"
+         "    {           {    int64 int64 -> int64 } -> int64 }");
+    // FIXED: Expect test to fail for not mentioning escaped 'fx' - requires both
+    // - No bug, FX is external, escaped under FIDX#2 already.
+    // FIXED: Printer bug, 'I:'  no need to print.
+    // FIXED: Expect display alive to find math.rand.  Not printing it, but part of type.
+    // - No bug, was part of type
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -105,11 +114,14 @@ public class TestParse {
             "int:int64");
 
     // TestParse.b_recursive_05, Y combinator
-    test("{ f -> ({ x -> (f (x x))} { x -> (f (x x))})}", "[55]{any,4 -> %[2][2,55]? }", "{ A { B C -> C } -> C }", null, null, "[]", "[55]" );
+    test("{ f -> ({ x -> (f (x x))} { x -> (f (x x))})}",
+         "[55]{any,4 -> %[2,5][2,55]? }", "{ A { B C -> C } -> C }",
+         null, null,
+         "[5]", "[55]" );
 
     // TestParse.b_recursive_06
     test("fun = { fx -> math.rand(2) ? 1 : fx(fun(fx),2) }; fun",
-         "[55]{any,4 -> %[2][2,55]? }",
+         "[55]{any,4 -> %[2,5][2,55]? }",
          // Expect field fun=A to be dead.
          // Expect display alive to find math.rand.  Not printing it, but part of type.
          // Expect E to be dead, and not printing it.

@@ -7,7 +7,7 @@ import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.*;
 
-// Load a struct from memory.  Does it's own nil-check testing.
+// Load a struct from memory.  Does its own nil-check testing.
 public class LoadNode extends Node {
   private final Parse _bad;
   private boolean _mid_grow;
@@ -44,7 +44,6 @@ public class LoadNode extends Node {
     // Memory demands
     adr().deps_add(def);
     Type ptr = adr()._val;
-    if( ptr instanceof TypeStruct ) return ptr.oob(TypeMem.ALLMEM); // Loading from a clazz
     TypeMemPtr tptr=null;
     if( !(ptr instanceof TypeMemPtr tptr0) ) {
       // Go from the incoming primitive to a Clazz struct

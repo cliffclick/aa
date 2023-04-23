@@ -35,6 +35,11 @@ public class TVErr extends TV3 {
 
   @Override int eidx() { throw unimpl(); }
 
+  public TV3 make_struct() {
+    assert _args[XSTR]==null;
+    return (_args[XSTR] = new TVLeaf());
+  }
+  
   @Override TV3 find_nil(TVNil nil) { return this; }
 
   // This is Fresh, that is TVErr and missing index i.
