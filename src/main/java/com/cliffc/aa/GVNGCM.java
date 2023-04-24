@@ -158,7 +158,7 @@ public class GVNGCM {
   // once; restores monotonicity over the whole region when done.
   public void revalive(Node... ns) {
     for( Node n : ns ) {
-      if( n == null ) continue;
+      if( n == null || n.is_dead() ) continue;
       Type t = n.value();
       if( t != n._val ) {
         n._val = t;
@@ -167,7 +167,7 @@ public class GVNGCM {
     }
     for( int i=ns.length-1; i>=0; i-- ) {
       Node n = ns[i];
-      if( n==null ) continue;
+      if( n==null || n.is_dead() ) continue;
       Type t = n.live();
       if( t != n._live ) {
         n._live=t;

@@ -93,6 +93,19 @@ public class LoadNode extends Node {
         return null;
       } else throw unimpl();
     }
+
+    // Load can move past a Call if there's no escape.  Not really a reduce,
+    // but depends on the deps mechanism.
+    Node mem = mem();
+    if( mem instanceof MProjNode mprj ) {
+      if( mprj.in(0) instanceof CallEpiNode cepi ) {
+        if( adr instanceof NewNode nnn && !nnn.escaped(this) ) {
+          Env.GVN.add_reduce(this); // Re-run reduce
+          return set_mem(cepi.call().mem());
+        } else adr.deps_add(this);
+      }
+    } else mem.deps_add(this);
+    
     return null;
   }
 
@@ -113,22 +126,15 @@ public class LoadNode extends Node {
       throw unimpl();
     }
 
-    // Load can move out of a Call, if the function has no Parm:mem - happens
-    // for single target calls that do not (have not yet) inlined.
-    if( mem instanceof MProjNode && mem.in(0) instanceof CallNode )
-    //  return set_mem(((CallNode)mem.in(0)).mem());
-      throw unimpl();
-
     return null;
   }
 
   @Override public Node ideal_grow() {
-    Node mem = mem();
-    Node adr = adr();
     // Load from a memory Phi; split through in an effort to sharpen the memory.
     // TODO: Hoist out of loops.
-    if( !_mid_grow && mem instanceof PhiNode mphi && adr instanceof NewNode ) {
+    if( !_mid_grow && mem() instanceof PhiNode mphi && split_load_profit() ) {
       _mid_grow=true;           // Prevent recursive trigger when calling nested xform
+      Node adr = adr();
       Node[] ns = new Node[mphi.len()];
       for( int i=1; i<mphi.len(); i++ ) {
         ns[i] = Env.GVN.xform(new LoadNode(mphi.in(i),adr,_bad));
@@ -146,6 +152,17 @@ public class LoadNode extends Node {
     return null;
   }
 
+  // Profit to split a load thru a Phi?
+  private boolean split_load_profit() {
+    Node adr = adr();
+    // Only split if the address is known directly
+    if( !(adr instanceof NewNode) ) return false;
+    // Do not split if we think a following store will fold already
+    if( _uses._len==1 && _uses.at(0) instanceof StoreNode st && st.adr()==adr )
+      return false;
+    return true;
+  }
+  
   // Find a matching prior Store - matching address.
   // Returns null if highest available memory does not match address.
   static Node find_previous_struct(Node ldst, Node mem, Node adr, BitsAlias aliases ) {

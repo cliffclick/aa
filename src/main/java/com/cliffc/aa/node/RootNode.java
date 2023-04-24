@@ -63,6 +63,9 @@ public class RootNode extends Node {
     // Conservative final memory
     Node mem = in(MEM_IDX);
     TypeMem tmem = mem._val instanceof TypeMem tmem0 ? tmem0 : mem._val.oob(TypeMem.ALLMEM);
+    // Kill the killed
+    for( int alias : KILL_ALIASES )
+      tmem = tmem.set(alias,TypeStruct.UNUSED);
     // All primitive aliases have sharper types
     tmem = PrimNode.primitive_memory(this,tmem);
 
@@ -87,6 +90,7 @@ public class RootNode extends Node {
     // (escaped) aliases and functions.
     TypeMem ext_mem = EXT_MEM;
     TypeNil escapes = escapes_get();
+    for( int alias : KILL_ALIASES ) assert ext_mem.at(alias)==TypeStruct.UNUSED;
     return TypeTuple.make(Type.CTRL,
                           ext_mem,
                           trez,
@@ -115,9 +119,6 @@ public class RootNode extends Node {
     EXT_MEM = tmem;             // Memory escaping, plus escaped primitives
     EXT_ALIASES = BitsAlias.EXT;
     EXT_FIDXS   = BitsFun  .EXT;
-    // Kill the killed
-    for( int alias : KILL_ALIASES )
-      EXT_MEM = EXT_MEM.set(alias,TypeStruct.UNUSED);
   }
   // Called after computing to get state
   private static TypeNil escapes_get() {
@@ -179,12 +180,12 @@ public class RootNode extends Node {
         for( int i = 1; i < tss.length; i++ )
           if( tss[i] != null ) {
             _escapes(tss[i]);
-            if( BitsAlias.INT.test_recur(i) && EXT_MEM.at(i)!=tss[i] )
+            if( BitsAlias.INT.test_recur(i) && EXT_MEM.at(i)!=tss[i] && !KILL_ALIASES.test(i) )
               EXT_MEM = EXT_MEM.set(i,(TypeStruct)EXT_MEM.at(i).meet(tss[i]));
           }
       }
       default -> {
-        if( t == Type.ALL ) throw unimpl();
+        //if( t == Type.ALL ) throw unimpl(); // Typical error case
         assert t.getClass() == Type.class;
       }
     }
@@ -265,6 +266,8 @@ public class RootNode extends Node {
       }
     if( live==Type.ANY ) return live;
     TypeMem mem = (TypeMem)live;
+    for( int kill : KILL_ALIASES )
+      mem = mem.set(kill,TypeStruct.UNUSED);
     // Liveness for return value: All reaching aliases plus their escapes are alive.
     BitsAlias ralias = ralias();
     if( ralias==BitsAlias.EMPTY ) return mem;

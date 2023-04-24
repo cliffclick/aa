@@ -37,7 +37,6 @@ public class TestParse {
          // Expect B to be dead, and not printing it.
          // Expect escaped function 'fun' to also escape external 'fx'
          // Expect escaped 'fx' to be widened to { int int -> int }
-         // Alias#9 is alive at Root AND in KILL_ALIAS
 
          //"A:{ *@{fun=A} {B C:int:1 int:2 -> C     } -> C     }"
          "    {           {    int64 int64 -> int64 } -> int64 }");
@@ -46,6 +45,9 @@ public class TestParse {
     // FIXED: Printer bug, 'I:'  no need to print.
     // FIXED: Expect display alive to find math.rand.  Not printing it, but part of type.
     // - No bug, was part of type
+    // FIXED: Alias#9 is alive at Root AND in KILL_ALIAS
+    // - Root no longer passes KILLs thru, breaks cycle, lifts.  Not optimistic & happens in pass#2.
+    // - 
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -325,7 +327,7 @@ public class TestParse {
     testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",36);
     // Test that the type-check is on the variable and not the function.
     test   ("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x;y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
-            "*[12](4,4)", "*(A:int:B:int64,A)", null, null, "[12]", null);
+            "*[12](4,4)", "*(A:int:int64,A)", null, null, "[12]", null);
     testerr("fun={x y -> x+y}; baz:{int @{x;y} -> int} = fun; (fun(2,3), baz(2,3))",
             "3 is not a *@{x:=Scalar; y:=Scalar; ...}", 66);
     testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> foo(x,y)}; (fun(2,3), baz(2,3))",

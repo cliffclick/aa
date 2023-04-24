@@ -671,7 +671,11 @@ public abstract class Node implements Cloneable, IntSupplier {
       assert nval.isa(oval);    // Monotonically improving
       _val = nval;
       add_flow_uses();          // Classic forwards flow
-      if( nval.is_con() ) Env.GVN.add_reduce(this);// Replace a constant
+      if( this instanceof CallNode call && CallNode.ttfp(oval)!=CallNode.ttfp(nval) ) {
+        Env.GVN.add_reduce(call);        // Can wire
+        Env.GVN.add_reduce(call.cepi()); // Can wire
+      }
+      if( nval.is_con() ) Env.GVN.add_reduce(this); // Replace a constant
     }
     return progress;
   }

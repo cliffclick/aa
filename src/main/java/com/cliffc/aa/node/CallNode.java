@@ -404,7 +404,7 @@ public class CallNode extends Node {
   @Override public ErrMsg err( boolean fast ) {
     // Expect a function pointer
     TypeFunPtr tfp = ttfp(_val);
-    if( tfp.is_empty() )
+    if( tfp.is_empty() || tfp.is_full() )
       return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"A function is being called, but "+fdx()._val+" is not a function");
 
     BitsFun fidxs = tfp.fidxs();

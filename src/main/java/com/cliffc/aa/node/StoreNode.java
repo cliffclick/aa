@@ -139,6 +139,10 @@ public class StoreNode extends Node {
       }
     }
 
+    // Store of a Load
+    if( rez() instanceof LoadNode ld && ld.adr()==adr && ld.mem()==mem )
+      return mem;
+    
     //// Escape a dead MemSplit
     //if( mem instanceof MProjNode && mem.in(0) instanceof MemSplitNode msp &&
     //    msp.join()==null ) {

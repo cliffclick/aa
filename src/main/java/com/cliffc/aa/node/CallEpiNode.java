@@ -470,7 +470,7 @@ public final class CallEpiNode extends Node {
       TVLambda lam = new TVLambda(call.nargs(),new TVLeaf(),tvar());
       if( tv3==null ) {
         // Error with no lambda, force one
-        ((TVErr)fdx.tvar())._union_impl(lam);
+        fdx.tvar()._union_impl(lam);
         return true;
       }
       return tv3.unify(lam,false);

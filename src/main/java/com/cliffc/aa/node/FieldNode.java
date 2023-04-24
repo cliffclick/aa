@@ -221,10 +221,12 @@ public class FieldNode extends Node implements Resolvable {
       }
       case TVErr err -> {
         if( err.as_clz()!=null ) tv0 = err.as_clz().clz(); // Try a CLZ
+        else if( err.as_nil()!= null ) throw unimpl();     // Try the NIL (repeat clz_node lookup)
         else {
-          // Try the NIL (repeat clz_node lookup)
+          if( test ) return true;
           // Treat as Leaf; make a Clz, unify and use it
-          throw unimpl();
+          TVLeaf lclz = err.make_clz();
+          progress |= lclz.unify(new TVClz(new TVStruct(new String[0],new TV3[0],true),tv0=new TVLeaf()),false);
         }
       }
       default -> throw unimpl();

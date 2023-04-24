@@ -32,7 +32,7 @@ public class TVClz extends TV3 {
     if( test ) return true;
     _args[1] = rhs().copy();
     _args[1].add_may_nil(false);
-    add_may_nil(false);
+    super.add_may_nil(false);
     return true;
   }
 

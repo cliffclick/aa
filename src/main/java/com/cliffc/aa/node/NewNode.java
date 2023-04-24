@@ -64,12 +64,26 @@ public class NewNode extends Node {
     return null;
   }
   
-  // If all uses do not escape the pointer, the New is dead.
+  // If all uses are store addresses only, then this is a write-only memory and
+  // is not used.
   private boolean used() {
     if( is_prim() ) return true;
     for( Node use : _uses )
       if( !(use instanceof StoreNode st) || st.rez()==this )
         return true;
+    return false;
+  }
+
+  // If all uses are load/store addresses, then the memory does not escape and
+  // loads can bypass calls.
+  boolean escaped(Node dep) {
+    if( is_prim() ) return true;
+    for( Node use : _uses )
+      if( !(use instanceof LoadNode ld ||
+            (use instanceof StoreNode st && st.rez()!=this) )) {
+        use.deps_add(dep);
+        return true;
+      }
     return false;
   }
   

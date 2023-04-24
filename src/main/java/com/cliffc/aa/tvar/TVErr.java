@@ -39,6 +39,10 @@ public class TVErr extends TV3 {
     assert _args[XSTR]==null;
     return (_args[XSTR] = new TVLeaf());
   }
+  public TVLeaf make_clz() {
+    assert _args[XCLZ]==null;
+    return (TVLeaf)(_args[XCLZ] = new TVLeaf());
+  }
   
   @Override TV3 find_nil(TVNil nil) { return this; }
 
@@ -102,7 +106,7 @@ public class TVErr extends TV3 {
       TV3 err_part = arg(that.eidx());
       if( err_part == null ) _args[that.eidx()] = that;
       else err_part._union_impl(that);
-      throw unimpl();
+      return true;
     } else {
       throw unimpl();
     }
