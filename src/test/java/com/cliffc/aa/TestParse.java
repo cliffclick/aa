@@ -66,7 +66,7 @@ public class TestParse {
     // TestParse.a_basic_05
     // example that demonstrates generic and non-generic variables:
     // 'g' is not-fresh in function 'f'.
-      // 'f' IS fresh in the body of 'g' pair.
+    // 'f' IS fresh in the body of 'g' pair.
     test("{ g -> f = { ignore -> g }; (f 3, f \"abc\")}",
          "[55]{any,4 -> *[13](%[2,5,13][2,55]?, %[2,5,13][2,55]?) }",
          "{ A B -> *( B, B) }",

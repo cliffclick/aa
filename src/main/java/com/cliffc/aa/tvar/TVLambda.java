@@ -56,7 +56,20 @@ public class TVLambda extends TV3 {
       that.unify_err("Expected "+tnargs+" but found "+nargs,that,false);
     return true;
   }
-  
+
+  // -------------------------------------------------------------
+  // This is fresh, and that._args[i] is missing.  Lambdas with missing arguments
+  boolean _fresh_missing_rhs(TV3 that, int i, boolean test) {
+    if( test ) return true;
+    int len = that._args.length;
+    while( len<=i ) {
+      that._args = Arrays.copyOf(that._args,len+1);
+      TVErr err = new TVErr();
+      err.err("Bad arg count",arg(i),test);
+      that._args[len-1] = err;
+    }
+  }
+
   // -------------------------------------------------------------
   // Sub-classes specify trial_unify on sub-parts.
   // Check arguments, not return.
