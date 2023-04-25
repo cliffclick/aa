@@ -29,8 +29,8 @@ public class TestParse {
 
     DO_GCP=true;
     DO_HMT=false;
-    RSEED=3;
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))","*[13](nil,1,2)","*(int:int64,A:int:B:int64,A)", null, null, "[13]", null);
+    RSEED=0;
+    test("x:=1;x++;x", "2", "int:2");
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -319,7 +319,7 @@ public class TestParse {
     testerr("a=@{x=1.2;y}; x", "Unknown ref 'x'",14);
     testerr("a=@{x=1;x=2}.x", "Cannot re-assign final field '.x' in @{x=1}",8);
     test   ("a=@{x=1.2;y;}; a.x", "1.2", "flt:1.2"); // standard "." field naming; trailing semicolon optional
-    test   ("x=@{n:=1;v:=2}; x.n := 3; x", "*[10]@{_; n:=3; v:=2}","*@{n=int:nint8; v=int:3}", null, null, "[10]", null);
+    test   ("x=@{n:=1;v:=2}; x.n := 3; x", "*[10]@{_; n:=3; v:=2}","*@{n=int:nint8; v=int:2}", null, null, "[10]", null);
     testerr("(a=@{x=0;y=0}; a.)", "Missing field name after '.'",17);
     testerr("a=@{x=0;y=0}; a.x=1; a","Cannot re-assign final field '.x' in @{x=nil; y=nil}",16);
     test   ("a=@{x=0;y=1}; b=@{x=2}  ; c=math.rand(1)?a:b; c.x", "int8", "int:int8"); // either 0 or 2; structs can be partially merged

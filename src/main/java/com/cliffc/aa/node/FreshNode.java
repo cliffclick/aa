@@ -49,7 +49,7 @@ public class FreshNode extends Node {
   @Override public TV3 _set_tvar() {
     unelock();                  // Adding a tvar changes equals
     TV3 tv = _tvar = new TVLeaf();
-    //tv.deps_add_deep(this);
+    tv.deps_add_deep(this);
     if( len()>1 ) {
       _nongen = new TV3[len() - 1];
       for( int i = 1; i < len(); i++ )
