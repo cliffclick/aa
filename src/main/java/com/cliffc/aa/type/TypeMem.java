@@ -533,10 +533,21 @@ public class TypeMem extends Type<TypeMem> {
   public TypeMem remove(BitsAlias escs) {
     if( escs==BitsAlias.EMPTY ) return this;
     if( escs==BitsAlias.NALL  ) throw com.cliffc.aa.AA.unimpl(); // Shortcut
+    // See if any changes
+    boolean found=false;
+    for( int alias : escs )
+      if( at(alias)!=TypeStruct.UNUSED )
+        { found=true; break; }
+    if( !found ) return this;
+      
     TypeStruct[] tos = _pubs.clone();
-    for( int i = 1; i< _pubs.length; i++ )
-      if( escs.test(i) )
-        tos[i] = TypeStruct.UNUSED;
+    tos[0] = null;
+    for( int alias : escs )
+      if( alias < tos.length ) {
+        for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
+          if( kid < tos.length ) tos[kid]=null;
+        tos[alias] = TypeStruct.UNUSED;
+      }
     return make0(tos);
   }
 

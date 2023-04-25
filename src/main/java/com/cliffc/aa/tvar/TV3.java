@@ -694,6 +694,7 @@ abstract public class TV3 implements Cloneable {
   // States are: never visited & no_widen, visited & no_widen, visited & widen
   // Root is set to visited & no widen.
   public boolean widen( byte widen, boolean test ) {
+    assert !unified();
     if( _widen>=widen )  return false;
     if( test ) return true;
     _widen = widen;

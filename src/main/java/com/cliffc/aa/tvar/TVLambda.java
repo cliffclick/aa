@@ -6,6 +6,8 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
+import java.util.Arrays;
+
 import static com.cliffc.aa.AA.*;
 
 /** A lambda, higher-order function
@@ -66,8 +68,10 @@ public class TVLambda extends TV3 {
       that._args = Arrays.copyOf(that._args,len+1);
       TVErr err = new TVErr();
       err.err("Bad arg count",arg(i),test);
-      that._args[len-1] = err;
+      that._args[len++] = err;
+      arg(i)._fresh_unify(err,false);
     }
+    return true;
   }
 
   // -------------------------------------------------------------

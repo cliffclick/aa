@@ -125,6 +125,7 @@ public final class FunPtrNode extends Node {
       if( parms[i]!=null ) {
         progress |= lam.arg(i).unify(parms[i].tvar(),test);
         if( test && progress ) return true;
+        lam = (TVLambda)lam.find();
       }
     progress |= lam.ret().unify(ret.rez().tvar(),test);
 

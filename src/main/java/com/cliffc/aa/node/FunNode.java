@@ -200,10 +200,12 @@ public class FunNode extends Node {
     if( def instanceof RootNode ) throw unimpl();
     if( def instanceof ConNode ) return Type.ANY; // Dead control path
     assert def.is_CFG();
-    ParmNode mem = parm(MEM_IDX);
-    if( mem==null ) return TypeMem.ANYMEM; // No mem parm, so pure function
-    mem.deps_add(def);
-    return mem._live; // Pass through mem liveness
+    ParmNode pmem = parm(MEM_IDX);
+    if( pmem==null ) return TypeMem.ANYMEM; // No mem parm, so pure function
+    pmem.deps_add(def);
+    if( !(pmem._live instanceof TypeMem mem) ) return Type.ANY;
+    TypeMem mem2 = mem.remove(RootNode.KILL_ALIASES);
+    return mem2;                // Pass through mem liveness
   }
 
   // ----

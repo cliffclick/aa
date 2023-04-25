@@ -664,8 +664,8 @@ public abstract class Node implements Cloneable, IntSupplier {
 
     // Compute best value.  If progressing, push uses on the flow worklist.
     // This is a forward flow computation.
-    Type oval = _val; // Get old type
-    Type nval = value();// Get best type
+    Type oval = _val;    // Get old type
+    Type nval = value(); // Get best type
     if( nval!=oval ) {
       progress = this;          // Progress!
       assert nval.isa(oval);    // Monotonically improving

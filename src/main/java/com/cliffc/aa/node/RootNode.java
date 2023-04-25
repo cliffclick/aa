@@ -239,7 +239,7 @@ public class RootNode extends Node {
   // Default memory during initial Iter, before Combo: all memory minus the
   // kills.  Many things produce def_mem, and in general it has to be used
   // until Combo finishes the Call Graph.
-  private static BitsAlias KILL_ALIASES = BitsAlias.EMPTY;
+  static BitsAlias KILL_ALIASES = BitsAlias.EMPTY;
   static void kill_alias( int alias ) {
     if( KILL_ALIASES.test_recur(alias) ) return;
     KILL_ALIASES = KILL_ALIASES.set(alias);
@@ -370,7 +370,7 @@ public class RootNode extends Node {
 
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
-    TV3 tv3 = in(REZ_IDX).set_tvar();
+    TV3 tv3 = in(REZ_IDX).set_tvar().find();
     tv3.widen((byte)1,false);   // Widen result, since escaping
     return tv3;
   }
