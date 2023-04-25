@@ -106,9 +106,10 @@ abstract public class TV3 implements Cloneable {
     TV3 leader = _find0();
     // Additional read-barrier for TVNil to collapse nil-of-something
     if( !(leader instanceof TVNil tnil) ) return leader;
-    TV3 nnn = tnil.arg(0).find_nil(tnil);
-    if( nnn==leader ) return leader;
-    leader._find0().union(nnn);
+    TV3 nnn = leader.arg(0);
+    if( nnn instanceof TVLeaf ) return leader; // No change
+    nnn = nnn.find_nil();
+    leader.union(nnn);
     return nnn;
   }
   public TV3 _find0() {
@@ -126,7 +127,7 @@ abstract public class TV3 implements Cloneable {
 
   // Bases return the not-nil base; pointers return the not-nil pointer.
   // Nested nils collapse.
-  TV3 find_nil(TVNil nil) { throw unimpl(); }
+  TV3 find_nil() { throw unimpl(); }
 
   // Fetch a specific arg index, with rollups
   public TV3 arg( int i ) {
@@ -224,7 +225,7 @@ abstract public class TV3 implements Cloneable {
 
   // Structural unification, 'this' into 'that'.  No change if just testing and
   // returns a progress flag.  If updating, both 'this' and 'that' are the same
-  // afterwards.
+  // afterward.
   final boolean _unify(TV3 that, boolean test) {
     assert !unified() && !that.unified();
     if( this==that ) return false;
@@ -313,17 +314,13 @@ abstract public class TV3 implements Cloneable {
     if( nongen_in() ) return vput(that,_unify(that,test));
 
     // LHS leaf, RHS is unchanged but goes in the VARS
-    if( this instanceof TVLeaf ) return vput(that,false);
+    if( this instanceof TVLeaf ) { if( !test ) add_delay_fresh(); return vput(that,false); }
     if( that instanceof TVLeaf ) // RHS is a tvar; union with a deep copy of LHS
       return test || vput(that,that.union(_fresh()));
 
     // Special handling for nilable
     if( !(that instanceof TVNil) && this instanceof TVNil nil ) return vput(that,nil._unify_nil_l(that,test));
     if( !(this instanceof TVNil) && that instanceof TVNil nil ) return vput(nil._unify_nil_r(this,test),true);
-
-    // Special handling for Base SCALAR, which can "forget" pointers
-    if( that instanceof TVBase base && base._t==TypeNil.SCALAR && this instanceof TVPtr )
-      throw unimpl(); // return false;             // No change to 'that'
 
     // Two unrelated classes make an error
     if( getClass() != that.getClass() )
@@ -351,12 +348,11 @@ abstract public class TV3 implements Cloneable {
     assert !unified() && !that.unified();
     boolean progress = false;
     if( _args != null ) {
-      assert _args.length == that._args.length;
       TV3 thsi = this;
       for( int i=0; i<thsi._args.length; i++ ) {
         if( thsi._args[i]==null ) continue; // Missing LHS is no impact on RHS
         TV3 lhs = thsi.arg(i);
-        TV3 rhs = that.arg(i);
+        TV3 rhs = i<that._args.length ? that.arg(i) : null;
         progress |= rhs == null // Missing RHS?
           ? _fresh_missing_rhs(that,i,test)
           : lhs._fresh_unify(rhs,test);
@@ -364,21 +360,32 @@ abstract public class TV3 implements Cloneable {
         that = that.find();
       }
       if( progress && test ) return true;
+      // Extra args in RHS
+      for( int i=thsi._args.length; i<that._args.length; i++ )
+        throw unimpl();
     } else assert that._args==null;
     return progress;
   }
 
   private boolean vput(TV3 that, boolean progress) { VARS.put(this,that); return progress; }
 
-  // This is fresh, and neither is a TVErr.
+  // This is fresh, and neither is a TVErr, and they are different classes
   boolean _fresh_unify_err(TV3 that, boolean test) {
     assert !(this instanceof TVErr) && !(that instanceof TVErr);
+    assert this.getClass() != that.getClass();
     if( test ) return true;
     TVErr terr = new TVErr();
     return terr._fresh_unify_err_fresh(this,test) | terr._unify_err(that);
   }
 
+  // This is fresh, and RHS is missing.  Possibly Lambdas with missing arguments
   boolean _fresh_missing_rhs(TV3 that, int i, boolean test) {
+    if( test ) return true;
+
+    //if( !that.unify_miss_fld(key,work) )
+    //  return false;
+    //add_deps_work(work);
+    //return true;
     throw unimpl();
   }
 
@@ -608,6 +615,7 @@ abstract public class TV3 implements Cloneable {
   // unifies to something, we need to Fresh-unify the something with `that`.
   void add_delay_fresh() { add_delay_fresh(FRESH_ROOT); }
   void add_delay_fresh( DelayFresh df ) {
+    df.update();
     // Lazy make a list to hold
     if( _delay_fresh==null ) _delay_fresh = new Ary<>(new DelayFresh[1],0);
     // Dup checks: no dups upon insertion, but due to later unification we
@@ -685,14 +693,14 @@ abstract public class TV3 implements Cloneable {
   // Args to external functions are widened by root callers.
   // States are: never visited & no_widen, visited & no_widen, visited & widen
   // Root is set to visited & no widen.
-  boolean widen( byte widen, boolean test ) {
+  public boolean widen( byte widen, boolean test ) {
     if( _widen>=widen )  return false;
     if( test ) return true;
     _widen = widen;
-    _widen();
+    _widen(widen);
     return true;
   }
-  abstract void _widen( );
+  abstract void _widen( byte widen );
 
   // -----------------
   // True if these two can exactly unify and never not-unify (which means:

@@ -44,7 +44,7 @@ public class TVErr extends TV3 {
     return (TVLeaf)(_args[XCLZ] = new TVLeaf());
   }
   
-  @Override TV3 find_nil(TVNil nil) { return this; }
+  @Override TV3 find_nil() { return this; }
 
   // This is Fresh, that is TVErr and missing index i.
   // Fresh copy LHS into RHS.
@@ -102,18 +102,32 @@ public class TVErr extends TV3 {
   // -------------------------------------------------------------
   // Union/merge subclass specific bits
   @Override public boolean _union_impl(TV3 that) {
-    if( !(that instanceof TVErr err) ) {
+    if( !(that instanceof TVErr terr) ) {
       TV3 err_part = arg(that.eidx());
       if( err_part == null ) _args[that.eidx()] = that;
       else err_part._union_impl(that);
       return true;
     } else {
-      throw unimpl();
+      // Merge error messages
+      for( String err : terr._errs )
+        if( _errs.find(err)== -1 )
+          throw unimpl();         // Progress
+      for( String err : _errs )
+        if( terr._errs.find(err)== -1 )
+          throw unimpl();         // Progress
+      return true;
     }
   }
 
   @Override boolean _unify_impl(TV3 that ) {
-    throw unimpl();
+    TVErr terr = (TVErr)that;
+    for( int i=0; i<XMAX; i++ ) {
+      TV3 tv3 = arg(i);
+      if( tv3!=null )
+        if( terr.arg(i)==null ) terr._args[i] = tv3;
+        else tv3._unify(terr.arg(i),false);
+    }
+    return true;
   }
   
   // -------------------------------------------------------------
@@ -133,7 +147,11 @@ public class TVErr extends TV3 {
     return tv._as_flow(dep);
   }
 
-  @Override void _widen() { throw unimpl(); }
+  @Override void _widen( byte widen ) {
+    for( int i=0; i<_args.length; i++ )
+      if( _args[i]!=null )
+        arg(i).widen(widen,false);
+  }
     
   // Add an error message
   public boolean err(String err, TV3 extra, boolean test) {

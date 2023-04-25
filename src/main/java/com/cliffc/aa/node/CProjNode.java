@@ -1,7 +1,6 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
-import com.cliffc.aa.Env;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 
@@ -24,4 +23,17 @@ public class CProjNode extends ProjNode {
     return x;
   }
   @Override Type live_use( Node def ) { return def.is_mem() ? TypeMem.ANYMEM : Type.ALL; }
+
+  // Strictly reducing
+  @Override public Node ideal_reduce() {
+    Node c = in(0).is_copy(_idx);
+    if( c != null ) {
+      // Folding IF control flow against a half CopyCal, might need to fold again
+      if( c._live instanceof TypeMem )
+        return null;            // Stall till parent folds
+      return c; 
+    }
+    return null;
+  }
+
 }

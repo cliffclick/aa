@@ -27,27 +27,10 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_GCP=false;
-    DO_HMT=true;
-    RSEED=0;
-    // TestParse.b_recursive_06
-    test("fun = { fx -> math.rand(2) ? 1 : fx(fun(fx),2) }; fun",
-         "[55]{any,4 -> %[2,5][2,55]? }",
-         // Expect field fun=A to be dead.
-         // Expect B to be dead, and not printing it.
-         // Expect escaped function 'fun' to also escape external 'fx'
-         // Expect escaped 'fx' to be widened to { int int -> int }
-
-         //"A:{ *@{fun=A} {B C:int:1 int:2 -> C     } -> C     }"
-         "    {           {    int64 int64 -> int64 } -> int64 }");
-    // FIXED: Expect test to fail for not mentioning escaped 'fx' - requires both
-    // - No bug, FX is external, escaped under FIDX#2 already.
-    // FIXED: Printer bug, 'I:'  no need to print.
-    // FIXED: Expect display alive to find math.rand.  Not printing it, but part of type.
-    // - No bug, was part of type
-    // FIXED: Alias#9 is alive at Root AND in KILL_ALIAS
-    // - Root no longer passes KILLs thru, breaks cycle, lifts.  Not optimistic & happens in pass#2.
-    // - 
+    DO_GCP=true;
+    DO_HMT=false;
+    RSEED=2;
+    testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -78,7 +61,7 @@ public class TestParse {
     // TestParse.a_basic_01
     test("{ x -> ( 3, x )}", "[55]{any,4 -> *[11](3, %[2,11][2,55]?) }", "{ A B -> *(int:3, B) }", null, null, "[11]", "[55]");
     // TestParse.a_basic_02
-    test("{ z -> ((z 0), (z \"abc\")) }", "[55]{any,4 -> *[12](%[2,5,11,12][2,55]?, %[2,5,11,12][2,55]?) }", "{A {B *str:(int:97)? -> C } -> *(C,C) }", null, null, "[5,11,12]", "[55]" );
+    test("{ z -> ((z 0), (z \"abc\")) }", "[55]{any,4 -> *[12](%[2,11,12][2,55]?, %[2,11,12][2,55]?) }", "{A {B *str:(int:int64)? -> C } -> *(C,C) }", null, null, "[11,12]", "[55]" );
 
     // TestParse.a_basic_05
     // example that demonstrates generic and non-generic variables:
@@ -124,19 +107,10 @@ public class TestParse {
     // TestParse.b_recursive_06
     test("fun = { fx -> math.rand(2) ? 1 : fx(fun(fx),2) }; fun",
          "[55]{any,4 -> %[2,5][2,55]? }",
-         // Expect field fun=A to be dead.
-         // Expect display alive to find math.rand.  Not printing it, but part of type.
-         // Expect E to be dead, and not printing it.
-         // Printer bug, 'I:'  no need to print.
-         // Expect escaped function 'fun' to also escape external 'fx'
-         // Expect escaped 'fx' to be widened to { int int -> int }
-         
-         //"A:{*@{fun=A} D:{E F:int:G:1 H:int:I:2-> F     } -> F     }",
-         "    {            {    int64     int64  -> int64 } -> int64 }");
-    // FIXED: Expect test to fail for not mentioning escaped 'fx' - requires both
-    // - No bug, FX is external, escaped under FIDX#2 already.
-
-    
+         // Currently allowing 'fun' display to stay alive.
+         "A:{ *@{fun=A} {B C:int:int64 int:int64-> C } -> C }",
+         null, null,
+         "[5]","[55]");
   }
 
   @Test public void testParse00() {

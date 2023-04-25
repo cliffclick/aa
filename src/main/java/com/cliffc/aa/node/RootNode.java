@@ -155,6 +155,9 @@ public class RootNode extends Node {
             if(  EXT_ALIASES.test_recur(alias)) continue; // Never seen before escape
             EXT_ALIASES = EXT_ALIASES.set(alias);
             // TODO: walk the memory for this escaped alias?
+            NewNode nnn = NewNode.get(alias);
+            if( nnn != null )
+              nnn.tvar().widen((byte)1,false); // HMT widen
           }
         }
         if( !tn._fidxs.above_center()) {
@@ -164,7 +167,11 @@ public class RootNode extends Node {
             if( EXT_FIDXS.test_recur(fidx)) continue; // Never seen before escape
             EXT_FIDXS = EXT_FIDXS.set(fidx);
             RetNode ret = RetNode.get(fidx);
-            if( ret != null ) escape_ret(ret);
+            if( ret != null ) {
+              escape_ret(ret);
+              FunPtrNode fptr = ret.funptr();
+              fptr.tvar().widen((byte)1,false); // HMT widen
+            }
           }
           // The return (but not inputs, so not display) also escapes
           if( tn instanceof TypeFunPtr tfp)
@@ -361,7 +368,12 @@ public class RootNode extends Node {
 
   @Override Node walk_dom_last( Predicate<Node> P) { return null; }
 
-  @Override public boolean has_tvar() { return false; }
+  @Override public boolean has_tvar() { return true; }
+  @Override public TV3 _set_tvar() {
+    TV3 tv3 = in(REZ_IDX).set_tvar();
+    tv3.widen((byte)1,false);   // Widen result, since escaping
+    return tv3;
+  }
 
   // Unify trailing result ProjNode with RootNode results; but no unification
   // with anything from Root, all results are independent.

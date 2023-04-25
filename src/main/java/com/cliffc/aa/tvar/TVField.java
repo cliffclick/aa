@@ -33,6 +33,6 @@ public class TVField extends TV3 {
 
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) { throw unimpl(); }
-  @Override void _widen() { throw unimpl(); }
+  @Override void _widen( byte widen ) { throw unimpl(); }
 
 }

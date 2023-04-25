@@ -86,8 +86,10 @@ public final class RetNode extends Node {
     if( cc!=null ) return cc;
     
     // If the fun is a copy, then we are collapsing
-    Node cp = fun().is_copy(0);
-    if( cp!=null ) set_def(4,cp);
+    if( in(4) instanceof FunNode fun ) {
+      Node cp = fun.is_copy(0);
+      if( cp!=null ) set_def(4,cp);
+    }
 
     // If control is dead, but the Ret is alive, we're probably only using the
     // FunPtr as a 'gensym'.  Nuke the function body.

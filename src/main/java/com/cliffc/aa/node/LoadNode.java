@@ -254,14 +254,15 @@ public class LoadNode extends Node {
   @Override public boolean unify( boolean test ) {
     TV3 self = tvar();
     TV3 adr = adr().tvar();
-    return switch (adr) {
+    return switch( adr ) {
       // Wait until forced to either TVStruct or TVPtr
-    case TVLeaf leaf -> leaf.deps_add_deep(this);
-    case TVPtr ptr -> self.unify(ptr.load(),test);
+    case TVLeaf leaf   -> leaf.deps_add_deep(this);
+    case TVPtr ptr     -> self.unify(ptr.load(),test);
     case TVStruct tstr -> self.unify(adr, test); // Load from prototype, just pass-thru
     case TVClz tclz    -> self.unify(adr, test); // Load from prototype, just pass-thru
-    case TVBase   base -> self.unify(FieldNode.clz_tv(base._t), test); // Unify against primitive CLZ
-    case TVErr err -> err.unify(self,test);
+    case TVBase base   -> self.unify(FieldNode.clz_tv(base._t), test); // Unify against primitive CLZ
+    case TVErr err     -> err .unify(self,test);
+    case TVNil tnil    -> tnil.deps_add_deep(this); // Stall until this settles out
     default -> throw unimpl();
     };
   }

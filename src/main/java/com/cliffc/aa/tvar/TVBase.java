@@ -2,7 +2,6 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
@@ -38,13 +37,14 @@ public class TVBase extends TV3 {
 
   // Convert the leader nil into a base+NIL, widened if the leader is not a
   // copy.
-  @Override TV3 find_nil( TVNil nil ) {
+  @Override TV3 find_nil( ) {
     Type t = _t.meet(TypeNil.NIL);
     if( t==_t && _may_nil )
       return this;
     // Need a new base, because may_nil changes
     TVBase b = new TVBase(t);
     b.add_may_nil(false);
+    b.widen(_widen,false);
     return b;
   }
   
@@ -90,12 +90,12 @@ public class TVBase extends TV3 {
   
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) { return _t; }
-  @Override void _widen() {
+  @Override void _widen( byte widen ) {
+    if( widen < 2 ) return;
     Type tw = _t.widen();
     if( tw == _t ) return;
     _t = tw;
-    //if( WORK!=null ) add_deps_work(WORK);
-    throw unimpl();
+    _deps_work_clear();
   }
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) { return sb.p(_t); }  
 }

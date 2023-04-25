@@ -374,13 +374,14 @@ public final class CallEpiNode extends Node {
 
     // Add missing wires
     boolean vCG = unknown_callers(); // Has virtual CG edges
-    if( !fidxs.above_center() && fidxs!=BitsFun.NALL ) {
+    if( !fidxs.above_center() ) {
       for( int fidx : fidxs ) {
         Node ret,fun;
         if( fidx == BitsFun.EXTX ) {
           ret = fun = Env.ROOT;
         } else {
           RetNode ret2 = RetNode.get(fidx);
+          if( ret2.is_copy() ) continue;
           FunNode fun2 = ret2.fun();
           if( fun2==null ) continue; // Broken function
           if( call.nargs() != tfp.nargs() || tfp.nargs() != fun2.nargs() )

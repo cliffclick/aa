@@ -79,7 +79,6 @@ public class TypeFlt extends TypeNil<TypeFlt> {
   }
   // Return a double from a TypeFlt constant; assert otherwise.
   @Override public double getd() { assert is_con(); return _con; }
-  //@Override public long   getl() { assert is_con() && ((long)_con)==_con; return (long)_con; }
 
   @Override protected TypeFlt xdual() {
     if( _z==0 ) return this;

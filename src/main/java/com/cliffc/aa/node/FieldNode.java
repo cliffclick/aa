@@ -106,7 +106,7 @@ public class FieldNode extends Node implements Resolvable {
       return TypeStruct.UNUSED;
     }
     // Clazz load, the instance is normal-live
-    if( _clz && def==in(0) ) return TypeStruct.ISUSED;
+    //if( _clz && def==in(0) ) return TypeStruct.ISUSED;
     // Otherwise normal fields and clazz fields are field-alive.
     return TypeStruct.UNUSED.replace_fld(TypeFld.make(_fld,Type.ALL));
   }

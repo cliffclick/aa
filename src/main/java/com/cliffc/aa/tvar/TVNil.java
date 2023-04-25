@@ -40,7 +40,11 @@ public class TVNil extends TV3 {
     assert !not_nil._may_nil; // might not be true under nested nilables, not required since copy strips nil
     not_nil._deps_work_clear();
     TV3 copy = that.copy().strip_nil();
-    return not_nil.union(copy) | union(that);
+    not_nil.union(copy);
+    union(that);
+    TV3 rez = that.find_nil();
+    that._unify(rez,false);
+    return true;
   }
 
   // U-F union; this is nilable and a fresh copy of this unifies to that.
@@ -100,7 +104,9 @@ public class TVNil extends TV3 {
     Type t = not_nil()._as_flow(dep);
     return t.meet(TypeNil.NIL);
   }
-  @Override void _widen() { throw unimpl(); }
+  @Override void _widen( byte widen ) {
+    not_nil().widen(widen,false);
+  }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     return _args[0]._str(sb,visit,dups,debug).p('?');

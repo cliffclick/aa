@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
@@ -112,7 +111,7 @@ public class CastNode extends Node {
       return maynil.deps_add_deep(this);
     
     // Unify the maynil with a nilable version of notnil
-    return maynil.unify(new TVNil(notnil),test);
+    return new TVNil(notnil).find().unify(maynil,test);
   }
 
   @Override public @NotNull CastNode copy( boolean copy_edges) {

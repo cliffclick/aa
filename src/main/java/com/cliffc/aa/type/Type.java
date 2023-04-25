@@ -721,10 +721,9 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     };
   }
   // True if a constant.  Same as centerline-or-above-center.
-  // Treat XCTRL as not-constant.
   public boolean is_con() {
     assert is_simple();
-    return above_center() && this!=XCTRL;
+    return above_center();
   }
   // Type must support a nil
   public boolean must_nil() { return this==ALL; }

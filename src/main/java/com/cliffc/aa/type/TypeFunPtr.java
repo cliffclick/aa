@@ -394,7 +394,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
 
   @Override public boolean is_con()       {
     // Constant display or unbound display
-    return (!has_dsp() || _dsp.is_con()) &&
+    return _dsp.is_con() &&
       // Single bit covers all functions (no new children added, but new splits
       // can appear).  Currently, not tracking this at the top-level, so instead
       // just triggering off of a simple heuristic: a single bit above BitsFun.ALL.

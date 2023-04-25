@@ -405,7 +405,7 @@ public class CallNode extends Node {
     // Expect a function pointer
     TypeFunPtr tfp = ttfp(_val);
     if( tfp.is_empty() || tfp.is_full() )
-      return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"A function is being called, but "+fdx()._val+" is not a function");
+      return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs==null ? null : _badargs[0],"A function is being called, but "+fdx()._val+" is not a function");
 
     BitsFun fidxs = tfp.fidxs();
     if( fidxs.above_center() ) return null; // Not resolved (yet)

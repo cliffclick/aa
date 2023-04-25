@@ -6,7 +6,6 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeNil;
-import com.cliffc.aa.util.Ary;
 
 import static com.cliffc.aa.AA.unimpl;
 
@@ -18,7 +17,7 @@ public class TVLeaf extends TV3 {
   @Override int eidx() { throw unimpl(); }
 
   // No improvement, return the not-nil leader
-  @Override TV3 find_nil(TVNil nil) { return nil; }
+  @Override TV3 find_nil() { throw unimpl(); }
 
   // -------------------------------------------------------------
   @Override boolean _unify_impl(TV3 that ) {
@@ -46,6 +45,6 @@ public class TVLeaf extends TV3 {
     deps_add(dep);
     return (AA.DO_HMT || !_use_nil) ? TypeNil.XSCALAR : TypeNil.AND_XSCALAR;
   }
-  @Override void _widen() { }
+  @Override void _widen( byte widen ) { }
 
 }

@@ -38,8 +38,8 @@ public class TVClz extends TV3 {
 
   
   // Keep the Clz wrapper, but find_nil the instance
-  @Override TV3 find_nil( TVNil nil ) {
-    TV3 nn = rhs().find_nil(nil);
+  @Override TV3 find_nil( ) {
+    TV3 nn = rhs().find_nil();
     if( nn == rhs() )
       return this; // No change so just use same Clz
     return new TVClz(clz(),nn);
@@ -80,7 +80,10 @@ public class TVClz extends TV3 {
     // TODO: Add clazz to structs
     return rhs;
   }
-  @Override void _widen() { throw unimpl(); }
+  @Override void _widen( byte widen ) {
+    clz().widen(widen,false);
+    rhs().widen(widen,false);
+  }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     TVStruct clz = arg(0).as_struct();

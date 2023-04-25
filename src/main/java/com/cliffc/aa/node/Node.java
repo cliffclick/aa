@@ -709,22 +709,12 @@ public abstract class Node implements Cloneable, IntSupplier {
         is_mem() ||
         is_prim() )                 // Never touch a Primitive
       return false; // Already a constant, or never touch an ErrNode
-    if( t instanceof TypeFunPtr tfp ) {
-      if( tfp.dsp()!=Type.ANY ) return false; // Even if whole TFP is a constant, need to construct with display
-      // External fidxs are never constants
-      if( BitsFun.EXT.test_recur(tfp.fidx()) )  return false;
-    }
-    // Call DProj being used by function ParmNode.  Removing the DProj makes
-    // the Call arg go dead, which prevents Call resolution.  Also, if the Call
-    // input is not then removed, but the target function gets inlined the
-    // inliner manifests a DProj, which makes the call input become alive
-    // again.
-    if( this instanceof ProjNode proj && proj.in(0) instanceof CallNode && _uses._len>0 ) {
-      for( Node use : _uses )
-        if( use instanceof ParmNode )
-          return false;
-    }
-
+    // External fidxs are never constants, except primitives which are both
+    // external and the same everywhere.
+    if( !is_prim() &&
+        t instanceof TypeFunPtr tfp &&
+        BitsFun.EXT.test_recur(tfp.fidx()) )
+      return false;
     return true;
   }
 
@@ -743,7 +733,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     } else {                    // New constant
       con._val = t;             // Typed
       con._live = Combo.post() ? Type.ANY : Type.ALL;     // Not live yet
-      if( Combo.post() ) con.set_tvar();
+      if( Combo.post() && con.has_tvar() ) con.set_tvar();
       con._elock(); // Put in VALS, since if Con appears once, probably appears again in the same XFORM call
     }
     return Env.GVN.add_flow(con); // Updated live flows

@@ -64,6 +64,8 @@ public class TVStruct extends TV3 {
     _args[_max] = tvf;
     _pins[_max] = pinned;
     _max++;
+    // New field is just as wide
+    if( _widen>0 ) throw unimpl();
     // Changed struct shape, move delayed-fresh updates to now
     move_delay();
     return true;
@@ -192,26 +194,27 @@ public class TVStruct extends TV3 {
   @Override boolean _fresh_unify_impl(TV3 tv3, boolean test) {
     boolean progress = false, missing = false;
     assert !unified() && !tv3.unified();    
+    TVStruct thsi = this;
     TVStruct that = (TVStruct)tv3.find(); // Might have to update
 
     for( int i=0; i<_max; i++ ) {
-      TV3 lhs = arg(i);
-      int ti = Util.find(that._flds,_flds[i]);
+      TV3 lhs = thsi.arg(i);
+      int ti = Util.find(that._flds,thsi._flds[i]);
       if( ti == -1 ) {          // Missing in RHS
-        if( is_open() || that.is_open() ) {
+        if( thsi.is_open() || that.is_open() ) {
           if( test ) return true; // Will definitely make progress
           TV3 nrhs = lhs._fresh();
           if( !that.is_open() ) // RHS not open, put copy of LHS into RHS with miss_fld error
             throw unimpl();
-          progress |= that.add_fld(_flds[i],_pins[i],nrhs);
+          progress |= that.add_fld(thsi._flds[i],thsi._pins[i],nrhs);
         } else missing = true; // Else neither side is open, field is not needed in RHS
       } else {
         TV3 rhs = that.arg(ti); // Lookup via field name
         progress |= lhs._fresh_unify(rhs,test);
-        that._pins[ti] |= _pins[i];
+        that._pins[ti] |= thsi._pins[i];
       }
+      thsi = (TVStruct)thsi.find(); // Might have to update
       that = (TVStruct)that.find(); // Might have to update
-      assert !unified();            // TODO: update/find thsi,that
       if( progress && test ) return true;
     }
 
@@ -219,10 +222,10 @@ public class TVStruct extends TV3 {
     // just copy the missing fields into it, then unify the structs (shortcut:
     // just skip the copy).  If the LHS is closed, then the extra RHS fields
     // are removed.
-    if( _max != that._max || missing )
+    if( thsi._max != that._max || missing )
       for( int i=0; i<that._max; i++ ) {
         if( Resolvable.is_resolving(that._flds[i]) ) continue;
-        TV3 lhs = arg(that._flds[i]); // Lookup vis field name
+        TV3 lhs = thsi.arg(that._flds[i]); // Lookup vis field name
         if( lhs==null ) {
           if( test ) return true;
           progress |= that.del_fld(i--);
@@ -230,7 +233,7 @@ public class TVStruct extends TV3 {
       }
     
     // If LHS is closed, force RHS closed
-    if( !_open && that._open ) {
+    if( !thsi._open && that._open ) {
       if( test ) return true;
       that._open = false;
       progress = true;
@@ -294,7 +297,10 @@ public class TVStruct extends TV3 {
 
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) { throw unimpl(); }
-  @Override void _widen() { throw unimpl(); }
+  @Override void _widen( byte widen ) {
+    for( int i=0; i<len(); i++ )
+      arg(i).widen(widen,false);
+  }
   
   public boolean is_int_clz() { return  Util.find(_flds,"!_" ) >= 0; }
   public boolean is_flt_clz() { return  Util.find(_flds,"sin") >= 0; }

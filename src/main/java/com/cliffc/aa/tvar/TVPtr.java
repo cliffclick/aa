@@ -6,8 +6,6 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
-import static com.cliffc.aa.AA.unimpl;
-
 /** A ptr-to-struct
  *
  */
@@ -23,10 +21,9 @@ public class TVPtr extends TV3 {
   @Override int eidx() { return TVErr.XPTR; }
 
   // Make the leader a nilable version of 'this' child
-  @Override TV3 find_nil(TVNil nil) {
+  @Override TV3 find_nil() {
     TV3 ptr = copy();
     ptr.add_may_nil(false);
-    nil.union(ptr);
     return ptr;
   }
 
@@ -52,7 +49,7 @@ public class TVPtr extends TV3 {
     TypeStruct tstr = dep==null ? (TypeStruct)load()._as_flow(dep) : TypeStruct.ISUSED;
     return TypeMemPtr.make(false,_may_nil,aliases,tstr);
   }
-  @Override void _widen() { throw unimpl(); }
+  @Override void _widen( byte widen ) { load().widen(widen,false); }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     return _args[0]._str(sb.p("*"),visit,dups,debug).p(_may_nil ? "?" : "");

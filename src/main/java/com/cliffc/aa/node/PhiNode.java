@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -72,6 +73,7 @@ public class PhiNode extends Node {
     Node r = in(0);
     if( r==def  ) return Type.ALL; // Self-loop, error
     if( r==null ) return _live;    // Mid-collapse, error, pass live thru
+    if( r== Env.XCTRL ) return Type.ANY;
     if( r.len() != len() ) return _live; // Error, pass live thru
     // The same def can appear on several inputs; check them all.
     for( int i=1; i<_defs._len; i++ )

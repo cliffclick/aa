@@ -28,10 +28,10 @@ public class TestHM {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_HMT=false;
-    DO_GCP=true;
+    DO_HMT=true;
+    DO_GCP=false;
     RSEED=0;
-    b_recursive_06();
+    a_basic_07();
   }
 
   private void _run0s( String prog, String rprog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -157,6 +157,7 @@ public class TestHM {
   }
   @Test public void a_basic_06() { run("(i* 2 3)","int64","6");  }
 
+  @Test public void a_basic_07() { run("(if (rand 2) 0 1)","int1","int:int1");  }
 
   @Test(expected = RuntimeException.class)
   public void a_basic_err_00() { run( "fred","","all"); }

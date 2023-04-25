@@ -35,17 +35,23 @@ public class TVLambda extends TV3 {
 
   @Override int eidx() { return TVErr.XFUN; }
 
-  @Override TV3 find_nil(TVNil nil) { return this; }
+  @Override TV3 find_nil() { return this; } // TODO: Push down to each child
 
   // -------------------------------------------------------------
   @Override public boolean _union_impl( TV3 tv3) { return false; }
 
   @Override boolean _unify_impl(TV3 tv3 ) {
+    TVLambda thsi = this;
     TVLambda that = (TVLambda)tv3; // Invariant when called
-    ret()._unify(that.ret(),false);
+    thsi.ret()._unify(that.ret(),false);
+    thsi = (TVLambda)thsi.find();
+    that = (TVLambda)that.find();
     int nargs = nargs(), tnargs = that.nargs();
-    for( int i=DSP_IDX; i<Math.min(nargs,tnargs); i++ )
-      arg(i)._unify(that.arg(i),false);
+    for( int i=DSP_IDX; i<Math.min(nargs,tnargs); i++ ) {
+      thsi.arg( i )._unify( that.arg( i ), false );
+      thsi = (TVLambda)thsi.find();
+      that = (TVLambda)that.find();
+    }
     if( nargs != tnargs )
       that.unify_err("Expected "+tnargs+" but found "+nargs,that,false);
     return true;
@@ -78,7 +84,12 @@ public class TVLambda extends TV3 {
     Type rez = ret()._as_flow(dep);
     return TypeFunPtr.makex(false,fidxs,nargs(),dsp,rez);
   }
-  @Override void _widen() { throw unimpl(); }
+  @Override void _widen( byte widen ) {
+    // widen all args as a 2, widen ret as the incoming widen
+    ret().widen(widen,false);
+    for( int i = DSP_IDX; i<nargs(); i++ )
+      arg(i).widen((byte)2,false);
+  }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     sb.p("{ ");
