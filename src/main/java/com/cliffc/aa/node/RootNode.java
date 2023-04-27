@@ -155,9 +155,9 @@ public class RootNode extends Node {
             if(  EXT_ALIASES.test_recur(alias)) continue; // Never seen before escape
             EXT_ALIASES = EXT_ALIASES.set(alias);
             // TODO: walk the memory for this escaped alias?
-            NewNode nnn = NewNode.get(alias);
-            if( nnn != null )
-              nnn.tvar().widen((byte)1,false); // HMT widen
+            //NewNode nnn = NewNode.get(alias);
+            //if( nnn != null )
+            //  nnn.tvar().widen((byte)1,false); // HMT widen
           }
         }
         if( !tn._fidxs.above_center()) {
@@ -169,8 +169,8 @@ public class RootNode extends Node {
             RetNode ret = RetNode.get(fidx);
             if( ret != null ) {
               escape_ret(ret);
-              FunPtrNode fptr = ret.funptr();
-              fptr.tvar().widen((byte)1,false); // HMT widen
+              //FunPtrNode fptr = ret.funptr();
+              //fptr.tvar().widen((byte)1,false); // HMT widen
             }
           }
           // The return (but not inputs, so not display) also escapes

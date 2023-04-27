@@ -64,12 +64,14 @@ public class TVBase extends TV3 {
     TVBase base = (TVBase)that;
     add_delay_fresh();          // If this Base can fall, must fresh-unify that Base
     Type t = _t.meet(base._t);
-    if( t==base._t && t==_t ) return false;
+    if( t==base._t && (!WIDEN_FRESH || t==_t) ) return false;
     if( test ) return true;
     if( base._t != t ) base.move_delay(); // Any Fresh base updates need to rerun
     base._t = t;
-    if( _t != t ) move_delay(); // Any Fresh base updates need to rerun
-    _t = t;
+    if( WIDEN_FRESH ) {
+      if( _t != t ) move_delay(); // Any Fresh base updates need to rerun
+      _t = t;
+    }
     return true;
   }
 

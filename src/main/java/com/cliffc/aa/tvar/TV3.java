@@ -43,6 +43,8 @@ import static com.cliffc.aa.AA.unimpl;
  */
 
 abstract public class TV3 implements Cloneable {
+  public static final boolean WIDEN = true, WIDEN_FRESH=false; // WIDEN currently turned off
+  
   private static int CNT=1;
   public int _uid=CNT++; // Unique dense int, used in many graph walks for a visit bit
 
@@ -695,12 +697,15 @@ abstract public class TV3 implements Cloneable {
   // Root is set to visited & no widen.
   public boolean widen( byte widen, boolean test ) {
     assert !unified();
+    if( !WIDEN ) return false;
     if( _widen>=widen )  return false;
     if( test ) return true;
     _widen = widen;
     _widen(widen);
     return true;
   }
+  // Used to initialize primitives
+  public void set_widen() { _widen=2; }
   abstract void _widen( byte widen );
 
   // -----------------

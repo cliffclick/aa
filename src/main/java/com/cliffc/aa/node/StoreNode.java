@@ -76,9 +76,12 @@ public class StoreNode extends Node {
         return live;
       }
       mem().deps_add(def);
-      // Precise update if it's a single alias, and no value at alias is arriving here
+      // Precise update if it's a single alias, and no value at alias is
+      // arriving here OR directly storing from the NewNode.
+      Node adr = adr();
+      if( adr instanceof FreshNode frsh ) adr = frsh.id();
       int alias = tmp._aliases.abit();
-      if( alias!=-1 && mem.at(alias).above_center() )
+      if( alias!=-1 && ((adr instanceof NewNode nnn && nnn._alias==alias) || mem.at(alias).above_center()) )
         return live.set(alias,TypeStruct.UNUSED); // Precise set, no longer demanded
       // Imprecise update, cannot dataflow kill alias going backwards
       return live;
@@ -106,12 +109,16 @@ public class StoreNode extends Node {
       // Keep the store op until values are monotonic.
       if( tmp.above_center() && rez() != null )
         return Env.GVN.add_reduce(set_def(3,null)); // Try again
-      // Same/same up/down
-      if( _live.isa(mem._live) && mem._val == _val ) {
+      // Same/same up/down, or no value readers
+      if( _live.isa(mem._live) && (_uses._len==1 || mem._val == _val) ) {
         // If dead from either above or below, we can remove
         if( tmp.above_center() ) return mem;
         TypeStruct ts0 = (_live instanceof TypeMem tm ? tm : _live.oob(TypeMem.ALLMEM)).ld(tmp);
-        if( ts0==TypeStruct.UNUSED ) return mem;
+        if( ts0==TypeStruct.UNUSED ) {
+          if( mem._val == _val /*|| _uses._len==1*/ ) return mem; // Same/same or no readers, just delete
+          if( rez()!=null )
+            return Env.GVN.add_reduce(set_def(3,null)); // Dont store, keep until monotonic
+        }
       }
       mem.deps_add(this);   // Input address changes, check reduce
       deps_add(this);       // Our   address changes, check reduce

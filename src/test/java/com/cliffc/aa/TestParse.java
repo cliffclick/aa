@@ -27,10 +27,10 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_GCP=true;
-    DO_HMT=false;
+    DO_GCP=false;
+    DO_HMT=true;
     RSEED=0;
-    test("x:=1;x++;x", "2", "int:2");
+    test   ("x=@{n:=1;v:=2}; x.n := 3; x", "*[10]@{_; n:=3; v:=2}","*@{n=int:nint8; v=int:2}", null, null, "[10]", null);
   }
   static private void assertTrue(boolean t) {
     if( t ) return;

@@ -81,8 +81,8 @@ public class TVClz extends TV3 {
     return rhs;
   }
   @Override void _widen( byte widen ) {
-    clz().widen(widen,false);
-    rhs().widen(widen,false);
+    clz().widen((byte)1,false);
+    rhs().widen(widen  ,false);
   }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {

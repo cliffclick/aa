@@ -95,7 +95,7 @@ public class TVLambda extends TV3 {
     if( _may_nil ) fidxs = fidxs.set(0);
     if( _use_nil ) throw unimpl();
     Type tfun = ADUPS.get(_uid);
-    if( tfun != null ) return tfun;  // TODO: Returning recursive flow-type functions
+    if( tfun != null ) throw unimpl(); // return tfun;  // TODO: Returning recursive flow-type functions
     ADUPS.put(_uid, TypeNil.XSCALAR);
     Type dsp = nargs() > DSP_IDX ? dsp()._as_flow(dep) : Type.ALL;
     Type rez = ret()._as_flow(dep);

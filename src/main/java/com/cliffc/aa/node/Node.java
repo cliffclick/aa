@@ -743,7 +743,9 @@ public abstract class Node implements Cloneable, IntSupplier {
   public final void walk_initype( VBitSet visit ) {
     if( visit.tset(_uid) ) return; // Been there, done that
     Env.GVN.add_flow(this);        // On worklist and mark visited
-    if( has_tvar() ) set_tvar();
+    if( has_tvar() ) { set_tvar();
+      //if( is_prim() ) tvar().set_widen();
+    }
     if( this instanceof FunNode fun )
       fun.set_unknown_callers();
     _val = _live = Type.ANY;  // Highest value
