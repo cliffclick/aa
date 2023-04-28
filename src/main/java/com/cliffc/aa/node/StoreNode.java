@@ -115,7 +115,9 @@ public class StoreNode extends Node {
         if( tmp.above_center() ) return mem;
         TypeStruct ts0 = (_live instanceof TypeMem tm ? tm : _live.oob(TypeMem.ALLMEM)).ld(tmp);
         if( ts0==TypeStruct.UNUSED ) {
-          if( mem._val == _val /*|| _uses._len==1*/ ) return mem; // Same/same or no readers, just delete
+          if( mem._val == _val ) return mem; // Same/same or no readers, just delete
+          //if( _uses._len==1 )
+          //  return mem;
           if( rez()!=null )
             return Env.GVN.add_reduce(set_def(3,null)); // Dont store, keep until monotonic
         }
@@ -126,15 +128,18 @@ public class StoreNode extends Node {
 
     // Store of a Store, same address
     if( mem instanceof StoreNode st ) {
-      if( st.adr() == adr ) {
+      Node adr0 = st.adr();
+      if( adr  instanceof FreshNode f ) adr  = f.id();
+      if( adr0 instanceof FreshNode f ) adr0 = f.id();
+      if( adr == adr0 ) {
         // Do not bypass a parallel writer
         if( st.check_solo_mem_writer(this) &&
             // And liveness aligns
-            _live.isa(mem._live) ) {
+            _live.isa(st.mem()._live) ) {
           // Storing same-over-same, just use the first store
           if( rez()==st.rez() ) return st;
           // If not wiping out an error, wipe out the first store
-          if( st.rez().err(true)==null ) {
+          if( st.rez()==null || st.rez().err(true)==null ) {
             set_def(1,st.mem());
             return this;
           }
@@ -149,7 +154,7 @@ public class StoreNode extends Node {
     // Store of a Load
     if( rez() instanceof LoadNode ld && ld.adr()==adr && ld.mem()==mem )
       return mem;
-    
+
     //// Escape a dead MemSplit
     //if( mem instanceof MProjNode && mem.in(0) instanceof MemSplitNode msp &&
     //    msp.join()==null ) {
@@ -216,12 +221,11 @@ public class StoreNode extends Node {
   // leaf is never expected to unify with anything.
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
-    if( rez()!=null ) {
-      TV3 rez = rez().set_tvar();
-      TV3 ptr = adr().set_tvar();
-      if( ptr instanceof TVPtr pv3 ) rez.unify(pv3.load(),false);
-      else ptr.unify(new TVPtr(rez),false);
-    }
+    assert rez()!=null;         // Should have cleared out during iter
+    TV3 rez = rez().set_tvar();
+    TV3 ptr = adr().set_tvar();
+    if( ptr instanceof TVPtr pv3 ) rez.unify(pv3.load(),false);
+    else ptr.unify(new TVPtr(rez),false);
     return new TVLeaf();
   }
 
