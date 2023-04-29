@@ -89,7 +89,7 @@ public class NewNode extends Node {
   
   @Override public boolean has_tvar() { /*assert used(); */ return true; }
 
-  @Override public TV3 _set_tvar() { return new TVPtr(new TVLeaf()); }
+  @Override public TV3 _set_tvar() { return new TVPtr(BitsAlias.make0(_alias)); }
 
   // clones during inlining all become unique new sites
   @Override public @NotNull NewNode copy(boolean copy_edges) {

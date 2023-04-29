@@ -7,6 +7,7 @@ import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.*;
+import static com.cliffc.aa.AA.MEM_IDX;
 import static com.cliffc.aa.Env.GVN;
 
 // See CallNode.  Slot 0 is the Call.  The remaining slots are Returns which
@@ -444,6 +445,7 @@ public final class CallEpiNode extends Node {
 
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
+    // Unwire all; will rewire optimistically during Combo
     while( nwired()>0 ) {
       Node w = del(1), fun=w;
       if( w instanceof RetNode ret ) fun = ret.fun();
@@ -458,8 +460,8 @@ public final class CallEpiNode extends Node {
     assert !_is_copy;
     boolean progress = false;
     CallNode call = call();     // Call header for Apply
-    Node fdx = call.fdx();      // node {dsp args -> ret}
-    TV3 tv3 = fdx.tvar();       // type {dsp args -> ret}
+    Node fdx = call.fdx();      // node     {dsp args -> ret}
+    TV3 tv3 = fdx.tvar();       // type {mem dsp args -> ret mem}
     
     // Peek thru any error
     if( tv3 instanceof TVErr err ) tv3 = err.as_lambda();
@@ -468,20 +470,19 @@ public final class CallEpiNode extends Node {
     if( !(tv3 instanceof TVLambda tfun) ) {
       if( test ) return true;
       add_flow();           // Re-unify after forcing a Lambda, to get the args
-      TVLambda lam = new TVLambda(call.nargs(),new TVLeaf(),tvar());
-      if( tv3==null ) {
-        // Error with no lambda, force one
-        fdx.tvar()._union_impl(lam);
-        return true;
-      }
+      TVLambda lam = new TVLambda(call.nargs(),
+                                  new TVMem(), // input mem
+                                  new TVLeaf(),// display
+                                  new TVMem(), // output mem
+                                  tvar());     // Result
       return tv3.unify(lam,false);
     }
     
     // Check for progress amongst args
-    int tnargs = tfun.nargs() - ARG_IDX;
-    int cnargs = call.nargs() - ARG_IDX;
+    int tnargs = tfun.nargs();
+    int cnargs = call.nargs();
     int nargs = Math.min(tnargs,cnargs);
-    for( int i=DSP_IDX; i<nargs+ARG_IDX; i++ ) {
+    for( int i=MEM_IDX; i<nargs; i++ ) {
       TV3 formal = tfun.arg(i);
       TV3 actual = call.tvar(i);
       progress |= actual.unify(formal,test);
@@ -489,9 +490,9 @@ public final class CallEpiNode extends Node {
       tfun = tfun.find().as_lambda();
     }
 
-    // Check for progress on the return
-    progress |= tvar().unify(tfun.ret(),test);
-
+    // Check for progress on the return & memory
+    progress |= tvar().unify(tfun.ret (),test);
+    progress |= ProjNode.proj(this,MEM_IDX).tvar().unify(tfun.omem(),test);
     
     if( tnargs > nargs )  // Missing arguments
       progress |= tvar().unify_err("Passing "+cnargs+" arguments to a function taking "+tnargs+" arguments",tfun,test);
@@ -502,8 +503,13 @@ public final class CallEpiNode extends Node {
 
   // Unify trailing result ProjNode with the CallEpi directly.
   @Override public boolean unify_proj( ProjNode proj, boolean test ) {
-    assert proj._idx==REZ_IDX;
-    return tvar().unify(proj.tvar(),test);
+    if( proj._idx==REZ_IDX ) 
+      return tvar().unify(proj.tvar(),test);
+    if( proj._idx==MEM_IDX ) {
+      assert ((TVLambda)call().fdx().tvar()).omem()==proj.tvar();
+      return false;
+    }
+    throw unimpl(); // memory unify
   }
   
 }

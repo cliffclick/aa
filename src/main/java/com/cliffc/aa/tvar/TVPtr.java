@@ -1,20 +1,25 @@
 package com.cliffc.aa.tvar;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.node.Node;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.type.BitsAlias;
+import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
+
+import static com.cliffc.aa.AA.unimpl;
 
 /** A ptr-to-struct
  *
  */
 public class TVPtr extends TV3 {
-  // This has a single pointer edge to a Struct or Leaf (or Err)
-  public TVPtr( boolean may_nil, TV3 rec ) { super(may_nil,rec); }
-  public TVPtr( TV3 rec ) { this(false,rec); }
-  // Get the Struct
-  public TV3 load() { return arg(0); }
+  // This is a pointer tracking aliases.
+  // The actual pointed-at type is tracked in memory.
+  BitsAlias _aliases;
+  public TVPtr( BitsAlias aliases ) {
+    super(aliases.test(0));
+    _aliases = aliases;
+  }
+  public TVPtr( ) { this(BitsAlias.EMPTY); }
 
   @Override boolean can_progress() { return false; }
 
@@ -22,36 +27,54 @@ public class TVPtr extends TV3 {
 
   // Make the leader a nilable version of 'this' child
   @Override TV3 find_nil() {
-    TV3 ptr = copy();
+    TVPtr ptr = (TVPtr)copy();
+    ptr._aliases = ptr._aliases.meet_nil();
     ptr.add_may_nil(false);
     return ptr;
   }
 
   // -------------------------------------------------------------
-  // No subparts to union
-  @Override public boolean _union_impl(TV3 that) { return false; }
+  // Union aliases
+  @Override public boolean _union_impl(TV3 that) {
+    
+    //return false;
+    throw unimpl();
+  }
 
-  @Override boolean _unify_impl(TV3 that ) { return arg(0)._unify(that.arg(0),false); }
-
+  @Override boolean _unify_impl(TV3 that ) { return true; }
+  
+  // -------------------------------------------------------------
+  @Override boolean _fresh_unify_impl(TV3 that, boolean test) {
+    TVPtr ptr = (TVPtr)that;    // Invariant when called
+    if( _aliases==ptr._aliases ) return false;
+    BitsAlias aliases = _aliases.meet(ptr._aliases);
+    if( aliases == ptr._aliases ) return false;
+    ptr._aliases = aliases;
+    return true;
+  }
+  
   // -------------------------------------------------------------
   @Override boolean _trial_unify_ok_impl( TV3 tv3, boolean extras ) {
-    TVPtr that = (TVPtr)tv3; // Invariant when called
-    // Structural trial unification on the one child
-    return load()._trial_unify_ok( that.load(), extras);
+    //TVPtr that = (TVPtr)tv3; // Invariant when called
+    //// Structural trial unification on the one child
+    //return load()._trial_unify_ok( that.load(), extras);
+    throw unimpl();
   }
 
   @Override boolean _exact_unify_impl( TV3 tv3 ) { return true; }
   
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) {
-    // Compatible escaped aliases
-    BitsAlias aliases = Env.ROOT.matching_escaped_aliases(this, dep);
-    TypeStruct tstr = dep==null ? (TypeStruct)load()._as_flow(dep) : TypeStruct.ISUSED;
-    return TypeMemPtr.make(false,_may_nil,aliases,tstr);
+    //// Compatible escaped aliases
+    //BitsAlias aliases = Env.ROOT.matching_escaped_aliases(this, dep);
+    //TypeStruct tstr = dep==null ? (TypeStruct)load()._as_flow(dep) : TypeStruct.ISUSED;
+    //return TypeMemPtr.make(false,_may_nil,aliases,tstr);
+    throw unimpl();
   }
-  @Override void _widen( byte widen ) { load().widen(widen,false); }
+  @Override void _widen( byte widen ) { }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
-    return _args[0]._str(sb.p("*"),visit,dups,debug).p(_may_nil ? "?" : "");
+    sb.p("*");
+    return _aliases.str(sb);
   }
 }

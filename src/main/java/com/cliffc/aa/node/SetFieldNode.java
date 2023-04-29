@@ -98,6 +98,7 @@ public class SetFieldNode extends Node {
     TVStruct self = tvar( ).as_struct();
     TVStruct rec  = tvar(0).as_struct();
     // Unify all other common fields, same as normal struct unification
+    // TODO: verify i need this both ways
     return 
       self.half_unify(rec ,_fld,test) |
       rec .half_unify(self,_fld,test);

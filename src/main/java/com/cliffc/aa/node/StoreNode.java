@@ -3,9 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.TV3;
-import com.cliffc.aa.tvar.TVLeaf;
-import com.cliffc.aa.tvar.TVPtr;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.unimpl;
@@ -216,20 +214,26 @@ public class StoreNode extends Node {
     return null;
   }
 
-  // Store unifies the contents of address and value, but does not itself have
-  // a real tvar.  Give it a leaf to it participates in unification but its
-  // leaf is never expected to unify with anything.
+  // Given a tmem, tptr, trez:
+  //    TVMem[aliases].unify(TVRez)
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
     assert rez()!=null;         // Should have cleared out during iter
+    TV3 mem = mem().set_tvar();
+    TV3 adr = adr().set_tvar();
     TV3 rez = rez().set_tvar();
-    TV3 ptr = adr().set_tvar();
-    if( ptr instanceof TVPtr pv3 ) rez.unify(pv3.load(),false);
-    else ptr.unify(new TVPtr(rez),false);
-    return new TVLeaf();
+    if( !(mem instanceof TVMem   ) )  mem.unify(new TVMem(),false);
+    if( !(adr instanceof TVPtr   ) )  adr.unify(new TVPtr(),false);
+    if( !(rez instanceof TVStruct) )  rez.unify(new TVStruct(new String[0], new TV3[0], true),false);
+    return mem;
   }
 
-  @Override public boolean unify( boolean test ) { return false; }
+  @Override public boolean unify( boolean test ) {
+    TVMem mem = (TVMem)tvar();
+    TVPtr ptr  = (TVPtr)adr().tvar();
+    TVStruct rec  = (TVStruct)rez().tvar();    
+    return mem.unify(ptr,rec,test);
+  }
 
   @Override public ErrMsg err( boolean fast ) {
     Type tadr = adr()._val;

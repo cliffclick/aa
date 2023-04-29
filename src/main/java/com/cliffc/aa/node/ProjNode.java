@@ -30,9 +30,8 @@ public class ProjNode extends Node {
     return null;
   }
 
-  // Standard data ProjNode has a type variable, Control or Memory projnodes do
-  // not (CProj, CEProj, MProj)
-  @Override public boolean has_tvar() { return getClass()==ProjNode.class; }
+  // Standard data ProjNode has a type variable, Control does not
+  @Override public boolean has_tvar() { return true; }
 
   // Unify with the parent TVar sub-part
   @Override public boolean unify( boolean test ) {

@@ -652,7 +652,7 @@ abstract public class TV3 implements Cloneable {
       if( !tfp.is_full() ) throw unimpl(); //return new TVLeaf(); // TODO
       yield new TVLeaf(); // Generic Function Ptr
     }
-    case TypeMemPtr tmp -> new TVPtr(tmp.must_nil(), from_flow(tmp._obj));
+    case TypeMemPtr tmp -> new TVPtr(tmp._aliases);
     case TypeStruct ts -> {
       if( ts.len()==0 ) yield new TVLeaf();
       String[] ss = new String[ts.len()];

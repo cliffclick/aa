@@ -107,7 +107,7 @@ public final class FunPtrNode extends Node {
   @Override public TV3 _set_tvar() {
     Node rez = ret().rez();
     if( rez==null ) return new TVLeaf(); // Happens for broken Lambdas
-    return new TVLambda(nargs(),new TVLeaf(),rez.set_tvar());
+    return new TVLambda(nargs(),null,new TVLeaf(),null,rez.set_tvar());
   }
 
   // Implements class HM.Lambda unification.

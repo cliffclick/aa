@@ -36,4 +36,6 @@ public class CProjNode extends ProjNode {
     return null;
   }
 
+  @Override public boolean has_tvar() { return false; }
+
 }
