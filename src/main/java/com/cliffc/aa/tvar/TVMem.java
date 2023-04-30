@@ -36,6 +36,24 @@ public class TVMem extends TV3 {
   //@Override public TVMem as_mem() { return this; }
   @Override public int len() { return _max; }  
 
+  public TV3 sharptr(TV3 ptr) {
+    assert !ptr.unified();
+    if( !(ptr instanceof TVPtr tptr) ) return ptr;
+    if( tptr._aliases.is_empty() )
+      throw unimpl();
+    int j=-1;
+    for( int i=0; i<_max; i++ ) {
+      TVPtr p0 = _ptrs.at(i);
+      if( p0._aliases==tptr._aliases ) j=i;
+      else if( p0._aliases.overlaps(tptr._aliases) )
+        throw unimpl();         // Expecting exact hit
+    }
+    if( j== -1 ) throw unimpl();
+    // TODO: recursively fill in
+    return new TVPtr(tptr._aliases,arg(j));
+  }
+
+  
   // Unify rec against all aliases.  Also, fold up any unified ptrs.
   public boolean unify( TVPtr ptr, TVStruct rec, boolean test ) {
     assert !ptr.unified() && !rec.unified();
@@ -83,7 +101,9 @@ public class TVMem extends TV3 {
 
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) { throw unimpl(); }
-  @Override void _widen( byte widen ) { throw unimpl(); }
+  @Override void _widen( byte widen ) {
+    throw unimpl();
+  }
 
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     sb.p("[[ ");

@@ -38,7 +38,7 @@ public abstract class AA {
       if( te._errs!=null ) System.out.println(te._errs);
       else {
         System.out.println(te._hmt.toString());
-        System.out.println(te._tmem.sharptr(te._t).toString());
+        System.out.println(te._t  .toString());
       }
     } else {
       REPL.go();

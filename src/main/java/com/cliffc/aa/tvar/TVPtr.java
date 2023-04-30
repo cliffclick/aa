@@ -20,6 +20,11 @@ public class TVPtr extends TV3 {
     _aliases = aliases;
   }
   public TVPtr( ) { this(BitsAlias.EMPTY); }
+  
+  public TVPtr( BitsAlias aliases, TV3 str ) {
+    super(aliases.test(0),str);
+    _aliases = aliases;
+  }
 
   @Override boolean can_progress() { return false; }
 
@@ -75,6 +80,8 @@ public class TVPtr extends TV3 {
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     sb.p("*");
-    return _aliases.str(sb);
+    _aliases.str(sb);
+    if( _args[0]!=null ) arg(0)._str(sb,visit,dups,debug);
+    return sb;
   }
 }

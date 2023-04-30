@@ -151,6 +151,7 @@ abstract public class TV3 implements Cloneable {
   public TVClz    as_clz   () { throw unimpl(); }
   public TVNil    as_nil   () { throw unimpl(); }
 
+  public TV3 sharptr(TV3 ptr) { return ptr; }
   private long dbl_uid(TV3 t) { return dbl_uid(t._uid); }
   private long dbl_uid(long uid) { return ((long)_uid<<32)|uid; }
 

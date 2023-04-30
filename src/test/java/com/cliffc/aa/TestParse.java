@@ -30,7 +30,9 @@ public class TestParse {
     DO_GCP=false;
     DO_HMT=true;
     RSEED=0;
-    test   ("x=@{n:=1;v:=2}; x.n := 3; x", "*[10]@{_; n:=3; v:=2}","*@{n=int:nint8; v=int:2}", null, null, "[10]", null);
+    test("x=@{n:=1;v:=2}; x.n := 3; x", "*[10]@{_; n:=3; v:=2}",
+         "*[10]@{n=int:3; v=int:2}",
+         null, null, "[10]", null);
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -955,7 +957,7 @@ HashTable = {@{
     // Check GCP result
     if( gcp != null && (err==null || cur_off<0) ) {
       assertNull(te._errs);
-      Type actual = te._tmem.sharptr(te._t); // Sharpen any memory pointers
+      Type actual = te._t;      // Sharpen any memory pointers
       Type expect = Type.valueOf(gcp);
       assertEquals(expect,actual);
     }

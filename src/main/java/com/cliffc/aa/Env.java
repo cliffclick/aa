@@ -163,14 +163,14 @@ public class Env implements AutoCloseable {
 
     Node rez = Env.ROOT.in(REZ_IDX);
     Type mem = Env.ROOT.in(MEM_IDX)._val;
-    Type val = rez._val;   
+    Type val = mem.sharptr(rez._val);
+    TV3 tval = Env.ROOT.in(MEM_IDX).tvar().sharptr(rez.tvar());
     BitsAlias aliases = Env.ROOT.ralias();
     BitsFun   fidxs   = Env.ROOT.rfidxs();
     return new TypeEnv(val,     // GCP result
                        fidxs,   // Escaping FIDXS
                        aliases, // Escaping ALIASES
-                       mem instanceof TypeMem mem0 ? mem0 : mem.oob(TypeMem.ALLMEM),
-                       AA.DO_HMT && rez.has_tvar() ? rez.tvar() : null,
+                       tval,
                        errs0.isEmpty() ? null : errs0);
   }
 

@@ -110,11 +110,12 @@ public class TVLambda extends TV3 {
     throw unimpl();
   }
   @Override void _widen( byte widen ) {
-    //// widen all args as a 2, widen ret as the incoming widen
-    //ret().widen(widen,false);
-    //for( int i = DSP_IDX; i<nargs(); i++ )
-    //  arg(i).widen((byte)2,false);
-    throw unimpl();
+    // widen all args as a 2, widen ret as the incoming widen
+    ret().widen(widen,false);
+    if( omem()!=null ) omem().widen(widen,false);
+    for( int i = DSP_IDX; i<nargs(); i++ )
+      arg(i).widen((byte)2,false);
+    if( imem()!=null ) imem().widen(widen,false);
   }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
