@@ -1,12 +1,12 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.tvar.TV3;
-import com.cliffc.aa.tvar.TVLambda;
-import com.cliffc.aa.tvar.TVLeaf;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 
-import static com.cliffc.aa.AA.*;
+import static com.cliffc.aa.AA.MEM_IDX;
+import static com.cliffc.aa.AA.DSP_IDX;
+import static com.cliffc.aa.AA.REZ_IDX;
 
 // See CallNode and FunNode comments. The FunPtrNode converts a RetNode into a
 // TypeFunPtr with a constant fidx.  Used to allow first class functions to be
@@ -105,9 +105,16 @@ public final class FunPtrNode extends Node {
   @Override public boolean has_tvar() { return true; }
 
   @Override public TV3 _set_tvar() {
-    Node rez = ret().rez();
+    RetNode ret = ret();
+    Node rez = ret.rez();
     if( rez==null ) return new TVLeaf(); // Happens for broken Lambdas
-    return new TVLambda(nargs(),null,new TVLeaf(),null,rez.set_tvar());
+    Node imem = ret.fun().parm(MEM_IDX);
+    Node dsp  = ret.fun().parm(DSP_IDX);
+    Node omem = ret.mem();
+    TVMem timem = imem == null ? new TVMem () : (TVMem)imem.set_tvar();
+    TV3   tdsp  = dsp  == null ? new TVLeaf() :        dsp .set_tvar();
+    TVMem tomem = omem == null ? new TVMem () : (TVMem)omem.set_tvar();
+    return new TVLambda(nargs(),timem,tdsp,tomem,rez.set_tvar());
   }
 
   // Implements class HM.Lambda unification.
@@ -121,7 +128,7 @@ public final class FunPtrNode extends Node {
     // Each normal argument from the parms directly
     boolean progress = false;
     for( int i=DSP_IDX; i<parms.length; i++ )
-      // Parms can be missing (and display might not support a TVar)
+      // Parms can be missing
       if( parms[i]!=null ) {
         progress |= lam.arg(i).unify(parms[i].tvar(),test);
         if( test && progress ) return true;

@@ -5,7 +5,6 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVLeaf;
-import com.cliffc.aa.tvar.TVMem;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.MEM_IDX;
@@ -25,7 +24,7 @@ public class ParmNode extends Node {
     _t = t;
     _bad = bad;
   }
-  @Override public boolean is_mem() { return _t==TypeMem.ALLMEM; }
+  @Override public boolean is_mem() { return _t instanceof TypeMem; }
   public FunNode fun() { return (FunNode) in(0); }
   @Override public String xstr() { return "Parm:"+_idx; }
 
@@ -99,7 +98,7 @@ public class ParmNode extends Node {
   @Override public boolean has_tvar() { return !(_t instanceof TypeRPC); }
   
   @Override public TV3 _set_tvar() {
-    TV3 tv = is_mem() ? new TVMem() : new TVLeaf();
+    TV3 tv = is_mem() ? TV3.from_flow(_t) : new TVLeaf();
     tv.deps_add(this);          // with Root input, value depends on tvar
     return tv;
   }

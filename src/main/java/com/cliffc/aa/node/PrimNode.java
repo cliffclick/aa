@@ -167,6 +167,28 @@ public abstract class PrimNode extends Node {
     return new FunPtrNode(_name,ret).init();
   }
   
+  // Primitive wrapped as a simple function.
+  // String memory, then DSP as first arg.
+  FunPtrNode as_fun_str( ) {
+    assert !_is_lazy;           // No lazy operators here
+    // Lazily discover operators
+    if( is_oper() ) Oper.make(_name,false);
+    FunNode fun = new FunNode(this,_name).init();
+    ParmNode rpc = new ParmNode(0      ,fun,null,TypeRPC.ALL_CALL).init();
+    ParmNode mem = new ParmNode(MEM_IDX,fun,null,TypeMem.STRMEM  ).init();
+    add_def(mem);
+    // Make a Parm for every formal
+    for(int i = DSP_IDX; i<_formals.len(); i++ )
+      add_def(new ParmNode(i,fun,null,_formals.at(i)).init());
+    // The primitive, working on and producing wrapped prims
+    init();
+    // Return the result
+    RetNode ret = new RetNode(fun,mem,this,rpc,fun).init();
+    // FunPtr is UNBOUND here, will be bound when loaded thru a named struct to the Clazz.
+    // Primitives all late-bind by default, so no BindFP here.
+    return new FunPtrNode(_name,ret).init();
+  }
+
   // Make and install a primitive Clazz.
   private static void make_prim( StructNode clz, String clzname, NewNode ptr, PrimNode[][] primss ) {
     for( PrimNode[] prims : primss ) {
@@ -241,12 +263,12 @@ public abstract class PrimNode extends Node {
   // In the test HM, all primitives are a Lambda without a body.  Here they are
   // effectively Applies/Calls and the primitive computes a result.
   @Override TV3 _set_tvar() {
-    // All arguments are pre-unified to unique copy bases, wrapped in a
-    // primitive with a clazz reference
+    // All arguments are pre-unified to unique bases, wrapped in a primitive
+    // with a clazz reference
     for( int i=DSP_IDX; i<_formals.len(); i++ )
       if( _formals.at(i)!=Type.ANY )
         in(i-DSP_IDX).set_tvar().unify(make_tvar((TypeNil)_formals.at(i)),false);
-    // Return is some primitive, and is typically never a copy
+    // Return is some primitive
     return make_tvar(_ret);
   }
 
@@ -540,13 +562,25 @@ public abstract class PrimNode extends Node {
 
   public static class StrLen extends PrimNode {
     public StrLen() { super("#_",TypeTuple.STR,TypeInt.INT64); }
-    @Override public TypeNil apply( TypeNil[] args ) {
-      if( !(args[0] instanceof TypeMemPtr tmp) ||
+    @Override public TypeNil apply( TypeNil[] args ) { throw unimpl(); }
+    @Override public Type value() {
+      if( !(val(1) instanceof TypeMemPtr tmp) ||
           !Util.eq("str:",tmp._obj._clz) )
-        return args[0].oob(TypeInt.INT64);
+        return val(1).oob(TypeInt.INT64);
       return tmp.oob(TypeInt.INT64);
     }
-
+    @Override FunPtrNode as_fun() { return as_fun_str(); }
+    // In the test HM, all primitives are a Lambda without a body.  Here they are
+    // effectively Applies/Calls and the primitive computes a result.
+    @Override TV3 _set_tvar() {
+      // All arguments are pre-unified to unique bases, wrapped in a
+      // primitive with a clazz reference
+      for( int i=DSP_IDX; i<_formals.len(); i++ )
+        if( _formals.at(i)!=Type.ANY )
+          in(i-MEM_IDX).set_tvar().unify(make_tvar((TypeNil)_formals.at(i)),false);
+      // Return is some primitive
+      return make_tvar(_ret);
+    }
   }
   
 

@@ -23,14 +23,14 @@ public class TVLeaf extends TV3 {
   @Override boolean _unify_impl(TV3 that ) {
     // Always fold leaf into the other.
     // If that is ALSO a Leaf, keep the lowest UID.
-    assert !(that instanceof TVLeaf leaf) || _uid > that._uid;
+    assert !(that instanceof TVLeaf) || _uid > that._uid;
     // Leafs must call union themselves; other callers of _unify_impl get a
     // union call done for them.
     return this.union(that);
   }
 
   // Leafs have no subclass specific parts to union.
-  @Override public boolean _union_impl(TV3 that) { return false; }
+  @Override public void _union_impl(TV3 that) { }
 
   // Always unifies
   @Override boolean _trial_unify_ok_impl( TV3 tv3, boolean extras ) { return true; }

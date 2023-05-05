@@ -8,6 +8,7 @@ import com.cliffc.aa.util.*;
 import java.util.IdentityHashMap;
 
 import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.DSP_IDX;
 
 /** Type variable base class
  *
@@ -151,7 +152,6 @@ abstract public class TV3 implements Cloneable {
   public TVClz    as_clz   () { throw unimpl(); }
   public TVNil    as_nil   () { throw unimpl(); }
 
-  public TV3 sharptr(TV3 ptr) { return ptr; }
   private long dbl_uid(TV3 t) { return dbl_uid(t._uid); }
   private long dbl_uid(long uid) { return ((long)_uid<<32)|uid; }
 
@@ -180,12 +180,11 @@ abstract public class TV3 implements Cloneable {
   final boolean union(TV3 that) {
     if( this==that ) return false;
     assert !unified() && !that.unified(); // Cannot union twice
-    boolean that_progress = false;
-    if( _may_nil ) that_progress |= that.add_may_nil(false);
-    if( _use_nil ) that_progress |= that.add_use_nil(false);
+    if( _may_nil ) that.add_may_nil(false);
+    if( _use_nil ) that.add_use_nil(false);
     if( that._may_nil && that._use_nil ) throw unimpl();
-    that_progress |= _union_impl(that); // Merge subclass specific bits into that
-    that_progress |= that.widen(_widen,false);
+    _union_impl(that); // Merge subclass specific bits into that
+    that.widen(_widen,false);
     // TODO: Also reverse widen???
     // widen.(that._widen,false) ???
 
@@ -206,7 +205,7 @@ abstract public class TV3 implements Cloneable {
   }
 
   // Merge subclass specific bits
-  abstract public boolean _union_impl(TV3 that);
+  abstract public void _union_impl(TV3 that);
 
   // -------------------------------------------------------------
   // Classic Hindley-Milner structural unification.
@@ -217,7 +216,7 @@ abstract public class TV3 implements Cloneable {
 
   // Supports iso-recursive types, nilable, overload field resolution, and the
   // normal HM structural recursion.
-  static private final NonBlockingHashMapLong<TV3> DUPS = new NonBlockingHashMapLong<>();
+  static NonBlockingHashMapLong<TV3> DUPS = new NonBlockingHashMapLong<>();
   public boolean unify( TV3 that, boolean test ) {
     if( this==that ) return false;
     assert DUPS.isEmpty();
@@ -304,13 +303,15 @@ abstract public class TV3 implements Cloneable {
   }
 
   boolean _fresh_unify( TV3 that, boolean test ) {
-    if( this==that ) return false;
     assert !unified() && !that.unified();
 
     // Check for cycles
     TV3 prior = VARS.get(this);
     if( prior!=null )                        // Been there, done that
       return prior.find()._unify(that,test); // Also, 'prior' needs unification with 'that'
+
+    // Must check this after the cyclic check, in case the 'this' is cyclic
+    if( this==that ) return false;
 
     // Famous 'occurs-check': In the non-generative set, so do a hard unify,
     // not a fresh-unify.
@@ -432,7 +433,7 @@ abstract public class TV3 implements Cloneable {
 
 
   // -----------------
-  private static final VBitSet ODUPS = new VBitSet();
+  static final VBitSet ODUPS = new VBitSet();
   boolean nongen_in() {
     if( FRESH_ROOT ==null || FRESH_ROOT._nongen==null ) return false;
     ODUPS.clear();
@@ -586,12 +587,19 @@ abstract public class TV3 implements Cloneable {
 
   // Move delayed-fresh updates onto not-delayed update list.
   void move_delay() {
-    DELAY_FRESH  .addAll(_delay_fresh  );
-    DELAY_RESOLVE.addAll(_delay_resolve);
+    _move_delay(DELAY_FRESH  ,_delay_fresh  );
+    _move_delay(DELAY_RESOLVE,_delay_resolve);
     if( _may_nil && _use_nil && _widen==2 && !can_progress() ) {
       if( _delay_fresh  !=null ) _delay_fresh  .clear();
       if( _delay_resolve!=null ) _delay_resolve.clear();
     }
+  }
+  // Strip dups
+  static void _move_delay( Ary dst, Ary src ) {
+    if( src!=null )
+      for( Object x : src )
+        if( dst.find(x)== -1 )
+          dst.push(x);
   }
 
   void merge_delay_fresh(Ary<DelayFresh>dfs) {
@@ -616,7 +624,7 @@ abstract public class TV3 implements Cloneable {
 
   // Record that on the delayed fresh list and return that.  If `this` ever
   // unifies to something, we need to Fresh-unify the something with `that`.
-  void add_delay_fresh() { add_delay_fresh(FRESH_ROOT); }
+  void add_delay_fresh() { if( FRESH_ROOT!=null ) add_delay_fresh(FRESH_ROOT); }
   void add_delay_fresh( DelayFresh df ) {
     df.update();
     // Lazy make a list to hold
@@ -676,6 +684,16 @@ abstract public class TV3 implements Cloneable {
     case TypeNil tn -> tn == TypeNil.NIL
       ? new TVNil( new TVLeaf() )
       : TVBase.make(tn);
+    case TypeMem tmem -> {
+      TVMem mem = new TVMem();
+      if( tmem == TypeMem.ALLMEM ) yield mem;
+      if( tmem == TypeMem.EXTMEM ) yield mem;
+      if( tmem == TypeMem.STRMEM ) {
+        mem.unify(new TVPtr(BitsAlias.STR),new TVStruct(new String[0],new TV3[0],true),false);
+        yield mem;
+      }
+      throw unimpl();
+    }
     case Type tt -> {
       if( tt == Type.ANY || tt == Type.ALL ) yield new TVLeaf();
       throw unimpl();
@@ -719,6 +737,7 @@ abstract public class TV3 implements Cloneable {
   }
   boolean _exact_unify_ok(TV3 tv3) {
     if( this==tv3 ) return true;
+    if( tv3==null && this instanceof TVMem ) return true; // Allow null TVMem to match any TVMem
     assert !unified() && !tv3.unified();
     long duid = dbl_uid(tv3);
     if( EXHIT.get(duid) != null ) return true;
@@ -736,27 +755,53 @@ abstract public class TV3 implements Cloneable {
   abstract boolean _exact_unify_impl(TV3 tv3);
 
   // -----------------
+
+  public TV3 sharptr(TVMem mem) {
+    assert !unified();
+    ODUPS.clear();
+    return _sharptr(mem);
+  }
+
+  TV3 _sharptr( TVMem mem ) {
+    if( ODUPS.tset(_uid) ) return this;
+    if( _args==null ) return this;
+    for( int i=0; i<len(); i++ )
+      if( _args[i]!=null )
+        _args[i] = _args[i]._sharptr(mem);
+    return this;
+  }
+  
+  // -----------------
   // Glorious Printing
 
   // Look for dups, in a tree or even a forest (which Syntax.p() does).  Does
   // not rollup edges, so that debug printing does not have any side effects.
-  public VBitSet get_dups() { return _get_dups(new VBitSet(),new VBitSet()); }
-  public VBitSet _get_dups(VBitSet visit, VBitSet dups) {
+  public VBitSet get_dups(boolean debug) { return _get_dups(new VBitSet(),new VBitSet(),debug); }
+  public VBitSet _get_dups(VBitSet visit, VBitSet dups, boolean debug) {
+    // Skip dups checks inside common primitives
+    if( _uf==null && this instanceof TVStruct clzz &&
+        (clzz.is_int_clz() || clzz.is_flt_clz() || clzz.is_str_clz()) )
+      return dups;
     if( visit.tset(_uid) )
       { dups.set(debug_find()._uid); return dups; }
-    if( !unified() && this instanceof TVClz clz && clz.arg(0) instanceof TVStruct clzz &&
-        (clzz.is_int_clz() || clzz.is_flt_clz() || clzz.is_str_clz()) )
-      return clz.rhs()._get_dups(visit,dups);
+    // Dup count unified and not the args
     if( _uf!=null )
-      _uf._get_dups(visit,dups);
-    else if( _args != null )
+      return _uf._get_dups(visit,dups,debug);
+    // Skip memory contents when printing non-debug
+    if( !debug && this instanceof TVLambda lam ) {
+      _args[0]._get_dups(visit,dups,debug);
+      for( int i=DSP_IDX; i<lam.nargs(); i++ )
+        _args[i]._get_dups(visit,dups,debug);
+      return dups;
+    }
+    if( _args != null )
       for( TV3 tv3 : _args )  // Edge lookup does NOT 'find()'
         if( tv3!=null )
-          tv3._get_dups(visit,dups);
+          tv3._get_dups(visit,dups,debug);
     return dups;
   }
 
-  public String p() { VCNT=0; VNAMES.clear(); return str(new SB(), new VBitSet(), get_dups(), false ).toString(); }
+  public String p() { VCNT=0; VNAMES.clear(); return str(new SB(), new VBitSet(), get_dups(false), false ).toString(); }
   private static int VCNT;
   private static final NonBlockingHashMapLong<String> VNAMES = new NonBlockingHashMapLong<>();
 
@@ -764,7 +809,7 @@ abstract public class TV3 implements Cloneable {
 
   public final SB str(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     if( visit==null ) {
-      dups = get_dups();
+      dups = get_dups(debug);
       visit = new VBitSet();
     }
     return _str(sb,visit,dups,debug);
@@ -783,11 +828,11 @@ abstract public class TV3 implements Cloneable {
     }
     // Dup printing for all but bases (which are short, just repeat them)
     if( dup ) {
-      vname(sb,debug,false);            // Leading V123
+      vname(sb,debug,false);           // Leading V123
       if( visit.tset(_uid) && !(this instanceof TVBase ) ) return sb; // V123 and nothing else
       sb.p(':');                        // V123:followed_by_type_descr
     } else {
-      if( visit.tset(_uid) ) return sb;  // Internal missing dup bug?
+      //if( visit.tset(_uid) ) return sb;  // Internal missing dup bug?
     }
     return _str_impl(sb,visit,dups,debug);
   }

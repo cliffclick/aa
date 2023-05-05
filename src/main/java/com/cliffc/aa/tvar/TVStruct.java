@@ -65,7 +65,7 @@ public class TVStruct extends TV3 {
     _pins[_max] = pinned;
     _max++;
     // New field is just as wide
-    if( _widen>0 ) throw unimpl();
+    tvf.widen(_widen,false);
     // Changed struct shape, move delayed-fresh updates to now
     move_delay();
     return true;
@@ -138,12 +138,9 @@ public class TVStruct extends TV3 {
   @Override public TVStruct as_struct() { return this; }
 
   // -------------------------------------------------------------
-  @Override public boolean _union_impl( TV3 tv3 ) {
+  @Override public void _union_impl( TV3 tv3 ) {
     TVStruct ts = (TVStruct)tv3; // Invariant when called
-    boolean x = ts._open & _open;
-    if( x==ts._open ) return false;
-    ts._open = x;
-    return true;
+    ts._open = ts._open & _open;
   }
 
   @Override boolean _unify_impl( TV3 tv3 ) {
@@ -290,7 +287,7 @@ public class TVStruct extends TV3 {
 
   @Override boolean _exact_unify_impl( TV3 tv3 ) {
     TVStruct ts = (TVStruct)tv3;
-    return (!_open && !ts._open ) &&  // Both are closed (no adding unmatching fields)
+    return (!_open && !ts._open ) &&   // Both are closed (no adding unmatching fields)
       Arrays.equals(_flds,ts._flds) && // And all fields match
       Arrays.equals(_pins,ts._pins);
   }
@@ -301,27 +298,43 @@ public class TVStruct extends TV3 {
     for( int i=0; i<len(); i++ )
       arg(i).widen(widen,false);
   }
+
+  @Override public TVStruct copy() {
+    TVStruct st = (TVStruct)super.copy();
+    st._flds = _flds.clone();
+    st._pins = _pins.clone();
+    return st;
+  }
   
-  public boolean is_int_clz() { return  Util.find(_flds,"!_" ) >= 0; }
-  public boolean is_flt_clz() { return  Util.find(_flds,"sin") >= 0; }
-  public boolean is_str_clz() { return  Util.find(_flds,"#_" ) >= 0; }
+  public boolean is_int_clz() { return Util.find(_flds,"!_"  ) >= 0; }
+  public boolean is_flt_clz() { return Util.find(_flds,"sin" ) >= 0; }
+  public boolean is_str_clz() { return Util.find(_flds,"#_"  ) >= 0; }
+  public boolean is_math_clz(){ return Util.find(_flds,"pi"  ) >= 0; }
+  public boolean is_top_clz() { return Util.find(_flds,"math") >= 0; }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
+    if( _args==null  ) return sb.p(_open ? "(...)" : "()");
+    if( is_int_clz() ) return sb.p("int");
+    if( is_flt_clz() ) return sb.p("flt");
+    if( is_str_clz() ) return sb.p("str");
+    if( is_math_clz()) return sb.p("math");
+    if( is_top_clz() ) return sb.p("TOP");
+    
     boolean is_tup = _max==0 || Character.isDigit(_flds[0].charAt(0));
     sb.p(is_tup ? "(" : "@{");
-    if( _args==null ) sb.p(", ");
-    else {
-      for( int idx : sorted_flds() ) {
-        if( !debug && Util.eq("^",_flds[idx]) ) continue; // Displays are private by default
-        if( !is_tup )                                     // Skip tuple field names
-          sb.p(_flds[idx]).p(debug && _pins[idx] ? "#":"").p("= ");
-        if( _args[idx] == null ) sb.p("_");
-        else _args[idx]._str(sb,visit,dups,debug);
-        sb.p(is_tup ? ", " : "; ");
+    for( int idx : sorted_flds() ) {
+      if( !debug && Util.eq("^",_flds[idx]) ) continue; // Displays are private by default
+      if( !is_tup ) {                                   // Skip tuple field names
+        sb.p(_flds[idx]);
+        // sb.p(debug && _pins[idx] ? "#":"");
+        sb.p("= ");
       }
+      if( _args[idx] == null ) sb.p("_");
+      else _args[idx]._str(sb,visit,dups,debug);
+      sb.p(is_tup ? ", " : "; ");
     }
     if( _open ) sb.p(" ..., ");
-    if( _args!=null && _args.length>0 ) sb.unchar(2);
+    if( _args.length>0 ) sb.unchar(2);
     sb.p(!is_tup ? "}" : ")");
     return sb;
   }

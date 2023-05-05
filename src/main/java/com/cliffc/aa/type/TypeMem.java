@@ -238,14 +238,16 @@ public class TypeMem extends Type<TypeMem> {
   public static TypeMem make_live(TypeStruct live) { return make0(new TypeStruct[]{live}); }
 
   public static final TypeMem ANYMEM,ALLMEM,EXTMEM; // Every alias is unused (so above XOBJ or below OBJ)
+  public static final TypeMem STRMEM; // Every alias is unused except string
 
   static {
     // Every alias is used in the worst way
     ALLMEM = make0(new TypeStruct[]{null,TypeStruct.ISUSED});
     ANYMEM = ALLMEM.dual();
     EXTMEM = make(BitsAlias.EXTX,TypeStruct.ISUSED);
+    STRMEM = make(BitsAlias.STRX,TypeStruct.ISUSED);
   }
-  static final TypeMem[] TYPES = new TypeMem[]{ALLMEM};
+  static final TypeMem[] TYPES = new TypeMem[]{ALLMEM,STRMEM};
 
   // All mapped memories remain, but each memory flips internally.
   @Override protected TypeMem xdual() {

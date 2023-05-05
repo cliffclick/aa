@@ -27,7 +27,7 @@ public class TVNil extends TV3 {
   
   // -------------------------------------------------------------
   // No sub-parts to union
-  @Override public boolean _union_impl(TV3 that) { return false; }
+  @Override public void _union_impl(TV3 that) { }
 
   @Override boolean _unify_impl(TV3 that ) { return arg(0)._unify(that.arg(0),false); }
 

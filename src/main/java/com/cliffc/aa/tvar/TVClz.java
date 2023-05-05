@@ -46,7 +46,7 @@ public class TVClz extends TV3 {
   }
 
   // -------------------------------------------------------------
-  @Override public boolean _union_impl(TV3 that) { return false; }
+  @Override public void _union_impl(TV3 that) { }
 
   @Override boolean _unify_impl(TV3 t ) {
     TVClz clz = (TVClz)t;       // Invariant when called
@@ -86,12 +86,7 @@ public class TVClz extends TV3 {
   }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
-    TVStruct clz = arg(0).as_struct();
-    if( clz.is_int_clz() )
-      { if( !(rhs() instanceof TVNil) ) sb.p("int:"); }
-    else if( clz.is_flt_clz()     ) sb.p("flt:");
-    else if( clz.is_str_clz()     ) sb.p("str:");
-    else arg(0)._str(sb,visit,dups,debug).p(':');
+    clz()._str(sb,visit,dups,debug).p(':');
     return rhs()._str(sb,visit,dups,debug);
   }  
 }

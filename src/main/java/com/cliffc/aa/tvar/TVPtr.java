@@ -1,8 +1,8 @@
 package com.cliffc.aa.tvar;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.node.Node;
-import com.cliffc.aa.type.BitsAlias;
-import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
@@ -40,10 +40,9 @@ public class TVPtr extends TV3 {
 
   // -------------------------------------------------------------
   // Union aliases
-  @Override public boolean _union_impl(TV3 that) {
-    
-    //return false;
-    throw unimpl();
+  @Override public void _union_impl(TV3 that) {
+    TVPtr ptr = (TVPtr)that;    // Invariant when called
+    _aliases = _aliases.meet(ptr._aliases);
   }
 
   @Override boolean _unify_impl(TV3 that ) { return true; }
@@ -68,20 +67,40 @@ public class TVPtr extends TV3 {
 
   @Override boolean _exact_unify_impl( TV3 tv3 ) { return true; }
   
+  // -----------------
+  @Override TV3 _sharptr( TVMem mem ) {
+    if( ODUPS.tset(_uid) ) return this;
+    assert _args==null || _args.length==0;
+    if( _aliases.is_empty() )
+      throw unimpl();
+    int j=-1;
+    int mlen = mem.len();
+    for( int i=0; i<mlen; i++ ) {
+      TVPtr p0 = mem.ptr(i);      
+      if( p0._aliases==_aliases ) j=i;
+      else if( p0._aliases.overlaps(_aliases) )
+        throw unimpl();         // Expecting exact hit
+    }
+    if( j== -1 ) throw unimpl(); // Not found
+    TVPtr ptr = new TVPtr(_aliases,mem.arg(j)._sharptr(mem));
+    ptr._may_nil = _may_nil;
+    return ptr;
+  }
+  
+  
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) {
-    //// Compatible escaped aliases
-    //BitsAlias aliases = Env.ROOT.matching_escaped_aliases(this, dep);
-    //TypeStruct tstr = dep==null ? (TypeStruct)load()._as_flow(dep) : TypeStruct.ISUSED;
-    //return TypeMemPtr.make(false,_may_nil,aliases,tstr);
-    throw unimpl();
+    // Compatible escaped aliases
+    BitsAlias aliases = Env.ROOT.matching_escaped_aliases(this, dep);
+    return TypeMemPtr.make(false,_may_nil,aliases,TypeStruct.ISUSED);
   }
   @Override void _widen( byte widen ) { }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     sb.p("*");
     _aliases.str(sb);
-    if( _args[0]!=null ) arg(0)._str(sb,visit,dups,debug);
+    if( _args.length>0 && _args[0]!=null ) arg(0)._str(sb,visit,dups,debug);
+    if( _may_nil ) sb.p('?');
     return sb;
   }
 }

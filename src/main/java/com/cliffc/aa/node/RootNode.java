@@ -157,7 +157,7 @@ public class RootNode extends Node {
             // TODO: walk the memory for this escaped alias?
             //NewNode nnn = NewNode.get(alias);
             //if( nnn != null )
-            //  nnn.tvar().widen((byte)1,false); // HMT widen
+            //  throw unimpl();
           }
         }
         if( !tn._fidxs.above_center()) {
@@ -169,8 +169,8 @@ public class RootNode extends Node {
             RetNode ret = RetNode.get(fidx);
             if( ret != null ) {
               escape_ret(ret);
-              //FunPtrNode fptr = ret.funptr();
-              //fptr.tvar().widen((byte)1,false); // HMT widen
+              FunPtrNode fptr = ret.funptr();
+              fptr.tvar().widen((byte)1,false); // HMT widen
             }
           }
           // The return (but not inputs, so not display) also escapes
@@ -375,11 +375,25 @@ public class RootNode extends Node {
     return tv3;
   }
 
+  @Override public boolean unify( boolean test ) {
+    boolean progress = false;
+    TV3 rootmem = tvar(MEM_IDX);
+    for( int fidx : rfidxs() ) {
+      if( fidx == BitsFun.ALLX ) continue;
+      if( fidx == BitsFun.EXTX ) continue;
+      RetNode ret = RetNode.get(fidx);
+      Node mem = ret.mem();
+      if( mem==null ) mem = ret.fun().parm(MEM_IDX); // Pure functions use incoming memory
+      TV3 retmem = mem.tvar();
+      progress |= rootmem.unify(retmem,test);
+      if( test && progress ) return true;
+    }
+    return progress;
+  }
+  
   // Unify trailing result ProjNode with RootNode results; but no unification
   // with anything from Root, all results are independent.
-  @Override public boolean unify_proj( ProjNode proj, boolean test ) {
-    return false;
-  }
+  @Override public boolean unify_proj( ProjNode proj, boolean test ) { return false; }
 
   @Override public int hashCode() { return 123456789+1; }
   @Override public boolean equals(Object o) { return this==o; }

@@ -21,9 +21,7 @@ public class TVField extends TV3 {
   public static void reset_to_init0() { FIELDS.clear(); }
 
   // -------------------------------------------------------------
-  @Override public boolean _union_impl(TV3 that) {
-    throw unimpl();
-  }
+  @Override public void _union_impl(TV3 that) { throw unimpl(); }
   
   @Override boolean _unify_impl(TV3 that ) { throw unimpl(); }
 

@@ -91,7 +91,7 @@ public class PhiNode extends Node {
 
   // Yes for e.g. ints, flts, memptrs, funptrs.  A Phi corresponds to the
   // merging HM value in the core AA If.
-  @Override public boolean has_tvar() { return !(_t instanceof TypeMem); }
+  @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() { return is_mem() ? new TVMem() : new TVLeaf(); }
 
   // All inputs unify

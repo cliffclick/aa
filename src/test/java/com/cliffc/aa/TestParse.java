@@ -27,12 +27,13 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_GCP=false;
-    DO_HMT=true;
+    DO_GCP=true;
+    DO_HMT=false;
     RSEED=0;
-    test("x=@{n:=1;v:=2}; x.n := 3; x", "*[10]@{_; n:=3; v:=2}",
-         "*[10]@{n=int:3; v=int:2}",
-         null, null, "[10]", null);
+    // TestParse.b_recursive_02
+    test("fun = { fx x -> x ? fx( fun(fx,x-1) ) : 1 }; fun(2._*_._, 99)",
+            "int:int64",
+            "int:int64");
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -61,17 +62,21 @@ public class TestParse {
     // Simple no-arg anonymous function, being called
     test("{5}()", "5", "int:5");
     // TestParse.a_basic_01
-    test("{ x -> ( 3, x )}", "[55]{any,4 -> *[11](3, %[2,11][2,55]?) }", "{ A B -> *(int:3, B) }", null, null, "[11]", "[55]");
+    test("{ x -> ( 3, x )}", "[55]{any,4 -> *[11](3, %[2,11][2,55]?) }", "{ A B -> *[11](int:3, B) }", null, null, "[11]", "[55]");
     // TestParse.a_basic_02
-    test("{ z -> ((z 0), (z \"abc\")) }", "[55]{any,4 -> *[12](%[2,11,12][2,55]?, %[2,11,12][2,55]?) }", "{A {B *str:(int:int64)? -> C } -> *(C,C) }", null, null, "[11,12]", "[55]" );
+    test("{ z -> ((z 0), (z \"abc\")) }", "[55]{any,4 -> *[12](%[2,11,12][2,55]?, %[2,11,12][2,55]?) }",
+         "{A {B *[11]str:(int:97)? -> C } -> *[12](C,C) }",
+         null, null,
+         "[11,12]", "[55]" );
 
+   
     // TestParse.a_basic_05
     // example that demonstrates generic and non-generic variables:
     // 'g' is not-fresh in function 'f'.
     // 'f' IS fresh in the body of 'g' pair.
     test("{ g -> f = { ignore -> g }; (f 3, f \"abc\")}",
          "[55]{any,4 -> *[13](%[2,5,13][2,55]?, %[2,5,13][2,55]?) }",
-         "{ A B -> *( B, B) }",
+         "{ A B -> *[13]( B, B) }",
          null,null,"[5,13]","[55]");
 
     // TestParse.g_overload_err_00
@@ -110,7 +115,7 @@ public class TestParse {
     test("fun = { fx -> math.rand(2) ? 1 : fx(fun(fx),2) }; fun",
          "[55]{any,4 -> %[2,5][2,55]? }",
          // Currently allowing 'fun' display to stay alive.
-         "A:{ *@{fun=A} {B C:int:int64 int:int64-> C } -> C }",
+         "A:{ *[9]@{fun=A} {B C:int:int64 int:int64-> C } -> C }",
          null, null,
          "[5]","[55]");
   }

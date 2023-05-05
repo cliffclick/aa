@@ -485,6 +485,7 @@ public final class CallEpiNode extends Node {
     for( int i=MEM_IDX; i<nargs; i++ ) {
       TV3 formal = tfun.arg(i);
       TV3 actual = call.tvar(i);
+      if( formal == null ) continue; // Function ignores argument
       progress |= actual.unify(formal,test);
       if( progress && test ) return true;
       tfun = tfun.find().as_lambda();
@@ -492,7 +493,9 @@ public final class CallEpiNode extends Node {
 
     // Check for progress on the return & memory
     progress |= tvar().unify(tfun.ret (),test);
-    progress |= ProjNode.proj(this,MEM_IDX).tvar().unify(tfun.omem(),test);
+    Node omem = ProjNode.proj(this,MEM_IDX);
+    if( omem==null ) omem = call.mem(); // No output mem means direct pass-thru
+    progress |= omem.tvar().unify(tfun.omem(),test);
     
     if( tnargs > nargs )  // Missing arguments
       progress |= tvar().unify_err("Passing "+cnargs+" arguments to a function taking "+tnargs+" arguments",tfun,test);
@@ -506,8 +509,10 @@ public final class CallEpiNode extends Node {
     if( proj._idx==REZ_IDX ) 
       return tvar().unify(proj.tvar(),test);
     if( proj._idx==MEM_IDX ) {
-      assert ((TVLambda)call().fdx().tvar()).omem()==proj.tvar();
-      return false;
+      TV3 fvar = call().fdx().tvar();
+      if( fvar instanceof TVErr terr ) fvar = terr.as_lambda();
+      TV3 omem = ((TVLambda)fvar).omem();
+      return omem.unify(proj.tvar(),test);
     }
     throw unimpl(); // memory unify
   }

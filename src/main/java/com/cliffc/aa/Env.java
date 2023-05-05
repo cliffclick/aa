@@ -2,6 +2,7 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.TVMem;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.NonBlockingHashMap;
 import com.cliffc.aa.util.VBitSet;
@@ -164,7 +165,7 @@ public class Env implements AutoCloseable {
     Node rez = Env.ROOT.in(REZ_IDX);
     Type mem = Env.ROOT.in(MEM_IDX)._val;
     Type val = mem.sharptr(rez._val);
-    TV3 tval = Env.ROOT.in(MEM_IDX).tvar().sharptr(rez.tvar());
+    TV3 tval = rez.tvar().sharptr((TVMem)Env.ROOT.in(MEM_IDX).tvar());
     BitsAlias aliases = Env.ROOT.ralias();
     BitsFun   fidxs   = Env.ROOT.rfidxs();
     return new TypeEnv(val,     // GCP result

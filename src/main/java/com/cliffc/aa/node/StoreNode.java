@@ -133,7 +133,7 @@ public class StoreNode extends Node {
         // Do not bypass a parallel writer
         if( st.check_solo_mem_writer(this) &&
             // And liveness aligns
-            _live.isa(st.mem()._live) ) {
+            st._live.isa(st.mem()._live) ) {
           // Storing same-over-same, just use the first store
           if( rez()==st.rez() ) return st;
           // If not wiping out an error, wipe out the first store
@@ -224,14 +224,19 @@ public class StoreNode extends Node {
     TV3 rez = rez().set_tvar();
     if( !(mem instanceof TVMem   ) )  mem.unify(new TVMem(),false);
     if( !(adr instanceof TVPtr   ) )  adr.unify(new TVPtr(),false);
-    if( !(rez instanceof TVStruct) )  rez.unify(new TVStruct(new String[0], new TV3[0], true),false);
+    if( !(rez instanceof TVStruct) )  {
+      if( (rez instanceof TVClz clz) )  { // CLZ of a Struct is OK
+        if( !(clz.rhs() instanceof TVStruct) )
+          throw unimpl();
+      } else rez.unify(new TVStruct(new String[0], new TV3[0], true),false);
+    }
     return mem;
   }
 
   @Override public boolean unify( boolean test ) {
     TVMem mem = (TVMem)tvar();
     TVPtr ptr  = (TVPtr)adr().tvar();
-    TVStruct rec  = (TVStruct)rez().tvar();    
+    TV3   rec  = rez().tvar();    
     return mem.unify(ptr,rec,test);
   }
 

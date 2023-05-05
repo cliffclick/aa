@@ -102,12 +102,11 @@ public class TVErr extends TV3 {
   
   // -------------------------------------------------------------
   // Union/merge subclass specific bits
-  @Override public boolean _union_impl(TV3 that) {
+  @Override public void _union_impl(TV3 that) {
     if( !(that instanceof TVErr terr) ) {
       TV3 err_part = arg(that.eidx());
       if( err_part == null ) _args[that.eidx()] = that;
       else err_part._union_impl(that);
-      return true;
     } else {
       // Merge error messages
       for( String err : terr._errs )
@@ -116,7 +115,6 @@ public class TVErr extends TV3 {
       for( String err : _errs )
         if( terr._errs.find(err)== -1 )
           throw unimpl();         // Progress
-      return true;
     }
   }
 
@@ -154,6 +152,12 @@ public class TVErr extends TV3 {
         arg(i).widen(widen,false);
   }
     
+  @Override public TVErr copy() {
+    TVErr terr = (TVErr)super.copy();
+    terr._errs = _errs.deepCopy();
+    return terr;
+  }
+
   // Add an error message
   public boolean err(String err, TV3 extra, boolean test) {
     assert !unified();
