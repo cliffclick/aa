@@ -70,11 +70,10 @@ public class TVClz extends TV3 {
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) {
     TVStruct clz = arg(0).as_struct();
-    if( clz.is_int_clz() ) return rhs()._as_flow(dep);
-    if( clz.is_flt_clz() ) return rhs()._as_flow(dep);
+    Type rhs = rhs()._as_flow(dep);
+    if( clz.is_int_clz() || clz.is_flt_clz() ) return rhs;
     // Need to return a flow-type with this unnamed inferred clazz; also I do
     // not know the instance type either.
-    Type rhs = rhs()._as_flow(dep);
     if( clz.is_str_clz() )
       throw unimpl();
     // TODO: Add clazz to structs
@@ -85,8 +84,8 @@ public class TVClz extends TV3 {
     rhs().widen(widen  ,false);
   }
   
-  @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
-    clz()._str(sb,visit,dups,debug).p(':');
-    return rhs()._str(sb,visit,dups,debug);
+  @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
+    clz()._str(sb,visit,dups,debug,prims).p(':');
+    return rhs()._str(sb,visit,dups,debug,prims);
   }  
 }

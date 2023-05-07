@@ -244,10 +244,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
 
     // Some early cutouts for common bulky cases
     if( this==TypeStruct.ISUSED ) return sb.p("()"); // Shortcut for common case
-    //if( this instanceof TypeStruct ts && ts.is_top_clz() ) return sb.p("$TOP");
-    //if( this instanceof TypeStruct ts && ts.is_int_clz() ) return sb.p("$INT");
-    //if( this instanceof TypeStruct ts && ts.is_flt_clz() ) return sb.p("$FLT");
-    //if( this instanceof TypeStruct ts && ts.is_math_clz() ) return sb.p("$MATH");
 
     // Print a dups label, and optionally the type
     String s = dups.get(_uid);

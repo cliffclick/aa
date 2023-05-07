@@ -33,7 +33,6 @@ public class TVPtr extends TV3 {
   // Make the leader a nilable version of 'this' child
   @Override TV3 find_nil() {
     TVPtr ptr = (TVPtr)copy();
-    ptr._aliases = ptr._aliases.meet_nil();
     ptr.add_may_nil(false);
     return ptr;
   }
@@ -59,10 +58,8 @@ public class TVPtr extends TV3 {
   
   // -------------------------------------------------------------
   @Override boolean _trial_unify_ok_impl( TV3 tv3, boolean extras ) {
-    //TVPtr that = (TVPtr)tv3; // Invariant when called
-    //// Structural trial unification on the one child
-    //return load()._trial_unify_ok( that.load(), extras);
-    throw unimpl();
+    TVPtr that = (TVPtr)tv3; // Invariant when called
+    return _aliases == that._aliases;
   }
 
   @Override boolean _exact_unify_impl( TV3 tv3 ) { return true; }
@@ -96,10 +93,10 @@ public class TVPtr extends TV3 {
   }
   @Override void _widen( byte widen ) { }
   
-  @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
+  @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     sb.p("*");
     _aliases.str(sb);
-    if( _args.length>0 && _args[0]!=null ) arg(0)._str(sb,visit,dups,debug);
+    if( _args.length>0 && _args[0]!=null ) arg(0)._str(sb,visit,dups,debug,prims);
     if( _may_nil ) sb.p('?');
     return sb;
   }

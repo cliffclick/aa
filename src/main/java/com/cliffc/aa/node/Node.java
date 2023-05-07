@@ -310,7 +310,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     sb.p(str()).s();
     if( _val==null ) sb.p("----");
     else _val.str(sb, typebs, dups, true, false); // Print a type using the shared dups printer
-    if( ptvar && _tvar!=null ) _tvar.str(sb.p(" - "), hmt_bs, hmt_dups, true);
+    if( ptvar && _tvar!=null ) _tvar.str(sb.p(" - "), hmt_bs, hmt_dups, true, false);
 
     return sb;
   }
@@ -380,7 +380,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     for( Node n : nodes ) {
       n._val ._str_dups(typebs, dups, ucnt);
       n._live._str_dups(typebs, dups, ucnt);
-      if( n._tvar!=null ) n._tvar._get_dups(hmt_bs,hmt_dups,true);
+      if( n._tvar!=null ) n._tvar._get_dups(hmt_bs,hmt_dups,true,prims);
     }
     typebs.clr();
     hmt_bs.clr();

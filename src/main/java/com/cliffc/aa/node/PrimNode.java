@@ -272,8 +272,7 @@ public abstract class PrimNode extends Node {
     return make_tvar(_ret);
   }
 
-  // Make a wrapped TV3
-
+  // Make a TV3
   static TV3 make_tvar(TypeNil rez) {
     if( rez==TypeNil.NIL ) throw unimpl();
     return TV3.from_flow(rez);

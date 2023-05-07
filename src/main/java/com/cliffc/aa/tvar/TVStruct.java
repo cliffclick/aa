@@ -167,8 +167,8 @@ public class TVStruct extends TV3 {
         fthis._unify(fthat,false); // Unify both into RHS
         that._pins[ti] |= pinned;  // Unify pinned
         // Progress may require another find()
-        that = (TVStruct)that.find();
         thsi = (TVStruct)thsi.find();
+        that = (TVStruct)that.find();
       }
     }
 
@@ -191,26 +191,25 @@ public class TVStruct extends TV3 {
   @Override boolean _fresh_unify_impl(TV3 tv3, boolean test) {
     boolean progress = false, missing = false;
     assert !unified() && !tv3.unified();    
-    TVStruct thsi = this;
     TVStruct that = (TVStruct)tv3.find(); // Might have to update
 
     for( int i=0; i<_max; i++ ) {
-      TV3 lhs = thsi.arg(i);
-      int ti = Util.find(that._flds,thsi._flds[i]);
+      TV3 lhs = arg(i);
+      int ti = Util.find(that._flds,_flds[i]);
       if( ti == -1 ) {          // Missing in RHS
-        if( thsi.is_open() || that.is_open() ) {
+        if( is_open() || that.is_open() ) {
           if( test ) return true; // Will definitely make progress
           TV3 nrhs = lhs._fresh();
           if( !that.is_open() ) // RHS not open, put copy of LHS into RHS with miss_fld error
             throw unimpl();
-          progress |= that.add_fld(thsi._flds[i],thsi._pins[i],nrhs);
+          progress |= that.add_fld(_flds[i],_pins[i],nrhs);
         } else missing = true; // Else neither side is open, field is not needed in RHS
       } else {
         TV3 rhs = that.arg(ti); // Lookup via field name
         progress |= lhs._fresh_unify(rhs,test);
-        that._pins[ti] |= thsi._pins[i];
+        that._pins[ti] |= _pins[i];
       }
-      thsi = (TVStruct)thsi.find(); // Might have to update
+      assert !unified();
       that = (TVStruct)that.find(); // Might have to update
       if( progress && test ) return true;
     }
@@ -219,10 +218,10 @@ public class TVStruct extends TV3 {
     // just copy the missing fields into it, then unify the structs (shortcut:
     // just skip the copy).  If the LHS is closed, then the extra RHS fields
     // are removed.
-    if( thsi._max != that._max || missing )
+    if( _max != that._max || missing )
       for( int i=0; i<that._max; i++ ) {
         if( Resolvable.is_resolving(that._flds[i]) ) continue;
-        TV3 lhs = thsi.arg(that._flds[i]); // Lookup vis field name
+        TV3 lhs = arg(that._flds[i]); // Lookup vis field name
         if( lhs==null ) {
           if( test ) return true;
           progress |= that.del_fld(i--);
@@ -230,7 +229,7 @@ public class TVStruct extends TV3 {
       }
     
     // If LHS is closed, force RHS closed
-    if( !thsi._open && that._open ) {
+    if( !_open && that._open ) {
       if( test ) return true;
       that._open = false;
       progress = true;
@@ -306,19 +305,19 @@ public class TVStruct extends TV3 {
     return st;
   }
   
-  public boolean is_int_clz() { return Util.find(_flds,"!_"  ) >= 0; }
-  public boolean is_flt_clz() { return Util.find(_flds,"sin" ) >= 0; }
-  public boolean is_str_clz() { return Util.find(_flds,"#_"  ) >= 0; }
-  public boolean is_math_clz(){ return Util.find(_flds,"pi"  ) >= 0; }
-  public boolean is_top_clz() { return Util.find(_flds,"math") >= 0; }
+  boolean is_int_clz() { return Util.find(_flds,"!_"  ) >= 0; }
+  boolean is_flt_clz() { return Util.find(_flds,"sin" ) >= 0; }
+  boolean is_str_clz() { return Util.find(_flds,"#_"  ) >= 0; }
+  boolean is_math_clz(){ return Util.find(_flds,"pi"  ) >= 0; }
+  boolean is_top_clz() { return Util.find(_flds,"math") >= 0; }
   
-  @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
+  @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     if( _args==null  ) return sb.p(_open ? "(...)" : "()");
-    if( is_int_clz() ) return sb.p("int");
-    if( is_flt_clz() ) return sb.p("flt");
-    if( is_str_clz() ) return sb.p("str");
-    if( is_math_clz()) return sb.p("math");
-    if( is_top_clz() ) return sb.p("TOP");
+    if( !prims && is_int_clz() ) return sb.p("int");
+    if( !prims && is_flt_clz() ) return sb.p("flt");
+    if( !prims && is_str_clz() ) return sb.p("str");
+    if( !prims && is_math_clz()) return sb.p("math");
+    if( !prims && is_top_clz() ) return sb.p("TOP");
     
     boolean is_tup = _max==0 || Character.isDigit(_flds[0].charAt(0));
     sb.p(is_tup ? "(" : "@{");
@@ -330,7 +329,7 @@ public class TVStruct extends TV3 {
         sb.p("= ");
       }
       if( _args[idx] == null ) sb.p("_");
-      else _args[idx]._str(sb,visit,dups,debug);
+      else _args[idx]._str(sb,visit,dups,debug,prims);
       sb.p(is_tup ? ", " : "; ");
     }
     if( _open ) sb.p(" ..., ");

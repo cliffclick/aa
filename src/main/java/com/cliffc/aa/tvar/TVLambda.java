@@ -52,6 +52,8 @@ public class TVLambda extends TV3 {
     thsi = (TVLambda)thsi.find();
     that = (TVLambda)that.find();
     thsi.imem()._unify( that.imem(), false );
+    thsi = (TVLambda)thsi.find();
+    that = (TVLambda)that.find();
     int nargs = nargs(), tnargs = that.nargs();
     for( int i=DSP_IDX; i<Math.min(nargs,tnargs); i++ ) {
       thsi.arg( i )._unify( that.arg( i ), false );
@@ -132,17 +134,17 @@ public class TVLambda extends TV3 {
     imem().widen((byte)2,false);
   }
   
-  @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
+  @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     sb.p("{ ");
     if( debug )                 // Only print mem during debug
-      _args[MEM_IDX]._str(sb,visit,dups,debug).p(' ');
+      _args[MEM_IDX]._str(sb,visit,dups,debug,prims).p(' ');
     for( int i=DSP_IDX; i<nargs(); i++ )
-      _args[i]._str(sb,visit,dups,debug).p(' ');
+      _args[i]._str(sb,visit,dups,debug,prims).p(' ');
     sb.p("-> ");
     if( debug )                 // Only print mem during debug
-      _args[nargs()]._str(sb,visit,dups,debug).p(' ');
+      _args[nargs()]._str(sb,visit,dups,debug,prims).p(' ');
     // Return
-    _args[0]._str(sb,visit,dups,debug).p(' ');    
+    _args[0]._str(sb,visit,dups,debug,prims).p(' ');    
     return sb.p("}").p(_may_nil ? "?" : "");
   }
 

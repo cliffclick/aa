@@ -485,7 +485,6 @@ public final class CallEpiNode extends Node {
     for( int i=MEM_IDX; i<nargs; i++ ) {
       TV3 formal = tfun.arg(i);
       TV3 actual = call.tvar(i);
-      if( formal == null ) continue; // Function ignores argument
       progress |= actual.unify(formal,test);
       if( progress && test ) return true;
       tfun = tfun.find().as_lambda();

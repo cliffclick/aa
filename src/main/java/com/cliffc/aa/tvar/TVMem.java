@@ -38,6 +38,8 @@ public class TVMem extends TV3 {
   TVPtr ptr(int i) {
     TVPtr p0 = _ptrs.at(i);
     if( p0.unified() )        // Might collapse into a prior ptr
+      // _ptrs[i] = p0 = p0.find();
+      // scan for dups
       throw unimpl();
     return p0;
   }
@@ -117,9 +119,14 @@ public class TVMem extends TV3 {
   // -------------------------------------------------------------
   @Override boolean _trial_unify_ok_impl( TV3 tv3, boolean extras ) {
     TVMem tmem = (TVMem)tv3;      // Invariant when called    
-    for( int i=0; i<len(); i++ )
-      for( int j=0; j<tmem.len(); j++ )
-        throw unimpl();
+    for( int i=0; i<len(); i++ ) {
+      TVPtr p0 = ptr(i);
+      int idx = tmem.find(p0);
+      if( idx== -1 ) continue;  // Assume OK
+      assert p0 == tmem._ptrs.at(idx);
+      if( !arg(i)._trial_unify_ok(tmem.arg(idx),extras) )
+        return false;
+    }
     return true;
   }
   @Override boolean _exact_unify_impl( TV3 tv3 ) {
@@ -141,12 +148,12 @@ public class TVMem extends TV3 {
     return mem;
   }
   
-  @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
+  @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     sb.p("[[ ");
     for( int i=0; i<len(); i++ ) {
       _ptrs.at(i)._aliases.str(sb).p('=');
       if( _args==null ) sb.p("!!!");
-      else _args[i]._str(sb,visit,dups,debug).p(',');
+      else _args[i]._str(sb,visit,dups,debug,prims).p(',');
     }
     return sb.unchar().p("]]");
   }

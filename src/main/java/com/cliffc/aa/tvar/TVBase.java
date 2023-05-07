@@ -97,5 +97,5 @@ public class TVBase extends TV3 {
     _t = tw;
     _deps_work_clear();
   }
-  @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) { return sb.p(_t); }  
+  @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) { return sb.p(_t); }  
 }

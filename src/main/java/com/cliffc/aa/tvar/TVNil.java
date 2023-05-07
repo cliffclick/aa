@@ -108,7 +108,7 @@ public class TVNil extends TV3 {
     not_nil().widen(widen,false);
   }
   
-  @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
-    return _args[0]._str(sb,visit,dups,debug).p('?');
+  @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
+    return _args[0]._str(sb,visit,dups,debug,prims).p('?');
   }  
 }

@@ -30,10 +30,8 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    // TestParse.b_recursive_02
-    test("fun = { fx x -> x ? fx( fun(fx,x-1) ) : 1 }; fun(2._*_._, 99)",
-            "int:int64",
-            "int:int64");
+    test("x:=y:=0; z=x++ && y++;(x,y,z)", // increments x, but it starts zero, so y never increments
+            "*[11](1, nil,nil)","*(int:int64,A?,B?)",null,null,"[11]",null);
   }
   static private void assertTrue(boolean t) {
     if( t ) return;

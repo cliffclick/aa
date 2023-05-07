@@ -186,7 +186,7 @@ public class TVErr extends TV3 {
   // Format with 2+  types: [Cannot unify t0 and t1...]
   // Format with 2+  types: [err0, cannot unify t0 and t1...]
 
-  @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
+  @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     if( debug ) sb.p("[");
     if( _errs!=null ) {
       for( int i=0; i<_errs._len; i++ ) {
@@ -195,7 +195,7 @@ public class TVErr extends TV3 {
         if( idx==-1 ) sb.p(msg);
         else {
           sb.p(msg.substring(0,idx));
-          _args[i+XMAX]._str(sb,visit,dups,debug);
+          _args[i+XMAX]._str(sb,visit,dups,debug,prims);
           sb.p(msg.substring(idx+1));
         }
         sb.p(", ");
@@ -210,7 +210,7 @@ public class TVErr extends TV3 {
       } // If exactly 1 choice, assume a prior message has detail info
       for( int i=0; i<XMAX; i++ )
         if( _args[i]!=null )
-          _args[i]._str(sb,visit,dups,debug).p(" and ");
+          _args[i]._str(sb,visit,dups,debug,prims).p(" and ");
       sb.unchar(5);
     }
     if( debug ) sb.p("]");
