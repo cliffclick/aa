@@ -1,6 +1,5 @@
 package com.cliffc.aa.tvar;
 
-import com.cliffc.aa.Oper;
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.*;
@@ -13,7 +12,11 @@ import static com.cliffc.aa.AA.unimpl;
  *
  */
 public class TVStruct extends TV3 {
-
+  private static final String [] FLDS0 = new String [0];
+  private static final TV3    [] TVS0  = new TV3    [0];
+  // Empty closed struct.  Used for e.g. no-class Structs.
+  public  static final TVStruct EMPTY = new TVStruct(false);
+  
   // True if more fields can be added.  Generally false for a known Struct, and
   // true for a Field reference to an unknown struct.
   boolean _open;
@@ -21,20 +24,24 @@ public class TVStruct extends TV3 {
   // The set of field labels, 1-to-1 with TV3 field contents.
   // Most field operations are UNORDERED, so we generally need to search the fields by string
   private String[] _flds;       // Field labels
-  // Fields are pinned in this TVStruct, or UNPINNED and can unify on the RHS of a TVClz
-  private boolean[] _pins;      // 
 
   private int _max;             // Max set of in-use flds/args
   
-  public TVStruct( Ary<String> flds ) { this(flds.asAry(),new TV3[flds.len()]);  }
   // Made from a StructNode; fields are known, so this is closed
   public TVStruct( String[] flds, TV3[] tvs ) { this(flds,tvs,false); }
+  // No fields
+  public TVStruct(boolean open) { this(FLDS0,TVS0,open); }
+  // Normal StructNode constructor, all Leaf fields
+  public TVStruct( Ary<String> flds ) {  this(flds.asAry(),leafs(flds.len()),false);  }
+  private static TV3[] leafs(int len) {
+    TV3[] ls = new TV3[len];
+    for( int i=0; i<len; i++ ) ls[i] = new TVLeaf();
+    return ls;
+  }
   // Made from a Field or SetField; fields are unknown so this is open
-  public TVStruct( String[] flds, TV3[] tvs, boolean open ) { this(flds,pins(flds),tvs,open); }
-  public TVStruct( String[] flds, boolean[] pins, TV3[] tvs, boolean open ) {
+  public TVStruct( String[] flds, TV3[] tvs, boolean open ) {
     super(tvs);
     _flds = flds;
-    _pins = pins;
     _open = open;
     _max = flds.length;
     assert tvs.length==_max;
@@ -42,27 +49,15 @@ public class TVStruct extends TV3 {
 
   @Override boolean can_progress() { throw unimpl(); }
   
-  // Used during cyclic construction
-  public void set_pin_fld(int i, TV3 fld) { _args[i] = fld; _pins[i] = true; }
-  public boolean is_pinned(String fld) { return _pins[Util.find(_flds,fld)]; }
-  private static boolean[] pins( String[] flds ) {
-    boolean[] pins = new boolean[flds.length];
-    for( int i=0; i<flds.length; i++ )
-      pins[i] = Oper.is_oper(flds[i]); // Operators pinned into clazz structs
-    return pins;
-  }
-
-  public boolean add_fld(String fld, boolean pinned, TV3 tvf) {
+  public boolean add_fld(String fld, TV3 tvf) {
     if( _max == _flds.length ) {
       int len=1;
       while( len<=_max ) len<<=1;
       _flds = Arrays.copyOf(_flds,len);
-      _pins = Arrays.copyOf(_pins,len);
       _args = Arrays.copyOf(_args,len);
     }
     _flds[_max] = fld;
     _args[_max] = tvf;
-    _pins[_max] = pinned;
     _max++;
     // New field is just as wide
     tvf.widen(_widen,false);
@@ -74,7 +69,6 @@ public class TVStruct extends TV3 {
   // Remove
   boolean del_fld(int idx) {
     _args[idx] = _args[_max-1];
-    _pins[idx] = _pins[_max-1];
     _flds[idx] = _flds[_max-1];
     _max--;
     // Changed struct shape, move delayed-fresh updates to now
@@ -130,7 +124,7 @@ public class TVStruct extends TV3 {
   private boolean _miss_fld( TVStruct that, int i, TV3 lhs, boolean test ) {
     if( test ) return true;
     return that.is_open()
-      ? that.add_fld(_flds[i],_pins[i],lhs)
+      ? that.add_fld(_flds[i],lhs)
       : this.del_fld(i);
   }
 
@@ -153,19 +147,17 @@ public class TVStruct extends TV3 {
     for( int i=0; i<thsi._max; i++ ) {
       TV3 fthis = thsi.arg(i);       // Field of this      
       String key = thsi._flds[i];
-      boolean pinned = thsi._pins[i];
       int ti = Util.find(that._flds,key);
       if( ti == -1 ) {          // Missing field in that
         assert !Resolvable.is_resolving(key);
         //if( Resolvable.is_resolving(key) ) continue; // Do not add or remove until resolved
         if( open || Resolvable.is_resolving(key) )
-          that.add_fld(key,pinned,fthis);   // Add to RHS
+          that.add_fld(key,fthis); // Add to RHS
         else
-          that.del_fld(key);                // Remove from RHS
+          that.del_fld(key);    // Remove from RHS
       } else {
         TV3 fthat = that.arg(ti);  // Field of that
         fthis._unify(fthat,false); // Unify both into RHS
-        that._pins[ti] |= pinned;  // Unify pinned
         // Progress may require another find()
         thsi = (TVStruct)thsi.find();
         that = (TVStruct)that.find();
@@ -178,7 +170,7 @@ public class TVStruct extends TV3 {
       if( thsi.arg(key)==null ) {                    // Missing field in this
         assert !Resolvable.is_resolving(key);
         if( Resolvable.is_resolving(key) ) continue; // Do not remove until resolved
-        if( is_open() ) thsi.add_fld(key,that._pins[i],that.arg(i)); // Add to LHS
+        if( is_open() ) thsi.add_fld(key,that.arg(i)); // Add to LHS
         else thsi.del_fld(key); // Drop from RHS
       }
     }
@@ -202,14 +194,13 @@ public class TVStruct extends TV3 {
           TV3 nrhs = lhs._fresh();
           if( !that.is_open() ) // RHS not open, put copy of LHS into RHS with miss_fld error
             throw unimpl();
-          progress |= that.add_fld(_flds[i],_pins[i],nrhs);
+          progress |= that.add_fld(_flds[i],nrhs);
         } else missing = true; // Else neither side is open, field is not needed in RHS
       } else {
         TV3 rhs = that.arg(ti); // Lookup via field name
         progress |= lhs._fresh_unify(rhs,test);
-        that._pins[ti] |= _pins[i];
       }
-      assert !unified();
+      assert !unified();      // If LHS unifies, VARS is missing the unified key
       that = (TVStruct)that.find(); // Might have to update
       if( progress && test ) return true;
     }
@@ -286,9 +277,8 @@ public class TVStruct extends TV3 {
 
   @Override boolean _exact_unify_impl( TV3 tv3 ) {
     TVStruct ts = (TVStruct)tv3;
-    return (!_open && !ts._open ) &&   // Both are closed (no adding unmatching fields)
-      Arrays.equals(_flds,ts._flds) && // And all fields match
-      Arrays.equals(_pins,ts._pins);
+    return (!_open && !ts._open ) && // Both are closed (no adding unmatching fields)
+      Arrays.equals(_flds,ts._flds); // And all fields match
   }
 
   // -------------------------------------------------------------
@@ -301,7 +291,6 @@ public class TVStruct extends TV3 {
   @Override public TVStruct copy() {
     TVStruct st = (TVStruct)super.copy();
     st._flds = _flds.clone();
-    st._pins = _pins.clone();
     return st;
   }
   
@@ -351,5 +340,8 @@ public class TVStruct extends TV3 {
       }
     return is;
   }
-
+  
+  public static void reset_to_init0() {
+    EMPTY._deps = null;
+  }
 }

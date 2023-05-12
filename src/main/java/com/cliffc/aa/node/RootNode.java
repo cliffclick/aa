@@ -334,6 +334,7 @@ public class RootNode extends Node {
         ret.fun().add_def(this).add_flow();
         add_def(ret);
         add_flow(); // Recompute root values to include function return memory
+        ret.add_flow();
         progress = true;
       }
     }
@@ -345,15 +346,20 @@ public class RootNode extends Node {
     if( in(0)==null ) return null;
     Node cc = fold_ccopy();
     if( cc!=null ) return cc;
-    // See if the result can ever refer to local memory.
-    Node rez = in(REZ_IDX);
-    if( in(MEM_IDX) != Env.XMEM &&
-        cannot_lift_to(rez._val,TypeMemPtr.ISUSED) &&
-        cannot_lift_to(rez._val,TypeFunPtr.GENERIC_FUNPTR) ) {
-      set_def(MEM_IDX,Env.XMEM);
-      Env.XMEM.xliv();          // Added a new use
-      return this;
-    }
+    
+    // Turned off, since int/flt constant returns actually have a TVClz with a
+    // TVPtr in memory which is used for the HM return.
+    
+    //// See if the result can ever refer to local memory.
+    //Node rez = in(REZ_IDX);
+    //if( in(MEM_IDX) != Env.XMEM &&
+    //    cannot_lift_to(rez._val,TypeMemPtr.ISUSED) &&
+    //    cannot_lift_to(rez._val,TypeFunPtr.GENERIC_FUNPTR) ) {
+    //  set_def(MEM_IDX,Env.XMEM);
+    //  Env.XMEM.xliv();          // Added a new use
+    //  return this;
+    //}
+    
     if( CG_wire() ) return this;
 
     return null;

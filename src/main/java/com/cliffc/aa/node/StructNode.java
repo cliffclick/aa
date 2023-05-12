@@ -194,7 +194,7 @@ public class StructNode extends Node {
     }
   }
 
-  // Remove a non-prim field, preserving order.  For reseting primitives for
+  // Remove a non-prim field, preserving order.  For resetting primitives for
   // multi-testing
   @Override void walk_reset0( ) {
     Node c;
@@ -249,45 +249,55 @@ public class StructNode extends Node {
   
   @Override public boolean has_tvar() { return true; }
 
+  // Self is always Clz:[ @{CLZ} : @{instance} ]
   @Override TV3 _set_tvar() {
     TVStruct ts = new TVStruct(_flds);
+    TVStruct clz = _clz.isEmpty()
+      ? TVStruct.EMPTY
+      // PROTOs Clz.clz is always TVStruct.EMPTY (or ClazzClazz?).
+      // The proto Clz.rhs carries the type description.
+      : Env.PROTOS.get(_clz).set_tvar().as_clz().rhs();
+    _tvar = new TVClz( clz, ts ); // Close cycle
+    // Unify all fields
     for( int i=0; i<len(); i++ )
-      ts.set_pin_fld(i,new TVLeaf());
-    if( _clz.isEmpty() ) return ts;
-    // Explicit clazz representation
-    StructNode proto = Env.PROTOS.get(_clz);
-    return new TVClz( (TVStruct)proto.set_tvar(), ts );
+      ts.arg(i).unify(in(i).set_tvar(),false); // Unify (possible cycle)
+    return _tvar;
   }
   
-
+  // Structs are pre-unified in set_tvar
   @Override public boolean unify( boolean test ) {
     boolean progress = false;
-    if( _clz.isEmpty() ) {
-      // Unify existing fields.  Ignore extras on either side.
-      TVStruct rec = tvar().as_struct();      
-      for( int i=0; i<len(); i++ ) {
-        TV3 fld = rec.arg(_flds.at(i)); // Field lookup by string
-        if( fld!=null && in(i).has_tvar() ) progress |= fld.unify(tvar(i),test);
-        if( test && progress ) return true;
-      }
-      
-    } else {
-      // Unify existing fields, first in the clazz and if that misses and is
-      // unpinned, try again in the instance.
-      TVClz clzz = tvar().as_clz();
-      TVStruct clz = clzz.clz();
-      TVStruct rec = clzz.rhs().as_struct();
-      for( int i=0; i<len(); i++ ) {
-        String label = _flds.at(i);
-        TV3 fld = clz.arg(label); // Field lookup by string
-        if( fld==null ) {
-          fld = rec.arg(label);
-          if( fld==null ) continue; // Missing field
-        }
-        progress |= fld.unify(tvar(i),test);
-        if( test && progress ) return true;
-      }      
-    }
+    //TVClz clz = tvar().as_clz();
+    //// Unify existing fields.  Ignore extras on either side.
+    //TVStruct rec = clz.rhs().as_struct();
+    //for( int i=0; i<len(); i++ ) {
+    //  TV3 fld = rec.arg(_flds.at(i)); // Field lookup by string
+    //  if( fld!=null && in(i).has_tvar() ) progress |= fld.unify(tvar(i),test);
+    //  if( test && progress ) return true;
+    //}
+    //
+    //if( _clz.isEmpty() ) {
+    //  assert clz.clz()==TVStruct.EMPTY;
+    //} else {
+    //  TVStruct clz.clz().as_struct();
+    //  
+    //  // Unify existing fields, first in the clazz and if that misses and is
+    //  // unpinned, try again in the instance.
+    //  TVClz clzz = tvar().as_clz();
+    //  TVStruct clz = clzz.clz();
+    //  TVStruct rec = clzz.rhs().as_struct();
+    //  for( int i=0; i<len(); i++ ) {
+    //    String label = _flds.at(i);
+    //    TV3 fld = clz.arg(label); // Field lookup by string
+    //    if( fld==null ) {
+    //      fld = rec.arg(label);
+    //      if( fld==null ) continue; // Missing field
+    //    }
+    //    progress |= fld.unify(tvar(i),test);
+    //    if( test && progress ) return true;
+    //  }      
+    //  throw unimpl();
+    //}
     return progress;
   }
   

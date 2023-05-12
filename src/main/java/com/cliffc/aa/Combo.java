@@ -139,6 +139,9 @@ public abstract class Combo {
 
     // Set all values to ANY and lives to DEAD, their most optimistic types.
     // Set all type-vars to Leafs.
+    PrimNode.PINT.set_tvar();
+    PrimNode.PFLT.set_tvar();
+    PrimNode.PSTR.set_tvar();
     PrimNode.ZINT.set_tvar();
     PrimNode.ZFLT.set_tvar();
     PrimNode.ZSTR.set_tvar();

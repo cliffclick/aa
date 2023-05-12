@@ -149,6 +149,8 @@ abstract public class TV3 implements Cloneable {
   abstract int eidx();
   public TVStruct as_struct() { throw unimpl(); }
   public TVLambda as_lambda() { throw unimpl(); }
+  public TVBase   as_int   () { throw unimpl(); }
+  public TVBase   as_flt   () { throw unimpl(); }
   public TVClz    as_clz   () { throw unimpl(); }
   public TVNil    as_nil   () { throw unimpl(); }
 
@@ -165,13 +167,12 @@ abstract public class TV3 implements Cloneable {
     if( _use_nil ) throw unimpl(); // unify_errs("May be nil",work);
     return (_may_nil=true);        // Progress
   }
-  // Set use_nil flag.  Return progress flag.
-  // Set an error if both may_nil and use-nil.
-  boolean add_use_nil(boolean test) {
-    if( _use_nil ) return false;   // No change
-    if( test ) return true;        // Will be progress
-    if( _may_nil ) throw unimpl(); // unify_errs("May be nil",work);
-    return (_use_nil=true);        // Progress
+  // Set use_nil flag. Set an error if both may_nil and use-nil.
+  void add_use_nil() {
+    if( !_use_nil ) {
+      _use_nil=true;                 // Progress
+      if( _may_nil ) throw unimpl(); // unify_errs("May be nil",work);
+    }
   }
 
   // -----------------
@@ -181,7 +182,7 @@ abstract public class TV3 implements Cloneable {
     if( this==that ) return false;
     assert !unified() && !that.unified(); // Cannot union twice
     if( _may_nil ) that.add_may_nil(false);
-    if( _use_nil ) that.add_use_nil(false);
+    if( _use_nil ) that.add_use_nil();
     if( that._may_nil && that._use_nil ) throw unimpl();
     _union_impl(that); // Merge subclass specific bits into that
     that.widen(_widen,false);
@@ -670,16 +671,17 @@ abstract public class TV3 implements Cloneable {
         ss [i] = fld._fld;
         tvs[i] = from_flow(fld._t);
       }
-      TV3 tv3 = new TVStruct(ss,tvs,false);
-      // Clazz structs get wrapped in a TVClz
-      if( !ts._clz.isEmpty() )
-        tv3 = new TVClz((TVStruct)Env.PROTOS.get(ts._clz).tvar(),tv3);
-      yield tv3;
+      //TV3 tv3 = new TVStruct(ss,tvs,false);
+      //// Clazz structs get wrapped in a TVClz
+      //if( !ts._clz.isEmpty() )
+      //  tv3 = new TVClz((TVStruct)Env.PROTOS.get(ts._clz).tvar(),tv3);
+      //yield tv3;
+      throw unimpl();
     }
-    case TypeInt ti ->
-      new TVClz((TVStruct)PrimNode.ZINT.tvar(),TVBase.make(ti));
-    case TypeFlt tf ->
-      new TVClz((TVStruct)PrimNode.ZFLT.tvar(),TVBase.make(tf));
+    case TypeInt ti ->  TVBase.make(ti);
+      //new TVClz((TVPtr)PrimNode.PINT.tvar(),TVBase.make(ti));
+    case TypeFlt tf -> TVBase.make(tf);
+      //new TVClz((TVPtr)PrimNode.PFLT.tvar(),TVBase.make(tf));
     case TypeNil tn -> tn == TypeNil.NIL
       ? new TVNil( new TVLeaf() )
       : TVBase.make(tn);
@@ -882,6 +884,7 @@ abstract public class TV3 implements Cloneable {
   public static void reset_to_init0() {
     CNT=0;
     TVField.reset_to_init0();
+    TVStruct.reset_to_init0();
     DELAY_FRESH.clear();
     DELAY_RESOLVE.clear();
   }

@@ -188,7 +188,7 @@ public final class CallEpiNode extends Node {
 
     // If above_center (not resolved) or not all wired, can bail conservative
     BitsFun fidxs = tfptr.fidxs();
-    if( fidxs.above_center() ) return TypeTuple.CALLE.dual();
+    if( Combo.pre() && fidxs.above_center() ) return TypeTuple.CALLE.dual();
     if( Combo.pre() &&           // In iter (not combo)
         (fidxs==BitsFun.EMPTY || // Lifted to no functions
          len()==1 ||             // Not wired (wireable?)
@@ -199,7 +199,7 @@ public final class CallEpiNode extends Node {
 
     // Compute meet over wired called function returns
     Type tmem = TypeMem.ANYMEM, rmem;
-    Type trez = Type.ANY, rrez;
+    Type trez = fidxs.above_center() ? tfptr._ret : Type.ANY, rrez;
     int fidx;
     boolean pre_call_mem = false;
     for( int i=1; i<len(); i++ ) {

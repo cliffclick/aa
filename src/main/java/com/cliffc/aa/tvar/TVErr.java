@@ -29,6 +29,8 @@ public class TVErr extends TV3 {
 
   @Override public TVStruct as_struct() { return (TVStruct)arg(XSTR); }
   @Override public TVLambda as_lambda() { return (TVLambda)arg(XFUN); }
+  @Override public TVBase   as_int   () { return (TVBase  )arg(XINT); }
+  @Override public TVBase   as_flt   () { return (TVBase  )arg(XFLT); }
   @Override public TVClz    as_clz   () { return (TVClz   )arg(XCLZ); }
   @Override public TVNil    as_nil   () { return (TVNil   )arg(XNIL); }
 

@@ -105,7 +105,10 @@ public class TypeFlt extends TypeNil<TypeFlt> {
   }
   static int log( double con ) { return ((double)(float)con)==con ? 32 : 64; }
 
-  @Override public TypeFlt widen() { return FLT64; }
+  @Override public TypeFlt widen() {
+    if( !_nil && _sub ) return NFLT64;
+    return FLT64;
+  }
   @Override TypeNil cross_flt(TypeNil i) {
     return  i instanceof TypeInt ii ? ii.cross_flt(this) : null;
   }

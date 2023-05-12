@@ -2,6 +2,7 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.node.Node;
+import com.cliffc.aa.node.PrimNode;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
@@ -94,6 +95,12 @@ public class TVPtr extends TV3 {
   @Override void _widen( byte widen ) { }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
+    if( !prims ) {
+      if( _aliases == PrimNode.PINT ._tptr._aliases ) return sb.p("int" );
+      if( _aliases == PrimNode.PFLT ._tptr._aliases ) return sb.p("flt" );
+      if( _aliases == PrimNode.PSTR ._tptr._aliases ) return sb.p("str" );
+      if( _aliases == PrimNode.PMATH._tptr._aliases ) return sb.p("math");
+    }
     sb.p("*");
     _aliases.str(sb);
     if( _args.length>0 && _args[0]!=null ) arg(0)._str(sb,visit,dups,debug,prims);

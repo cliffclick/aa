@@ -111,9 +111,9 @@ public final class FunPtrNode extends Node {
     Node imem = ret.fun().parm(MEM_IDX);
     Node dsp  = ret.fun().parm(DSP_IDX);
     Node omem = ret.mem();
-    TVMem timem = imem == null ? new TVMem () : (TVMem)imem.set_tvar();
-    TV3   tdsp  = dsp  == null ? new TVLeaf() :        dsp .set_tvar();
-    TVMem tomem = omem == null ? new TVMem () : (TVMem)omem.set_tvar();
+    TVMem timem = (TVMem)(imem == null ? Env.MEM_0 : imem).set_tvar();
+    TV3   tdsp  = dsp  == null ? new TVLeaf() :       dsp .set_tvar();
+    TVMem tomem = omem == null ? timem        :(TVMem)omem.set_tvar();
     return new TVLambda(nargs(),timem,tdsp,tomem,rez.set_tvar());
   }
 

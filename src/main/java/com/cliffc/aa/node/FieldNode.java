@@ -24,7 +24,8 @@ public class FieldNode extends Node implements Resolvable {
   // Field being loaded from a TypeStruct.  If "_", the field name is inferred
   // from amongst the field choices.  If not present, then error.
   public       String _fld;
-  // Field lookup is strictly in the clazz and not locally.
+  // TRUE:  Field lookup is strictly in the clazz and not locally.
+  // FALSE: Can be either/unknown
   public final boolean _clz;
   // Where to report errors
   public final Parse _bad;
@@ -177,116 +178,70 @@ public class FieldNode extends Node implements Resolvable {
   @Override public TV3 _set_tvar() {
     if( is_resolving() )
       TVField.FIELDS.put(_fld,this); // Track resolving field names
+    // Force CLZ:[@{...},@{...}].    
+    // Under SOME situations but not ALL, we can tell were to put the field
+    // (either CLZ or instance struct).  Since we sometimes need to wait, we
+    // put that logic in the unify call.
+
+    // Next New Think:
+    // - must jam the unify-able type in, without a proper field name.
+    // - so bring back the "&123" field names.
+    // - if not flagged clz/instance and both are open, still dunno where to go
+    // - can temp put it in e.g. rhs, and claim it floats until resolved
+    // - or gets a clz/inst user.
+    // - opers alreayd flagged as clz
+    // 
+    
+    in(0).set_tvar().unify( new TVClz(new TVStruct(true),new TVStruct(true)), false);
     return new TVLeaf();
   }
 
   @Override public boolean unify( boolean test ) {
-    boolean progress = false;
+    TVClz clz = tvar(0).as_clz();  TV3 fld;
+    // Where is the field?
+    // RHS  - if !_clz && resolving
+    if( is_resolving() ) return do_resolve(clz,test);
+    // OR   - if  found in one or other
+    if( (fld=clz.clz().arg(_fld))!=null ) return do_clz(fld,clz,test);
+    if( (fld=clz.rhs().arg(_fld))!=null ) return do_rhs(fld,clz,test);
+    // CLZ  - If  _clz
+    if( _clz )
+      return clz.clz().is_open() ? add_clz(clz,test) : do_miss(clz,test);
+    // STALL- if !found in either and both are open
+    // CLZ  - Only CLZ is open so must be there
+    if( clz.clz().is_open() )
+      return clz.rhs().is_open() ? false : add_clz(clz,test);
+    // RHS  - Only RHS is open so must be there
+    // MISS - if !found in either and both are closed
+    return clz.rhs().is_open() ? add_rhs(test) : do_miss(clz,test);
+  }    
 
-    TV3 tv0 = tvar(0);          // If an instance field, need the input struct
-    // Clazz fields do clazz lookups, expect clazz structures.
-    // - if a TVClz, we got the clz
-    // - if a TVLeaf, try a prototype lookup from the flow type; if that works use the prototype
-    //                else unify to a pending clz
-    // - if a TVNil , try a prototype lookup from the flow type; if that works use the prototype
-    //                else stall
-    // - if a TVErr , try a clz (repeat above), or a nil (repeat), or a leaf
-    //
-    // Else do an instance lookup
-    // - if a TVStruct, use it
-    // - if a TVErr   , get the struct
-    // - else unify with TVStruct (handles Leafs, or forces TVErr with Struct)
-    //
-    // With struct in-hand, proceed to resolve & do lookup
-    if( _clz ) {
-      switch( tv0 ) {
-      case TVClz clz -> tv0 = clz.clz(); // Clazz part from a clazzed TV
-      case TVLeaf leaf -> {              // Expand to a clazzed TV
-        StructNode proto = clz_node(val(0)); // Existing prototypes for int/flt/named-clazz-types
-        if( proto == null ) {            // Unknown inferred clazz
-          if( test ) return true;        // Always progress
-          progress = true;
-          TVStruct obj = new TVStruct(new String[]{_fld}, new boolean[]{true}, new TV3[]{tvar()}, true);
-          TVClz clz = new TVClz(obj, new TVLeaf());
-          tv0.unify(clz, test);
-          tv0 = clz.clz();
-        } else {
-          tv0 = proto.tvar();
-        }
-      }
-      case TVNil nil -> {                    // Expand to a clazzed TV
-        StructNode proto = clz_node(val(0)); // Existing prototypes for int/flt/named-clazz-types
-        if( proto == null ) return false;    // Unknown inferred clazz, stall until we get something better
-        tv0 = proto.tvar();
-      }
-      case TVErr err -> {
-        if( err.as_clz()!=null ) tv0 = err.as_clz().clz(); // Try a CLZ
-        else if( err.as_nil()!= null ) throw unimpl();     // Try the NIL (repeat clz_node lookup)
-        else {
-          if( test ) return true;
-          // Treat as Leaf; make a Clz, unify and use it
-          TVLeaf lclz = err.make_clz();
-          progress |= lclz.unify(new TVClz(new TVStruct(new String[0],new TV3[0],true),tv0=new TVLeaf()),false);
-        }
-      }
-      default -> throw unimpl();
-      };
-      
-    } else {
-      // ----------------------
-      // Instance field lookup
-      
-      // Errors have a struct to unify against
-      if( tv0 instanceof TVErr terr ) {
-        tv0 = terr.as_clz();      // If TVErr has a Clz, take it, fetch RHS
-        if( tv0==null ) {         // No CLZ
-          tv0 = terr.as_struct(); // If TVErr has a Struct, take it
-          if( tv0 == null )       // Force struct under error
-            tv0 = terr.make_struct();
-        }
-      }
-      if( tv0 instanceof TVClz clz ) tv0 = clz.rhs();
-    }
-
-    // Still not a struct?  Make one, add field
-    TVStruct str;
-    if( tv0 instanceof TVStruct str0 ) str = str0;
-    else {
-      if( test ) return true;
-      TVStruct inst = new TVStruct(new String[]{}, new TV3[]{}, true);
-      if( !is_resolving() )
-        inst.add_fld(_fld,Oper.is_oper(_fld),tvar());
-      progress = tv0.unify(str=inst,test);
-    }
-
-    // If resolving, cannot do a field lookup.  Attempt resolve first.
-    if( is_resolving() ) {
-      if( Combo.HM_AMBI ) return false; // Failed earlier, can never resolve
-      progress |= try_resolve(str,test);
-      if( is_resolving() || test ) return progress;
-      str = (TVStruct)str.find();
-    }
-    assert !is_resolving();
-
-    // Look up field normally
-    TV3 fld = str.arg(_fld);
-    if( fld!=null )           // Unify against a pre-existing field
-      return tvar().unify(fld, test) | progress;
-
-    // If field is doing overload resolution, inject even if rec is closed
-    if( is_resolving() ) {
-      if( test ) return true;
-      throw unimpl();
-    }
-    
-    // If the field is resolved, and not in struct and not in proto and the
-    // struct is closed, then the field is missing.
-    if( !str.is_open() )
-      return tvar().unify_err(resolve_failed_msg(),tvar(0),test);
-
-    // Add the field, make progress
-    if( !test ) str.add_fld(_fld,_clz,tvar());
-    return true;
+  private boolean do_clz( TV3 fld, TVClz clz, boolean test ) {
+    assert clz.rhs().arg(_fld)==null;
+    return tvar().unify(fld,test);
+  }
+  private boolean do_rhs( TV3 fld, TVClz clz, boolean test ) {
+    assert !_clz && clz.clz().arg(_fld)==null;
+    return tvar().unify(fld,test);
+  }
+  private boolean add_clz( TVClz clz, boolean test ) {
+    assert clz.rhs().arg(_fld)==null;
+    return test || clz.clz().add_fld(_fld,tvar());
+  }
+  private boolean add_rhs( boolean test ) {
+    throw unimpl();
+  }
+  private boolean do_resolve( TVClz clz, boolean test ) {
+    assert !_clz;
+    if( Combo.HM_AMBI ) return false; // Failed earlier, can never resolve
+    boolean progress = try_resolve(clz.rhs(),test);
+    if( is_resolving() || test ) return progress; // Failed to resolve, or resolved but testing
+    // Known to be resolved and in RHS
+    do_rhs(clz.rhs().arg(_fld),clz,test);
+    return true;                // Progress
+  }
+  private boolean do_miss(TVClz clz, boolean test) {
+    return tvar().unify_err(resolve_failed_msg(),clz,test);
   }
 
 
@@ -307,10 +262,6 @@ public class FieldNode extends Node implements Resolvable {
     return clz==null ? null : Env.PROTOS.get(clz);  // CLZ from instance
   }
 
-  public static TVStruct clz_tv(Type t) {
-    return (TVStruct)clz_node(t).tvar();
-  }
-
   private static TV3 CLZ;
   boolean clz_lookup( boolean test ) {
     StructNode proto = clz_node(val(0)); // Existing prototypes for int/flt/named-clazz-types
@@ -319,10 +270,11 @@ public class FieldNode extends Node implements Resolvable {
 
     // Unknown inferred clazz
     if( test ) return true;        // Always progress
-    TVStruct obj = new TVStruct(new String[]{_fld}, new boolean[]{true}, new TV3[]{tvar()}, true);
-    CLZ = new TVClz(obj, new TVLeaf());
-    tvar(0).unify(CLZ, test);
-    return true;
+    //TVStruct obj = new TVStruct(new String[]{_fld}, new boolean[]{true}, new TV3[]{tvar()}, true);
+    //CLZ = new TVClz(obj, new TVLeaf());
+    //tvar(0).unify(CLZ, test);
+    //return true;
+    throw unimpl();
   }
 
   
@@ -375,7 +327,7 @@ public class FieldNode extends Node implements Resolvable {
       String clz = FieldNode.clz_str(fldn.val(0));
       if( clz!=null ) fld = clz+fld; // Attempt to be clazz specific operator
     }
-    TVStruct tvs = match_tvar() instanceof TVStruct tv0 ? tv0 : null;
+    TVStruct tvs = match_tvar() instanceof TVClz tv0 ? tv0.rhs() : null;
     String err, post;
     if( !is_resolving() ) { err = "Unknown"; post=" in %: "; }
     else if( tvs!=null && ambi(tvar(),tvs) ) { err = "Ambiguous, matching choices %"; post = " vs "; }

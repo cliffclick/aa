@@ -94,7 +94,7 @@ public class CastNode extends Node {
 
     // Expand nilable to either base
     if( maynil instanceof TVBase maybase && notnil instanceof TVBase notbase ) {
-      assert maybase._t == notbase._t.meet(TypeNil.XNIL);
+      assert maybase._t == notbase._t.meet(TypeNil.NIL);
       return false;
     }
     

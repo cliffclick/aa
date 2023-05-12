@@ -27,11 +27,13 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
 
+
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    test("x:=y:=0; z=x++ && y++;(x,y,z)", // increments x, but it starts zero, so y never increments
-            "*[11](1, nil,nil)","*(int:int64,A?,B?)",null,null,"[11]",null);
+    test("fun = { fx x -> x ? fx( fun(fx,x-1) ) : 1 }; fun(2._*_._, 99)",
+            "int64",
+            "int64");
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -51,24 +53,24 @@ public class TestParse {
 
   // Some HM related type tests
   @Test public void testParse99() {
-    test("1", "1", "int:1");
+    test("1", "1", "1");
     // Simple primitive expansion, pre-combo
-    test("1+2", "3", "int:3");
+    test("1+2", "3", "3");
     // Big enough that the primitives do not all inline before Combo, so Combo
     // has to deal with primitive expansions.
-    test("1+2 * 3+4 *5", "27", "int:27");
+    test("1+2 * 3+4 *5", "27", "27");
     // Simple no-arg anonymous function, being called
-    test("{5}()", "5", "int:5");
-    // TestParse.a_basic_01
-    test("{ x -> ( 3, x )}", "[55]{any,4 -> *[11](3, %[2,11][2,55]?) }", "{ A B -> *[11](int:3, B) }", null, null, "[11]", "[55]");
-    // TestParse.a_basic_02
+    test("{5}()", "5", "5");
+    // TestHM.a_basic_01
+    test("{ x -> ( 3, x )}", "[55]{any,4 -> *[11](3, %[2,11][2,55]?) }", "{ A B -> *[11](3, B) }", null, null, "[11]", "[55]");
+    // TestHM.a_basic_02
     test("{ z -> ((z 0), (z \"abc\")) }", "[55]{any,4 -> *[12](%[2,11,12][2,55]?, %[2,11,12][2,55]?) }",
-         "{A {B *[11]str:(int:97)? -> C } -> *[12](C,C) }",
+         "{A {B *[11]str:(int64)? -> C } -> *[12](C,C) }",
          null, null,
          "[11,12]", "[55]" );
 
    
-    // TestParse.a_basic_05
+    // TestHM.a_basic_05
     // example that demonstrates generic and non-generic variables:
     // 'g' is not-fresh in function 'f'.
     // 'f' IS fresh in the body of 'g' pair.
@@ -78,163 +80,162 @@ public class TestParse {
          null,null,"[5,13]","[55]");
 
     // TestParse.g_overload_err_00
-    testerr("( { x -> x*2 }, { x -> x*3 })._ 4", "Ambiguous, matching choices ({ A B -> C }, { D E -> F }) vs { G int:4 -> H }",30);
+    testerr("( { x -> x*2 }, { x -> x*3 })._ 4", "Ambiguous, matching choices ({ A B -> C }, { D E -> F }) vs { G 4 -> H }",30);
 
     // Variations on a simple wrapped add.  Requires full annotations to type -
     // because in fact it is all ambiguous and cannot be typed without seeing all
     // the usages.
-    testerr("{ x -> x+1 }", "Unable to resolve operator '_+_': { A int:1 -> B }",8);       // LHS is not known, unknown clazz, oper (pinned, no clazz to report)
-    testerr("{ x -> 1+x }", "Ambiguous, matching choices ({ int:int64 int:int64 -> int:int64 }, { int:int64 flt:nflt64 -> flt:flt64 }) vs { int:1 A -> B }",8);
+    testerr("{ x -> x+1 }", "Unable to resolve operator '_+_': { A 1 -> B }",8);       // LHS is not known, unknown clazz, oper (pinned, no clazz to report)
+    testerr("{ x -> 1+x }", "Ambiguous, matching choices ({ int64 int64 -> int64 }, { int64 nflt64 -> flt64 }) vs { 1 A -> B }",8);
     testerr("{ x y -> x+y }", "Unable to resolve operator '_+_': { A B -> C }",10);
-    testerr("( { x -> x*2 }, { x -> x*3 })._ 4", "Ambiguous, matching choices ({ A B -> C }, { D E -> F }) vs { G int:4 -> H }",30);
     testerr("@{x=7}.y",  "Unknown field '.y' in @{x= A}: ",7); // LHS is known, not a clazz, field not found in instance
     testerr("\"abc\".y", "Unknown field '.y' in str:(A): ",6);  // LHS is known, has clazz, field not found in either, field is not oper (not pinned)
-    testerr("\"abc\"&1", "Unknown operator '_&_' in str:(int:97): ( ..., )",5); // LHS is known, has clazz, field not found in either, field it oper (pinned, so report clazz)
-    test("{x:flt y:int -> x+y}", "[55]{any,5 -> flt64 }", "{ A flt:flt64 int:int64 -> flt:flt64 }", null, null, null, "[55]");
+    testerr("\"abc\"&1", "Unknown operator '_&_' in str:(97): ( ..., ):( ..., )",5); // LHS is known, has clazz, field not found in either, field it oper (pinned, so report clazz)
+    test("{x:flt y:int -> x+y}", "[55]{any,5 -> flt64 }", "{ A flt64 int64 -> flt64 }", null, null, null, "[55]");
 
     // error, missing a comma
     testerr("{ x -> ( 3 x )}", "A function is being called, but 3 is not a function",11);
 
-    // TestParse.b_recursive_01
+    // TestHM.b_recursive_01
     test("{ f -> (f f) }", "[55]{any,4 -> %[2][2,55]? }", "{A B:{C B -> D } -> D }", null, null, "[]", "[55]" );
 
-    // TestParse.b_recursive_02
+    // TestHM.b_recursive_02
     test("fun = { fx x -> x ? fx( fun(fx,x-1) ) : 1 }; fun(2._*_._, 99)",
-            "int:int64",
-            "int:int64");
+            "int64",
+            "int64");
 
-    // TestParse.b_recursive_05, Y combinator
+    // TestHM.b_recursive_05, Y combinator
     test("{ f -> ({ x -> (f (x x))} { x -> (f (x x))})}",
          "[55]{any,4 -> %[2,5][2,55]? }", "{ A { B C -> C } -> C }",
          null, null,
          "[5]", "[55]" );
 
-    // TestParse.b_recursive_06
+    // TestHM.b_recursive_06
     test("fun = { fx -> math.rand(2) ? 1 : fx(fun(fx),2) }; fun",
          "[55]{any,4 -> %[2,5][2,55]? }",
          // Currently allowing 'fun' display to stay alive.
-         "A:{ *[9]@{fun=A} {B C:int:int64 int:int64-> C } -> C }",
+         "A:{ *[9]@{fun=A} {B C:int64 int64-> C } -> C }",
          null, null,
          "[5]","[55]");
   }
 
   @Test public void testParse00() {
-    test("1", "1", "int:1");
+    test("1", "1", "1");
     // Unary operator
-    test("-1", "-1", "int:-1");
+    test("-1", "-1", "-1");
     test("!1", "nil", "A?");
     // Binary operators
-    test("1+2", "3", "int:3");
-    test("1-2", "-1",  "int:-1");
-    test("1+2*3", "7", "int:7");
-    test("1  < 2", "1", "int:1");
-    test("1  <=2", "1", "int:1");
+    test("1+2", "3", "3");
+    test("1-2", "-1",  "-1");
+    test("1+2*3", "7", "7");
+    test("1  < 2", "1", "1");
+    test("1  <=2", "1", "1");
     test("1  > 2", "nil", "A?");
     test("1  >=2", "nil", "A?");
     test("1  ==2", "nil", "A?");
-    test("1  !=2", "1", "int:1");
-    test("1.2< 2", "1", "int:1");
-    test("1.2<=2", "1", "int:1");
+    test("1  !=2", "1", "1");
+    test("1.2< 2", "1", "1");
+    test("1.2<=2", "1", "1");
     test("1.2> 2", "nil", "A?");
     test("1.2>=2", "nil", "A?");
     test("1.2==2", "nil", "A?");
-    test("1.2!=2", "1", "int:1");
+    test("1.2!=2", "1", "1");
 
     // Binary with precedence check
-    test(" 1+2 * 3+4 *5", "27", "int:27");
-    test("(1+2)*(3+4)*5", "105", "int:105");
-    test("1// some comment\n+2", "3", "int:3"); // With bad comment
-    test("-1-2*3-4*5", "-27", "int:-27");
-    test("1&3|1&2", "1", "int:1");
+    test(" 1+2 * 3+4 *5", "27", "27");
+    test("(1+2)*(3+4)*5", "105", "105");
+    test("1// some comment\n+2", "3", "3"); // With bad comment
+    test("-1-2*3-4*5", "-27", "-27");
+    test("1&3|1&2", "1", "1");
 
     // Float
-    test("1.2+3.4", "4.6", "flt:4.6");
+    test("1.2+3.4", "4.6", "4.6");
     // Mixed int/float with conversion
-    test("1+2.3", "3.3", "flt:3.3");
+    test("1+2.3", "3.3", "3.3");
 
     // Variable lookup
-    test("math.pi", "3.141592653589793", "flt:3.141592653589793");
+    test("math.pi", "3.141592653589793", "3.141592653589793");
     // bare function lookup; returns a union of '+' functions
     testerr("+", "Syntax error; trailing junk",0);
     testerr("!", "Missing term after operator '!_'",1);
     testerr("_+_", "Syntax error; trailing junk",0);
     testerr("!_", "Missing term after operator '!_'",1);
     // Function application, traditional paren/comma args
-    test("1._+_._(2)", "3", "int:3" );
-    test("1._-_._(2)", "-1", "int:-1"); // binary version
-    test("1.-_._()"  , "-1", "int:-1"); // unary version
+    test("1._+_._(2)", "3", "3" );
+    test("1._-_._(2)", "-1", "-1"); // binary version
+    test("1.-_._()"  , "-1", "-1"); // unary version
     // error; mismatch arg count
     testerr("math.pi(1)", "A function is being called, but 3.141592653589793 is not a function",7);
     testerr("1._+_._(2,3)", "Passing 2 arguments to _+_ which takes 1 arguments",7);
 
     // Parsed as +(1,(2*3))
-    test("1._+_._(2 * 3) ", "7", "int:7");
+    test("1._+_._(2 * 3) ", "7", "7");
     // Parsed as (1+2*3)+(4*5+6)
-    test("(1 + 2 * 3)._+_._(4 * 5 + 6) ", "33", "int:33");
+    test("(1 + 2 * 3)._+_._(4 * 5 + 6) ", "33", "33");
     // Statements
-    test("(1;2 )", "2", "int:2");
-    test("(1;2;)", "2", "int:2"); // final semicolon is optional
-    test("1._+_._(2;3)", "4", "int:4"); // statements in arguments
+    test("(1;2 )", "2", "2");
+    test("(1;2;)", "2", "2"); // final semicolon is optional
+    test("1._+_._(2;3)", "4", "4"); // statements in arguments
     // Operators squished together
-    test("-1== -1",  "1",  "int:1");
+    test("-1== -1",  "1",  "1");
     test("0== !!1",  "nil", "A?");
     test("2==-1",    "nil", "A?");
     test("-1==--1",  "nil", "A?");
-    test("-1==---1", "1",  "int:1");
+    test("-1==---1", "1",  "1");
     testerr("-1== --", "Missing term after operator '-_'",7);
   }
 
   @Test public void testParse01() {
     // Syntax for variable assignment
-    test("x=1", "1", "int:1");
-    test("x=y=1", "1", "int:1");
+    test("x=1", "1", "1");
+    test("x=y=1", "1", "1");
     testerr("x=y=", "Missing ifex after assignment of 'y'",4);
     testerr("x=z" , "Unknown ref 'z'",2);
     testerr("x=1+y","Unknown ref 'y'",4);
     testerr("x=y; x=y","Unknown ref 'y'",2);
-    test("x=2; y=x+1; x*y", "6", "int:6");
+    test("x=2; y=x+1; x*y", "6", "6");
     // Re-use ref immediately after def; parses as: x=(2*3); 1+x+x*x
-    test("1+(x=2*3)+x*x", "43", "int:43");
+    test("1+(x=2*3)+x*x", "43", "43");
     testerr("x=(1+(x=2)+x); x", "Cannot re-assign final field '.x' in @{x=2}",0);
-    test("x:=1;x++", "1", "int:int64");
-    test("x:=1;x++;x", "2", "int:2");
-    test("x:=1;x++ + x--","3", "int:3");
-    test("x++","nil", "int:int64");
-    test("x++;x","1", "int:1");
+    test("x:=1;x++", "1", "int64");
+    test("x:=1;x++;x", "2", "2");
+    test("x:=1;x++ + x--","3", "3");
+    test("x++","nil", "int64");
+    test("x++;x","1", "1");
 
     // Conditional:
-    test   ("0 ?    2  : 3", "3", "int:3"); // false
-    test   ("2 ?    2  : 3", "2", "int:2"); // true
-    test   ("math.rand(2)?x=4:x=3;x", "nint8", "int:nint8"); // x defined on both arms, so available after
-    test   ("math.rand(2)?x=2:  3;4", "4", "int:4"); // x-defined on 1 side only, but not used thereafter
-    test   ("math.rand(2)?(y=2;x=y*y):x=3;x", "nint8", "int:int64"); // x defined on both arms, so available after, while y is not
+    test   ("0 ?    2  : 3", "3", "3"); // false
+    test   ("2 ?    2  : 3", "2", "2"); // true
+    test   ("math.rand(2)?x=4:x=3;x", "nint8", "nint8"); // x defined on both arms, so available after
+    test   ("math.rand(2)?x=2:  3;4", "4", "4"); // x-defined on 1 side only, but not used thereafter
+    test   ("math.rand(2)?(y=2;x=y*y):x=3;x", "nint8", "int64"); // x defined on both arms, so available after, while y is not
     testerr("math.rand(2)?x=2: 3 ;x", "'x' not defined on false arm of trinary",20);
     testerr("math.rand(2)?x=2: 3 ;y=x+2;y", "'x' not defined on false arm of trinary",20);
     testerr("0 ? x=2 : 3;x", "'x' not defined on false arm of trinary",11);
-    test   ("2 ? x=2 : 3;x", "2", "int:2"); // off-side is constant-dead, so missing x-assign is ignored
-    test   ("2 ? x=2 : y  ", "2", "int:2"); // off-side is constant-dead, so missing 'y'      is ignored
+    test   ("2 ? x=2 : 3;x", "2", "2"); // off-side is constant-dead, so missing x-assign is ignored
+    test   ("2 ? x=2 : y  ", "2", "2"); // off-side is constant-dead, so missing 'y'      is ignored
     testerr("x=1;2?(x=2):(x=3);x", "Cannot re-assign final field '.x' in @{x=1}",7);
-    test   ("x=1;2?   2 :(x=3);x", "1", "int:1"); // Re-assigned allowed & ignored in dead branch
-    test   ("math.rand(2)?1:int:2:int","nint8", "int:nint8"); // no ambiguity between conditionals and type annotations
+    test   ("x=1;2?   2 :(x=3);x", "1", "1"); // Re-assigned allowed & ignored in dead branch
+    test   ("math.rand(2)?1:2:int","nint8", "nint8"); // no ambiguity between conditionals and type annotations
     testerr("math.rand(2)?1: :2:int","missing expr after ':'",16); // missing type
     testerr("math.rand(2)?1::2:int","missing expr after ':'",15); // missing type
-    test   ("math.rand(2)?1","int1","int:int1"); // Missing optional else defaults to nil
-    test   ("x:=0;math.rand(2)?(x:=1);x","int1","int:int1");
+    test   ("math.rand(2)?1","int1","int1"); // Missing optional else defaults to nil
+    test   ("x:=0;math.rand(2)?(x:=1);x","int1","int1");
     testerr("a.b.c();","Unknown ref 'a'",0);
   }
 
   // Short-circuit tests
   @Test public void testParse01a() {
     test("0 && 0", "nil","A?");
-    test("1 && 2", "int:2","int:2");
+    test("1 && 2", "int:2","2");
     test("0 && 2", "nil","A?");
     test("0 || 0", "nil","A?");
-    test("0 || 2", "int:2","int:2");
-    test("1 || 2", "int:1","int:1");
-    test("0 && 1 || 2 && 3", "int:3","int:3");    // Precedence
+    test("0 || 2", "int:2","2");
+    test("1 || 2", "int:1","1");
+    test("0 && 1 || 2 && 3", "3","3");    // Precedence
 
     test("x:=y:=0; z=x++ && y++;(x,y,z)", // increments x, but it starts zero, so y never increments
-         "*[11](1, nil,nil)","*(int:int64,A?,B?)",null,null,"[11]",null);
+         "*[11](1, nil,nil)","*[11](int64,A?,B?)",null,null,"[11]",null);
     test("x:=y:=0; x++ && y++; z=x++ && y++; (x,y,z)", // x++; x++; y++; (2,1,0)
             "*[12](2, 1, nil)","*(int:int64,int:int64,int:int64)", null, null, "[12]", null);
     test("(x=1) && x+2", "int:3", "int:3"); // Def x in 1st position

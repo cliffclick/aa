@@ -9,14 +9,19 @@ import static com.cliffc.aa.AA.unimpl;
 
 /** Subclassing.  LHS is a struct representing a clazz; RHS is an instance.
  * <p> 
- *  LHS is the clazz struct; a collection of final constant fields available in
- *  field lookups on the RHS.  RHS can be anything, include "int" or a struct.
+ *  These forms are allowed:
+ *    [TVPtr ,@{instance}]  // Finding the clazz requires a Load
+ *    [@{clz},@{instance}]  // Loaded already
+ *  Either @{clz} or @{instance} can be closed and empty
+ *
  */
 public class TVClz extends TV3 {
   
-  public TVClz( TVStruct clz, TV3 rhs ) { super(clz,rhs); }
+  public TVClz( TVPtr    ptr, TVStruct rhs ) { super(ptr,rhs); }
+  public TVClz( TVStruct clz, TVStruct rhs ) { super(clz,rhs); }
+  public TVPtr    ptr() { return (TVPtr   )arg(0); }
   public TVStruct clz() { return (TVStruct)arg(0); }
-  public TV3      rhs() { return           arg(1); }
+  public TVStruct rhs() { return (TVStruct)arg(1); }
 
   @Override boolean can_progress() { return false; }
   @Override int eidx() { return TVErr.XCLZ; }
@@ -42,7 +47,8 @@ public class TVClz extends TV3 {
     TV3 nn = rhs().find_nil();
     if( nn == rhs() )
       return this; // No change so just use same Clz
-    return new TVClz(clz(),nn);
+    //return new TVClz(ptr(),nn);
+    throw unimpl();
   }
 
   // -------------------------------------------------------------
@@ -50,7 +56,7 @@ public class TVClz extends TV3 {
 
   @Override boolean _unify_impl(TV3 t ) {
     TVClz clz = (TVClz)t;       // Invariant when called
-    return clz()._unify(clz.clz(),false) | ((TVClz)find()).rhs()._unify(((TVClz)clz.find()).rhs(),false);
+    return arg(0)._unify(clz.arg(0),false) | ((TVClz)find()).rhs()._unify(((TVClz)clz.find()).rhs(),false);
   }
 
 
@@ -61,8 +67,8 @@ public class TVClz extends TV3 {
   @Override boolean _trial_unify_ok_impl( TV3 tv3, boolean extras ) {
     TVClz clz = (TVClz)tv3;     // Invariant when called
     return
-      clz()._trial_unify_ok(clz.clz(),extras) &&
-      rhs()._trial_unify_ok(clz.rhs(),extras);
+      arg(0)._trial_unify_ok(clz.arg(0),extras) &&
+      rhs( )._trial_unify_ok(clz.rhs( ),extras);
   }
 
   @Override boolean _exact_unify_impl( TV3 tv3 ) { throw unimpl(); }
@@ -80,12 +86,13 @@ public class TVClz extends TV3 {
     return rhs;
   }
   @Override void _widen( byte widen ) {
-    clz().widen((byte)1,false);
-    rhs().widen(widen  ,false);
+    arg(0).widen((byte)1,false);
+    rhs( ).widen(widen  ,false);
   }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
-    clz()._str(sb,visit,dups,debug,prims).p(':');
+    if( arg(0)!=TVStruct.EMPTY )
+      arg(0)._str(sb,visit,dups,debug,prims).p(':');
     return rhs()._str(sb,visit,dups,debug,prims);
   }  
 }
