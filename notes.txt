@@ -1,4 +1,49 @@
 =======================================
+05/12/2023
+
+Got pretty far since last notes.
+   "fun = { fx x -> x ? fx( fun(fx,x-1) ) : 1 }; fun(2._*_._, 99)"
+New notes:
+
+"x" needs to be typed as having an operator "_-_" to compute "x-1" - but at
+which class hiearchy level?
+
+Which leads me to needing to infer class structure!
+
+So current theory:
+
+- All structs have a clazz in a field, which itself is a TVStruct.
+  "@{ . = @{CLZ}, ... }"
+  - Put the class with field name "." always in slot 0.
+  - Put a display uptick with field name as "^" in slot 1.  Optional.
+  - Structs in AA without further clzz names go straight to CLZ_CLZ clazz.
+  - The "." field is a TVStruct, not a TVPtr.  Sharing will keep costs down?
+  - - Can think about final-field (no leaf) optimizations for Fresh.
+
+
+
+  
+- Field unifies insert a field into a struct.
+  - If the field is in the current struct, unify to it
+  - Else
+  - - If the struct is closed, Field searchs the super-class chain
+  - - If the struct is open, Field inserts there (so first open clazz up the super-clazz chain)
+  - - If the super-clazz is null, go back down to the bottom and unify with miss_field
+  - Invariant: Following super-chain, from the Field struct to below placement
+    is always closed.  May be open at placement struct.
+
+- Base/prims act "as if" closed no-field struct with parent @{INT_CLZ} field.
+- INT_CLZ/FLT_CLZ/STR_CLZ has e.g. CLZ_CLZ as parent.  No fields in CLZ_CLZ.
+
+This leaves things like open clazzes (not declared) in-between some lower and higher class, which
+might inject a shadowing def, and this is OK.
+
+
+Can drop Type string clz.  Not being used.
+Can drop TVClz, using just a tree in TVStruct/TVPtr.
+
+
+=======================================
 2/09/2023
 
 Fresh is horribly wrong.  Can't track just FunNodes, because still have to flag
