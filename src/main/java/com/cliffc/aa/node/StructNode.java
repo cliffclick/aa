@@ -214,7 +214,7 @@ public class StructNode extends Node {
     for( int i=0; i<_flds.len(); i++ )
       flds[i] = TypeFld.make(_flds.at(i),val(i),_accesses.at(i));
     Arrays.sort(flds,(tf0,tf1) -> tf0._fld.compareTo(tf1._fld));
-    return TypeStruct.make_flds(_clz,_def,flds);
+    return TypeStruct.make_flds(_def,flds);
   }
 
   // Return liveness for a field

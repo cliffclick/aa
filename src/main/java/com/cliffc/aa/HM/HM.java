@@ -1454,7 +1454,7 @@ public class HM {
       Alloc a = ALIASES.at(i);
       if( a!= null ) ts[i] = a.tmp()._obj;
     }
-    ASIG_MEM = TypeMem.make0(ts);
+    ASIG_MEM = TypeMem.make0(false,ts);
     return add_sig(t);
   }
   private static Type add_sig(Type t) {
@@ -2191,7 +2191,7 @@ public class HM {
       tfs[0] = TypeFld.NO_DISP;
       for( int i=0; i<ts.length; i++ )                // Insert and alpha sort 
         tfs = TypeFlds.add_sort(tfs,TypeFld.make(ids[i],ts[i]));
-      return TypeMemPtr.make(alias,TypeStruct.make_flds("", Type.ALL,tfs));
+      return TypeMemPtr.make(alias,TypeStruct.make_flds(Type.ALL,tfs));
     }
     // Get a flow type from a field id
     Type fld(String id, Syntax foo);
@@ -2529,15 +2529,13 @@ public class HM {
         if( tstr==null ) {
           // Returning a high version of struct
           Type.RECURSIVE_MEET++;
-          tstr = TypeStruct.malloc(false,"",Type.ALL.oob(is_open()),TypeFlds.get(0));
+          tstr = TypeStruct.malloc(false,Type.ALL.oob(is_open()),TypeFlds.get(0));
           if( _args!=null ) {
             for( String fld : _args.keySet() )
-              if( fld.endsWith(":") ) tstr._clz = fld; // Move a nomative tag into the clz field
-              else tstr.add_fld(TypeFld.malloc(fld));
+              tstr.add_fld(TypeFld.malloc(fld));
             ADUPS.put(_uid,tstr); // Stop cycles
             for( String id : _args.keySet() )
-              if( !Util.eq(id,tstr._clz) )
-                tstr.get(id).setX(arg(id)._as_flow(syn,deep)); // Recursive
+              tstr.get(id).setX(arg(id)._as_flow(syn,deep)); // Recursive
           }
           // update root args of an open HM struct, needs a type-flow type
           // that allows fields to be added

@@ -564,7 +564,7 @@ public abstract class PrimNode extends Node {
     @Override public TypeNil apply( TypeNil[] args ) { throw unimpl(); }
     @Override public Type value() {
       if( !(val(1) instanceof TypeMemPtr tmp) ||
-          !Util.eq("str:",tmp._obj._clz) )
+          !tmp.is_str() )
         return val(1).oob(TypeInt.INT64);
       return tmp.oob(TypeInt.INT64);
     }

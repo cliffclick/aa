@@ -507,6 +507,8 @@ public class TestNodeSmall {
     dsp_file.close();
     // Return the fptr to keep all alive
     ScopeNode env = new ScopeNode(null,ctl,mem,bind,dsp_file_ptr,dsp_file).init();
+    Env.ROOT.set_def(AA.MEM_IDX,Env.MEM_0);
+    Env.ROOT.set_def(AA.REZ_IDX,dsp_file);
 
     Node[] nodes = new Node[]{ctl,mem,rpc,dsp_prims,dsp_file,dsp_file_ptr,dsp_file_mem,fun,parm_mem,parm_dsp_ptr,ret,fptr,bind,env};
 

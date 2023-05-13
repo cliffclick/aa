@@ -124,7 +124,8 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public static TypeMemPtr make_str(String s) { return make_str(TypeInt.con(s.length()>0 ? s.charAt(0):0)); }
   public static TypeMemPtr make_str(Type t) { return make_str(BitsAlias.make0(STR_ALIAS),t); }
   public static TypeMemPtr make_str(BitsAlias aliases, Type t) {
-    TypeStruct ts = TypeStruct.make(TypeFld.make_tup(t, AA.ARG_IDX)).set_name("str:");
+    // Make a string object
+    TypeStruct ts = TypeStruct.make_test(TypeFld.make(".",TypeStruct.XSTRZ),TypeFld.make_tup(t, AA.ARG_IDX));
     return TypeMemPtr.make(aliases.test(0),aliases.clear(0),ts);
   }
   public boolean is_str() { return _obj.is_str(); }
@@ -142,7 +143,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     TypeStruct.RECURSIVE_MEET++;
     TypeFld[] flds = TypeFlds.make(DISP_FLD);
     TypeStruct.RECURSIVE_MEET--;
-    DISPLAY = TypeStruct.malloc(false,"",ALL,flds);
+    DISPLAY = TypeStruct.malloc(false,ALL,flds);
     DISPLAY_PTR = malloc(false,false,BitsAlias.NALL,DISPLAY);
     DISP_FLD.setX(DISPLAY_PTR);
     TypeStruct ds = Cyclic.install(DISPLAY);
@@ -181,14 +182,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   // Widens, not lowers.
   @Override public TypeMemPtr simple_ptr() {
     if( _obj.len()==0 ) return this;
-    return make_from(_obj.oob(TypeStruct.ISUSED).set_name(_obj._clz));
-  }
-  // Value types have a named prototype, and locally carry their fields in the
-  // Type, i.e. are not a simple_ptr.  Reference types also have a named
-  // prototype, but locally carry their fields in memory and so always use a
-  // simple ptr.
-  public boolean is_valtype() {
-    return _obj._clz.length()>0; // Not a simple ptr
+    return make_from(_obj.oob(TypeStruct.ISUSED));
   }
 
   public BitsAlias aliases() { return _aliases; }

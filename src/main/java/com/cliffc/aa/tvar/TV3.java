@@ -688,6 +688,7 @@ abstract public class TV3 implements Cloneable {
     case TypeMem tmem -> {
       TVMem mem = new TVMem();
       if( tmem == TypeMem.ALLMEM ) yield mem;
+      if( tmem == TypeMem.ANYMEM ) yield mem;
       if( tmem == TypeMem.EXTMEM ) yield mem;
       if( tmem == TypeMem.STRMEM ) {
         mem.unify(new TVPtr(BitsAlias.STR),new TVStruct(new String[0],new TV3[0],true),false);

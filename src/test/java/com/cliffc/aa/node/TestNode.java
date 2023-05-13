@@ -206,7 +206,6 @@ public class TestNode {
     RetNode ret = fun_plus.ret();
     CallNode call = new CallNode(false,null,_ins[0],unr,mem);
     call._val = TypeTuple.CALLE;
-    TypeStruct tname = TypeStruct.NAMEPT;
 
     // Testing 1 set of types into a value call.
     // Comment out when not debugging.
@@ -251,13 +250,6 @@ public class TestNode {
     test1monotonic(new AssertNode(_ins[1],_ins[2],TypeNil.XNIL   ,null));
     test1monotonic(new AssertNode(_ins[1],_ins[2],TypeFlt.FLT64  ,null));
 
-    // TODO: Needs a prototype name
-    //StructNode nnn2 = new StructNode(false,false,tname._name);
-    //nnn2.add_fld(TypeFld.NO_DSP,Env.XNIL,null);
-    //set_type(1,TypeNil.SCALAR);  nnn2.add_fld(TypeFld.make("x"),_ins[1],null);
-    //set_type(2,TypeNil.SCALAR);  nnn2.add_fld(TypeFld.make("y"),_ins[2],null);
-    //test1monotonic(nnn2);
-    //
     //assertEquals(0,_errs);
     throw com.cliffc.aa.AA.unimpl();
   }

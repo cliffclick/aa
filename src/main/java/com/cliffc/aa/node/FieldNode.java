@@ -249,8 +249,8 @@ public class FieldNode extends Node implements Resolvable {
     return switch( t ) {
     case TypeInt ti -> "int:";
     case TypeFlt tf -> "flt:";
-    case TypeMemPtr tmp -> { throw unimpl(); } // Fetch from tmp._obj._clz?
-    case TypeStruct ts -> ts._clz;
+    case TypeMemPtr tmp -> { throw unimpl(); } // Fetch from tmp._obj._flds[0]?
+    case TypeStruct ts -> { throw unimpl(); } // Fetch from _flds[0]?
     case TypeNil tn -> tn==TypeNil.NIL || tn==TypeNil.XNIL ? "int:" : null;
     default -> null;
     };

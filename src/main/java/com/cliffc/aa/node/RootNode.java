@@ -280,7 +280,7 @@ public class RootNode extends Node {
     if( ralias==BitsAlias.EMPTY ) return mem;
     if( ralias.above_center() ) return mem;
     if( ralias.test(BitsAlias.ALLX) ) return TypeMem.ALLMEM;
-    TypeMem rlive = TypeMem.make(ralias,TypeStruct.make(TypeFld.ANY_DSP));
+    TypeMem rlive = TypeMem.make(ralias,TypeStruct.ISUSED);
     return mem.meet(rlive);
   }
 

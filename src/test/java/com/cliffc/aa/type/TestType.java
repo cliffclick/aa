@@ -37,6 +37,7 @@ public class TestType {
   // Test for a collection of Strings, that toString and valueOf are a bijection
   @Test public void testValueOf() {
     //PrimNode.PRIMS();
+    Type ignore = TypeMemPtr.NO_DISP;
     String[] ss = new String[] {
       "Scalar",                 // The Scalars and Nils
       "nScalar",
@@ -58,7 +59,7 @@ public class TestType {
       "%[4][]?",                // BitsAlias.EXT yes nil
       "*[17](_, 1, ~Scalar)",   // Bare ~type as a field
       "[23]{any,3 -> *[7](3, Scalar) }", // Function returning a struct
-      "*[3](_, 0=PA:*[3]@{_; _*_=*[nALL]over35:(); f=flt64}, *[](), 2=PA)", // Struct with self-references
+      "*[3](_, 0=PA:*[3]@{_; _*_=*[nALL](); f=flt64}, *[](), 2=PA)", // Struct with self-references
       "PA:*[7]@{_; add=[23]{any,4 -> PA }; i=int64}", // Struct with function return self-reference
       "PA:*[18]@{_; n1=*[17]@{_; n1=PA; FB:v1=7}; FB}", // DUP Field
       "*[18](_, 0=PA:*[17](_, *[4,5]@{_; x=nScalar}, nScalar), 1=PA)",
@@ -157,9 +158,9 @@ public class TestType {
     int alias1 = BitsAlias.new_alias(alias0);
     int alias2 = BitsAlias.new_alias(alias1);
 
-    TypeMemPtr t0 = TypeMemPtr.make(alias2,TypeStruct.NAMEPT);
-    TypeMemPtr t1 = TypeMemPtr.make(alias1,TypeStruct.POINT );
-    TypeMemPtr t2 = TypeMemPtr.make(alias0,TypeStruct.ISUSED);
+    TypeMemPtr t0 = TypeMemPtr.make(alias2,TypeStruct.POINT3D);
+    TypeMemPtr t1 = TypeMemPtr.make(alias1,TypeStruct.POINT  );
+    TypeMemPtr t2 = TypeMemPtr.make(alias0,TypeStruct.ISUSED );
     assertTrue(t0.isa(t1));
     Type t02,t12,mt;
 
@@ -184,12 +185,12 @@ public class TestType {
     // Lattice around int8 and 0 is well-formed; exactly 3 edges, 3 nodes
     // Confirm lattice: {~i16 -> ~i8 -> 0 -> i8 -> i16 }
     // Confirm lattice: {        ~i8 -> 1 -> i8        }
-    TypeStruct  i16= TypeStruct.make(false,"int:",TypeInt.INT16 , TypeFlds.EMPTY);
-    TypeStruct  i8 = TypeStruct.make(false,"int:",TypeInt.INT8  , TypeFlds.EMPTY);
-    TypeStruct xi8 = TypeStruct.make( true,"int:",TypeInt.INT8.dual(), TypeFlds.EMPTY);
-    TypeStruct xi16= TypeStruct.make( true,"int:",TypeInt.INT16.dual(), TypeFlds.EMPTY);
-    TypeStruct z   = TypeStruct.make(false,"int:",TypeInt.con(0), TypeFlds.EMPTY);
-    TypeStruct o   = TypeStruct.make(false,"int:",TypeInt.TRUE  , TypeFlds.EMPTY);
+    TypeStruct  i16= TypeStruct.make(false,TypeInt.INT16 , TypeFlds.EMPTY);
+    TypeStruct  i8 = TypeStruct.make(false,TypeInt.INT8  , TypeFlds.EMPTY);
+    TypeStruct xi8 = TypeStruct.make( true,TypeInt.INT8.dual(), TypeFlds.EMPTY);
+    TypeStruct xi16= TypeStruct.make( true,TypeInt.INT16.dual(), TypeFlds.EMPTY);
+    TypeStruct z   = TypeStruct.make(false,TypeInt.con(0), TypeFlds.EMPTY);
+    TypeStruct o   = TypeStruct.make(false,TypeInt.TRUE  , TypeFlds.EMPTY);
     assertEquals(xi8,xi8.meet(xi16)); // ~i16-> ~i8
     //assertEquals( z ,z  .meet(xi8 )); // ~i8 ->  0 // No longer applies single redoing nil
     assertEquals(i8 ,i8 .meet(xi8 )); //  ~i8 -> i8
@@ -197,31 +198,32 @@ public class TestType {
     assertEquals( o ,o  .meet(xi8 )); // ~i8 ->  1
     assertEquals(i8 ,i8 .meet(o   )); //  1  -> i8
 
-    // Lattice around n:int8 and n:0 is well-formed; exactly 2 edges, 3 nodes
-    // Confirm lattice: {N:~i8 -> N:1 -> N:i8}
-    // Confirm lattice: {N:~i8 -> N:0 -> N:i8}
-    Type ni8 = i8.set_name("int:__test_enum:");
-    Type xni8= ni8.dual();      // dual name:int8
-    Type no  = o.set_name("int:__test_enum:");
-    Type nz  = z.set_name("int:__test_enum:");
-    assertEquals(no ,no .meet(xni8)); // N:~i8 -> N: 1
-    assertEquals(ni8,ni8.meet(no  )); // N:  1 -> N:i8
-    //assertEquals(nz ,nz .meet(xni8)); // N:~i8 -> N:0 // No longer applies single redoing nil
-    assertEquals(ni8,ni8.meet(xni8)); //   N:~i8 -> N:i8
-    assertEquals(no ,no .meet(xni8)); // n:1 & n:~i8 -> mixing 0 and 1
-
-    // Crossing lattice between named and unnamed ints
-    //      Confirm lattice: {~i8 -> N:~i8 -> 0 -> N:i8 -> i8; N:0 -> 0 }
-    // NOT: Confirm lattice: {N:~i8 -> ~i8; N:i8 -> i8 }
-    assertEquals(xni8,xni8.meet( xi8));//   ~i8 -> N:~i8
-    // No longer applies single redoing nil
-    //assertEquals(   z, z  .meet(xni8));// N:~i8 -> {0,1}??? When falling off from a Named Int, must fall below ANY constant to keep a true lattice
-    assertEquals( ni8, ni8.meet(  xi8));//   ~i8 -> N:i8
-    assertEquals(  i8,  i8.meet( ni8));// N: i8 ->   i8
-    assertEquals(   z,   z.meet(  nz));// N:  0 ->    0
-
-    assertEquals(xni8,xi8.meet(xni8)); // N:~i8 <- ~i8
-    assertEquals(o, o .meet(xni8)); // 1 & N:~i8
+    // TODO: Add XINTZ to the above.  Make a INT subclass.  Test.
+    //// Lattice around n:int8 and n:0 is well-formed; exactly 2 edges, 3 nodes
+    //// Confirm lattice: {N:~i8 -> N:1 -> N:i8}
+    //// Confirm lattice: {N:~i8 -> N:0 -> N:i8}
+    //Type ni8 = i8.set_name("int:__test_enum:");
+    //Type xni8= ni8.dual();      // dual name:int8
+    //Type no  = o.set_name("int:__test_enum:");
+    //Type nz  = z.set_name("int:__test_enum:");
+    //assertEquals(no ,no .meet(xni8)); // N:~i8 -> N: 1
+    //assertEquals(ni8,ni8.meet(no  )); // N:  1 -> N:i8
+    ////assertEquals(nz ,nz .meet(xni8)); // N:~i8 -> N:0 // No longer applies single redoing nil
+    //assertEquals(ni8,ni8.meet(xni8)); //   N:~i8 -> N:i8
+    //assertEquals(no ,no .meet(xni8)); // n:1 & n:~i8 -> mixing 0 and 1
+    //
+    //// Crossing lattice between named and unnamed ints
+    ////      Confirm lattice: {~i8 -> N:~i8 -> 0 -> N:i8 -> i8; N:0 -> 0 }
+    //// NOT: Confirm lattice: {N:~i8 -> ~i8; N:i8 -> i8 }
+    //assertEquals(xni8,xni8.meet( xi8));//   ~i8 -> N:~i8
+    //// No longer applies single redoing nil
+    ////assertEquals(   z, z  .meet(xni8));// N:~i8 -> {0,1}??? When falling off from a Named Int, must fall below ANY constant to keep a true lattice
+    //assertEquals( ni8, ni8.meet(  xi8));//   ~i8 -> N:i8
+    //assertEquals(  i8,  i8.meet( ni8));// N: i8 ->   i8
+    //assertEquals(   z,   z.meet(  nz));// N:  0 ->    0
+    //
+    //assertEquals(xni8,xi8.meet(xni8)); // N:~i8 <- ~i8
+    //assertEquals(o, o .meet(xni8)); // 1 & N:~i8
   }
 
   // Memory is on a different line than pointers.
@@ -234,10 +236,10 @@ public class TestType {
     Type bot = Type      .ALL;
 
     Type mem = TypeMem   .ALLMEM; // All memory
-    Type str = TypeStruct.POINT;  // All Strings
+    Type str = TypeStruct.POINT;  // All Points
     Type tup = TypeStruct.ISUSED; // All Structs
 
-    Type abc = TypeStruct.NAMEPT; // String constant
+    Type abc = TypeStruct.POINT3D; // Point constant
     Type zer = TypeNil.NIL;
     Type tp0 = TypeStruct.make_test("0",zer,TypeFld.Access.Final);  // tuple of a '0'
 
@@ -279,8 +281,8 @@ public class TestType {
     Type ptup0= TypeMemPtr.ISUSED0; // *[tup]?
     Type ptup = TypeMemPtr.ISUSED;  // *[tup]
 
-    TypeMemPtr pabc0= TypeMemPtr.make_nil(alias2,TypeStruct.NAMEPT); // *["abc"]?
-    TypeMemPtr pabc = TypeMemPtr.make    (alias2,TypeStruct.NAMEPT); // *["abc"]?
+    TypeMemPtr pabc0= TypeMemPtr.make_nil(alias2,TypeStruct.POINT3D); // *["abc"]?
+    TypeMemPtr pabc = TypeMemPtr.make    (alias2,TypeStruct.POINT3D); // *["abc"]?
     TypeMemPtr pzer = TypeMemPtr.make(BitsAlias.new_alias(BitsAlias.ALLX),TypeStruct.ISUSED);// *[(0)]
     TypeMemPtr pzer0= TypeMemPtr.make(true,pzer._aliases,TypeStruct.ISUSED);  // *[(0)]?
     Type nil = TypeNil.NIL, xnil = TypeNil.XNIL;
@@ -303,9 +305,9 @@ public class TestType {
     TypeStruct[] tos = new TypeStruct[alias2+1];
     tos[alias0] = TypeStruct.ISUSED;
     tos[alias1] = TypeStruct.POINT;
-    tos[alias2] = TypeStruct.NAMEPT;
-    TypeMem MEM = TypeMem.make0(tos);
-    TypeMem ABC = TypeMem.make(alias2,TypeStruct.NAMEPT.dual());
+    tos[alias2] = TypeStruct.POINT3D;
+    TypeMem MEM = TypeMem.make0(false,tos);
+    TypeMem ABC = TypeMem.make(alias2,TypeStruct.POINT3D.dual());
 
     // "~str+0" or "*[~0+4+]~str?" includes a nil, but nothing can fall to a nil
     // (breaks lattice)... instead they fall to their appropriate nil-type.
@@ -381,7 +383,7 @@ public class TestType {
     tos.setX(alias1,a1);
     tos.setX(alias2,a2);
     tos.setX(alias3,a3);
-    TypeMem mem = TypeMem.make0(tos.asAry()); // [7:@{c==nil},8:{c=*[0,9]},9:@{x==1}]
+    TypeMem mem = TypeMem.make0(false,tos.asAry()); // [7:@{c==nil},8:{c=*[0,9]},9:@{x==1}]
     // *[1]? join *[2] ==> *[1+2]?
     // {~0+7+8} -> @{ c== [~0] -> @{x==1}} // Retain precision after nil
     Type ptr12 = TypeNil.XNIL.join(TypeMemPtr.make(-alias1,a1.dual())).join( TypeMemPtr.make(-alias2,a2.dual()));
@@ -439,7 +441,7 @@ public class TestType {
     TypeFld fldv = TypeFld.make("v",TypeInt.INT64);
     Type.RECURSIVE_MEET++;
     TypeFld fldn0 = TypeFld.malloc("n");
-    TypeStruct ts0 = TypeStruct.malloc_test("",fldn0,fldv);
+    TypeStruct ts0 = TypeStruct.malloc_test(fldn0,fldv);
     final TypeMemPtr ts0ptr = TypeMemPtr.make(alias1,ts0);
     fldn0.setX(ts0ptr);
     Type.RECURSIVE_MEET--;
@@ -449,7 +451,7 @@ public class TestType {
     // - struct with pointer to self or nil
     Type.RECURSIVE_MEET++;
     TypeFld fldn1 = TypeFld.malloc("n");
-    TypeStruct ts1 = TypeStruct.malloc_test("",fldn1,fldv);
+    TypeStruct ts1 = TypeStruct.malloc_test(fldn1,fldv);
     final TypeMemPtr ts1ptr0 = TypeMemPtr.make_nil(alias1,ts1);
     fldn1.setX(ts1ptr0);
     Type.RECURSIVE_MEET--;
@@ -466,18 +468,18 @@ public class TestType {
     // AS0AS0AS0AS0AS0AS0...
     final int alias2 = BitsAlias.new_alias(BitsAlias.ALLX);
     TypeMemPtr tptr2= TypeMemPtr.make_nil(alias2,TypeStruct.ISUSED); // *[0,2]
-    TypeStruct ta2 = TypeStruct.make_test("A:",Type.ALL,TypeFld.make("n",tptr2),fldv); // @{n:*[0,2],v:int}
+    TypeStruct ta2 = TypeStruct.make_test(Type.ALL,TypeStruct.XINTZ,TypeFld.make("n",tptr2),fldv); // @{n:*[0,2],v:int}
 
     // Peel A once without the nil: Memory#3: A:@{n:*[2],v:int}
     // ASAS0AS0AS0AS0AS0AS0...
     final int alias3 = BitsAlias.new_alias(BitsAlias.ALLX);
     TypeMemPtr tptr3= TypeMemPtr.make(alias3,TypeStruct.ISUSED); // *[3]
-    TypeStruct ta3 = TypeStruct.make_test("A:",Type.ALL,TypeFld.make("n",tptr2),fldv); // @{n:*[0,2],v:int}
+    TypeStruct ta3 = TypeStruct.make_test(Type.ALL,TypeStruct.XINTZ,TypeFld.make("n",tptr2),fldv); // @{n:*[0,2],v:int}
 
     // Peel A twice without the nil: Memory#4: A:@{n:*[3],v:int}
     // ASASAS0AS0AS0AS0AS0AS0...
     final int alias4 = BitsAlias.new_alias(BitsAlias.ALLX);
-    TypeStruct ta4 = TypeStruct.make_test("A:",Type.ALL,TypeFld.make("n",tptr3),fldv); // @{n:*[3],v:int}
+    TypeStruct ta4 = TypeStruct.make_test(Type.ALL,TypeStruct.XINTZ,TypeFld.make("n",tptr3),fldv); // @{n:*[3],v:int}
 
     // Then make a MemPtr{3,4}, and ld - should be a PeelOnce
     // Starting with the Struct not the A we get:
@@ -490,19 +492,19 @@ public class TestType {
     tos[alias2]=ta2;
     tos[alias3]=ta3;
     tos[alias4]=ta4;
-    TypeMem mem234 = TypeMem.make0(tos);
+    TypeMem mem234 = TypeMem.make0(false,tos);
     TypeMemPtr ptr34 = (TypeMemPtr)TypeMemPtr.make(alias3,TypeStruct.ISUSED).meet(TypeMemPtr.make(alias4,TypeStruct.ISUSED));
 
     // Since hacking ptrs about from mem values, no cycles so instead...
     Type mta = mem234.ld(ptr34);
     //assertEquals(ta3,mta);
     TypeMemPtr ptr023 = (TypeMemPtr)TypeMemPtr.make_nil(alias2,TypeStruct.ISUSED).meet(TypeMemPtr.make(alias3,TypeStruct.ISUSED));
-    TypeStruct xta = TypeStruct.make_test("A:",Type.ALL,TypeFld.make("n",ptr023),fldv);
+    TypeStruct xta = TypeStruct.make_test(Type.ALL,TypeStruct.XINTZ,TypeFld.make("n",ptr023),fldv);
     assertEquals(xta,mta);
 
     // Mismatched Names in a cycle; force a new cyclic type to appear
     final int alias5 = BitsAlias.new_alias(BitsAlias.ALLX);
-    TypeStruct tfb = TypeStruct.make_test("B:",Type.ALL,TypeFld.make("n",TypeMemPtr.make_nil(alias5,TypeStruct.ISUSED)),TypeFld.make("v",TypeFlt.FLT64));
+    TypeStruct tfb = TypeStruct.make_test(Type.ALL,TypeStruct.XSTRZ,TypeFld.make("n",TypeMemPtr.make_nil(alias5,TypeStruct.ISUSED)),TypeFld.make("v",TypeFlt.FLT64));
     Type mtab = ta2.meet(tfb);
 
     // TODO: Needs a way to easily test simple recursive types
@@ -548,8 +550,8 @@ public class TestType {
     Type.RECURSIVE_MEET++;
     TypeFld fldn1 = TypeFld.malloc("n");
     TypeFld fldn4 = TypeFld.malloc("n");
-    TypeStruct as1 = TypeStruct.malloc_test("A:",fldn1,fldvi);
-    TypeStruct bs4 = TypeStruct.malloc_test("B:",fldn4,fldvf);
+    TypeStruct as1 = TypeStruct.malloc_test(TypeStruct.XINTZ,fldn1,fldvi);
+    TypeStruct bs4 = TypeStruct.malloc_test(TypeStruct.XSTRZ,fldn4,fldvf);
     TypeMemPtr ap5 = TypeMemPtr.make(alias,as1);
     TypeMemPtr bp2 = TypeMemPtr.make(alias,bs4);
     fldn1.setX(bp2);
@@ -582,7 +584,7 @@ public class TestType {
     int alias0 = BitsAlias.ALLX;
     int alias1 = BitsAlias.new_alias(alias0);
     int alias2 = BitsAlias.new_alias(alias1);
-    TypeMemPtr t2 = TypeMemPtr.make(alias2,TypeStruct.NAMEPT); // ABCPTR
+    TypeMemPtr t2 = TypeMemPtr.make(alias2,TypeStruct.POINT3D); // ABCPTR
     TypeMemPtr t1 = TypeMemPtr.make(alias1,TypeStruct.POINT ); // STRPTR
     TypeMemPtr t0 = TypeMemPtr.make(alias0,TypeStruct.ISUSED);
     // All are ISA
@@ -604,9 +606,9 @@ public class TestType {
     TypeStruct[] tos = new TypeStruct[alias2+1];
     tos[alias0] = TypeStruct.ISUSED;
     tos[alias1] = TypeStruct.POINT;
-    tos[alias2] = TypeStruct.NAMEPT;
-    TypeMem mem = TypeMem.make0(tos);
-    TypeMem abc = TypeMem.make(alias2,TypeStruct.NAMEPT.dual());
+    tos[alias2] = TypeStruct.POINT3D;
+    TypeMem mem = TypeMem.make0(false,tos);
+    TypeMem abc = TypeMem.make(alias2,TypeStruct.POINT3D.dual());
     TypeMem[] tmems = new TypeMem[]{
       TypeMem.ANYMEM,             // [1:~obj,3:~obj,5:~obj ]
       abc,                        // [1:~obj,3:~obj,5:"abc"]

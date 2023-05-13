@@ -626,7 +626,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     // Some more complex exciting types
     for( String s : new String[]{
         "*[3](_, 1, ~Scalar)",
-        "*[3](_, 0=PA:*[6]@{_; _*_=*[nALL]over35:(); f=flt64}, *[](), 2=PA)",
+        "*[3](_, 0=PA:*[6]@{_; _*_=*[nALL](); f=flt64}, *[](), 2=PA)",
         "PA:*[3]@{_; add=[4]{any,4 -> PA }; i=int64}",
       })
       _push(ts,Type.valueOf(s));
@@ -810,13 +810,13 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       case '0','1','2','3','4','5','6','7','8','9','-' -> num();
       case '"'  -> throw unimpl(); // parse string
       case '~' -> type(dup,-1 < _x++,fld_num);
-      case ':' -> type(dup,_x++ < -1 | any,-2); // DUP::@{} dup struct with no clz, skip the extra ':' and normal struct parse
-      case '#' ->     TypeRPC   .valueOf(this,dup,any) ;
-      case '{' ->     TypeTuple .valueOf(this,dup,any) ;
-      case '*' ->     TypeMemPtr.valueOf(this,dup,any);
-      case '(' ->     TypeStruct.valueOf(this,dup,any,true );
-      case '@' ->     TypeStruct.valueOf(this,dup,any,false);
-      case '%' ->     TypeNil   .valueOf(this,dup,any);
+      case ':' -> throw unimpl();
+      case '#' -> TypeRPC   .valueOf(this,dup,any) ;
+      case '{' -> TypeTuple .valueOf(this,dup,any) ;
+      case '*' -> TypeMemPtr.valueOf(this,dup,any);
+      case '(' -> TypeStruct.valueOf(this,dup,any,true );
+      case '@' -> TypeStruct.valueOf(this,dup,any,false);
+      case '%' -> TypeNil   .valueOf(this,dup,any);
       case '[' -> peek("[[")
         ? TypeMem.valueOf(this,dup,any)
         : TypeFunPtr.valueOf(this,dup,any);
@@ -824,12 +824,9 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         // These strings all start with an id.
         // DUP:type     // defining a repeated type
         // DUP          // using    a repeated type
-        // CLZ:@{}  or CLZ:()  // Struct clazz
-        // int:1 or flt:3.14   // Shortcut for int/flt
-        // DUP:CLZ:@{}  // Both are possible
+        // int:1 or flt:3.14   // Shortcut for wrapped int/flt
         // FLD=type     // A field label
         // NIL          // Any one of several constant types
-        int oldx = _x;
         String id = id();
 
         // duplicate! - Use a repeat name
@@ -838,28 +835,12 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
 
         // Leading id, then ':'.  Can be
         // DUP:non_struct_type or
-        // CLZ:struct_type or
-        // DUP:CLZ:struct_type or
         // int:1 or
         // DUP:int:1 or
         // flt:3.14 or
         // DUP:flt:3.14
         if( peek(':') ) {
           int oldx2 = _x;
-          // To resolve ambiguity with TypeStruct parse, look for a 2nd clz id and ':'.
-          // "str:(97)"    - struct clz "str" with leading char 'a'
-          // "SA::(97)"    - struct no clz, with DUP "SA:"
-          // "SA:str:(97)" - struct clz "str" with DUP "SA:"
-          // "SA:int64"    - DUP "SA:" with some other type
-          id();                // Skip clz parse
-          if( !peek(':') && !eos() ) {   // Distinguish "CLZ:@{}" from "DUP:int64" or "DUP:fld_name=int64"
-            char c = at(_x);   // Single "clz:" then tuple or struct
-            // Check for DUP:CLZ:struct_type
-            if( c=='(' ) { _x=oldx; yield TypeStruct.valueOf(this,dup,any,true ); }
-            if( c=='@' ) { _x=oldx; yield TypeStruct.valueOf(this,dup,any,false); }
-            // DUP "id": with some other type
-          }
-          _x=oldx2;             // Unwind back to after "DUP:"
 
           // Shortcut for ints/flts.  Check for "int:int_type" or "flt:flt_type"
           if( Util.eq(id,"int") ) {

@@ -1400,7 +1400,7 @@ public class Parse implements Comparable<Parse> {
     }
     TypeFld[] tflds = TypeFlds.get(flds.len());
     System.arraycopy(flds._es,0,tflds,0,flds._len);
-    TypeStruct ts = TypeStruct.make_flds("",Type.ANY,tflds);
+    TypeStruct ts = TypeStruct.make_flds(Type.ANY,tflds);
     return TypeMemPtr.make(BitsAlias.INTX,ts);
   }
 
@@ -1418,7 +1418,7 @@ public class Parse implements Comparable<Parse> {
   private Type ttuple() {
     int oldx = _x;
     peek('(');
-    TypeStruct ts = TypeStruct.malloc(false,"",Type.ALL,TypeFlds.EMPTY);
+    TypeStruct ts = TypeStruct.malloc(false,Type.ALL,TypeFlds.EMPTY);
     while(true) {
       Type t = type();
       if( t==null ) { _x=oldx; return ts.free(null); }

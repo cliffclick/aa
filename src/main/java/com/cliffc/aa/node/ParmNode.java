@@ -48,7 +48,8 @@ public class ParmNode extends Node {
         Env.ROOT.deps_add(this); // Depends on Root
       } else if( _t==TypeFunPtr.THUNK ) {
         // Unknown callers can return an error
-        t = TypeFunPtr.make(false,false,true,Env.ROOT.rfidxs(),3,Env.ROOT.ext_caller(),Type.ALL);
+        BitsFun fidxs = Env.ROOT.rfidxs();
+        t = TypeFunPtr.make(false,false,true,fidxs,3,Env.ROOT.ext_caller(),Type.ALL.oob(fidxs.above_center()));
       } else if( _tvar==null || is_prim() ) {
         t = _t;
       } else {
@@ -62,15 +63,17 @@ public class ParmNode extends Node {
   
     // Merge all live paths
     for( int i=1; i<len; i++ ) {
-      CallNode call = (CallNode)fun.in(i);
-      call.deps_add(this);
-      Type tcall = call._val, t2;
-      // Parm RPC grabs the RPC from the Call directly, not any Call value 
-      if( _idx==0 ) t2 = TypeRPC.make(call._rpc);
-      else if( !(tcall instanceof TypeTuple tt) ) t2 = tcall.oob(_t);
-      else if( call._is_copy || _idx < call.nargs() ) t2 = tt.at(_idx);
-      else t2 = Type.ALL;       // Error, arg out of range
-      t = t.meet(t2);
+      if( fun.in(i) instanceof CallNode call ) {
+        call.deps_add(this);
+        Type tcall = call._val, t2;
+        // Parm RPC grabs the RPC from the Call directly, not any Call value 
+        if( _idx==0 ) t2 = TypeRPC.make(call._rpc);
+        else if( !(tcall instanceof TypeTuple tt) ) t2 = tcall.oob(_t);
+        else if( call._is_copy || _idx < call.nargs() ) t2 = tt.at(_idx);
+        else t2 = Type.ALL;       // Error, arg out of range
+        t = t.meet(t2);
+      } else
+        return _t;
     }
 
     return t.join(_t);
