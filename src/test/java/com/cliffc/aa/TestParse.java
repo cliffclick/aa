@@ -30,7 +30,10 @@ public class TestParse {
 
     DO_GCP=true;
     DO_HMT=false;
-    RSEED=0;
+    RSEED=3;
+    // Simple primitive expansion, pre-combo
+    test("1+2", "3", "3");
+
     test("fun = { fx x -> x ? fx( fun(fx,x-1) ) : 1 }; fun(2._*_._, 99)",
             "int64",
             "int64");

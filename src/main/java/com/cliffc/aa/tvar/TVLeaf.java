@@ -9,7 +9,7 @@ import com.cliffc.aa.type.TypeNil;
 
 import static com.cliffc.aa.AA.unimpl;
 
-public class TVLeaf extends TV3 {
+public class TVLeaf extends TVExpanding {
 
   @Override boolean can_progress() { return false; }
   
@@ -28,9 +28,15 @@ public class TVLeaf extends TV3 {
     // union call done for them.
     return this.union(that);
   }
-
+  
   // Leafs have no subclass specific parts to union.
   @Override public void _union_impl(TV3 that) { }
+
+  // Merge deps from this into that
+  @Override public void _union_deps(TV3 that) {
+    if( that._deps==null ) that._deps = _deps;
+    else that._deps.addAll(_deps);
+  }
 
   // Always unifies
   @Override boolean _trial_unify_ok_impl( TV3 tv3, boolean extras ) { return true; }

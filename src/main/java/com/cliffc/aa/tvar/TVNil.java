@@ -21,7 +21,6 @@ public class TVNil extends TV3 {
   public TVNil( TV3 tv3 ) { super(true,tv3); }
   public TVLeaf not_nil() { return (TVLeaf)arg(0); }
 
-  @Override boolean can_progress() { return false; }
   @Override int eidx() { return TVErr.XNIL; }
   @Override public TVNil as_nil() { return this; }
   
@@ -83,11 +82,8 @@ public class TVNil extends TV3 {
   @Override boolean _trial_unify_ok_impl( TV3 that, boolean extras ) {
     if( that instanceof TVNil ) return true;
     if( that instanceof TVBase base && base._t.must_nil() )
-      return true;
-    // Nil-check against the instance, not the clazz
-    if( that instanceof TVClz clz ) 
-      return _trial_unify_ok_impl(clz.rhs(),extras);
     // Some primitives will unify with NIL
+      return true;
     if( that instanceof TVStruct ts ) {
       //TV3 self = ts.arg(TypeStruct.SELF);
       //if( self==null ) return false;

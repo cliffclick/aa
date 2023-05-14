@@ -25,7 +25,7 @@ public interface Resolvable {
   // - 2+ two or more choices; resolve is ambiguous
   
   // "Pattern leafs" are just any TV3 that, if it changes might effect the match outcome.
-  static Ary<TV3> PAT_LEAFS = new Ary<>(new TV3[1],0);
+  static Ary<TVExpanding> PAT_LEAFS = new Ary<>(new TVExpanding[1],0);
   
   default boolean trial_resolve( boolean outie, TV3 pattern, TVStruct lhs, TVStruct rhs, boolean test ) {
     assert !rhs.is_open() && is_resolving();
@@ -36,8 +36,8 @@ public interface Resolvable {
     String lab = null;
     for( int i=0; i<rhs.len(); i++ ) {
       String id = rhs.fld(i);
-      assert !is_resolving(id);
-      if( !is_resolving(id) && pattern.trial_unify_ok(rhs.arg(id),false) ) {
+      if( is_resolving(id) ) continue;
+      if( pattern.trial_unify_ok(rhs.arg(id),false) ) {
         if( lab==null ) lab=id;   // No choices yet, so take this one
         else {
           // 2nd choice; ambiguous; either cannot resolve (yet), or too late
@@ -55,7 +55,6 @@ public interface Resolvable {
 
     String old_fld = resolve(lab);      // Change field label
     boolean old = lhs.del_fld(old_fld); // Remove old label from lhs, if any
-    assert !old;
     TV3 prior = lhs.arg(lab);           // Get prior matching lhs label, if any
     if( prior==null ) {
       assert old;               // Expect an unresolved label
@@ -68,7 +67,7 @@ public interface Resolvable {
     return true;              // Progress
   }
 
-  static boolean add_pat_leaf(TV3 leaf) {
+  static boolean add_pat_leaf(TVExpanding leaf) {
     if( PAT_LEAFS.find(leaf)== -1 )
       PAT_LEAFS.add(leaf);
     return true;

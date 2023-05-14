@@ -84,10 +84,6 @@ public class CastNode extends Node {
     if( maynil instanceof TVStruct )
       return notnil.unify(maynil,test);
 
-    if( maynil instanceof TVClz )
-      // TODO: probably should be the CLZ RHS
-      return notnil.unify(maynil,test);
-
     // Already an expanded nilable
     if( maynil instanceof TVNil tmaynil && tmaynil.not_nil() == notnil )
       return false;

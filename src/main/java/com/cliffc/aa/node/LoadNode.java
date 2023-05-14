@@ -250,8 +250,14 @@ public class LoadNode extends Node {
   
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
-    // Force self to Clz:[@{...},@{...}]
-    return new TVClz(new TVStruct(true),new TVStruct(true));
+    // Force mem input to be a mem
+    TV3 t0 = mem().set_tvar(); 
+    if( !(t0 instanceof TVMem) )
+      t0.unify(new TVMem(),false);
+    // Address needs to be one of a TVPtr or TVBase, but cannot tell.
+    // IF its a TVBase, we can get the CLZ ptr from it.
+    // Self is just an open TVStruct
+    return new TVStruct(true);
   }
 
   // Incoming address is
@@ -265,43 +271,41 @@ public class LoadNode extends Node {
   // - Either part might be empty & closed (use same single instance, Combo:TVStruct EMPTY).
   
   @Override public boolean unify( boolean test ) {
-    TVClz self = tvar().as_clz();
-    TV3 adr = adr().tvar();
+    TVStruct self = (TVStruct)tvar();
     TVMem mem = (TVMem)mem().tvar();
+    TV3 adr = adr().tvar();
     return switch( adr ) {
     // Stall until forced to Base,Clz or Err of same
     case TVLeaf leaf   -> leaf.deps_add_deep(this);
     //case TVStruct tstr -> self.unify(adr, test); // Load from prototype, just pass-thru
-    case TVClz tclz    -> do_clz (self,tclz,test);
+    //case TVClz tclz    -> do_clz (self,tclz,test);
     case TVBase base   -> do_base(self,base,test);
-    case TVErr err     -> {
-      if( err.as_int()!=null ) yield do_base(self,err.as_int(),test);
-      if( err.as_flt()!=null ) yield do_base(self,err.as_flt(),test);
-      if( err.as_clz()!=null ) yield do_clz (self,err.as_clz(),test);
-      yield err.unify(self,test);// Pass error along
-    }
+    //case TVErr err     -> {
+    //  if( err.as_int()!=null ) yield do_base(self,err.as_int(),test);
+    //  if( err.as_flt()!=null ) yield do_base(self,err.as_flt(),test);
+    //  if( err.as_clz()!=null ) yield do_clz (self,err.as_clz(),test);
+    //  yield err.unify(self,test);// Pass error along
+    //}
     //case TVNil tnil    -> tnil.deps_add_deep(this); // Stall until this settles out
     //case TVPtr ptr     -> mem.unify(ptr,self,test);
     default -> throw unimpl();
     };
   }
 
-  private static boolean do_base(TVClz self, TVBase base, boolean test) {
+  private static boolean do_base(TVStruct self, TVBase base, boolean test) {
     // Bases field their prototype via the TypeNil type, and from there the CLZ
     StructNode proto = FieldNode.clz_node(base._t);
-    TVClz clz = proto.tvar().as_clz();
-    // A prototypes CLZ has no CLZ itself (or perhaps ClazzClazz?) but the
-    // plain RHS carries the Loads CLZ.  So self.clz vs proto.clz.rhs
-    return self.clz().unify(clz.rhs(), test); // Unify against primitive CLZ
+    TVStruct base_clz = proto.tvar().as_struct();
+    return self.unify(base_clz, test); // Unify against primitive CLZ
   }
-  
-  private boolean do_clz(TVClz self, TVClz clz, boolean test) {
-    // Loading from a prior struct case: "e0._*_._".  No "Load" action is
-    // required, but the parser inserts in case the prior was a ptr.
-    if( clz.arg(1) instanceof TVStruct )
-      return self.unify(clz,test);
-    //  mem.unify(tclz.ptr(),self,test); // Load from prototype
-    throw unimpl();
-  }
+  //
+  //private boolean do_clz(TVClz self, TVClz clz, boolean test) {
+  //  // Loading from a prior struct case: "e0._*_._".  No "Load" action is
+  //  // required, but the parser inserts in case the prior was a ptr.
+  //  if( clz.arg(1) instanceof TVStruct )
+  //    return self.unify(clz,test);
+  //  //  mem.unify(tclz.ptr(),self,test); // Load from prototype
+  //  throw unimpl();
+  //}
   
 }

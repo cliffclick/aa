@@ -22,7 +22,7 @@ Merged at Phi and Parm.
 Passed in as arg to Call & Fun.
 Store maps a TVPtr to a TVStruct (unifies on TVPtr hit).
  */
-public class TVMem extends TV3 {
+public class TVMem extends TVExpanding {
   private Ary<TVPtr> _ptrs; // Map pointers to Structs
 
   public TVMem() { _ptrs = new Ary<>(new TVPtr[1],0); }
@@ -82,7 +82,7 @@ public class TVMem extends TV3 {
   // Unify rec against all aliases.  Also, fold up any unified ptrs.
   boolean _unify( TVPtr ptr, TV3 rec, boolean test ) {
     assert !ptr.unified() && !rec.unified();
-    assert rec instanceof TVLeaf || rec instanceof TVStruct || (rec instanceof TVClz clz && clz.rhs() instanceof TVStruct);
+    assert rec instanceof TVLeaf || rec instanceof TVStruct;
     int idx = find(ptr);
     if( idx != -1 ) 
       return arg(idx)._unify(rec,test); // Unify the mem struct

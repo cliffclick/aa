@@ -1,7 +1,9 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.node.*;
+import com.cliffc.aa.node.ConNode;
+import com.cliffc.aa.node.Node;
+import com.cliffc.aa.node.FreshNode;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 
@@ -49,11 +51,6 @@ abstract public class TV3 implements Cloneable {
   private static int CNT=1;
   public int _uid=CNT++; // Unique dense int, used in many graph walks for a visit bit
 
-  // This is used Fresh against that.
-  // If it ever changes (add_fld to TVStruct, or TVLeaf unify), we need to re-Fresh the deps.
-  static Ary<DelayFresh> DELAY_FRESH  = new Ary<>(new DelayFresh[1],0);
-  static Ary<TVStruct> DELAY_RESOLVE  = new Ary<>(new TVStruct[1],0);
-
   // Disjoint Set Union set-leader.  Null if self is leader.  Not-null if not a
   // leader, but pointing to a chain leading to a leader.  Rolled up to point
   // to the leader in many, many places.  Classic U-F cost model.
@@ -70,19 +67,6 @@ abstract public class TV3 implements Cloneable {
   boolean _may_nil;
   // Cannot NOT be a nil (e.g. used as ptr.fld)
   boolean _use_nil;
-
-  // This TV3 is used Fresh against another TV3.
-  // If it ever changes, we need to re-Fresh the dependents.
-  // - Leaf expands/unions
-  // - Base type drops
-  // - Struct adds/dels fields
-  // - Ptr becomes may/use-nil
-  // - Lambda becomes may/use-nil
-  private Ary<DelayFresh> _delay_fresh;
-
-  // This Leaf/Base is used to resolve a field.
-  // If it ever changes, we need to re-check the resolves
-  private Ary<TVStruct> _delay_resolve;
 
   // Nodes to put on a worklist, if this TV3 is modified.
   UQNodes _deps;
@@ -151,7 +135,6 @@ abstract public class TV3 implements Cloneable {
   public TVLambda as_lambda() { throw unimpl(); }
   public TVBase   as_int   () { throw unimpl(); }
   public TVBase   as_flt   () { throw unimpl(); }
-  public TVClz    as_clz   () { throw unimpl(); }
   public TVNil    as_nil   () { throw unimpl(); }
 
   private long dbl_uid(TV3 t) { return dbl_uid(t._uid); }
@@ -186,20 +169,11 @@ abstract public class TV3 implements Cloneable {
     if( that._may_nil && that._use_nil ) throw unimpl();
     _union_impl(that); // Merge subclass specific bits into that
     that.widen(_widen,false);
-    // TODO: Also reverse widen???
-    // widen.(that._widen,false) ???
 
     // Move delayed-fresh & delay-resolve updates onto the not-delayed list
-    that.merge_delay_fresh(_delay_fresh);
-    that.move_delay();
+    _union_delay(that);
     // Add Node updates to _work_flow list
-    if( that instanceof TVLeaf ) {
-      if( that._deps==null ) that._deps = _deps;
-      else that._deps.addAll(_deps);
-    } else {
-      this._deps_work_clear();    // This happens before the unification
-      that._deps_work_clear();
-    }
+    that._union_deps(this);
     // Actually make "this" into a "that"
     _uf = that;                 // U-F union
     return true;
@@ -208,6 +182,23 @@ abstract public class TV3 implements Cloneable {
   // Merge subclass specific bits
   abstract public void _union_impl(TV3 that);
 
+  public void _union_delay(TV3 that) { }
+
+  // Push all dependent nodes onto the worklist
+  public void _union_deps(TV3 that) {
+    this._deps_work_clear();    // This happens before the unification
+    that._deps_work_clear();
+  }
+
+  void merge_delay_fresh(Ary<TVExpanding.DelayFresh>dfs) {
+    if( dfs==null || dfs.len()==0 ) return;
+    if( _args==null ) return;
+    for( int i=0; i<len(); i++ )
+      if( arg(i) != null )
+        arg(i).merge_delay_fresh(dfs);
+  }
+  
+  
   // -------------------------------------------------------------
   // Classic Hindley-Milner structural unification.
   // Returns false if no-change, true for change.
@@ -291,12 +282,13 @@ abstract public class TV3 implements Cloneable {
   // the same as calling 'fresh' then 'unify', without the clone of 'this'.
   // Returns progress.
   static private final IdentityHashMap<TV3,TV3> VARS = new IdentityHashMap<>();
-  static DelayFresh FRESH_ROOT;
+  // A per-fresh-unify DelayFresh
+  static TVExpanding.DelayFresh FRESH_ROOT;
 
   public boolean fresh_unify( FreshNode frsh, TV3 that, TV3[] nongen, boolean test ) {
     if( this==that ) return false;
     assert VARS.isEmpty() && DUPS.isEmpty() && FRESH_ROOT ==null;
-    FRESH_ROOT = new DelayFresh(this,that,nongen,frsh);
+    FRESH_ROOT = new TVExpanding.DelayFresh(this,that,nongen,frsh);
     boolean progress = _fresh_unify(that,test);
     VARS.clear();  DUPS.clear();
     FRESH_ROOT = null;
@@ -319,8 +311,8 @@ abstract public class TV3 implements Cloneable {
     if( nongen_in() ) return vput(that,_unify(that,test));
 
     // LHS leaf, RHS is unchanged but goes in the VARS
-    if( this instanceof TVLeaf ) { if( !test ) add_delay_fresh(); return vput(that,false); }
-    if( that instanceof TVLeaf ) // RHS is a tvar; union with a deep copy of LHS
+    if( this instanceof TVLeaf lf ) { if( !test ) lf.add_delay_fresh(); return vput(that,false); }
+    if( that instanceof TVLeaf lf ) // RHS is a tvar; union with a deep copy of LHS
       return test || vput(that,that.union(_fresh()));
 
     // Special handling for nilable
@@ -431,6 +423,7 @@ abstract public class TV3 implements Cloneable {
     return t;
   }
 
+  void add_delay_fresh(){}          // Related via fresh, so track updates
 
   // -----------------
   static final VBitSet ODUPS = new VBitSet();
@@ -478,7 +471,7 @@ abstract public class TV3 implements Cloneable {
     if( TDUPS.putIfAbsent(duid,this)!=null )
       return true;              // Visit only once, and assume will resolve
     if( this instanceof TVLeaf leaf ) return Resolvable.add_pat_leaf(leaf); // No error
-    if( that instanceof TVLeaf ) return true; // No error
+    if( that instanceof TVLeaf leaf ) return Resolvable.add_pat_leaf(leaf); // No error
     // Nil can unify with ints,flts,ptrs
     if( this instanceof TVNil ) return this._trial_unify_ok_impl(that,extras);
     if( that instanceof TVNil ) return that._trial_unify_ok_impl(this,extras);
@@ -522,139 +515,6 @@ abstract public class TV3 implements Cloneable {
   }
 
   // -----------------
-  // Delayed-Fresh-Unify of LHS vs RHS.  LHS was a leaf and so imparted no
-  // structure to RHS.  When LHS changes to a non-leaf, the RHS needs to
-  // re-Fresh-Unify.
-  static class DelayFresh {
-    TV3 _lhs, _rhs;
-    TV3[] _nongen;
-    DelayFresh _next;
-    FreshNode _frsh;
-    private DelayFresh(TV3 lhs, TV3 rhs, TV3[] nongen, FreshNode frsh) {
-      assert !lhs.unified() && !rhs.unified();
-      _lhs=lhs;
-      _rhs=rhs;
-      _nongen=nongen;
-      _frsh = frsh;
-    }
-    boolean update() {
-      if( !_lhs.unified() && ! _rhs.unified() ) return false;
-      _lhs = _lhs.find();
-      _rhs = _rhs.find();
-      return true;              // Requires dup-check
-    }
-    boolean eq( DelayFresh df ) {
-      if( this==df ) return true;
-      if( _lhs!=df._lhs || _rhs!=df._rhs ) return false;
-      if( _frsh!=df._frsh ) return false;
-      assert eq_nongen(df);
-      return true;
-    }
-    // Deep equality check nongen
-    private boolean eq_nongen( DelayFresh df ) {
-      if( _nongen == df._nongen ) return true;
-      if( _nongen.length != df._nongen.length ) return false;
-      for( int i=0; i<_nongen.length; i++ )
-        if( _nongen[i].find()!=df._nongen[i].find() )
-          return false;
-      return true;
-    }
-    @Override public String toString() {
-      return "delayed_fresh_unify["+_lhs+" to "+_rhs+", "+_nongen+"]";
-    }
-  }
-
-  // Used by FreshNode to mark delay_fresh on all nongen parts
-  public void make_nongen_delay(TV3 rhs, TV3[] nongen, FreshNode frsh ) {
-    DelayFresh df = new DelayFresh(this,rhs,nongen,frsh);
-    for( TV3 ng : nongen )
-      ng.add_delay_fresh(df);
-  }
-
-  // Called from Combo after a Node unification; allows incremental update of
-  // Fresh unification.
-  public static void do_delay_fresh() {
-    while( DELAY_FRESH.len() > 0 ) {
-      DelayFresh df = DELAY_FRESH.pop();
-      df._lhs.find().fresh_unify(df._frsh,df._rhs.find(),df._nongen,false);
-      df._frsh.add_flow();
-    }
-  }
-  public static void do_delay_resolve() {
-    while( DELAY_RESOLVE.len() > 0 )
-      ((TVStruct)DELAY_RESOLVE.pop().find()).trial_resolve_all();
-  }
-
-  // Move delayed-fresh updates onto not-delayed update list.
-  void move_delay() {
-    _move_delay(DELAY_FRESH  ,_delay_fresh  );
-    _move_delay(DELAY_RESOLVE,_delay_resolve);
-    if( _may_nil && _use_nil && _widen==2 && !can_progress() ) {
-      if( _delay_fresh  !=null ) _delay_fresh  .clear();
-      if( _delay_resolve!=null ) _delay_resolve.clear();
-    }
-  }
-  // Strip dups
-  static void _move_delay( Ary dst, Ary src ) {
-    if( src!=null )
-      for( Object x : src )
-        if( dst.find(x)== -1 )
-          dst.push(x);
-  }
-
-  void merge_delay_fresh(Ary<DelayFresh>dfs) {
-    if( dfs==null || dfs.len()==0 ) return;
-    if( _delay_fresh==null ) _delay_fresh = dfs;
-    else {
-      if( _delay_fresh.find(dfs.at(0)) != -1 ) return;
-      _delay_fresh.addAll(dfs);
-    }
-    if( _args==null ) return;
-    for( int i=0; i<len(); i++ )
-      if( arg(i)!=null )
-        arg(i).merge_delay_fresh(dfs);
-  }
-
-  // True if this TV3 can progress in-place.
-  // Leafs unify and so become some other thing - so cannot update-in-place.
-  // Bases can fall, until the Type hits bottom, e.g. TypeInt.INT64.
-  // Structs can add fields while open, can close, and then can remove fields
-  // until empty.
-  abstract boolean can_progress();
-
-  // Record that on the delayed fresh list and return that.  If `this` ever
-  // unifies to something, we need to Fresh-unify the something with `that`.
-  void add_delay_fresh() { if( FRESH_ROOT!=null ) add_delay_fresh(FRESH_ROOT); }
-  void add_delay_fresh( DelayFresh df ) {
-    df.update();
-    // Lazy make a list to hold
-    if( _delay_fresh==null ) _delay_fresh = new Ary<>(new DelayFresh[1],0);
-    // Dup checks: no dups upon insertion, but due to later unification we
-    // might get more dups.  Every time we detect some progress, re-filter for
-    // dups.
-    for( int i=0; i<_delay_fresh._len; i++ ) {
-      DelayFresh dfi = _delay_fresh.at(i);
-      if( dfi.update() ) {      // Progress?  Do a dup-check
-        for( int j=0; j<i; j++ ) {
-          if( _delay_fresh.at(j) == dfi )
-            throw unimpl();     // 'i' became a dup, remove 'j'
-        }
-      }
-      // Inserting ROOT, unless a dup
-      if( df.eq(_delay_fresh.at(i)) )
-        return;                 // Dup, do not insert
-    }
-    _delay_fresh.push(df);
-    assert _delay_fresh.len()<=10; // Switch to worklist format
-  }
-
-  void add_delay_resolve(TVStruct tvs) {
-    if( _delay_resolve==null ) _delay_resolve = new Ary<>(new TVStruct[1],0);
-    if( _delay_resolve.find(tvs)== -1 )
-      _delay_resolve.push(tvs);
-  }
-
-  // -----------------
   public static TV3 from_flow(Type t) {
     return switch( t ) {
     case TypeFunPtr tfp -> {
@@ -679,9 +539,7 @@ abstract public class TV3 implements Cloneable {
       throw unimpl();
     }
     case TypeInt ti ->  TVBase.make(ti);
-      //new TVClz((TVPtr)PrimNode.PINT.tvar(),TVBase.make(ti));
     case TypeFlt tf -> TVBase.make(tf);
-      //new TVClz((TVPtr)PrimNode.PFLT.tvar(),TVBase.make(tf));
     case TypeNil tn -> tn == TypeNil.NIL
       ? new TVNil( new TVLeaf() )
       : TVBase.make(tn);
@@ -876,8 +734,6 @@ abstract public class TV3 implements Cloneable {
       TV3 tv3 = (TV3)clone();
       tv3._uid = CNT++;
       tv3._args = _args==null ? null : _args.clone();
-      tv3._delay_fresh = null;
-      tv3._delay_resolve = null;
       return tv3;
     } catch(CloneNotSupportedException cnse) {throw unimpl();}
   }
@@ -886,7 +742,6 @@ abstract public class TV3 implements Cloneable {
     CNT=0;
     TVField.reset_to_init0();
     TVStruct.reset_to_init0();
-    DELAY_FRESH.clear();
-    DELAY_RESOLVE.clear();
+    TVExpanding.reset_to_init0();
   }
 }

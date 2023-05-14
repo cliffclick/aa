@@ -12,8 +12,6 @@ public class TVField extends TV3 {
   
   public TVField( TV3 ptr ) { super(ptr); }
 
-  @Override boolean can_progress() { throw unimpl(); }
-
   @Override int eidx() { throw unimpl(); }
 
   // Unresolved field names; typically "&nnn" where `nnn` is the FieldNode id

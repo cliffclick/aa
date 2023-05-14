@@ -188,7 +188,7 @@ public abstract class Combo {
     // Work down list until all reachable nodes types quit falling
     Node n;
     while( (n=Env.GVN.pop_flow()) != null ) {
-      cnt++; assert cnt < 10000; // Infinite loop check
+      cnt++; assert cnt < 20000; // Infinite loop check
       Type told = n._val;
 
       // Forwards flow

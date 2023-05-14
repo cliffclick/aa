@@ -24,19 +24,18 @@ public class FieldNode extends Node implements Resolvable {
   // Field being loaded from a TypeStruct.  If "_", the field name is inferred
   // from amongst the field choices.  If not present, then error.
   public       String _fld;
-  // TRUE:  Field lookup is strictly in the clazz and not locally.
-  // FALSE: Can be either/unknown
-  public final boolean _clz;
+  // Value is TypeStruct and not a TypeNil
+  public final boolean _str;
   // Where to report errors
   public final Parse _bad;
 
-  public FieldNode(Node struct, String fld, boolean clz, Parse bad) {
+  public FieldNode(Node struct, String fld, boolean str, Parse bad) {
     super(OP_FIELD,struct);
     // A plain "_" field is a resolving field
     _fld = resolve_fld_name(fld);
     _bad = bad;
-    _clz = clz;
-    assert !(clz && is_resolving()); // One or the other for now
+    _str = str;
+    assert !(str && is_resolving()); // One or the other for now
   }
   // A plain "_" field is a resolving field
   private String resolve_fld_name(String fld) { return Util.eq(fld,"_") ? ("&"+_uid).intern() : fld; }
@@ -66,30 +65,38 @@ public class FieldNode extends Node implements Resolvable {
       boolean lo = _tvar==null || Combo.HM_AMBI;
       if( t instanceof TypeStruct ts )
         return lo ? meet(ts) : join(ts);
-      return t.oob(TypeNil.SCALAR);
+      return oob_ret(t);
     }
 
-    // Clazz or local struct ?
-    Type tstr = null;
-    if( _clz ) {
+    // Field from Base looks in the base CLZ
+    Type tstr = t;
+    if( t instanceof TypeInt || t instanceof TypeFlt ) {
       StructNode clazz = clz_node(t);
-      if( clazz !=null ) {
-        tstr = clazz._val;      // Value from clazz
-        // Add a dep edge to the clazz, so value changes propagate permanently
-        if( len()==2 ) assert in(1)==clazz;
-        else add_def(clazz);
-      } // Else clazz not defined, no clazz, no struct to field from
-    } else {
-      tstr = t;                 // Value direct from input
+      if( clazz ==null ) return oob_ret(t);
+      tstr = clazz._val;        // Value from clazz
+      // Add a dep edge to the clazz, so value changes propagate permanently
+      if( len()==2 ) assert in(1)==clazz;
+      else add_def(clazz);
     }
     // Hit on a field
-    if( tstr instanceof TypeStruct ts && ts.find(_fld)!= -1 )
-      return ts.at(_fld).join(TypeNil.SCALAR).meet(TypeNil.XSCALAR);
-    return (tstr==null ? t : tstr).oob(TypeNil.SCALAR);
+    if( tstr instanceof TypeStruct ts ) {
+      if( ts.find(_fld)!= -1 ) return ts.at(_fld);
+      // Miss on closed structs looks at superclass.
+      // Miss on open structs dunno if the field will yet appear
+      if( ts._def==TypeStruct.ISUSED && Util.eq(ts.fld(0)._fld,".") )
+        throw unimpl();        
+    }
+    return oob_ret(tstr);
   }
 
-  private static Type meet(TypeStruct ts) { Type t = TypeNil.XSCALAR; for( TypeFld t2 : ts )  t = t.meet(t2._t); return t; }
+  private Type oob_ret(Type t) { return t.oob(_str ? TypeStruct.ISUSED : TypeNil.SCALAR); }
+
+  private static Type meet(TypeStruct ts) {
+    if( ts.len()==0 ) return ts._def;
+    Type t = TypeNil.XSCALAR; for( TypeFld t2 : ts )  t = t.meet(t2._t); return t;
+  }
   private static Type join(TypeStruct ts) {
+    if( ts.len()==0 ) return ts._def;
     Type t = TypeNil.SCALAR;
     for( TypeFld t2 : ts )
       t = t.join( t2._t instanceof TypeFunPtr tfp2  ? tfp2.make_from(tfp2.fidxs().dual()) : t2._t );
@@ -106,8 +113,8 @@ public class FieldNode extends Node implements Resolvable {
       deps_add(def);
       return TypeStruct.UNUSED;
     }
-    // Clazz load, the instance is normal-live
-    //if( _clz && def==in(0) ) return TypeStruct.ISUSED;
+    // Struct load, the instance is normal-live
+    if( _str && def==in(0) ) return TypeStruct.ISUSED;
     // Otherwise normal fields and clazz fields are field-alive.
     return TypeStruct.UNUSED.replace_fld(TypeFld.make(_fld,Type.ALL));
   }
@@ -146,7 +153,7 @@ public class FieldNode extends Node implements Resolvable {
     // Field from a Bind of a Struct (overload)
     if( _live==Type.ALL && in(0) instanceof BindFPNode bind && bind.fp() instanceof StructNode sn ) {
       assert bind._over;
-      Node fp = new FieldNode(sn,_fld,_clz,_bad).init();
+      Node fp = new FieldNode(sn,_fld,false,_bad).init();
       return new BindFPNode(fp,bind.dsp(),false).init();
     }
     
@@ -165,7 +172,7 @@ public class FieldNode extends Node implements Resolvable {
       if( fcnt>0 ) {
         Node lphi = new PhiNode(TypeNil.SCALAR,phi._badgc,phi.in(0));
         for( int i=1; i<phi.len(); i++ )
-          lphi.add_def(Env.GVN.add_work_new(new FieldNode(phi.in(i),_fld,_clz,_bad)));
+          lphi.add_def(Env.GVN.add_work_new(new FieldNode(phi.in(i),_fld,false,_bad)));
         return lphi;
       }
     }
@@ -176,73 +183,65 @@ public class FieldNode extends Node implements Resolvable {
   @Override public boolean has_tvar() { return true; }
   
   @Override public TV3 _set_tvar() {
-    if( is_resolving() )
+    TVLeaf self = new TVLeaf(); 
+    _tvar = self;               // Stop cycles
+    // Force input to be a struct
+    TV3 t0 = in(0).set_tvar();
+    TVStruct ts;
+    if( t0 instanceof TVStruct ts0 ) ts = ts0;
+    else t0.unify(ts=new TVStruct(true),false);
+    // If resolving, force insert
+    if( is_resolving() ) {
       TVField.FIELDS.put(_fld,this); // Track resolving field names
-    // Force CLZ:[@{...},@{...}].    
-    // Under SOME situations but not ALL, we can tell were to put the field
-    // (either CLZ or instance struct).  Since we sometimes need to wait, we
-    // put that logic in the unify call.
-
-    // Next New Think:
-    // - must jam the unify-able type in, without a proper field name.
-    // - so bring back the "&123" field names.
-    // - if not flagged clz/instance and both are open, still dunno where to go
-    // - can temp put it in e.g. rhs, and claim it floats until resolved
-    // - or gets a clz/inst user.
-    // - opers alreayd flagged as clz
-    // 
-    
-    in(0).set_tvar().unify( new TVClz(new TVStruct(true),new TVStruct(true)), false);
-    return new TVLeaf();
+      ts.add_fld(_fld,self);
+      // No need to try-resolve or deal with recursive set_tvar already
+      // resolving!  The Field's normal unify will attempt a resolve which will
+      // set delay_resolve as needed on any complex shape 'self' has already
+      // been unified to.
+    }
+    return _tvar;
   }
 
   @Override public boolean unify( boolean test ) {
-    TVClz clz = tvar(0).as_clz();  TV3 fld;
-    // Where is the field?
-    // RHS  - if !_clz && resolving
-    if( is_resolving() ) return do_resolve(clz,test);
-    // OR   - if  found in one or other
-    if( (fld=clz.clz().arg(_fld))!=null ) return do_clz(fld,clz,test);
-    if( (fld=clz.rhs().arg(_fld))!=null ) return do_rhs(fld,clz,test);
-    // CLZ  - If  _clz
-    if( _clz )
-      return clz.clz().is_open() ? add_clz(clz,test) : do_miss(clz,test);
-    // STALL- if !found in either and both are open
-    // CLZ  - Only CLZ is open so must be there
-    if( clz.clz().is_open() )
-      return clz.rhs().is_open() ? false : add_clz(clz,test);
-    // RHS  - Only RHS is open so must be there
-    // MISS - if !found in either and both are closed
-    return clz.rhs().is_open() ? add_rhs(test) : do_miss(clz,test);
+    TVStruct tstr = tvar(0).as_struct();  TV3 fld;
+    // Attempt resolve
+    if( is_resolving() ) return do_resolve(tstr,test);
+    // If the field is in the struct, unify and done
+    if( (fld=tstr.arg(_fld))!=null ) return do_fld(fld,test);
+
+    if( tstr.is_open() ) return tstr.add_fld(_fld,tvar());
+    //  if struct closed, follow superchain
+    //  struct is end-of-super-chain, miss_field
+
+    
+    throw unimpl();
   }    
 
-  private boolean do_clz( TV3 fld, TVClz clz, boolean test ) {
-    assert clz.rhs().arg(_fld)==null;
+  //private boolean do_clz( TV3 fld, TVClz clz, boolean test ) {
+  //  assert clz.rhs().arg(_fld)==null;
+  //  return tvar().unify(fld,test);
+  //}
+  private boolean do_fld( TV3 fld, boolean test ) {
     return tvar().unify(fld,test);
   }
-  private boolean do_rhs( TV3 fld, TVClz clz, boolean test ) {
-    assert !_clz && clz.clz().arg(_fld)==null;
-    return tvar().unify(fld,test);
-  }
-  private boolean add_clz( TVClz clz, boolean test ) {
-    assert clz.rhs().arg(_fld)==null;
-    return test || clz.clz().add_fld(_fld,tvar());
-  }
-  private boolean add_rhs( boolean test ) {
-    throw unimpl();
-  }
-  private boolean do_resolve( TVClz clz, boolean test ) {
-    assert !_clz;
+  //private boolean add_clz( TVClz clz, boolean test ) {
+  //  assert clz.rhs().arg(_fld)==null;
+  //  return test || clz.clz().add_fld(_fld,tvar());
+  //}
+  //private boolean add_rhs( boolean test ) {
+  //  throw unimpl();
+  //}
+  private boolean do_resolve( TVStruct tstr, boolean test ) {
     if( Combo.HM_AMBI ) return false; // Failed earlier, can never resolve
-    boolean progress = try_resolve(clz.rhs(),test);
+    boolean progress = try_resolve(tstr,test);
     if( is_resolving() || test ) return progress; // Failed to resolve, or resolved but testing
     // Known to be resolved and in RHS
-    do_rhs(clz.rhs().arg(_fld),clz,test);
+    do_fld(tstr.arg(_fld),test);
     return true;                // Progress
   }
-  private boolean do_miss(TVClz clz, boolean test) {
-    return tvar().unify_err(resolve_failed_msg(),clz,test);
-  }
+  //private boolean do_miss(TVClz clz, boolean test) {
+  //  return tvar().unify_err(resolve_failed_msg(),clz,test);
+  //}
 
 
   public static String clz_str(Type t) {
@@ -250,7 +249,6 @@ public class FieldNode extends Node implements Resolvable {
     case TypeInt ti -> "int:";
     case TypeFlt tf -> "flt:";
     case TypeMemPtr tmp -> { throw unimpl(); } // Fetch from tmp._obj._flds[0]?
-    case TypeStruct ts -> { throw unimpl(); } // Fetch from _flds[0]?
     case TypeNil tn -> tn==TypeNil.NIL || tn==TypeNil.XNIL ? "int:" : null;
     default -> null;
     };
@@ -262,14 +260,14 @@ public class FieldNode extends Node implements Resolvable {
     return clz==null ? null : Env.PROTOS.get(clz);  // CLZ from instance
   }
 
-  private static TV3 CLZ;
+  //private static TV3 CLZ;
   boolean clz_lookup( boolean test ) {
-    StructNode proto = clz_node(val(0)); // Existing prototypes for int/flt/named-clazz-types
-    if( proto!=null )                    // Known clazz
-      { CLZ = proto.tvar(); return false; }
-
-    // Unknown inferred clazz
-    if( test ) return true;        // Always progress
+    //StructNode proto = clz_node(val(0)); // Existing prototypes for int/flt/named-clazz-types
+    //if( proto!=null )                    // Known clazz
+    //  { CLZ = proto.tvar(); return false; }
+    //
+    //// Unknown inferred clazz
+    //if( test ) return true;        // Always progress
     //TVStruct obj = new TVStruct(new String[]{_fld}, new boolean[]{true}, new TV3[]{tvar()}, true);
     //CLZ = new TVClz(obj, new TVLeaf());
     //tvar(0).unify(CLZ, test);
@@ -323,20 +321,21 @@ public class FieldNode extends Node implements Resolvable {
       }
     } else fld = _fld;
     boolean oper = fld!=null && Oper.is_oper(fld); // Is an operator?
-    if( oper && !_clz ) {
-      String clz = FieldNode.clz_str(fldn.val(0));
-      if( clz!=null ) fld = clz+fld; // Attempt to be clazz specific operator
-    }
-    TVStruct tvs = match_tvar() instanceof TVClz tv0 ? tv0.rhs() : null;
-    String err, post;
-    if( !is_resolving() ) { err = "Unknown"; post=" in %: "; }
-    else if( tvs!=null && ambi(tvar(),tvs) ) { err = "Ambiguous, matching choices %"; post = " vs "; }
-    else if( tvs==null || tvs.len()==0 ) { err = "Unable to resolve"; post=": "; }
-    else { err = "No choice % resolves"; post=": "; }
-    if( fld!=null )
-      err += (oper ? " operator '" : " field '.")+fld+"'";
-    err += post;
-    return err;
+    //if( oper && !_clz ) {
+    //  String clz = FieldNode.clz_str(fldn.val(0));
+    //  if( clz!=null ) fld = clz+fld; // Attempt to be clazz specific operator
+    //}
+    //TVStruct tvs = match_tvar() instanceof TVClz tv0 ? tv0.rhs() : null;
+    //String err, post;
+    //if( !is_resolving() ) { err = "Unknown"; post=" in %: "; }
+    //else if( tvs!=null && ambi(tvar(),tvs) ) { err = "Ambiguous, matching choices %"; post = " vs "; }
+    //else if( tvs==null || tvs.len()==0 ) { err = "Unable to resolve"; post=": "; }
+    //else { err = "No choice % resolves"; post=": "; }
+    //if( fld!=null )
+    //  err += (oper ? " operator '" : " field '.")+fld+"'";
+    //err += post;
+    //return err;
+    throw unimpl();
   }
   
   // True if ambiguous (more than one match), false if no matches.

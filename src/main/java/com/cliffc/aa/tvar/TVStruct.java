@@ -11,7 +11,7 @@ import static com.cliffc.aa.AA.unimpl;
 /** A type struct.
  *
  */
-public class TVStruct extends TV3 {
+public class TVStruct extends TVExpanding {
   private static final String [] FLDS0 = new String [0];
   private static final TV3    [] TVS0  = new TV3    [0];
   // Empty closed struct.  Used for e.g. no-class Structs.
@@ -27,17 +27,17 @@ public class TVStruct extends TV3 {
 
   private int _max;             // Max set of in-use flds/args
   
-  // Made from a StructNode; fields are known, so this is closed
-  public TVStruct( String[] flds, TV3[] tvs ) { this(flds,tvs,false); }
   // No fields
   public TVStruct(boolean open) { this(FLDS0,TVS0,open); }
   // Normal StructNode constructor, all Leaf fields
-  public TVStruct( Ary<String> flds ) {  this(flds.asAry(),leafs(flds.len()),false);  }
+  public TVStruct( Ary<String> flds ) {  this(flds.asAry(),leafs(flds.len()));  }
   private static TV3[] leafs(int len) {
     TV3[] ls = new TV3[len];
     for( int i=0; i<len; i++ ) ls[i] = new TVLeaf();
     return ls;
   }
+  // Made from a StructNode; fields are known, so this is closed
+  public TVStruct( String[] flds, TV3[] tvs ) { this(flds,tvs,false); }
   // Made from a Field or SetField; fields are unknown so this is open
   public TVStruct( String[] flds, TV3[] tvs, boolean open ) {
     super(tvs);
@@ -47,6 +47,12 @@ public class TVStruct extends TV3 {
     assert tvs.length==_max;
   }
 
+  // Clazz for this struct, or null for ClazzClazz
+  public TVStruct clz() {
+    assert Util.eq(_flds[0],".");
+    return (TVStruct)arg(0);
+  }
+  
   @Override boolean can_progress() { throw unimpl(); }
   
   public boolean add_fld(String fld, TV3 tvf) {
@@ -149,8 +155,6 @@ public class TVStruct extends TV3 {
       String key = thsi._flds[i];
       int ti = Util.find(that._flds,key);
       if( ti == -1 ) {          // Missing field in that
-        assert !Resolvable.is_resolving(key);
-        //if( Resolvable.is_resolving(key) ) continue; // Do not add or remove until resolved
         if( open || Resolvable.is_resolving(key) )
           that.add_fld(key,fthis); // Add to RHS
         else
@@ -299,6 +303,14 @@ public class TVStruct extends TV3 {
   boolean is_str_clz() { return Util.find(_flds,"#_"  ) >= 0; }
   boolean is_math_clz(){ return Util.find(_flds,"pi"  ) >= 0; }
   boolean is_top_clz() { return Util.find(_flds,"math") >= 0; }
+  boolean is_tup() {
+    if( _max==0 ) return true;
+    boolean label=true;
+    for( String fld : _flds )
+      if( fld.charAt(0)=='&' ) return false;
+      else if( Character.isDigit(fld.charAt(0)) ) label=false;
+    return !label;
+  }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     if( _args==null  ) return sb.p(_open ? "(...)" : "()");
@@ -308,7 +320,7 @@ public class TVStruct extends TV3 {
     if( !prims && is_math_clz()) return sb.p("math");
     if( !prims && is_top_clz() ) return sb.p("TOP");
     
-    boolean is_tup = _max==0 || Character.isDigit(_flds[0].charAt(0));
+    boolean is_tup = is_tup();
     sb.p(is_tup ? "(" : "@{");
     for( int idx : sorted_flds() ) {
       if( !debug && Util.eq("^",_flds[idx]) ) continue; // Displays are private by default

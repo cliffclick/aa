@@ -94,7 +94,14 @@ public abstract class Node implements Cloneable, IntSupplier {
   abstract public boolean has_tvar();
   public TV3 tvar(int x) { return in(x).tvar(); } // nth TV2
   // Initial set of type variables; lazy; handles cycles.
-  public final TV3 set_tvar() { assert has_tvar();  return _tvar==null ? (_tvar = _set_tvar()) : tvar(); }
+  public final TV3 set_tvar() {
+    assert has_tvar();          // Sanity check
+    if( _tvar!=null ) return tvar();
+    TV3 tvar = _set_tvar();
+    if( _tvar==tvar ) return tvar;
+    assert _tvar==null; // Still a null: this is a recursive check that _tvar is not assigned twice
+    return (_tvar=tvar);        // Assign and return
+  }
   // Initial compute of type variables.  No set, no smarts.  Overridden.
   TV3 _set_tvar() { return new TVLeaf(); }
 
@@ -582,8 +589,8 @@ public abstract class Node implements Cloneable, IntSupplier {
       return;
     if( unify(false) ) {
       assert !_tvar.find().unify(old.find(),true);// monotonic: unifying with the result is no-progress
-      TV3.do_delay_fresh();
-      TV3.do_delay_resolve();
+      TVExpanding.do_delay_fresh();
+      TVExpanding.do_delay_resolve();
       // HM changes; push related neighbors
       for( Node def : _defs ) if( def!=null && def.has_tvar() ) def.add_flow();
       for( Node use : _uses ) if(              use.has_tvar() ) use.add_flow();

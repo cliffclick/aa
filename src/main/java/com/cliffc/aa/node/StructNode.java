@@ -71,7 +71,7 @@ public class StructNode extends Node {
   // _paren_start, and the args are in _fld_starts.
   // Example: "  ( x,y)\n"
   // Example:  012345678
-  // _paren_start  ==2, offset to the openning paren
+  // _paren_start  ==2, offset to the opening paren
   // _fld_starts[0]==4, offset to start of zeroth arg
   // _fld_starts[1]==6, offset to start of oneth arg
   private final Parse _paren_start;
@@ -132,6 +132,7 @@ public class StructNode extends Node {
     unelock();                  // Changes hash
     _closed=true;
     Env.GVN.add_reduce(this);   // Rehash
+    add_flow();
     return this;
   }
 
@@ -198,13 +199,14 @@ public class StructNode extends Node {
   // multi-testing
   @Override void walk_reset0( ) {
     Node c;
-    while( !(c=_defs.last()).is_prim() ) {
-      _flds.pop();
-      _accesses.pop();
-      _fld_starts.pop();
-      _defs.pop();
-      c._uses.del(this);
-    }
+    if( _defs._len>0 )
+      while( !(c=_defs.last()).is_prim() ) {
+        _flds.pop();
+        _accesses.pop();
+        _fld_starts.pop();
+        _defs.pop();
+        c._uses.del(this);
+      }
   }
   
   // Gather inputs into a TypeStruct.
@@ -249,15 +251,10 @@ public class StructNode extends Node {
   
   @Override public boolean has_tvar() { return true; }
 
-  // Self is always Clz:[ @{CLZ} : @{instance} ]
+  // Self is always @{flds...}
   @Override TV3 _set_tvar() {
     TVStruct ts = new TVStruct(_flds);
-    TVStruct clz = _clz.isEmpty()
-      ? TVStruct.EMPTY
-      // PROTOs Clz.clz is always TVStruct.EMPTY (or ClazzClazz?).
-      // The proto Clz.rhs carries the type description.
-      : Env.PROTOS.get(_clz).set_tvar().as_clz().rhs();
-    _tvar = new TVClz( clz, ts ); // Close cycle
+    _tvar = ts;                 // Close cycle
     // Unify all fields
     for( int i=0; i<len(); i++ )
       ts.arg(i).unify(in(i).set_tvar(),false); // Unify (possible cycle)

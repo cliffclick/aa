@@ -7,7 +7,7 @@ import com.cliffc.aa.util.VBitSet;
 
 import static com.cliffc.aa.AA.unimpl;
 
-public class TVBase extends TV3 {
+public class TVBase extends TVExpanding {
   public Type _t;  
   private TVBase( Type t ) {
     assert t!=Type.ALL;
@@ -77,8 +77,7 @@ public class TVBase extends TV3 {
   @Override boolean _trial_unify_ok_impl( TV3 tv3, boolean extras ) {
     TVBase that = (TVBase)tv3; // Invariant when called
     // Unifies OK if bases will unify, e.g. both ints or both floats
-    if( _t.getClass() != that._t.getClass() ) return false;
-    return Resolvable.add_pat_leaf(this);
+    return _t.getClass() == that._t.getClass();
   }
 
   // Unifies if same and cannot fall

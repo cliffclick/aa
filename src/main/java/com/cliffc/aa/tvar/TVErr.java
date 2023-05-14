@@ -16,11 +16,10 @@ public class TVErr extends TV3 {
   static final int XFUN=1;
   static final int XINT=2;
   static final int XFLT=3;
-  static final int XCLZ=4;
-  static final int XNIL=5;
-  static final int XPTR=6;
-  static final int XMEM=7;
-  static final int XMAX=8;
+  static final int XNIL=4;
+  static final int XPTR=5;
+  static final int XMEM=6;
+  static final int XMAX=7;
   
   // Errors other than structural unify errors.
   public Ary<String> _errs;
@@ -31,20 +30,13 @@ public class TVErr extends TV3 {
   @Override public TVLambda as_lambda() { return (TVLambda)arg(XFUN); }
   @Override public TVBase   as_int   () { return (TVBase  )arg(XINT); }
   @Override public TVBase   as_flt   () { return (TVBase  )arg(XFLT); }
-  @Override public TVClz    as_clz   () { return (TVClz   )arg(XCLZ); }
   @Override public TVNil    as_nil   () { return (TVNil   )arg(XNIL); }
-
-  @Override boolean can_progress() { throw unimpl(); }
 
   @Override int eidx() { throw unimpl(); }
 
   public TV3 make_struct() {
     assert _args[XSTR]==null;
     return (_args[XSTR] = new TVLeaf());
-  }
-  public TVLeaf make_clz() {
-    assert _args[XCLZ]==null;
-    return (TVLeaf)(_args[XCLZ] = new TVLeaf());
   }
   
   @Override TV3 find_nil() { return this; }

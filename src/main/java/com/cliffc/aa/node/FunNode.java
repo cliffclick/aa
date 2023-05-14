@@ -64,9 +64,6 @@ public class FunNode extends Node {
   public int _fidx;         // Unique number for this piece of code
   public int _nargs;        // Number of arguments
 
-  // H-M non-generative set, only active during Combo.
-  public TV3[] _nongen;
-
   private byte _cnt_size_inlines; // Count of size-based inlines; prevents infinite unrolling via inlining
   public static int _must_inline; // Used for asserts
 

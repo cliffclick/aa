@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVLeaf;
+import com.cliffc.aa.tvar.TVExpanding;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFunPtr;
 import com.cliffc.aa.type.TypeNil;
@@ -54,7 +55,9 @@ public class FreshNode extends Node {
       _nongen = new TV3[len() - 1];
       for( int i = 1; i < len(); i++ )
         _nongen[i - 1] = in(i).set_tvar();
-      id().set_tvar().make_nongen_delay(tv,_nongen,this);
+      TV3 id = id().set_tvar();
+      if( id instanceof TVExpanding tex )
+        tex.make_nongen_delay(tv,_nongen,this);
     }
     return tv;
   }

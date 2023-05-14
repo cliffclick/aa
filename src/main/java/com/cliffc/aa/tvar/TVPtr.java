@@ -27,8 +27,6 @@ public class TVPtr extends TV3 {
     _aliases = aliases;
   }
 
-  @Override boolean can_progress() { return false; }
-
   @Override int eidx() { return TVErr.XPTR; }
 
   // Make the leader a nilable version of 'this' child

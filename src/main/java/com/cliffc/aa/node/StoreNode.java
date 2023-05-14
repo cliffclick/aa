@@ -225,10 +225,11 @@ public class StoreNode extends Node {
     if( !(mem instanceof TVMem   ) )  mem.unify(new TVMem(),false);
     if( !(adr instanceof TVPtr   ) )  adr.unify(new TVPtr(),false);
     if( !(rez instanceof TVStruct) )  {
-      if( (rez instanceof TVClz clz) )  { // CLZ of a Struct is OK
-        if( !(clz.rhs() instanceof TVStruct) )
-          throw unimpl();
-      } else rez.unify(new TVStruct(new String[0], new TV3[0], true),false);
+      //if( (rez instanceof TVClz clz) )  { // CLZ of a Struct is OK
+      //  if( !(clz.rhs() instanceof TVStruct) )
+      //    throw unimpl();
+      //} else rez.unify(new TVStruct(new String[0], new TV3[0], true),false);
+      throw unimpl();
     }
     return mem;
   }

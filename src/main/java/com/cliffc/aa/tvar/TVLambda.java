@@ -36,7 +36,6 @@ public class TVLambda extends TV3 {
   public TVLambda clr_dsp() { _args[DSP_IDX] = new TVLeaf(); return this; }
 
   @Override public TVLambda as_lambda() { return this; }
-  @Override boolean can_progress() { return false; }
 
   @Override int eidx() { return TVErr.XFUN; }
 
