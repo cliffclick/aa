@@ -49,8 +49,7 @@ public class TVStruct extends TVExpanding {
 
   // Clazz for this struct, or null for ClazzClazz
   public TVStruct clz() {
-    assert Util.eq(_flds[0],".");
-    return (TVStruct)arg(0);
+    return (TVStruct)arg(".");
   }
   
   @Override boolean can_progress() { throw unimpl(); }
@@ -172,7 +171,6 @@ public class TVStruct extends TVExpanding {
     for( int i=0; i<that._max; i++ ) {
       String key = that._flds[i];
       if( thsi.arg(key)==null ) {                    // Missing field in this
-        assert !Resolvable.is_resolving(key);
         if( Resolvable.is_resolving(key) ) continue; // Do not remove until resolved
         if( is_open() ) thsi.add_fld(key,that.arg(i)); // Add to LHS
         else thsi.del_fld(key); // Drop from RHS
@@ -289,7 +287,8 @@ public class TVStruct extends TVExpanding {
   @Override Type _as_flow( Node dep ) { throw unimpl(); }
   @Override void _widen( byte widen ) {
     for( int i=0; i<len(); i++ )
-      arg(i).widen(widen,false);
+      if( !Resolvable.is_resolving(_flds[i]) )
+        arg(i).widen(widen,false);
   }
 
   @Override public TVStruct copy() {
@@ -297,18 +296,30 @@ public class TVStruct extends TVExpanding {
     st._flds = _flds.clone();
     return st;
   }
+
+  @Override public VBitSet _get_dups_impl(VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
+    for( int i=0; i<len(); i++ ) {
+      if( !debug && Util.eq("^",_flds[i]) ) continue; // Display is private, not shown
+      if( !debug && Resolvable.is_resolving(_flds[i]) ) continue;
+      _args[i]._get_dups(visit,dups,debug,prims);
+    }
+    return dups;
+  }
+
   
   boolean is_int_clz() { return Util.find(_flds,"!_"  ) >= 0; }
   boolean is_flt_clz() { return Util.find(_flds,"sin" ) >= 0; }
   boolean is_str_clz() { return Util.find(_flds,"#_"  ) >= 0; }
   boolean is_math_clz(){ return Util.find(_flds,"pi"  ) >= 0; }
   boolean is_top_clz() { return Util.find(_flds,"math") >= 0; }
-  boolean is_tup() {
+  boolean is_tup(boolean debug) {
     if( _max==0 ) return true;
     boolean label=true;
-    for( String fld : _flds )
-      if( fld.charAt(0)=='&' ) return false;
-      else if( Character.isDigit(fld.charAt(0)) ) label=false;
+    for( int i=0; i<len(); i++ ) {
+      char c = _flds[i].charAt(0);
+      if( debug && c=='&' ) return false;
+      else if( Character.isDigit(c) ) label=false;
+    }
     return !label;
   }
   
@@ -319,14 +330,17 @@ public class TVStruct extends TVExpanding {
     if( !prims && is_str_clz() ) return sb.p("str");
     if( !prims && is_math_clz()) return sb.p("math");
     if( !prims && is_top_clz() ) return sb.p("TOP");
-    
-    boolean is_tup = is_tup();
+
+    TV3 clz = debug_arg(".");
+    if( clz!=null ) clz._str(sb,visit,dups,debug,prims).p(":");    
+    boolean is_tup = is_tup(debug);
     sb.p(is_tup ? "(" : "@{");
     for( int idx : sorted_flds() ) {
       if( !debug && Util.eq("^",_flds[idx]) ) continue; // Displays are private by default
-      if( !is_tup ) {                                   // Skip tuple field names
+      if( !debug && Resolvable.is_resolving(_flds[idx]) ) continue;
+      if( Util.eq(".",_flds[idx]) ) continue; // CLZ already printed up front
+      if( !is_tup ) {                         // Skip tuple field names
         sb.p(_flds[idx]);
-        // sb.p(debug && _pins[idx] ? "#":"");
         sb.p("= ");
       }
       if( _args[idx] == null ) sb.p("_");

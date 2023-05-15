@@ -74,14 +74,11 @@ public class BindFPNode extends Node {
   @Override public boolean unify( boolean test ) {
     boolean progress = false;
     TV3 fptv = fp().tvar();
-    if( _over ) {
-    //if( _over && fptv instanceof TVClz fpz ) {
-    //  TVStruct tvs = fpz.rhs();
-    //  for( int i = 0; i < tvs.len(); i++ )
-    //    if( !Resolvable.is_resolving(tvs.fld(i)) &&
-    //        tvs.arg(i) instanceof TVLambda lam )
-    //      progress |= lam.dsp().unify(dsp().tvar(), test);
-      throw unimpl();
+    if( _over && fptv instanceof TVStruct tvs ) {
+      for( int i = 0; i < tvs.len(); i++ )
+        if( !Resolvable.is_resolving(tvs.fld(i)) &&
+            tvs.arg(i) instanceof TVLambda lam )
+          progress |= lam.dsp().unify(dsp().tvar(), test);
     } else if( fptv instanceof TVLambda lam ) {
       progress |= lam.dsp().unify(dsp().tvar(),test);
     }

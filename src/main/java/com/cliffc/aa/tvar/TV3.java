@@ -2,15 +2,14 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.node.ConNode;
-import com.cliffc.aa.node.Node;
 import com.cliffc.aa.node.FreshNode;
+import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 
 import java.util.IdentityHashMap;
 
 import static com.cliffc.aa.AA.unimpl;
-import static com.cliffc.aa.AA.DSP_IDX;
 
 /** Type variable base class
  *
@@ -645,15 +644,11 @@ abstract public class TV3 implements Cloneable {
     if( visit.tset(_uid) )
       { dups.set(debug_find()._uid); return dups; }
     // Dup count unified and not the args
-    if( _uf!=null )
-      return _uf._get_dups(visit,dups,debug,prims);
-    // Skip memory contents when printing non-debug
-    if( !debug && this instanceof TVLambda lam ) {
-      _args[0]._get_dups(visit,dups,debug,prims);
-      for( int i=DSP_IDX; i<lam.nargs(); i++ )
-        _args[i]._get_dups(visit,dups,debug,prims);
-      return dups;
-    }
+    return _uf==null
+      ? _get_dups_impl(visit,dups,debug,prims) // Subclass specific dup counting
+      : _uf._get_dups (visit,dups,debug,prims);
+  }
+  public VBitSet _get_dups_impl(VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     if( _args != null )
       for( TV3 tv3 : _args )  // Edge lookup does NOT 'find()'
         if( tv3!=null )
@@ -688,7 +683,7 @@ abstract public class TV3 implements Cloneable {
       return unified() ? _uf._str(sb.p(">>"), visit, dups, debug, prims) : sb;
     }
     // Dup printing for all but bases (which are short, just repeat them)
-    if( dup ) {
+    if( dup && (debug || !(this instanceof TVBase)) ) {
       vname(sb,debug,false);           // Leading V123
       if( visit.tset(_uid) && !(this instanceof TVBase ) ) return sb; // V123 and nothing else
       sb.p(':');                        // V123:followed_by_type_descr

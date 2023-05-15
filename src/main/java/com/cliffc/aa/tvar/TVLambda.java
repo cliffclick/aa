@@ -133,6 +133,15 @@ public class TVLambda extends TV3 {
     imem().widen((byte)2,false);
   }
   
+  @Override public VBitSet _get_dups_impl(VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
+    if( debug  ) return super._get_dups_impl(visit,dups,debug,prims);
+    // Skip memory contents when printing non-debug
+    _args[0]._get_dups(visit,dups,debug,prims); // Return
+    for( int i=DSP_IDX; i<nargs(); i++ )        // All arguments
+      _args[i]._get_dups(visit,dups,debug,prims);
+    return dups;
+  }
+  
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     sb.p("{ ");
     if( debug )                 // Only print mem during debug

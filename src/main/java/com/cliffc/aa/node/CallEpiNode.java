@@ -199,7 +199,7 @@ public final class CallEpiNode extends Node {
 
     // Compute meet over wired called function returns
     Type tmem = TypeMem.ANYMEM, rmem;
-    Type trez = fidxs.above_center() ? tfptr._ret : Type.ANY, rrez;
+    Type trez = fidxs.above_center() || nwired()==0 ? tfptr._ret : Type.ANY, rrez;
     int fidx;
     boolean pre_call_mem = false;
     for( int i=1; i<len(); i++ ) {

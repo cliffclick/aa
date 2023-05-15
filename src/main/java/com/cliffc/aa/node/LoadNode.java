@@ -98,7 +98,7 @@ public class LoadNode extends Node {
     // but depends on the deps mechanism.
     Node mem = mem();
     if( mem instanceof MProjNode mprj ) {
-      if( mprj.in(0) instanceof CallEpiNode cepi ) {
+      if( mprj.in(0) instanceof CallEpiNode cepi && !cepi._is_copy ) {
         if( adr instanceof NewNode nnn && !nnn.escaped(this) ) {
           Env.GVN.add_reduce(this); // Re-run reduce
           return set_mem(cepi.call().mem());
@@ -271,7 +271,7 @@ public class LoadNode extends Node {
   // - Either part might be empty & closed (use same single instance, Combo:TVStruct EMPTY).
   
   @Override public boolean unify( boolean test ) {
-    TVStruct self = (TVStruct)tvar();
+    TVStruct self = tvar().as_struct();
     TVMem mem = (TVMem)mem().tvar();
     TV3 adr = adr().tvar();
     return switch( adr ) {
@@ -280,14 +280,13 @@ public class LoadNode extends Node {
     //case TVStruct tstr -> self.unify(adr, test); // Load from prototype, just pass-thru
     //case TVClz tclz    -> do_clz (self,tclz,test);
     case TVBase base   -> do_base(self,base,test);
-    //case TVErr err     -> {
-    //  if( err.as_int()!=null ) yield do_base(self,err.as_int(),test);
-    //  if( err.as_flt()!=null ) yield do_base(self,err.as_flt(),test);
-    //  if( err.as_clz()!=null ) yield do_clz (self,err.as_clz(),test);
-    //  yield err.unify(self,test);// Pass error along
-    //}
+    case TVErr err     -> {
+      if( err.as_int()!=null ) yield do_base(self,err.as_int(),test);
+      if( err.as_flt()!=null ) yield do_base(self,err.as_flt(),test);
+      yield false;
+    }
     //case TVNil tnil    -> tnil.deps_add_deep(this); // Stall until this settles out
-    //case TVPtr ptr     -> mem.unify(ptr,self,test);
+    case TVPtr ptr     -> mem.unify(ptr,self,test);
     default -> throw unimpl();
     };
   }

@@ -864,7 +864,7 @@ public class Parse implements Comparable<Parse> {
         int nidx = n.push();    // Keep alive across arg parse
         Node dsp = gvn(new FP2DSPNode(n,err));
         // Argument tuple, with "this" or display first arg
-        StructNode args = new StructNode(0,false,err, "", Type.ALL);
+        StructNode args = new StructNode(0,false,err, Type.ALL);
         args.add_fld("0",Access.Final,dsp,err); // TODO: get the display start for errors
         int aidx = args.push();
         Node arg1 = stmts();
@@ -1061,7 +1061,7 @@ public class Parse implements Comparable<Parse> {
    */
   private Node tuple(int oldx, Node s, int first_arg_start) {
     // First stmt is parsed already
-    StructNode nn = new StructNode(0,false,errMsg(oldx), "", Type.ALL).init();
+    StructNode nn = new StructNode(0,false,errMsg(oldx), Type.ALL).init();
     Parse bad = errMsg(first_arg_start);
     int sidx = nn.push();
     _tuple(oldx,s,bad,nn);
@@ -1333,7 +1333,8 @@ public class Parse implements Comparable<Parse> {
     String str = new String(_buf,oldx,_x-oldx-1).intern();
     // Convert to ptr-to-constant-memory-string
     Parse bad = errMsg(oldx);
-    StructNode scon = new StructNode(0,false,bad,"str:", Type.ALL);
+    StructNode scon = new StructNode(0,false,bad, Type.ALL);
+    scon.add_fld(".",Access.Final,PrimNode.ZSTR,bad);
     scon.add_fld("0",Access.Final,con(TypeInt.con(str.charAt(0))),bad);
     Node scon1 = gvn(scon.close());
     Node ptr = new NewNode().init();

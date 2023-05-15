@@ -105,6 +105,10 @@ public class CastNode extends Node {
     // Stall, until notnil becomes a TVNilable or a TVStruct
     if( maynil instanceof TVLeaf )
       return maynil.deps_add_deep(this);
+
+    // TODO: Probably need to as_struct or as_base or as_ptr all of these
+    if( maynil instanceof TVErr && notnil instanceof TVErr )
+      return false;
     
     // Unify the maynil with a nilable version of notnil
     return new TVNil(notnil).find().unify(maynil,test);

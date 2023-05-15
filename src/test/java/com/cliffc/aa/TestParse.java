@@ -27,16 +27,10 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-
     DO_GCP=true;
     DO_HMT=false;
-    RSEED=3;
-    // Simple primitive expansion, pre-combo
-    test("1+2", "3", "3");
-
-    test("fun = { fx x -> x ? fx( fun(fx,x-1) ) : 1 }; fun(2._*_._, 99)",
-            "int64",
-            "int64");
+    RSEED=0;
+    testerr("a.b.c();","Unknown ref 'a'",0);
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -93,7 +87,7 @@ public class TestParse {
     testerr("{ x y -> x+y }", "Unable to resolve operator '_+_': { A B -> C }",10);
     testerr("@{x=7}.y",  "Unknown field '.y' in @{x= A}: ",7); // LHS is known, not a clazz, field not found in instance
     testerr("\"abc\".y", "Unknown field '.y' in str:(A): ",6);  // LHS is known, has clazz, field not found in either, field is not oper (not pinned)
-    testerr("\"abc\"&1", "Unknown operator '_&_' in str:(97): ( ..., ):( ..., )",5); // LHS is known, has clazz, field not found in either, field it oper (pinned, so report clazz)
+    testerr("\"abc\"&1", "Unknown operator '_&_' in str:(97): @{ ...}",5); // LHS is known, has clazz, field not found in either, field it oper (pinned, so report clazz)
     test("{x:flt y:int -> x+y}", "[55]{any,5 -> flt64 }", "{ A flt64 int64 -> flt64 }", null, null, null, "[55]");
 
     // error, missing a comma
@@ -101,11 +95,6 @@ public class TestParse {
 
     // TestHM.b_recursive_01
     test("{ f -> (f f) }", "[55]{any,4 -> %[2][2,55]? }", "{A B:{C B -> D } -> D }", null, null, "[]", "[55]" );
-
-    // TestHM.b_recursive_02
-    test("fun = { fx x -> x ? fx( fun(fx,x-1) ) : 1 }; fun(2._*_._, 99)",
-            "int64",
-            "int64");
 
     // TestHM.b_recursive_05, Y combinator
     test("{ f -> ({ x -> (f (x x))} { x -> (f (x x))})}",
@@ -117,9 +106,15 @@ public class TestParse {
     test("fun = { fx -> math.rand(2) ? 1 : fx(fun(fx),2) }; fun",
          "[55]{any,4 -> %[2,5][2,55]? }",
          // Currently allowing 'fun' display to stay alive.
-         "A:{ *[9]@{fun=A} {B C:int64 int64-> C } -> C }",
+         "A:{ *[9]@{fun=A} {B int64 int64 -> int64 } -> int64 }",
          null, null,
          "[5]","[55]");
+
+    // TestHM.b_recursive_02.  The expression "x-1" cannot resolve the operator
+    // "_-_" because "x" is a free variable.  It binds in its one use.    
+    test("fun = { fx x -> x ? fx( fun(fx,x-1) ) : 1 }; fun(2._*_._, 99)",
+            "int64",
+            "int64");
   }
 
   @Test public void testParse00() {

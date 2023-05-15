@@ -128,7 +128,7 @@ public class Env implements AutoCloseable {
   Env( Env par, FunNode fun, int nargs, Node ctrl, Node mem, Node dsp_ptr, StructNode fref ) {
     _par = par;
     _fun = fun;
-    StructNode dsp = fref==null ? new StructNode(nargs,false,null, "", Type.ALL).init() : fref;
+    StructNode dsp = fref==null ? new StructNode(nargs,false,null, Type.ALL).init() : fref;
     dsp.add_fld("^",TypeFld.Access.Final,dsp_ptr,null);
     NewNode ptr = new NewNode();  GVN.add_flow(ptr);
     mem = new StoreNode(mem,ptr,dsp,null).init();

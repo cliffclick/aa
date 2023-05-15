@@ -47,11 +47,13 @@ public abstract class PrimNode extends Node {
     _badargs=null;
   }
 
-  // Int/Float primitives.  
-  public static final StructNode ZINT = new StructNode(0,false,null,"", Type.ALL);
-  public static final StructNode ZFLT = new StructNode(0,false,null,"", Type.ALL);
-  public static final StructNode ZSTR = new StructNode(0,false,null,"", Type.ALL);
-  public static final StructNode ZMATH= new StructNode(0,false,null,"", Type.ALL);
+  public static final StructNode ZCLZ = new StructNode(0,false,null, Type.ALL);
+  
+  // Int/Float/String primitives.  
+  public static final StructNode ZINT = new StructNode(0,false,null, Type.ALL);
+  public static final StructNode ZFLT = new StructNode(0,false,null, Type.ALL);
+  public static final StructNode ZSTR = new StructNode(0,false,null, Type.ALL);
+  public static final StructNode ZMATH= new StructNode(0,false,null, Type.ALL);
   public static final NewNode PINT = new NewNode(BitsAlias.new_alias(BitsAlias.EXTX));
   public static final NewNode PFLT = new NewNode(BitsAlias.new_alias(BitsAlias.EXTX));
   public static final NewNode PSTR = new NewNode(BitsAlias.STRX);
@@ -120,11 +122,16 @@ public abstract class PrimNode extends Node {
       //new MemPrimNode.ReadPrimNode.LValueLength(), // The other array ops are "balanced ops" and use term() for precedence
     };
 
+    Env.KEEP_ALIVE.add_def(ZCLZ);
     Env.KEEP_ALIVE.add_def(ZINT);
     Env.KEEP_ALIVE.add_def(ZFLT);
+    Env.KEEP_ALIVE.add_def(ZSTR);
     Env.KEEP_ALIVE.add_def( INT);
     Env.KEEP_ALIVE.add_def( FLT);
     Env.KEEP_ALIVE.add_def(NFLT);
+
+    // ClazzClazz
+    ZCLZ.close();
 
     // Gather
     Ary<PrimNode> allprims = new Ary<>(others);
@@ -191,12 +198,13 @@ public abstract class PrimNode extends Node {
 
   // Make and install a primitive Clazz.
   private static void make_prim( StructNode clz, String clzname, NewNode ptr, PrimNode[][] primss ) {
+    clz.add_fld(".",Access.Final,ZCLZ,null);
     for( PrimNode[] prims : primss ) {
       // Primitives are grouped into overload groups, where the 'this' or
       // display argument is always of the primitive type, and the other
       // arguments may vary, and the correct primitive is picked using overload
       // resolution.
-      StructNode over = new StructNode(0,false,null,"",Type.ALL);
+      StructNode over = new StructNode(0,false,null,Type.ALL);
       int cnt=0;
       for( PrimNode prim : prims ) {
         String fld = (""+cnt++).intern();

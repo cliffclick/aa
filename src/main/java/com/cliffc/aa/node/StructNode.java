@@ -2,7 +2,8 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.*;
+import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.TVStruct;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
@@ -50,9 +51,6 @@ public class StructNode extends Node {
   // A collection of fields which *almost* make up a TypeStruct.  Almost,
   // because missing the field Types, which come from the Node inputs are not
   // otherwise part of a StructNode.
-  
-  // String clazz.  Never null.  Empty string "" is the empty clazz.
-  public final String _clz;
 
   // Default type for unnamed fields.  Frequently 'ALL' except for primitive
   // classes which support direct lattice isa() tests vs XNIL.
@@ -77,11 +75,10 @@ public class StructNode extends Node {
   private final Parse _paren_start;
   private final Ary<Parse> _fld_starts;
 
-  public StructNode(int nargs, boolean forward_ref, Parse paren_start, String clz, Type def) {
+  public StructNode(int nargs, boolean forward_ref, Parse paren_start, Type def) {
     super(OP_STRUCT);
     _nargs = nargs;
     _forward_ref = forward_ref;
-    _clz = clz;
     _def = def;
     _flds = new Ary<>(new String[1],0);
     _accesses = new Ary<>(new TypeFld.Access[1],0);
@@ -91,7 +88,7 @@ public class StructNode extends Node {
   }
 
   @Override String str() {
-    SB sb = new SB().p(_clz).p("@{");
+    SB sb = new SB().p("@{");
     for( int i=0; i<_flds._len; i++ ) {
       if( i==_nargs ) sb.p("| ");
       sb.p(_flds.at(i)).p("; ");
@@ -102,7 +99,7 @@ public class StructNode extends Node {
 
   // Structs with the same inputs and same field names are the same.
   @Override public int hashCode() {
-    return super.hashCode() ^ _flds.hashCode() ^ _accesses.hashCode() ^ (int)_def._hash ^ _clz.hashCode();
+    return super.hashCode() ^ _flds.hashCode() ^ _accesses.hashCode() ^ (int)_def._hash;
   }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
@@ -110,8 +107,7 @@ public class StructNode extends Node {
       _closed==rec._closed &&
       _flds.equals(rec._flds) &&
       _accesses.equals(rec._accesses) &&
-      _def==rec._def &&
-      Util.eq(_clz,rec._clz);
+      _def==rec._def;
   }
 
   // String-to-node-index
@@ -215,7 +211,8 @@ public class StructNode extends Node {
     TypeFld[] flds = TypeFlds.get(_flds.len());
     for( int i=0; i<_flds.len(); i++ )
       flds[i] = TypeFld.make(_flds.at(i),val(i),_accesses.at(i));
-    Arrays.sort(flds,(tf0,tf1) -> tf0._fld.compareTo(tf1._fld));
+    // Fields are sorted in TypeStruct so I can merge-sort
+    Arrays.sort(flds,( tf0, tf1) -> tf0._fld.compareTo(tf1._fld));
     return TypeStruct.make_flds(_def,flds);
   }
 
@@ -241,7 +238,8 @@ public class StructNode extends Node {
       deps_add(this);           // If self-live lifts, self reduce makes progress
       Node progress=null;
       for( int i=0; i<_flds._len; i++ ) 
-        if( in(i)!=Env.ANY && live.at_def(_flds.at(i)).above_center() )
+        if( in(i)!=Env.ANY && live.at_def(_flds.at(i)).above_center() &&
+            !Util.eq(_flds.at(i),".") )  // Leave a dead CLZ for error messages
           progress = set_def(i,Env.ANY);
       if( progress!=null ) return this;
     }
@@ -262,40 +260,6 @@ public class StructNode extends Node {
   }
   
   // Structs are pre-unified in set_tvar
-  @Override public boolean unify( boolean test ) {
-    boolean progress = false;
-    //TVClz clz = tvar().as_clz();
-    //// Unify existing fields.  Ignore extras on either side.
-    //TVStruct rec = clz.rhs().as_struct();
-    //for( int i=0; i<len(); i++ ) {
-    //  TV3 fld = rec.arg(_flds.at(i)); // Field lookup by string
-    //  if( fld!=null && in(i).has_tvar() ) progress |= fld.unify(tvar(i),test);
-    //  if( test && progress ) return true;
-    //}
-    //
-    //if( _clz.isEmpty() ) {
-    //  assert clz.clz()==TVStruct.EMPTY;
-    //} else {
-    //  TVStruct clz.clz().as_struct();
-    //  
-    //  // Unify existing fields, first in the clazz and if that misses and is
-    //  // unpinned, try again in the instance.
-    //  TVClz clzz = tvar().as_clz();
-    //  TVStruct clz = clzz.clz();
-    //  TVStruct rec = clzz.rhs().as_struct();
-    //  for( int i=0; i<len(); i++ ) {
-    //    String label = _flds.at(i);
-    //    TV3 fld = clz.arg(label); // Field lookup by string
-    //    if( fld==null ) {
-    //      fld = rec.arg(label);
-    //      if( fld==null ) continue; // Missing field
-    //    }
-    //    progress |= fld.unify(tvar(i),test);
-    //    if( test && progress ) return true;
-    //  }      
-    //  throw unimpl();
-    //}
-    return progress;
-  }
+  @Override public boolean unify( boolean test ) { return false; }
   
 }

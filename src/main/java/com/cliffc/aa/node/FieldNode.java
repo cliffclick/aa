@@ -68,9 +68,10 @@ public class FieldNode extends Node implements Resolvable {
       return oob_ret(t);
     }
 
-    // Field from Base looks in the base CLZ
+    // Field from Base looks in the base CLZ.
+    // One of TypeInt, TypeFlt, NIL or XNIL
     Type tstr = t;
-    if( t instanceof TypeInt || t instanceof TypeFlt ) {
+    if( t instanceof TypeNil && !(t instanceof TypeStruct) ) {
       StructNode clazz = clz_node(t);
       if( clazz ==null ) return oob_ret(t);
       tstr = clazz._val;        // Value from clazz
@@ -89,18 +90,18 @@ public class FieldNode extends Node implements Resolvable {
     return oob_ret(tstr);
   }
 
-  private Type oob_ret(Type t) { return t.oob(_str ? TypeStruct.ISUSED : TypeNil.SCALAR); }
+  private Type oob_ret(Type t) { return t.oob(_str ? TypeStruct.ISUSED : Type.ALL); }
 
   private static Type meet(TypeStruct ts) {
     if( ts.len()==0 ) return ts._def;
-    Type t = TypeNil.XSCALAR; for( TypeFld t2 : ts )  t = t.meet(t2._t); return t;
+    Type t = Type.ANY; for( TypeFld t2 : ts )  t = t.meet(t2._t); return t;
   }
   private static Type join(TypeStruct ts) {
     if( ts.len()==0 ) return ts._def;
-    Type t = TypeNil.SCALAR;
+    Type t = Type.ALL;
     for( TypeFld t2 : ts )
       t = t.join( t2._t instanceof TypeFunPtr tfp2  ? tfp2.make_from(tfp2.fidxs().dual()) : t2._t );
-    return t.meet(TypeNil.XSCALAR);
+    return t;
   }
 
   // If the field is resolving, we do not know which field to demand, so demand
@@ -206,31 +207,21 @@ public class FieldNode extends Node implements Resolvable {
     TVStruct tstr = tvar(0).as_struct();  TV3 fld;
     // Attempt resolve
     if( is_resolving() ) return do_resolve(tstr,test);
-    // If the field is in the struct, unify and done
-    if( (fld=tstr.arg(_fld))!=null ) return do_fld(fld,test);
-
-    if( tstr.is_open() ) return tstr.add_fld(_fld,tvar());
-    //  if struct closed, follow superchain
-    //  struct is end-of-super-chain, miss_field
-
+    // Search up the super-clazz chain
+    for( ; tstr!=null; tstr = tstr.clz() ) {
+      // If the field is in the struct, unify and done
+      if( (fld=tstr.arg(_fld))!=null ) return do_fld(fld,test);
+      // If the struct is open, add field here and done
+      if( tstr.is_open() ) return tstr.add_fld(_fld,tvar());
+    }
     
-    throw unimpl();
-  }    
-
-  //private boolean do_clz( TV3 fld, TVClz clz, boolean test ) {
-  //  assert clz.rhs().arg(_fld)==null;
-  //  return tvar().unify(fld,test);
-  //}
+    //  struct is end-of-super-chain, miss_field
+    return do_miss(tvar(0),test);
+  }
+  
   private boolean do_fld( TV3 fld, boolean test ) {
     return tvar().unify(fld,test);
   }
-  //private boolean add_clz( TVClz clz, boolean test ) {
-  //  assert clz.rhs().arg(_fld)==null;
-  //  return test || clz.clz().add_fld(_fld,tvar());
-  //}
-  //private boolean add_rhs( boolean test ) {
-  //  throw unimpl();
-  //}
   private boolean do_resolve( TVStruct tstr, boolean test ) {
     if( Combo.HM_AMBI ) return false; // Failed earlier, can never resolve
     boolean progress = try_resolve(tstr,test);
@@ -239,9 +230,9 @@ public class FieldNode extends Node implements Resolvable {
     do_fld(tstr.arg(_fld),test);
     return true;                // Progress
   }
-  //private boolean do_miss(TVClz clz, boolean test) {
-  //  return tvar().unify_err(resolve_failed_msg(),clz,test);
-  //}
+  private boolean do_miss( TV3 tstr, boolean test) {
+    return tvar().unify_err(resolve_failed_msg(),tstr,test);
+  }
 
 
   public static String clz_str(Type t) {
@@ -325,17 +316,16 @@ public class FieldNode extends Node implements Resolvable {
     //  String clz = FieldNode.clz_str(fldn.val(0));
     //  if( clz!=null ) fld = clz+fld; // Attempt to be clazz specific operator
     //}
-    //TVStruct tvs = match_tvar() instanceof TVClz tv0 ? tv0.rhs() : null;
-    //String err, post;
-    //if( !is_resolving() ) { err = "Unknown"; post=" in %: "; }
-    //else if( tvs!=null && ambi(tvar(),tvs) ) { err = "Ambiguous, matching choices %"; post = " vs "; }
-    //else if( tvs==null || tvs.len()==0 ) { err = "Unable to resolve"; post=": "; }
-    //else { err = "No choice % resolves"; post=": "; }
-    //if( fld!=null )
-    //  err += (oper ? " operator '" : " field '.")+fld+"'";
-    //err += post;
-    //return err;
-    throw unimpl();
+    TVStruct tvs = match_tvar() instanceof TVStruct ts ? ts : null;
+    String err, post;
+    if( !is_resolving() ) { err = "Unknown"; post=" in %: "; }
+    else if( tvs!=null && ambi(tvar(),tvs) ) { err = "Ambiguous, matching choices %"; post = " vs "; }
+    else if( unable(tvs) ) { err = "Unable to resolve"; post=": "; }
+    else { err = "No choice % resolves"; post=": "; }
+    if( fld!=null )
+      err += (oper ? " operator '" : " field '.")+fld+"'";
+    err += post;
+    return err;
   }
   
   // True if ambiguous (more than one match), false if no matches.
@@ -345,6 +335,13 @@ public class FieldNode extends Node implements Resolvable {
           self.trial_unify_ok(tvs.arg(i),false) )
         return true;
     return false;
+  }
+  private static boolean unable( TVStruct tvs ) {
+    if( tvs==null ) return true;
+    for( int i=0; i<tvs.len(); i++ )
+      if( !Resolvable.is_resolving(tvs.fld(i)) )
+        return false;
+    return true;
   }
   
   // clones during inlining change resolvable field names

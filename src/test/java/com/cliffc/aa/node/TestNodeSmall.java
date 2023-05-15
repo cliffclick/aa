@@ -488,7 +488,7 @@ public class TestNodeSmall {
     // The file-scope display closing the graph-cycle.  Needs the FunPtr, not
     // yet built.
     ConNode dsp_prims = new ConNode<>(TypeMemPtr.DISP_SIMPLE).init();
-    StructNode dsp_file = new StructNode(1,false,null,"",Type.ALL).add_fld("^",Access.Final,dsp_prims,null).init();
+    StructNode dsp_file = new StructNode(1,false,null,Type.ALL).add_fld("^",Access.Final,dsp_prims,null).init();
     NewNode dsp_file_ptr = new NewNode().init();
     Node dsp_file_mem = new StoreNode(mem,dsp_file_ptr,dsp_file,null).init();
     // Function header with nargs
