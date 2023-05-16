@@ -460,8 +460,8 @@ public final class CallEpiNode extends Node {
     assert !_is_copy;
     boolean progress = false;
     CallNode call = call();     // Call header for Apply
-    Node fdx = call.fdx();      // node     {dsp args -> ret}
-    TV3 tv3 = fdx.tvar();       // type {mem dsp args -> ret mem}
+    Node fdx = call.fdx();      // node {dsp args -> ret}
+    TV3 tv3 = fdx.tvar();       // type {dsp args -> ret}
     
     // Peek thru any error
     if( tv3 instanceof TVErr err ) tv3 = err.as_lambda();
@@ -471,18 +471,16 @@ public final class CallEpiNode extends Node {
       if( test ) return true;
       add_flow();           // Re-unify after forcing a Lambda, to get the args
       TVLambda lam = new TVLambda(call.nargs(),
-                                  new TVMem(), // input mem
                                   new TVLeaf(),// display
-                                  new TVMem(), // output mem
                                   tvar());     // Result
-      return tv3.unify(lam,false);
+      return fdx.tvar().unify(lam,false);
     }
     
     // Check for progress amongst args
     int tnargs = tfun.nargs();
     int cnargs = call.nargs();
     int nargs = Math.min(tnargs,cnargs);
-    for( int i=MEM_IDX; i<nargs; i++ ) {
+    for( int i=DSP_IDX; i<nargs; i++ ) {
       TV3 formal = tfun.arg(i);
       TV3 actual = call.tvar(i);
       progress |= actual.unify(formal,test);
@@ -491,10 +489,7 @@ public final class CallEpiNode extends Node {
     }
 
     // Check for progress on the return & memory
-    progress |= tvar().unify(tfun.ret (),test);
-    Node omem = ProjNode.proj(this,MEM_IDX);
-    if( omem==null ) omem = call.mem(); // No output mem means direct pass-thru
-    progress |= omem.tvar().unify(tfun.omem(),test);
+    progress |= tvar().unify(tfun.ret(),test);
     
     if( tnargs > nargs )  // Missing arguments
       progress |= tvar().unify_err("Passing "+cnargs+" arguments to a function taking "+tnargs+" arguments",tfun,test);
@@ -507,12 +502,6 @@ public final class CallEpiNode extends Node {
   @Override public boolean unify_proj( ProjNode proj, boolean test ) {
     if( proj._idx==REZ_IDX ) 
       return tvar().unify(proj.tvar(),test);
-    if( proj._idx==MEM_IDX ) {
-      TV3 fvar = call().fdx().tvar();
-      if( fvar instanceof TVErr terr ) fvar = terr.as_lambda();
-      TV3 omem = ((TVLambda)fvar).omem();
-      return omem.unify(proj.tvar(),test);
-    }
     throw unimpl(); // memory unify
   }
   

@@ -214,32 +214,24 @@ public class StoreNode extends Node {
     return null;
   }
 
-  // Given a tmem, tptr, trez:
-  //    TVMem[aliases].unify(TVRez)
+  // Given a tptr, trez:
+  //    ptr.load().unify(rez)
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
     assert rez()!=null;         // Should have cleared out during iter
-    TV3 mem = mem().set_tvar();
     TV3 adr = adr().set_tvar();
     TV3 rez = rez().set_tvar();
-    if( !(mem instanceof TVMem   ) )  mem.unify(new TVMem(),false);
-    if( !(adr instanceof TVPtr   ) )  adr.unify(new TVPtr(),false);
-    if( !(rez instanceof TVStruct) )  {
-      //if( (rez instanceof TVClz clz) )  { // CLZ of a Struct is OK
-      //  if( !(clz.rhs() instanceof TVStruct) )
-      //    throw unimpl();
-      //} else rez.unify(new TVStruct(new String[0], new TV3[0], true),false);
-      throw unimpl();
-    }
-    return mem;
+    TVStruct stz;
+    if( rez instanceof TVStruct stz0 ) stz = stz0;
+    else  // Open empty struct
+      rez.unify(stz = new TVStruct(true),false);
+
+    if( adr instanceof TVPtr ptr ) ptr.load().unify(stz,false);
+    else adr.unify(new TVPtr(BitsAlias.EMPTY,stz),false);
+    return null;
   }
 
-  @Override public boolean unify( boolean test ) {
-    TVMem mem = (TVMem)tvar();
-    TVPtr ptr  = (TVPtr)adr().tvar();
-    TV3   rec  = rez().tvar();    
-    return mem.unify(ptr,rec,test);
-  }
+  @Override public boolean unify( boolean test ) { return false; }
 
   @Override public ErrMsg err( boolean fast ) {
     Type tadr = adr()._val;

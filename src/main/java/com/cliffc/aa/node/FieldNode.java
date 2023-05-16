@@ -194,7 +194,7 @@ public class FieldNode extends Node implements Resolvable {
     // If resolving, force insert
     if( is_resolving() ) {
       TVField.FIELDS.put(_fld,this); // Track resolving field names
-      ts.add_fld(_fld,self);
+      ts.add_fld(_fld,self,true);
       // No need to try-resolve or deal with recursive set_tvar already
       // resolving!  The Field's normal unify will attempt a resolve which will
       // set delay_resolve as needed on any complex shape 'self' has already
@@ -211,8 +211,9 @@ public class FieldNode extends Node implements Resolvable {
     for( ; tstr!=null; tstr = tstr.clz() ) {
       // If the field is in the struct, unify and done
       if( (fld=tstr.arg(_fld))!=null ) return do_fld(fld,test);
-      // If the struct is open, add field here and done
-      if( tstr.is_open() ) return tstr.add_fld(_fld,tvar());
+      // If the struct is open, add field here and done.
+      // Field is not pinned, because it might belong in a superclazz
+      if( tstr.is_open() ) return tstr.add_fld(_fld,tvar(),false);
     }
     
     //  struct is end-of-super-chain, miss_field

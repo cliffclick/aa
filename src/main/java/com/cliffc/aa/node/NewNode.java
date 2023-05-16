@@ -2,9 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.tvar.TV3;
-import com.cliffc.aa.tvar.TVLeaf;
-import com.cliffc.aa.tvar.TVPtr;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
@@ -89,7 +87,9 @@ public class NewNode extends Node {
   
   @Override public boolean has_tvar() { /*assert used(); */ return true; }
 
-  @Override public TV3 _set_tvar() { return new TVPtr(BitsAlias.make0(_alias)); }
+  @Override public TV3 _set_tvar() {
+    return new TVPtr(BitsAlias.make0(_alias), new TVStruct(true) );
+  }
 
   // clones during inlining all become unique new sites
   @Override public @NotNull NewNode copy(boolean copy_edges) {

@@ -7,8 +7,6 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
-import static com.cliffc.aa.AA.unimpl;
-
 /** A ptr-to-struct
  *
  */
@@ -16,17 +14,14 @@ public class TVPtr extends TV3 {
   // This is a pointer tracking aliases.
   // The actual pointed-at type is tracked in memory.
   BitsAlias _aliases;
-  public TVPtr( BitsAlias aliases ) {
-    super(aliases.test(0));
-    _aliases = aliases;
-  }
-  public TVPtr( ) { this(BitsAlias.EMPTY); }
   
-  public TVPtr( BitsAlias aliases, TV3 str ) {
+  public TVPtr( BitsAlias aliases, TVStruct str ) {
     super(aliases.test(0),str);
     _aliases = aliases;
   }
 
+  public TVStruct load() { return arg(0).as_struct(); }
+  
   @Override int eidx() { return TVErr.XPTR; }
 
   // Make the leader a nilable version of 'this' child
@@ -63,27 +58,6 @@ public class TVPtr extends TV3 {
 
   @Override boolean _exact_unify_impl( TV3 tv3 ) { return true; }
   
-  // -----------------
-  @Override TV3 _sharptr( TVMem mem ) {
-    if( ODUPS.tset(_uid) ) return this;
-    assert _args==null || _args.length==0;
-    if( _aliases.is_empty() )
-      throw unimpl();
-    int j=-1;
-    int mlen = mem.len();
-    for( int i=0; i<mlen; i++ ) {
-      TVPtr p0 = mem.ptr(i);      
-      if( p0._aliases==_aliases ) j=i;
-      else if( p0._aliases.overlaps(_aliases) )
-        throw unimpl();         // Expecting exact hit
-    }
-    if( j== -1 ) throw unimpl(); // Not found
-    TVPtr ptr = new TVPtr(_aliases,mem.arg(j)._sharptr(mem));
-    ptr._may_nil = _may_nil;
-    return ptr;
-  }
-  
-  
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) {
     // Compatible escaped aliases
@@ -102,6 +76,7 @@ public class TVPtr extends TV3 {
     sb.p("*");
     _aliases.str(sb);
     if( _args.length>0 && _args[0]!=null ) arg(0)._str(sb,visit,dups,debug,prims);
+    else sb.p("---");
     if( _may_nil ) sb.p('?');
     return sb;
   }

@@ -381,21 +381,7 @@ public class RootNode extends Node {
     return tv3;
   }
 
-  @Override public boolean unify( boolean test ) {
-    boolean progress = false;
-    TV3 rootmem = tvar(MEM_IDX);
-    for( int fidx : rfidxs() ) {
-      if( fidx == BitsFun.ALLX ) continue;
-      if( fidx == BitsFun.EXTX ) continue;
-      RetNode ret = RetNode.get(fidx);
-      Node mem = ret.mem();
-      if( mem==null ) mem = ret.fun().parm(MEM_IDX); // Pure functions use incoming memory
-      TV3 retmem = mem.tvar();
-      progress |= rootmem.unify(retmem,test);
-      if( test && progress ) return true;
-    }
-    return progress;
-  }
+  @Override public boolean unify( boolean test ) { return false; }
   
   // Unify trailing result ProjNode with RootNode results; but no unification
   // with anything from Root, all results are independent.

@@ -520,39 +520,31 @@ abstract public class TV3 implements Cloneable {
       if( !tfp.is_full() ) throw unimpl(); //return new TVLeaf(); // TODO
       yield new TVLeaf(); // Generic Function Ptr
     }
-    case TypeMemPtr tmp -> new TVPtr(tmp._aliases);
+    case TypeMemPtr tmp -> new TVPtr(tmp._aliases,(TVStruct)from_flow(tmp._obj));
     case TypeStruct ts -> {
-      if( ts.len()==0 ) yield new TVLeaf();
-      String[] ss = new String[ts.len()];
-      TV3[] tvs = new TV3[ts.len()];
-      for( int i=0; i<ts.len(); i++ ) {
+      // need to handle CLZ in slot 0
+      int len = ts.len();
+      TypeFld fclz = ts.get(".");
+      if( fclz==null ) len++;
+      
+      String[] ss = new String[len];
+      TV3[] tvs = new TV3[len];
+      ss [0] = ".";
+      tvs[0] = fclz==null ? new TVLeaf() : from_flow(fclz._t);
+      for( int i=0,j=1; i<ts.len(); i++ ) {
         TypeFld fld = ts.fld(i);
-        ss [i] = fld._fld;
-        tvs[i] = from_flow(fld._t);
+        if( !Util.eq(fld._fld,".") ) {
+          ss [j  ] = fld._fld;
+          tvs[j++] = from_flow(fld._t);
+        }
       }
-      //TV3 tv3 = new TVStruct(ss,tvs,false);
-      //// Clazz structs get wrapped in a TVClz
-      //if( !ts._clz.isEmpty() )
-      //  tv3 = new TVClz((TVStruct)Env.PROTOS.get(ts._clz).tvar(),tv3);
-      //yield tv3;
-      throw unimpl();
+      yield new TVStruct(ss,tvs,ts._def==Type.ANY);
     }
-    case TypeInt ti ->  TVBase.make(ti);
+    case TypeInt ti -> TVBase.make(ti);
     case TypeFlt tf -> TVBase.make(tf);
     case TypeNil tn -> tn == TypeNil.NIL
       ? new TVNil( new TVLeaf() )
       : TVBase.make(tn);
-    case TypeMem tmem -> {
-      TVMem mem = new TVMem();
-      if( tmem == TypeMem.ALLMEM ) yield mem;
-      if( tmem == TypeMem.ANYMEM ) yield mem;
-      if( tmem == TypeMem.EXTMEM ) yield mem;
-      if( tmem == TypeMem.STRMEM ) {
-        mem.unify(new TVPtr(BitsAlias.STR),new TVStruct(new String[0],new TV3[0],true),false);
-        yield mem;
-      }
-      throw unimpl();
-    }
     case Type tt -> {
       if( tt == Type.ANY || tt == Type.ALL ) yield new TVLeaf();
       throw unimpl();
@@ -596,7 +588,6 @@ abstract public class TV3 implements Cloneable {
   }
   boolean _exact_unify_ok(TV3 tv3) {
     if( this==tv3 ) return true;
-    if( tv3==null && this instanceof TVMem ) return true; // Allow null TVMem to match any TVMem
     assert !unified() && !tv3.unified();
     long duid = dbl_uid(tv3);
     if( EXHIT.get(duid) != null ) return true;
@@ -613,23 +604,6 @@ abstract public class TV3 implements Cloneable {
   }
   abstract boolean _exact_unify_impl(TV3 tv3);
 
-  // -----------------
-
-  public TV3 sharptr(TVMem mem) {
-    assert !unified();
-    ODUPS.clear();
-    return _sharptr(mem);
-  }
-
-  TV3 _sharptr( TVMem mem ) {
-    if( ODUPS.tset(_uid) ) return this;
-    if( _args==null ) return this;
-    for( int i=0; i<len(); i++ )
-      if( _args[i]!=null )
-        _args[i] = _args[i]._sharptr(mem);
-    return this;
-  }
-  
   // -----------------
   // Glorious Printing
 

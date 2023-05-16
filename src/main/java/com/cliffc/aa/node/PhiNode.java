@@ -5,7 +5,6 @@ import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV3;
-import com.cliffc.aa.tvar.TVMem;
 import com.cliffc.aa.tvar.TVLeaf;
 
 import static com.cliffc.aa.AA.unimpl;
@@ -91,8 +90,8 @@ public class PhiNode extends Node {
 
   // Yes for e.g. ints, flts, memptrs, funptrs.  A Phi corresponds to the
   // merging HM value in the core AA If.
-  @Override public boolean has_tvar() { return true; }
-  @Override public TV3 _set_tvar() { return is_mem() ? new TVMem() : new TVLeaf(); }
+  @Override public boolean has_tvar() { return !is_mem(); }
+  @Override public TV3 _set_tvar() { return new TVLeaf(); }
 
   // All inputs unify
   @Override public boolean unify( boolean test ) {

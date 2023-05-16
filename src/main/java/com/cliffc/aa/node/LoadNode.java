@@ -250,43 +250,31 @@ public class LoadNode extends Node {
   
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
-    // Force mem input to be a mem
-    TV3 t0 = mem().set_tvar(); 
-    if( !(t0 instanceof TVMem) )
-      t0.unify(new TVMem(),false);
     // Address needs to be one of a TVPtr or TVBase, but cannot tell.
-    // IF its a TVBase, we can get the CLZ ptr from it.
+    // IF it is a TVBase, we can get the CLZ ptr from it.
     // Self is just an open TVStruct
     return new TVStruct(true);
   }
 
   // Incoming address is
   // - Leaf - stall, need address TV3
-  // - Nil  - stall, need address TV3
-  // - Ptr  - classic memory/struct unify Clz:[---,@{instance}]
-  // - Base - Base._t dictates clz ptr; memory/clz-struct unify
-  // - Clz  - [clz ptr, instance]; memory/clz-struct unify but report a new Clz:[@{CLZ},@{instance}]
-  // - Clz  - [clz ptr, ptr     ]; memory/clz-struct unify but report a new Clz:[@{CLZ},@{instance}] (load both)
-  // Self type is always a Clz:[@{CLZ},@{instance}]
-  // - Either part might be empty & closed (use same single instance, Combo:TVStruct EMPTY).
-  
+  // - Ptr  - classic ptr.load unify
+  // - Base - Base._t dictates clz ptr; then same as Ptr  
   @Override public boolean unify( boolean test ) {
     TVStruct self = tvar().as_struct();
-    TVMem mem = (TVMem)mem().tvar();
     TV3 adr = adr().tvar();
     return switch( adr ) {
-    // Stall until forced to Base,Clz or Err of same
+    // Stall until forced to Base,Ptr or Err of same
     case TVLeaf leaf   -> leaf.deps_add_deep(this);
     //case TVStruct tstr -> self.unify(adr, test); // Load from prototype, just pass-thru
-    //case TVClz tclz    -> do_clz (self,tclz,test);
     case TVBase base   -> do_base(self,base,test);
     case TVErr err     -> {
       if( err.as_int()!=null ) yield do_base(self,err.as_int(),test);
       if( err.as_flt()!=null ) yield do_base(self,err.as_flt(),test);
       yield false;
     }
-    //case TVNil tnil    -> tnil.deps_add_deep(this); // Stall until this settles out
-    case TVPtr ptr     -> mem.unify(ptr,self,test);
+    case TVNil tnil    -> tnil.deps_add_deep(this); // Stall until this settles out
+    case TVPtr ptr     -> ptr.load().unify(self,test);
     default -> throw unimpl();
     };
   }
@@ -297,14 +285,5 @@ public class LoadNode extends Node {
     TVStruct base_clz = proto.tvar().as_struct();
     return self.unify(base_clz, test); // Unify against primitive CLZ
   }
-  //
-  //private boolean do_clz(TVClz self, TVClz clz, boolean test) {
-  //  // Loading from a prior struct case: "e0._*_._".  No "Load" action is
-  //  // required, but the parser inserts in case the prior was a ptr.
-  //  if( clz.arg(1) instanceof TVStruct )
-  //    return self.unify(clz,test);
-  //  //  mem.unify(tclz.ptr(),self,test); // Load from prototype
-  //  throw unimpl();
-  //}
   
 }

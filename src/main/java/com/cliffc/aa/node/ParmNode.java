@@ -98,10 +98,10 @@ public class ParmNode extends Node {
     return null;
   }
 
-  @Override public boolean has_tvar() { return !(_t instanceof TypeRPC); }
+  @Override public boolean has_tvar() { return !(_t instanceof TypeRPC) && !is_mem(); }
   
   @Override public TV3 _set_tvar() {
-    TV3 tv = is_mem() ? TV3.from_flow(_t) : new TVLeaf();
+    TV3 tv = new TVLeaf();
     tv.deps_add(this);          // with Root input, value depends on tvar
     return tv;
   }

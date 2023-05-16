@@ -29,7 +29,7 @@ public class ConNode<T extends Type> extends Node {
   @Override public boolean has_tvar() {
     if( _t==Type.ALL || _t==Type.ANY ) return true;  // Specifically allowed for various unused-displays on primitives
     if( _t instanceof TypeNil ) return true; // Yes on NIL, INT, FLT, MEMPTR, FUNPTR, STRUCT
-    if( _t instanceof TypeMem ) return true;
+    if( _t instanceof TypeMem ) return false;
     // No for TFLD, RPC
     return false;
   }
@@ -70,4 +70,3 @@ public class ConNode<T extends Type> extends Node {
   
   @Override Node walk_dom_last( Predicate<Node> P) { return null; }
 }
-

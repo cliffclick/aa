@@ -30,6 +30,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
+    test   ("x=@{n:=1;v:=2}; x.n := 3; x", "*[10]@{_; n:=3; v:=2}","*@{n=int:nint8; v=int:2}", null, null, "[10]", null);
     // TestHM.b_recursive_02.  The expression "x-1" cannot resolve the operator
     // "_-_" because "x" is a free variable.  It binds in its one use.
     test("fun = { fx x -> x ? fx( fun(fx,x-1) ) : 1 }; fun(2._*_._, 99)",
@@ -66,7 +67,7 @@ public class TestParse {
     test("{ x -> ( 3, x )}", "[55]{any,4 -> *[11](3, %[2,11][2,55]?) }", "{ A B -> *[11](3, B) }", null, null, "[11]", "[55]");
     // TestHM.a_basic_02
     test("{ z -> ((z 0), (z \"abc\")) }", "[55]{any,4 -> *[12](%[2,11,12][2,55]?, %[2,11,12][2,55]?) }",
-         "{A {B *[11]str:(int64)? -> C } -> *[12](C,C) }",
+         "{A {B *[11]str:(97)? -> C } -> *[12](C,C) }",
          null, null,
          "[11,12]", "[55]" );
 
@@ -249,38 +250,38 @@ public class TestParse {
 
   @Test public void testParse02() {
     // Anonymous function definition.  Note: { x -> x&1 }; 'x' can be any struct with an operator '_&_'.
-    test("{x:int -> x&1}","[55]{any,4 -> int1 }","{A int:int64 -> int:int64}",null,null,null,"[55]");
-    test("{5}()", "5", "int:5"); // No args nor -> required; this is simply a function returning 5, being executed
-    testerr("{x:flt y -> x+y}", "Ambiguous, matching choices ({ flt:flt64 flt:flt64 -> flt:flt64 }, { flt:flt64 int:int64 -> flt:flt64 }) vs { flt:flt64 A -> B }",13); // {Scalar Scalar -> Scalar}
+    test("{x:int -> x&1}","[55]{any,4 -> int1 }","{A int64 -> int64}",null,null,null,"[55]");
+    test("{5}()", "5", "5"); // No args nor -> required; this is simply a function returning 5, being executed
+    testerr("{x:flt y -> x+y}", "Ambiguous, matching choices ({ flt64 flt64 -> flt64 }, { flt64 int64 -> flt64 }) vs { flt64 A -> B }",13); // {Scalar Scalar -> Scalar}
 
     // Function execution and result typing
-    test("x=3; andx={y -> x & y}; andx(2)", "2", "int:2"); // trivially inlined; capture external variable
-    test("x=3; and2={x -> x & 2}; and2(x)", "2", "int:2"); // trivially inlined; shadow  external variable
+    test("x=3; andx={y -> x & y}; andx(2)", "2", "2"); // trivially inlined; capture external variable
+    test("x=3; and2={x -> x & 2}; and2(x)", "2", "2"); // trivially inlined; shadow  external variable
     testerr("plus2={x -> x+2}; x", "Unknown ref 'x'",18); // Scope exit ends lifetime
     testerr("fun={x -> }; fun(0)", "Missing function body",10);
     testerr("fun(2)", "Unknown ref 'fun'", 0);
-    test("mul3={x -> y=3; x*y}; mul3(2)", "6","int:6"); // multiple statements in func body
-    test("x=3; addx={y -> x+y}; addx(2)", "5","int:5");
-    test("x=3; mul2={x -> x*2}; mul2(2.1)", "4.2","flt:4.2"); // must inline to resolve overload {*}:Flt with I->F conversion
-    test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", "10.2","flt:10.2"); // Mix of types to mul2(), mix of {*} operators
-    test("sq={x -> x*x}; sq 2.1", "4.41","flt:4.41"); // No () required for single args
-    testerr("sq={x -> x&x}; sq(\"abc\")", "Unknown operator '_&_' in str:(int:97): ( ..., )",10);
-    testerr("sq={x -> x*x}; sq(\"abc\")", "Unknown operator '_*_' in str:(int:97): ( ..., )",10);
+    test("mul3={x -> y=3; x*y}; mul3(2)", "6","6"); // multiple statements in func body
+    test("x=3; addx={y -> x+y}; addx(2)", "5","5");
+    test("x=3; mul2={x -> x*2}; mul2(2.1)", "4.2","4.2"); // must inline to resolve overload {*}:Flt with I->F conversion
+    test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", "10.2","10.2"); // Mix of types to mul2(), mix of {*} operators
+    test("sq={x -> x*x}; sq 2.1", "4.41","4.41"); // No () required for single args
+    testerr("sq={x -> x&x}; sq(\"abc\")", "Unknown operator '_&_' in str:(97): @{ ...}",10);
+    testerr("sq={x -> x*x}; sq(\"abc\")", "Unknown operator '_*_' in str:(97): @{ ...}",10);
     // Recursive:
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)","6","int:6");
-    test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)","int64","int:int64");
-    test("f0 = { x -> x ? 1+(f0(x-1)) : 0 }; f0(2)", "2","int:2");
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)","6","6");
+    test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)","int64","int64");
+    test("f0 = { x -> x ? 1+(f0(x-1)) : 0 }; f0(2)", "2","2");
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))","*[13](nil,1,2)","*(int:int64,A:int:int64,A)", null, null, "[13]", null);
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))","*[13](nil,1,2)","*(int64,A:int64,A)", null, null, "[13]", null);
 
     // Co-recursion requires parallel assignment & type inference across a lexical scope
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", "1", "int:1" );
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", "int1", "int:int1" );
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", "1", "1" );
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", "int1", "int1" );
 
     // This test merges 2 TypeFunPtrs in a Phi, and then fails to resolve.
-    test("(math.rand(1) ? 2._+_ : 2._*_) ._ (3)","int64","int:int64"); // either 2+3 or 2*3, or {5,6} which is INT8.
-    test("(math.rand(1) ? 2._+_._ : 2._*_._)(3)","int64","int:int64"); // either 2+3 or 2*3, or {5,6} which is INT8.
-    test("f = g = {-> 3}; f() == g();", "1", "int:1");
+    test("(math.rand(1) ? 2._+_ : 2._*_) ._ (3)","int64","int64"); // either 2+3 or 2*3, or {5,6} which is INT8.
+    test("(math.rand(1) ? 2._+_._ : 2._*_._)(3)","int64","int64"); // either 2+3 or 2*3, or {5,6} which is INT8.
+    test("f = g = {-> 3}; f() == g();", "1", "1");
     testerr("add = {x:int x:int -> x + x}", "Duplicate parameter name 'x'", 13);
   }
 
@@ -326,7 +327,7 @@ public class TestParse {
     // simple anon struct tests
     testerr("a=@{x=1.2;y}; x", "Unknown ref 'x'",14);
     testerr("a=@{x=1;x=2}.x", "Cannot re-assign final field '.x' in @{x=1}",8);
-    test   ("a=@{x=1.2;y;}; a.x", "1.2", "flt:1.2"); // standard "." field naming; trailing semicolon optional
+    test   ("a=@{x=1.2;y;}; a.x", "1.2", "1.2"); // standard "." field naming; trailing semicolon optional
     test   ("x=@{n:=1;v:=2}; x.n := 3; x", "*[10]@{_; n:=3; v:=2}","*@{n=int:nint8; v=int:2}", null, null, "[10]", null);
     testerr("(a=@{x=0;y=0}; a.)", "Missing field name after '.'",17);
     testerr("a=@{x=0;y=0}; a.x=1; a","Cannot re-assign final field '.x' in @{x=nil; y=nil}",16);

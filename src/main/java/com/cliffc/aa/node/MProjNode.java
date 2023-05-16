@@ -3,7 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.type.BitsFun;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.tvar.TVMem;
 
 import static com.cliffc.aa.AA.MEM_IDX;
 
@@ -48,5 +47,5 @@ public class MProjNode extends ProjNode {
     return null;
   }
 
-  @Override TVMem _set_tvar() { return new TVMem(); }
+  @Override public boolean has_tvar() { return false; }
 }
