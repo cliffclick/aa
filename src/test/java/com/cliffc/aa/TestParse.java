@@ -30,7 +30,11 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    testerr("a.b.c();","Unknown ref 'a'",0);
+    // TestHM.b_recursive_02.  The expression "x-1" cannot resolve the operator
+    // "_-_" because "x" is a free variable.  It binds in its one use.
+    test("fun = { fx x -> x ? fx( fun(fx,x-1) ) : 1 }; fun(2._*_._, 99)",
+            "int64",
+            "int64");
   }
   static private void assertTrue(boolean t) {
     if( t ) return;

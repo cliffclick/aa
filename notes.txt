@@ -1,4 +1,60 @@
 =======================================
+05/15/2023
+
+ACTION: DROP TVMem
+ACTION: TVStruct always slot 0 is CLZ, ALWAYS
+ACTION: TVStruct, bring back pinned fields.  When unify drops a un-pinned
+        field, it instead "pushes up" to the next open clazz struct and
+        only deletes if it hits CLZCLZ
+
+Don't have Mem right yet.
+Let-assign with Mem, then Fresh on use.
+Goal is poly-morphic memory.
+Might be the same as just using pointers.
+But to allow assigns.
+
+Its the magic-updates after a Store to some other memory.  One option: no TV3
+updates after a Store.  Aliased pointers all unify, at least on stored fields.
+Ex: A = @{ x=?, y="abc" };
+    B = @{ x=?, z=3.14  };
+    P = rand ? A : B; // Alias A & B, but no unifiy of field parts
+    P.x = 16; // Force A.x and B.x to unify with int.
+
+fun= { A B ->
+  A.x = 17;      // do A & B alias?
+  B.y = "abc";
+}
+
+
+
+fun = { fx x ->
+  x
+  ? fx( fun(fx, x - 1 ) )  // Notice oper _-_ on free 'x'
+  : 1
+};
+fun(2._*_._, 99)
+
+Type for 'x' allows e.g. 'Matrix', as long as 'Matrix - 1' yields another 'Matrix'.
+Type for 'x' must be a ptr (or int or flt), with class type kept in memory.
+So Fresh has to track Memory along with ID (makes a Fresh copy of Memory)?
+Not sure I like this... 
+
+
+At the parm mem:     Parm:Mem            @{ _-_ ^= (&123={ [[]] FOO 1 -> [[]] FOO }, ...), ... } // Unpinned unresolved field can float up
+At the parm:4:       Parm        *[alias]
+At the klaz load:    Load        *[alias]@{ _-_ ^= (&123={ [[]] FOO 1 -> [[]] FOO }, ...), ... } // Unpinned unresolved field can float up
+At the oper load:    Field ._-_          @{ _-_ ^= (&123={ [[]] FOO 1 -> [[]] FOO }, ...), ... } // Unpinned unresolved field can float up
+At the resolve  :    Field ._                      (&123={ [[]] FOO 1 -> [[]] FOO }, ...)
+At the oper call:    CALL FOO 1                          { [[]] FOO 1 -> [[]] FOO }
+
+So at the call-site for 'fun' we make a fresh copy, and unify
+FRESH VAL:*[unk_alias]
+OTHER VAL: Base:99 --> *[PINT]
+FRESH MEM: [[ unk_alias = @{ _-_ ^= (&123={ [[ ]] FOO 1   -> [[ ]] FOO }, ...            ), ...                 } ]]
+OTHER MEM: [[ PINT      = @{ _-_  = (   0={ [MEM] int int -> [MEM] int },1={int flt->flt}), other opers, closed } ]]
+
+
+=======================================
 05/12/2023
 
 Got pretty far since last notes.
@@ -19,8 +75,6 @@ So current theory:
   - Structs in AA without further clzz names go straight to CLZ_CLZ clazz.
   - The "." field is a TVStruct, not a TVPtr.  Sharing will keep costs down?
   - - Can think about final-field (no leaf) optimizations for Fresh.
-
-
 
   
 - Field unifies insert a field into a struct.
