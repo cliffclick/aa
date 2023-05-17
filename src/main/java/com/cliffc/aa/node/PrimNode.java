@@ -275,16 +275,13 @@ public abstract class PrimNode extends Node {
     // with a clazz reference
     for( int i=DSP_IDX; i<_formals.len(); i++ )
       if( _formals.at(i)!=Type.ANY )
-        in(i-DSP_IDX).set_tvar().unify(make_tvar((TypeNil)_formals.at(i)),false);
+        in(i-DSP_IDX).set_tvar().unify(wrap_base(_formals.at(i)),false);
     // Return is some primitive
-    return make_tvar(_ret);
+    return wrap_base(_ret);
   }
 
   // Make a TV3
-  static TV3 make_tvar(TypeNil rez) {
-    if( rez==TypeNil.NIL ) throw unimpl();
-    return TV3.from_flow(rez);
-  }
+  public static TV3 wrap_base(Type rez) { return TV3.from_flow(rez); }
 
   // All work done in set_tvar, no need to unify
   @Override public boolean unify( boolean test ) { return false; }
@@ -584,9 +581,9 @@ public abstract class PrimNode extends Node {
       // primitive with a clazz reference
       for( int i=DSP_IDX; i<_formals.len(); i++ )
         if( _formals.at(i)!=Type.ANY )
-          in(i-MEM_IDX).set_tvar().unify(make_tvar((TypeNil)_formals.at(i)),false);
+          in(i-MEM_IDX).set_tvar().unify(wrap_base(_formals.at(i)),false);
       // Return is some primitive
-      return make_tvar(_ret);
+      return wrap_base(_ret);
     }
   }
   

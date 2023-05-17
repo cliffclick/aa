@@ -1,11 +1,11 @@
 =======================================
 05/15/2023
 
-ACTION: DROP TVMem
-ACTION: TVStruct always slot 0 is CLZ, ALWAYS
-ACTION: TVStruct, bring back pinned fields.  When unify drops a un-pinned
-        field, it instead "pushes up" to the next open clazz struct and
-        only deletes if it hits CLZCLZ
+*ACTION: DROP TVMem
+*ACTION: TVStruct always slot 0 is CLZ, ALWAYS
+*ACTION: TVStruct, bring back pinned fields.
+ ACTION: When unify drops a un-pinned field, it instead "pushes up" to the next
+         open clazz struct and only deletes if it hits CLZCLZ
 
 Don't have Mem right yet.
 Let-assign with Mem, then Fresh on use.

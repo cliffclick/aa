@@ -233,6 +233,9 @@ abstract public class TV3 implements Cloneable {
 
     // If 'this' and 'that' are different classes, unify both into an error
     if( getClass() != that.getClass() ) {
+      // As a special case, allow unify of TVPtr and the Clazz of a Base.
+      if( this instanceof TVPtr ptr && that instanceof TVBase base ) return ptr._unify_base(base,test);
+      if( that instanceof TVPtr ptr && this instanceof TVBase base ) return ptr._unify_base(base,test);
       if( test ) return true;
       return that instanceof TVErr
         ? that._unify_err(this)
@@ -311,18 +314,22 @@ abstract public class TV3 implements Cloneable {
 
     // LHS leaf, RHS is unchanged but goes in the VARS
     if( this instanceof TVLeaf lf ) { if( !test ) lf.add_delay_fresh(); return vput(that,false); }
-    if( that instanceof TVLeaf lf ) // RHS is a tvar; union with a deep copy of LHS
+    if( that instanceof TVLeaf    ) // RHS is a tvar; union with a deep copy of LHS
       return test || vput(that,that.union(_fresh()));
 
     // Special handling for nilable
     if( !(that instanceof TVNil) && this instanceof TVNil nil ) return vput(that,nil._unify_nil_l(that,test));
     if( !(this instanceof TVNil) && that instanceof TVNil nil ) return vput(nil._unify_nil_r(this,test),true);
 
-    // Two unrelated classes make an error
-    if( getClass() != that.getClass() )
+    // Two unrelated classes usually make an error
+    if( getClass() != that.getClass() ) {
+      // As a special case, allow unify of TVPtr and the Clazz of a Base.
+      if( this instanceof TVPtr && that instanceof TVBase ) throw unimpl();
+      if( that instanceof TVPtr && this instanceof TVBase ) throw unimpl();
       return that instanceof TVErr terr
         ? terr._fresh_unify_err_fresh(this,test)
         : this._fresh_unify_err      (that,test);
+    }
 
     boolean progress = false;
 
@@ -475,7 +482,12 @@ abstract public class TV3 implements Cloneable {
     if( this instanceof TVNil ) return this._trial_unify_ok_impl(that,extras);
     if( that instanceof TVNil ) return that._trial_unify_ok_impl(this,extras);
     // Different classes always fail
-    if( getClass() != that.getClass() ) return false;
+    if( getClass() != that.getClass() ) {
+      // As a special case, allow unify of TVPtr and the Clazz of a Base.
+      if( this instanceof TVPtr ptr && that instanceof TVBase base ) return ptr._trial_unify_base(base,extras);
+      if( that instanceof TVPtr ptr && this instanceof TVBase base ) return ptr._trial_unify_base(base,extras);      
+      return false;
+    }
     // Subclasses check sub-parts
     return _trial_unify_ok_impl(that, extras);
   }

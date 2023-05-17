@@ -38,10 +38,20 @@ public class TVPtr extends TV3 {
     _aliases = _aliases.meet(ptr._aliases);
   }
 
-  @Override boolean _unify_impl(TV3 that ) { return true; }
+  @Override boolean _unify_impl(TV3 that ) {
+    TVPtr ptr = (TVPtr)that;    // Invariant when called
+    return load()._unify(ptr.load(),false);
+  }
+
+  boolean _unify_base( TVBase base, boolean test ) { return _unify(base.clz(),test); }
+
+  boolean _trial_unify_base( TVBase base, boolean extras ) { return _trial_unify_ok(base.clz(),extras); }
   
   // -------------------------------------------------------------
   @Override boolean _fresh_unify_impl(TV3 that, boolean test) {
+    boolean progress = super._fresh_unify_impl(that,test);
+    if( test && progress ) return true;
+    assert !unified() && !that.unified();
     TVPtr ptr = (TVPtr)that;    // Invariant when called
     if( _aliases==ptr._aliases ) return false;
     BitsAlias aliases = _aliases.meet(ptr._aliases);

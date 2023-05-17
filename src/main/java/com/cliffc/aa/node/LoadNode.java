@@ -250,34 +250,16 @@ public class LoadNode extends Node {
   
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
-    // Address needs to be one of a TVPtr or TVBase, but cannot tell.
-    // IF it is a TVBase, we can get the CLZ ptr from it.
-    // Self is just an open TVStruct
-    return new TVStruct(true);
+    // Self is just an open struct
+    TVStruct self = new TVStruct(true);
+    _tvar = self;               // Stop cycles
+    TV3 adr = adr().set_tvar();
+    if( adr instanceof TVPtr ptr ) ptr.load().unify(self,false);
+    else adr.unify(new TVPtr(BitsAlias.EMPTY,self),false);
+    return self;
   }
 
-  // Incoming address is
-  // - Leaf - stall, need address TV3
-  // - Ptr  - classic ptr.load unify
-  // - Base - Base._t dictates clz ptr; then same as Ptr  
-  @Override public boolean unify( boolean test ) {
-    TVStruct self = tvar().as_struct();
-    TV3 adr = adr().tvar();
-    return switch( adr ) {
-    // Stall until forced to Base,Ptr or Err of same
-    case TVLeaf leaf   -> leaf.deps_add_deep(this);
-    //case TVStruct tstr -> self.unify(adr, test); // Load from prototype, just pass-thru
-    case TVBase base   -> do_base(self,base,test);
-    case TVErr err     -> {
-      if( err.as_int()!=null ) yield do_base(self,err.as_int(),test);
-      if( err.as_flt()!=null ) yield do_base(self,err.as_flt(),test);
-      yield false;
-    }
-    case TVNil tnil    -> tnil.deps_add_deep(this); // Stall until this settles out
-    case TVPtr ptr     -> ptr.load().unify(self,test);
-    default -> throw unimpl();
-    };
-  }
+  @Override public boolean unify( boolean test ) { return false; }
 
   private static boolean do_base(TVStruct self, TVBase base, boolean test) {
     // Bases field their prototype via the TypeNil type, and from there the CLZ

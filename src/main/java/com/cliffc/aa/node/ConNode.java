@@ -36,7 +36,7 @@ public class ConNode<T extends Type> extends Node {
 
   @Override public TV3 _set_tvar() {
     unelock();                  // Hash now depends on TVars
-    TV3 tv = TV3.from_flow(_t);
+    TV3 tv = PrimNode.wrap_base(_t);
     tv.deps_add_deep(this);     // Constant hash depends on tvar      
     return tv;
   }

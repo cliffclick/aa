@@ -1,6 +1,7 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.node.Node;
+import com.cliffc.aa.node.PrimNode;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
@@ -46,6 +47,12 @@ public class TVBase extends TVExpanding {
     b.add_may_nil(false);
     b.widen(_widen,false);
     return b;
+  }
+
+  TVPtr clz() {
+    if( _t instanceof TypeInt ) return (TVPtr)PrimNode.PINT.tvar();
+    if( _t instanceof TypeFlt ) return (TVPtr)PrimNode.PFLT.tvar();
+    throw unimpl();
   }
   
   // -------------------------------------------------------------

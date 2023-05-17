@@ -39,17 +39,14 @@ public class TVLambda extends TV3 {
   // -------------------------------------------------------------
   @Override public void _union_impl( TV3 tv3) { }
 
-  @Override boolean _unify_impl(TV3 tv3 ) {
-    TVLambda thsi = this;
-    TVLambda that = (TVLambda)tv3; // Invariant when called
-    thsi.ret()._unify(that.ret(),false);
-    thsi = (TVLambda)thsi.find();
-    that = (TVLambda)that.find();
-    int nargs = nargs(), tnargs = that.nargs();
-    for( int i=DSP_IDX; i<Math.min(nargs,tnargs); i++ ) {
+  @Override boolean _unify_impl(TV3 that ) {
+    TV3 thsi = this;
+    int nargs = nargs(), tnargs = ((TVLambda)that).nargs();
+    for( int i=0; i<Math.min(nargs,tnargs); i++ ) {
+      if( _args[i]==null ) continue;
       thsi.arg( i )._unify( that.arg( i ), false );
-      thsi = (TVLambda)thsi.find();
-      that = (TVLambda)that.find();
+      thsi = thsi.find();
+      that = that.find();      
     }
     if( nargs != tnargs )
       that.unify_err("Expected "+tnargs+" but found "+nargs,that,false);

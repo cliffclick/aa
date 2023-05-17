@@ -29,7 +29,6 @@ public interface Resolvable {
   
   default boolean trial_resolve( boolean outie, TV3 pattern, TVStruct lhs, TVStruct rhs, boolean test ) {
     assert !rhs.is_open() && is_resolving();
-    assert lhs==rhs;
 
     // Not yet resolved.  See if there is exactly 1 choice.
     PAT_LEAFS.clear();

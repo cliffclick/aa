@@ -23,13 +23,11 @@ public class FP2DSPNode extends Node {
 
   @Override public Node ideal_reduce() {
     Node fp = fp();
-    if( fp instanceof FreshNode frsh ) 
-      fp = frsh.id();    
-    if( fp instanceof BindFPNode bind ) return bind.dsp();
-    else {
-      fp.deps_add(this);
-      if( fp!=fp() ) fp().deps_add(this);
-    }
+    // Note: cannoy bypass Fresh nodes here; might need to Fresh a display.
+    if( fp instanceof BindFPNode bind )
+      return bind.dsp();
+    fp.deps_add(this);
+    if( fp!=fp() ) fp().deps_add(this);
     return null;
   }
 

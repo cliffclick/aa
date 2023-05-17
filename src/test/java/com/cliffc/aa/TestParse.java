@@ -30,7 +30,8 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    test   ("x=@{n:=1;v:=2}; x.n := 3; x", "*[10]@{_; n:=3; v:=2}","*@{n=int:nint8; v=int:2}", null, null, "[10]", null);
+    test("fun = { x -> math.rand(2) ? x : fun(x-1) }; fun(3)","int64","int64");
+    
     // TestHM.b_recursive_02.  The expression "x-1" cannot resolve the operator
     // "_-_" because "x" is a free variable.  It binds in its one use.
     test("fun = { fx x -> x ? fx( fun(fx,x-1) ) : 1 }; fun(2._*_._, 99)",

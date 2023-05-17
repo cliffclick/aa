@@ -8,8 +8,17 @@ import java.util.Arrays;
 
 import static com.cliffc.aa.AA.unimpl;
 
-/** A type struct.
+/** A type struct.  
  *
+ * Has (recursive) fields with labels.  A struct can be open or closed; open
+ * structs allow more fields to appear.  Open structs come from FieldNodes
+ * which know that a particular field must be present, and also maybe more.
+ * Closed structs come from StructNodes which list all the present fields.
+ * If field #0 is present, it is named "." and holds the Clazz for this struct.
+ * 
+ * Fields may be pinned or not.  Pinned fields cannot lift to a superclazz, and
+ * come from StructNodes.  Unpinned fields are not necessarily in the correct
+ * struct, and may migrate up the superclazz chain.  
  */
 public class TVStruct extends TVExpanding {
   public static final String[] FLDS0 = new String[0];
@@ -28,7 +37,7 @@ public class TVStruct extends TVExpanding {
 
   // Pinned fields do not lift to the super-clazz field.  Unpinned fields, if
   // deleted by unification, instead lift to the next open super-clazz or
-  // delete if no open super-clazz.
+  // delete if we hit the top of the super-clazz chain.
   private boolean[] _pins;
   
   private int _max;             // Max set of in-use flds/args
@@ -166,7 +175,7 @@ public class TVStruct extends TVExpanding {
     TVStruct that = (TVStruct)tv3; // Invariant when called
     assert !this.unified() && !that.unified();
     TVStruct thsi = this;
-
+    
     // Unify LHS fields into RHS
     boolean open = that.is_open();
     for( int i=0; i<thsi._max; i++ ) {
@@ -181,6 +190,7 @@ public class TVStruct extends TVExpanding {
       } else {
         TV3 fthat = that.arg(ti);  // Field of that
         fthis._unify(fthat,false); // Unify both into RHS
+        that._pins[ti] |= thsi._pins[i];  // Unify pinned
         // Progress may require another find()
         thsi = (TVStruct)thsi.find();
         that = (TVStruct)that.find();
@@ -211,17 +221,27 @@ public class TVStruct extends TVExpanding {
       TV3 lhs = arg(i);
       int ti = Util.find(that._flds,_flds[i]);
       if( ti == -1 ) {          // Missing in RHS
-        if( is_open() || that.is_open() ) {
+        boolean resolving =  Resolvable.is_resolving(_flds[i]);
+        if( is_open() || that.is_open() || resolving ) {
           if( test ) return true; // Will definitely make progress
           TV3 nrhs = lhs._fresh();
-          if( !that.is_open() ) // RHS not open, put copy of LHS into RHS with miss_fld error
-            throw unimpl();
-          //progress |= that.add_fld(_flds[i],nrhs);
-          throw unimpl();
+          if( !that.is_open() && !resolving ) // RHS not open, put copy of LHS into RHS with miss_fld error
+            throw unimpl();                   // miss_fld
+          // Put in RHS if its open OR resolving
+          progress |= that.add_fld(_flds[i],nrhs,_pins[i]);
+          if( resolving ) {
+            Resolvable fld = TVField.FIELDS.get(_flds[i]);
+            if( fld.trial_resolve(false,nrhs,that,that,false) ) {
+              _flds[i] = fld.fld(); // Update the field name in the Fresh side
+              progress = true;
+            }
+          }
         } else missing = true; // Else neither side is open, field is not needed in RHS
+        
       } else {
         TV3 rhs = that.arg(ti); // Lookup via field name
         progress |= lhs._fresh_unify(rhs,test);
+        that._pins[ti] |= _pins[i];        
       }
       assert !unified();      // If LHS unifies, VARS is missing the unified key
       that = (TVStruct)that.find(); // Might have to update
@@ -232,9 +252,10 @@ public class TVStruct extends TVExpanding {
     // just copy the missing fields into it, then unify the structs (shortcut:
     // just skip the copy).  If the LHS is closed, then the extra RHS fields
     // are removed.
-    if( _max != that._max || missing )
+    if( !is_open() && (_max != that._max || missing) )
       for( int i=0; i<that._max; i++ ) {
-        if( Resolvable.is_resolving(that._flds[i]) ) continue;
+        if( Resolvable.is_resolving(that._flds[i]) )
+          throw unimpl();
         TV3 lhs = arg(that._flds[i]); // Lookup vis field name
         if( lhs==null ) {
           if( test ) return true;
@@ -300,8 +321,9 @@ public class TVStruct extends TVExpanding {
 
   @Override boolean _exact_unify_impl( TV3 tv3 ) {
     TVStruct ts = (TVStruct)tv3;
-    return (!_open && !ts._open ) && // Both are closed (no adding unmatching fields)
-      Arrays.equals(_flds,ts._flds); // And all fields match
+    return (!_open && !ts._open ) &&   // Both are closed (no adding unmatching fields)
+      Arrays.equals(_flds,ts._flds) && // And all fields match
+      Arrays.equals(_pins,ts._pins);   // And all fields match
   }
 
   // -------------------------------------------------------------
@@ -315,10 +337,28 @@ public class TVStruct extends TVExpanding {
   @Override public TVStruct copy() {
     TVStruct st = (TVStruct)super.copy();
     st._flds = _flds.clone();
+    st._pins = _pins.clone();
     return st;
   }
 
+  boolean is_int_clz() { return Util.find(_flds,"!_"  ) >= 0; }
+  boolean is_flt_clz() { return Util.find(_flds,"sin" ) >= 0; }
+  boolean is_str_clz() { return Util.find(_flds,"#_"  ) >= 0; }
+  boolean is_math_clz(){ return Util.find(_flds,"pi"  ) >= 0; }
+  boolean is_top_clz() { return Util.find(_flds,"math") >= 0; }
+
   @Override public VBitSet _get_dups_impl(VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
+    TV3 clz = debug_arg(".");
+    if( !prims && is_int_clz() ) return dups;
+    if( !prims && is_flt_clz() ) return dups;
+    if( !prims && is_str_clz() ) return dups;
+    if( !prims && is_math_clz()) return dups;
+    if( !prims && is_top_clz() ) return dups;
+    
+    if( !debug && clz instanceof TVPtr zptr && _flds.length==2 && Util.eq(_flds[1],"0") ) {
+      if( zptr.load().is_int_clz() || zptr.load().is_flt_clz() )
+        return _args[1]._get_dups(visit,dups,debug,prims);
+    }
     for( int i=0; i<len(); i++ ) {
       if( !debug && Util.eq("^",_flds[i]) ) continue; // Display is private, not shown
       if( !debug && Resolvable.is_resolving(_flds[i]) ) continue;
@@ -328,22 +368,6 @@ public class TVStruct extends TVExpanding {
   }
 
   
-  boolean is_int_clz() { return Util.find(_flds,"!_"  ) >= 0; }
-  boolean is_flt_clz() { return Util.find(_flds,"sin" ) >= 0; }
-  boolean is_str_clz() { return Util.find(_flds,"#_"  ) >= 0; }
-  boolean is_math_clz(){ return Util.find(_flds,"pi"  ) >= 0; }
-  boolean is_top_clz() { return Util.find(_flds,"math") >= 0; }
-  boolean is_tup(boolean debug) {
-    if( _max==0 ) return true;
-    boolean label=true;
-    for( int i=0; i<len(); i++ ) {
-      char c = _flds[i].charAt(0);
-      if( debug && c=='&' ) return false;
-      else if( Character.isDigit(c) ) label=false;
-    }
-    return !label;
-  }
-  
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     if( _args==null  ) return sb.p(_open ? "(...)" : "()");
     if( !prims && is_int_clz() ) return sb.p("int");
@@ -352,7 +376,13 @@ public class TVStruct extends TVExpanding {
     if( !prims && is_math_clz()) return sb.p("math");
     if( !prims && is_top_clz() ) return sb.p("TOP");
 
+    // Special hack to print "int:(2)" as "2"
     TV3 clz = debug_arg(".");
+    if( !debug && clz instanceof TVPtr zptr && _flds.length==2 && Util.eq(_flds[1],"0") ) {
+      if( zptr.load().is_int_clz() || zptr.load().is_flt_clz() )
+        return _args[1]._str(sb,visit,dups,debug,prims);
+    }
+    // Print clazz field up front.
     if( clz!=null ) clz._str(sb,visit,dups,debug,prims).p(":");    
     boolean is_tup = is_tup(debug);
     sb.p(is_tup ? "(" : "@{");
@@ -372,6 +402,17 @@ public class TVStruct extends TVExpanding {
     if( _args.length>0 ) sb.unchar(2);
     sb.p(!is_tup ? "}" : ")");
     return sb;
+  }
+
+  boolean is_tup(boolean debug) {
+    if( _max==0 ) return true;
+    boolean label=true;
+    for( int i=0; i<len(); i++ ) {
+      char c = _flds[i].charAt(0);
+      if( debug && c=='&' ) return false;
+      else if( Character.isDigit(c) ) label=false;
+    }
+    return !label;
   }
 
   // Stoopid hand-rolled bubble sort
