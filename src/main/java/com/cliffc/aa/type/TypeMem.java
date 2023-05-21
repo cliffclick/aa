@@ -94,7 +94,7 @@ public class TypeMem extends Type<TypeMem> {
           }
     return true;
   }
-  @Override public long static_hash( ) { return _objs.length; }
+  @Override public long static_hash( ) { return _objs.length + (_any ? 127 : 0); }
 
   // ----------
   @Override long compute_hash() {
@@ -108,7 +108,7 @@ public class TypeMem extends Type<TypeMem> {
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeMem tf) ) return false;
-    if( _objs.length != tf._objs.length ) return false;
+    if( _objs.length != tf._objs.length || _any != tf._any ) return false;
     for( int i = 0; i< _objs.length; i++ )
       if( _objs[i] != tf._objs[i] ) // note '==' and NOT '.equals()'
         return false;

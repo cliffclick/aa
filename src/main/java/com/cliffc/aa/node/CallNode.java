@@ -188,6 +188,7 @@ public class CallNode extends Node {
       _unpacked = true;         // Only do it once
       xval(); // Recompute value, this is not monotonic since replacing tuple with args
       GVN.add_work_new(this);// Revisit after unpacking
+      fdx().add_flow();      // Also, fcn/dsp liveness changes
       return this;
     }
 
@@ -343,10 +344,11 @@ public class CallNode extends Node {
     return super.live();                        // Ok, take liveness from all users
   }
   
+  static final Type FP_LIVE = TypeStruct.UNUSED.add_fldx(TypeFld.make("fp",Type.ALL));
   @Override public Type live_use(Node def) {
     if( _is_copy ) return def._live;
     if( def==ctl() ) return Type.ALL;
-    if( def==fdx() ) return Type.ALL;
+    if( def==fdx() ) return _unpacked ? FP_LIVE : Type.ALL;
     boolean is_keep = is_keep();
     if( def==mem() ) return is_keep || _live==Type.ALL ? RootNode.def_mem(def) : _live;
     if( def==arg(DSP_IDX) && !_unpacked ) return TypeStruct.ISUSED;

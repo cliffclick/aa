@@ -23,7 +23,7 @@ public class CastNode extends Node {
     if( n1 instanceof FreshNode frs ) n1 = frs.id();
     // No-Op, should remove shortly
     if( n1._val instanceof TypeStruct )
-      return n1._val;    
+      return n1._val;
     if( !checked(in(0),n1) ) return t;
       // Pin t between cast
       //return t.meet(_t.dual()).join(_t);
@@ -93,10 +93,23 @@ public class CastNode extends Node {
       assert maybase._t == notbase._t.meet(TypeNil.NIL);
       return false;
     }
+
+    if( maynil instanceof TVErr merr && merr.as_ptr() != null ) maynil = merr.as_ptr();
+    if( notnil instanceof TVErr nerr && nerr.as_ptr() != null ) notnil = nerr.as_ptr();
     
     // Already an expanded nilable with ptr
-    if( maynil instanceof TVPtr mptr && notnil instanceof TVPtr nptr )
+    if( maynil instanceof TVPtr mptr && notnil instanceof TVPtr nptr ) {
+      assert !mptr.load().unify(nptr.load(),true); // Already unified
       return false;
+    }
+
+    // Special case of mixing ptrs and bases
+    if( maynil instanceof TVBase mbase && notnil instanceof TVPtr nptr ) {
+      return mbase.clz().unify(nptr,test);
+    }
+    if( maynil instanceof TVPtr mptr && notnil instanceof TVBase nbase ) {
+      throw unimpl();
+    }
 
     // Can be nilable of nilable; fold the layer
     if( maynil instanceof TVNil && notnil instanceof TVNil )
@@ -109,7 +122,7 @@ public class CastNode extends Node {
     // TODO: Probably need to as_struct or as_base or as_ptr all of these
     if( maynil instanceof TVErr && notnil instanceof TVErr )
       return false;
-    
+
     // Unify the maynil with a nilable version of notnil
     return new TVNil(notnil).find().unify(maynil,test);
   }
@@ -122,7 +135,7 @@ public class CastNode extends Node {
     if( val(0)==Type.XCTRL || val(1).isa(_t) ) return null;
     return fast ? ErrMsg.FAST : ErrMsg.typerr(null,val(1),_t);
   }
-  
+
   private boolean checked( Node n, Node addr ) {
     // Cast up for a typed Parm; always apply
     //if( TypeNil.XNIL.isa(_t) ) return true;

@@ -20,6 +20,8 @@ public class TVPtr extends TV3 {
     _aliases = aliases;
   }
 
+  @Override public TVPtr as_ptr() { return this; }
+
   public TVStruct load() { return arg(0).as_struct(); }
   
   @Override int eidx() { return TVErr.XPTR; }
@@ -51,8 +53,8 @@ public class TVPtr extends TV3 {
   @Override boolean _fresh_unify_impl(TV3 that, boolean test) {
     boolean progress = super._fresh_unify_impl(that,test);
     if( test && progress ) return true;
-    assert !unified() && !that.unified();
-    TVPtr ptr = (TVPtr)that;    // Invariant when called
+    assert !unified();
+    TVPtr ptr = (TVPtr)that.find();    // Invariant when called
     if( _aliases==ptr._aliases ) return false;
     BitsAlias aliases = _aliases.meet(ptr._aliases);
     if( aliases == ptr._aliases ) return false;

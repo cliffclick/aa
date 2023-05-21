@@ -638,7 +638,7 @@ public class Parse implements Comparable<Parse> {
       }
       int aidx = arg.push();
       Node dsp = gvn(new FP2DSPNode(Node.peek(eidx),errMsg(oldx)));
-      expr = do_call0(false,errMsgs(oldx,oldx),args(dsp,Node.pop(aidx),Node.pop(eidx))); // Pass the 1 arg
+      expr = do_call0(true,errMsgs(oldx,oldx),args(dsp,Node.pop(aidx),Node.pop(eidx))); // Pass the 1 arg
     }
   }
 
@@ -1634,6 +1634,7 @@ public class Parse implements Comparable<Parse> {
   // is wired it picks up projections to merge at the Fun & Parm nodes.
   private Node do_call( Parse[] bads, Node... args ) { return do_call0(true,bads,args); }
   private Node do_call0( boolean unpack, Parse[] bads, Node... args ) {
+    if( unpack ) args[args.length-1].add_flow(); // If already unpacked, make sure the fdx liveness updates
     CallNode call = (CallNode)gvn(new CallNode(unpack,bads,args));
     CallEpiNode cepi = (CallEpiNode)gvn(new CallEpiNode(call));
     int cidx = cepi.push(); // CallEpi can optimize a lot (e.g. inlining)

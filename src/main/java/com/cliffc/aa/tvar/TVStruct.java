@@ -215,27 +215,23 @@ public class TVStruct extends TVExpanding {
   @Override boolean _fresh_unify_impl(TV3 tv3, boolean test) {
     boolean progress = false, missing = false;
     assert !unified() && !tv3.unified();    
-    TVStruct that = (TVStruct)tv3.find(); // Might have to update
 
+    trial_resolve_all(this); assert !unified();
+    progress |= trial_resolve_all((TVStruct)tv3);
+    TVStruct that = (TVStruct)tv3.find();
+    
     for( int i=0; i<_max; i++ ) {
       TV3 lhs = arg(i);
+      boolean resolving = Resolvable.is_resolving(_flds[i]);
       int ti = Util.find(that._flds,_flds[i]);
       if( ti == -1 ) {          // Missing in RHS
-        boolean resolving =  Resolvable.is_resolving(_flds[i]);
+              
         if( is_open() || that.is_open() || resolving ) {
           if( test ) return true; // Will definitely make progress
           TV3 nrhs = lhs._fresh();
           if( !that.is_open() && !resolving ) // RHS not open, put copy of LHS into RHS with miss_fld error
             throw unimpl();                   // miss_fld
-          // Put in RHS if its open OR resolving
           progress |= that.add_fld(_flds[i],nrhs,_pins[i]);
-          if( resolving ) {
-            Resolvable fld = TVField.FIELDS.get(_flds[i]);
-            if( fld.trial_resolve(false,nrhs,that,that,false) ) {
-              _flds[i] = fld.fld(); // Update the field name in the Fresh side
-              progress = true;
-            }
-          }
         } else missing = true; // Else neither side is open, field is not needed in RHS
         
       } else {
@@ -254,14 +250,15 @@ public class TVStruct extends TVExpanding {
     // are removed.
     if( !is_open() && (_max != that._max || missing) )
       for( int i=0; i<that._max; i++ ) {
-        if( Resolvable.is_resolving(that._flds[i]) )
-          throw unimpl();
+        if( Resolvable.is_resolving(that._flds[i]) ) continue;
         TV3 lhs = arg(that._flds[i]); // Lookup vis field name
         if( lhs==null ) {
           if( test ) return true;
           progress |= that.del_fld(i--);
         }
       }
+
+    progress |= trial_resolve_all(that);
     
     // If LHS is closed, force RHS closed
     if( !_open && that._open ) {
@@ -275,25 +272,35 @@ public class TVStruct extends TVExpanding {
   
   // -------------------------------------------------------------
   // TODO  move to Resolvable?
-  void trial_resolve_all() {
-    assert !unified();
-    for( int i=0; i<_max; i++ ) {
-      String key = _flds[i];
+  // Attempt to resolve any unresolved fields.
+  // Remove any pre-resolved fields.
+  static boolean trial_resolve_all(TVStruct t) {
+    boolean progress = false;
+    for( int i=0; i<t._max; i++ ) {
+      t = ((TVStruct)t.find());
+      String key = t._flds[i];
+      if( !Resolvable.is_resolving(key) ) continue; // Resolving key?
       Resolvable res = TVField.FIELDS.get(key);
       if( res==null ) continue;  // Field is already resolved, or not a resolvable field
       // Field is still resolving?
       if( res.is_resolving() ) {
-        if( !is_open() ) // More fields possible, so trial_resolve cannot be tried
-          res.trial_resolve(true,arg(i),this,this, false); // Attempt resolve
+        if( !t.is_open() && // More fields possible, so trial_resolve cannot be tried
+            res.trial_resolve(true,t.arg(i),t,t, false) ) { // Attempt resolve
+          progress = true;
+          t = (TVStruct)t.find();
+          i--;                  // Rerun after removing resolved field
+        }
       } else {
+        progress = true;
         // key is resolving, but Field is already resolved
-        TV3 old = arg(i);        // Old unresolved value
-        del_fld(i);              // Remove resolving key
-        TV3 t3 = arg(res.fld()); // Get resolved label, if any
-        if( t3==null ) throw unimpl(); //_args.put(res._fld,old); // Insert resolved-label, even if this is open, since operation is a label replacement
+        TV3 old = t.arg(i);        // Old unresolved value
+        t.del_fld(i);              // Remove resolving key
+        TV3 t3 = t.arg(res.fld()); // Get resolved label, if any
+        if( t3==null ) t.add_fld(res.fld(),old,true); // Insert resolved-label, even if this is open, since operation is a label replacement
         else old._unify(t3, false); // Unify into existing (fold labels together)
       }
     }
+    return progress;
   }
 
   @Override boolean _trial_unify_ok_impl( TV3 tv3, boolean extras ) {

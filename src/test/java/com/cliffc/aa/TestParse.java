@@ -30,13 +30,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    test("fun = { x -> math.rand(2) ? x : fun(x-1) }; fun(3)","int64","int64");
-    
-    // TestHM.b_recursive_02.  The expression "x-1" cannot resolve the operator
-    // "_-_" because "x" is a free variable.  It binds in its one use.
-    test("fun = { fx x -> x ? fx( fun(fx,x-1) ) : 1 }; fun(2._*_._, 99)",
-            "int64",
-            "int64");
+    testerr("( { x -> x*2 }, { x -> x*3 })._ 4", "Ambiguous, matching choices ({ A B -> C }, { D E -> F }) vs { G 4 -> H }",30);
   }
   static private void assertTrue(boolean t) {
     if( t ) return;
@@ -78,9 +72,9 @@ public class TestParse {
     // 'g' is not-fresh in function 'f'.
     // 'f' IS fresh in the body of 'g' pair.
     test("{ g -> f = { ignore -> g }; (f 3, f \"abc\")}",
-         "[55]{any,4 -> *[13](%[2,5,13][2,55]?, %[2,5,13][2,55]?) }",
+         "[55]{any,4 -> *[13](%[2,13][2,55]?, %[2,13][2,55]?) }",
          "{ A B -> *[13]( B, B) }",
-         null,null,"[5,13]","[55]");
+         null,null,"[13]","[55]");
 
     // TestParse.g_overload_err_00
     testerr("( { x -> x*2 }, { x -> x*3 })._ 4", "Ambiguous, matching choices ({ A B -> C }, { D E -> F }) vs { G 4 -> H }",30);

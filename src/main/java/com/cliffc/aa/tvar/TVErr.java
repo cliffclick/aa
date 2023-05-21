@@ -31,6 +31,7 @@ public class TVErr extends TV3 {
   @Override public TVBase   as_int   () { return (TVBase  )arg(XINT); }
   @Override public TVBase   as_flt   () { return (TVBase  )arg(XFLT); }
   @Override public TVNil    as_nil   () { return (TVNil   )arg(XNIL); }
+  @Override public TVPtr    as_ptr   () { return (TVPtr   )arg(XPTR); }
 
   @Override int eidx() { throw unimpl(); }
 

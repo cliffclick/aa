@@ -1,11 +1,13 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVLambda;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.*;
+import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.VBitSet;
 
 import java.util.function.Predicate;
 
@@ -124,9 +126,6 @@ public class RootNode extends Node {
   private static TypeNil escapes_get() {
     TypeNil tn = TypeNil.make(false,false,false, EXT_ALIASES, EXT_FIDXS );
     EVISIT.clear();
-    EXT_MEM = null;             // Reset for next pass
-    EXT_ALIASES = null;
-    EXT_FIDXS = null;
     return tn;
   }
 
@@ -165,12 +164,15 @@ public class RootNode extends Node {
           // Apply might) with the most conservative flow arguments possible.
           for( int fidx : tn._fidxs) {
             if( EXT_FIDXS.test_recur(fidx)) continue; // Never seen before escape
-            EXT_FIDXS = EXT_FIDXS.set(fidx);
             RetNode ret = RetNode.get(fidx);
             if( ret != null ) {
-              escape_ret(ret);
               FunPtrNode fptr = ret.funptr();
-              fptr.tvar().widen((byte)1,false); // HMT widen
+              if( fptr != null ) {
+                EXT_FIDXS = EXT_FIDXS.set(fidx);
+                fptr.tvar().widen((byte)1,false); // HMT widen
+                fptr.deps_add(Env.ROOT); // Un-escaping by deleting FunPtr will trigger Root recompute
+                escape_ret(ret);
+              }
             }
           }
           // The return (but not inputs, so not display) also escapes
@@ -179,8 +181,11 @@ public class RootNode extends Node {
         }
       }
       case TypeTuple tup -> {
-        for( Type tt : tup._ts )
-          _escapes(tt);
+        assert tup.len()== AA.ARG_IDX;
+        TypeMem mem = (TypeMem)tup.at(MEM_IDX);
+        TypeMem mem2 = mem.remove(KILL_ALIASES);
+        EXT_MEM = (TypeMem)EXT_MEM.meet(mem2);
+        _escapes(tup.at(REZ_IDX));
       }
       case TypeMem mem -> {
         TypeStruct[] tss = mem.alias2objs();
@@ -287,7 +292,18 @@ public class RootNode extends Node {
   @Override public Type live_use(Node def) {
     if( def==in(CTL_IDX) ) return Type.ALL;
     if( def==in(MEM_IDX) ) return _live;
-    if( def==in(REZ_IDX) ) return Type.ALL;
+    if( def==in(REZ_IDX) ) {
+      // Sharpen liveness for escaping function displays
+      if( val(REZ_IDX) instanceof TypeFunPtr tfp ) {
+        if( tfp.dsp() instanceof TypeMemPtr tmp ) {
+          if( !ralias().overlaps(tmp.aliases()) )
+            return CallNode.FP_LIVE;
+        } else if( tfp.dsp()==Type.ANY )
+          return CallNode.FP_LIVE;
+      }
+      if( val(REZ_IDX)==Type.ANY ) return Type.ANY; // TODO: Surely broken
+      return Type.ALL;
+    }
     assert def instanceof CallNode || def instanceof RetNode;
     return _live;               // Global calls take same memory as me
   }
@@ -346,6 +362,13 @@ public class RootNode extends Node {
     if( in(0)==null ) return null;
     Node cc = fold_ccopy();
     if( cc!=null ) return cc;
+
+    // See if we can unescape some functions
+    for( int i=ARG_IDX; i<len(); i++ )
+      if( in(i) instanceof RetNode ret && ret.funptr()==null ) {
+        del(i--);
+        if( ret._uses._len==0 ) ret.kill();
+      }
     
     // Turned off, since int/flt constant returns actually have a TVClz with a
     // TVPtr in memory which is used for the HM return.

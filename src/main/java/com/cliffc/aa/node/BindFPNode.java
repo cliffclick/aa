@@ -3,11 +3,12 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Util;
 
-import static com.cliffc.aa.AA.DSP_IDX;
 import static com.cliffc.aa.AA.unimpl;
 
-// Bind a 'this' into an unbound function pointer.  Inverse of FP2DSP.
+// Bind a 'this' into an unbound function pointer.  Inverse of FP2DSP.  The
+// function input can also be a struct (overload) of function pointers.
 public class BindFPNode extends Node {
   final boolean _over;  // Binds an Overload
   public BindFPNode( Node fp, Node dsp, boolean over ) { super(OP_BINDFP,fp,dsp); _over = over; }
@@ -25,11 +26,15 @@ public class BindFPNode extends Node {
   //   -   NO_DSP      XXX    - BIND Pass along XXX dsp.  Unify TFP.DSP and DSP.
   //   -  HAS_DSP      ANY    - NOOP Pass along has-dsp.  
   //   -  HAS_DSP      XXX    - EXTR Pass along has-dsp.  
-  @Override public Type value() { return bind(fp()._val, dsp()._val,_over); }
+  @Override public Type value() {
+    Type tfp = fp ()==null ? TypeFunPtr.GENERIC_FUNPTR.dual() : fp()._val;
+    Type dsp = dsp()==null ? Type.ANY : dsp()._val;
+    return bind(tfp,dsp,_over);
+  }
 
   private Type bind(Type fun, Type dsp, boolean over) {    
     if( !over && fun instanceof TypeFunPtr tfp )
-        return tfp.make_from(dsp);
+      return tfp.make_from(dsp);
     
     // Push Bind down into overloads
     if( over && fun instanceof TypeStruct ts ) {
@@ -45,26 +50,31 @@ public class BindFPNode extends Node {
   // Displays are always alive, if the Bind is alive.  However, if the Bind is
   // binding an overload the result is a struct-liveness instead just ALL.
   @Override public Type live_use(Node def) {
-    if( def==dsp() ) return Type.ALL;
-    return _over ? TypeStruct.ISUSED : Type.ALL;
+    if( def==dsp() ) return bind_live("dsp");
+    Type fplive = bind_live("fp");
+    return _over ? fplive.oob(TypeStruct.ISUSED) : fplive;
   }
-  // Bind can be used by a Field, and so have a struct-liveness
-  @Override public boolean assert_live(Type live) { return live instanceof TypeStruct; }
+  private Type bind_live(String name) {
+    return _live instanceof TypeStruct ts ? ts.at_def(name): _live;
+  }
+  
+  // Bind can be used by a Field, and so have a struct-liveness, and the whole of the Bind
+  // is pushed into functions with
+  @Override public boolean assert_live(Type live) {
+    if( !(live instanceof TypeStruct ts) ) return false;
+    if( _over ) return true; // Used by a Field node which will select which field is alive
+    // Normal binds allow on fields "fp" and "dsp"
+    for( TypeFld tf : ts )
+      if( !Util.eq(tf._fld,"fp") && Util.eq(tf._fld,"dsp") )
+        return false;
+    return true;
+  }
 
   @Override public Node ideal_reduce() {
-    // Check for early bind of an anonymous function which is not using the display.
-    if( fp()._val instanceof TypeFunPtr tptr ) {
-      int fidx = tptr.fidxs().abit();
-      if( fidx>0 ) {
-        RetNode ret = RetNode.get(fidx);
-        if( ret!=null && !ret.is_copy() ) {
-          Node dsp = ret.fun().parm(DSP_IDX);
-          if( dsp==null ) return fp(); // Display is dead, no need to bind
-          else dsp.deps_add(this);     // 
-        }
-      }
+    if( !_over && _live instanceof TypeStruct live ) {
+      if( live.at_def("fp" )==Type.ANY ) return set_def(0,null);
+      if( live.at_def("dsp")==Type.ANY ) return set_def(1,null);
     }
-
     return null;
   }
   

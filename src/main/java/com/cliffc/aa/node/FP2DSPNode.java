@@ -21,13 +21,24 @@ public class FP2DSPNode extends Node {
     return (fpt instanceof TypeFunPtr tfp) ? tfp.dsp() : fpt.oob();
   }
 
+  private static final Type DSP_LIVE = TypeStruct.UNUSED.add_fldx(TypeFld.make("dsp",Type.ALL));
+  @Override public Type live_use( Node def ) { return DSP_LIVE; }
+
   @Override public Node ideal_reduce() {
     Node fp = fp();
-    // Note: cannoy bypass Fresh nodes here; might need to Fresh a display.
+    // Note: cannot bypass Fresh nodes here; might need to Fresh a display.
     if( fp instanceof BindFPNode bind )
       return bind.dsp();
+    // Replace FP2DSP/Fresh/Bind/display with Fresh/display
+    if( fp instanceof FreshNode frsh ) {
+      if( frsh.id() instanceof BindFPNode bind ) {
+        Node frsh2 = frsh.copy(true).set_def(0,bind.dsp());
+        frsh2._val = bind.dsp()._val;
+        return frsh2;
+      }
+      frsh.deps_add(this);
+    }
     fp.deps_add(this);
-    if( fp!=fp() ) fp().deps_add(this);
     return null;
   }
 

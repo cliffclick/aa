@@ -135,6 +135,7 @@ abstract public class TV3 implements Cloneable {
   public TVBase   as_int   () { throw unimpl(); }
   public TVBase   as_flt   () { throw unimpl(); }
   public TVNil    as_nil   () { throw unimpl(); }
+  public TVPtr    as_ptr   () { throw unimpl(); }
 
   private long dbl_uid(TV3 t) { return dbl_uid(t._uid); }
   private long dbl_uid(long uid) { return ((long)_uid<<32)|uid; }
@@ -324,13 +325,13 @@ abstract public class TV3 implements Cloneable {
     // Two unrelated classes usually make an error
     if( getClass() != that.getClass() ) {
       // As a special case, allow unify of TVPtr and the Clazz of a Base.
-      if( this instanceof TVPtr && that instanceof TVBase ) throw unimpl();
-      if( that instanceof TVPtr && this instanceof TVBase ) throw unimpl();
+      if( this instanceof TVPtr && that instanceof TVBase base )
+        return this._fresh_unify(base.clz(),test);
+      if( that instanceof TVPtr && this instanceof TVBase base ) return base.clz()._fresh_unify(that,test);
       return that instanceof TVErr terr
         ? terr._fresh_unify_err_fresh(this,test)
         : this._fresh_unify_err      (that,test);
     }
-
     boolean progress = false;
 
     // Progress on parts

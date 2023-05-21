@@ -108,7 +108,7 @@ public class FieldNode extends Node implements Resolvable {
   // them all when lifting and none when lowering.  
   @Override public Type live_use( Node def ) {
     if( is_resolving() ) {
-      if( Combo.pre() || Combo.post() | Combo.HM_AMBI )
+      if( Combo.pre() || Combo.post() || Combo.HM_AMBI )
         return TypeStruct.ISUSED; // Not sure which one, so pick all
       // Still might resolve, and therefore keep alive only the resolved field.
       deps_add(def);
@@ -228,7 +228,7 @@ public class FieldNode extends Node implements Resolvable {
     boolean progress = try_resolve(tstr,test);
     if( is_resolving() || test ) return progress; // Failed to resolve, or resolved but testing
     // Known to be resolved and in RHS
-    do_fld(tstr.arg(_fld),test);
+    do_fld(((TVStruct)tstr.find()).arg(_fld),test);
     return true;                // Progress
   }
   private boolean do_miss( TV3 tstr, boolean test) {

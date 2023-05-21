@@ -49,7 +49,7 @@ public class TVBase extends TVExpanding {
     return b;
   }
 
-  TVPtr clz() {
+  public TVPtr clz() {
     if( _t instanceof TypeInt ) return (TVPtr)PrimNode.PINT.tvar();
     if( _t instanceof TypeFlt ) return (TVPtr)PrimNode.PFLT.tvar();
     throw unimpl();
