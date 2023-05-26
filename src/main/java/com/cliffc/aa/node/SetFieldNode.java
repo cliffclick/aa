@@ -38,12 +38,12 @@ public class SetFieldNode extends Node {
     return ts.update(_fin,_fld,val(1));
   }
 
-  @Override public Type live_use( Node def ) {
+  @Override public Type live_use( int i ) {
     // If this node is not alive, neither input is
     if( !(_live instanceof TypeStruct ts) ) return _live;
     Type fld_live = ts.at_def(_fld);
     // For this field, pass liveness thru directly
-    if( def==in(1) ) return fld_live;
+    if( i==1 ) return fld_live;
     // For memory, pass thru liveness of all fields except this one
     if( fld_live==Type.ANY ) return ts; // Already dead
     // Here liveness depends on incoming value (i.e., value turns around into

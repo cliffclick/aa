@@ -1,8 +1,11 @@
 package com.cliffc.aa.tvar;
 
+import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.node.FieldNode;
 import com.cliffc.aa.util.Ary;
+
+import static com.cliffc.aa.AA.unimpl;
 
 public interface Resolvable {
   // True if this field is still resolving: the actual field being referenced
@@ -36,14 +39,19 @@ public interface Resolvable {
     for( int i=0; i<rhs.len(); i++ ) {
       String id = rhs.fld(i);
       if( is_resolving(id) ) continue;
-      if( pattern.trial_unify_ok(rhs.arg(id),false) ) {
+      if( pattern.trial_unify_ok(rhs.arg(id)) ) {
         if( lab==null ) lab=id;   // No choices yet, so take this one
         else {
           // 2nd choice; ambiguous; either cannot resolve (yet), or too late
           // and will never resolve.  Record all pattern leaves in the RHS
           // delay list which may later expand and force the resolve.
-          while( PAT_LEAFS._len>0 )
-            PAT_LEAFS.pop().add_delay_resolve(rhs);
+          if( Combo.HM_AMBI ) {
+            return ((FieldNode)this).resolve_ambiguous_msg();
+          } else {
+            // Not resolvable (yet).  Delay until it can resolve.
+            while( PAT_LEAFS._len>0 )
+              PAT_LEAFS.pop().add_delay_resolve(rhs);
+          }
           return false;
         }
       }
@@ -58,7 +66,7 @@ public interface Resolvable {
     if( prior==null ) {
       assert old;               // Expect an unresolved label
       //lhs.add_fld(lab,pattern); // Add label and pattern, basically replace unresolved old_fld with lab
-      throw com.cliffc.aa.AA.unimpl(); // todo needs pinned
+      throw unimpl(); // todo needs pinned
     } else {
       if( outie ) prior. unify(pattern,test); // Merge pattern and prior label in LHS
       else        prior._unify(pattern,test); // Merge pattern and prior label in LHS
@@ -77,8 +85,6 @@ public interface Resolvable {
   // each choice.
   default void resolve_failed() {
     FieldNode fld = (FieldNode)this;
-    String msg = fld.resolve_failed_msg();
-    tvar().unify_err(msg,match_tvar(),false);
     Env.GVN.add_flow(fld);
     fld.deps_work_clear();
   }

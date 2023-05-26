@@ -7,6 +7,8 @@ import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.MEM_IDX;
+import static com.cliffc.aa.AA.CTL_IDX;
 
 // Store a value into a named struct field.  Does it's own nil-check and value
 // testing; also checks final field updates.
@@ -51,11 +53,10 @@ public class StoreNode extends Node {
 
   // Compute the liveness local contribution to def's liveness.  Turns around
   // value into live: if values are ANY then nothing is demand-able.
-  @Override public Type live_use( Node def ) {
+  @Override public Type live_use( int i ) {
+    Node def = in(i);
     // Liveness as a TypeMem
-    TypeMem live = _live== Type.ANY ? TypeMem.ANYMEM
-      : (_live== Type.ALL ? RootNode.def_mem(def)
-         : (TypeMem)_live);
+    TypeMem live = _live== Type.ALL ? RootNode.def_mem(def) : (TypeMem)_live;
     // Input memory as a TypeMem
     Type mem0 = mem()._val;
     TypeMem mem = mem0== Type.ANY ? TypeMem.ANYMEM
@@ -64,7 +65,7 @@ public class StoreNode extends Node {
     TypeMemPtr tmp = adr()._val instanceof TypeMemPtr tmp0 ? tmp0 : adr()._val.oob(TypeMemPtr.ISUSED);
 
     // Liveness for memory?
-    if( def==mem() ) {
+    if( i==MEM_IDX ) {
       adr().deps_add(def);
       // Assume all above center aliases kill everything (will optimistically
       // kill what we need) to make uses go away
@@ -79,8 +80,19 @@ public class StoreNode extends Node {
       Node adr = adr();
       if( adr instanceof FreshNode frsh ) adr = frsh.id();
       int alias = tmp._aliases.abit();
-      if( alias!=-1 && ((adr instanceof NewNode nnn && nnn._alias==alias) || mem.at(alias).above_center()) )
-        return live.set(alias,TypeStruct.UNUSED); // Precise set, no longer demanded
+      if( adr instanceof NewNode nnn && (tmp._aliases.is_empty() || nnn._alias==alias) )
+        return live.set(nnn._alias,TypeStruct.UNUSED); // Precise set, no longer demanded
+
+      // Since empty can fall to any single precise alias, we need to assume
+      // all things are not demanded until one or more aliases show up.
+      if( tmp._aliases.is_empty() ) {
+        for( int ax=1; ax<mem.len(); ax++ )
+          if( mem.at(ax).above_center() )
+            live = live.set(ax,TypeStruct.UNUSED);
+      } else {
+        if( alias!=-1 && mem.at(alias).above_center() )
+          return live.set(alias,TypeStruct.UNUSED); // Precise set, no longer demanded
+      }
       // Imprecise update, cannot dataflow kill alias going backwards
       return live;
     }
@@ -89,7 +101,7 @@ public class StoreNode extends Node {
 
     // Demanded struct; if ptr just any/all else demand struct
     TypeStruct ts = live.ld(tmp);
-    return def==adr() ? ts.oob() : ts;
+    return i==CTL_IDX ? ts.oob() : ts;
   }
 
   @Override public Node ideal_reduce() {
@@ -117,7 +129,7 @@ public class StoreNode extends Node {
           //if( _uses._len==1 )
           //  return mem;
           if( rez()!=null )
-            return Env.GVN.add_reduce(set_def(3,null)); // Dont store, keep until monotonic
+            return Env.GVN.add_reduce(set_def(3,null)); // Don't store, keep until monotonic
         }
       }
       mem.deps_add(this);   // Input address changes, check reduce

@@ -92,7 +92,7 @@ abstract public class TVExpanding extends TV3 {
   }
   public static void do_delay_resolve() {
     while( DELAY_RESOLVE.len() > 0 )
-      TVStruct.trial_resolve_all((TVStruct)DELAY_RESOLVE.pop().find());
+      TVStruct.trial_resolve_all(true,DELAY_RESOLVE.pop().find().as_struct());
   }
 
   // Union this into that.  Merge the delay worklist

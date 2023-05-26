@@ -83,18 +83,19 @@ public class ScopeNode extends Node {
     return RootNode.def_mem(this);
   }
 
-  @Override public Type live_use(Node def ) {
+  @Override public Type live_use( int i ) {
     // Basic liveness ("You are Alive!") for control and returned value
-    if( def == ctrl() ) return Type.ALL;
-    if( def == mem() ) return _live;
-    if( def == rez() ) return Type.ALL; // Returning a Scalar, including e.g. a mem ptr
-    if( def == ptr() ) return Type.ALL; // Display must be kept-alive during e.g. parsing.
-    if( def == stk() ) return TypeStruct.ISUSED;
-    // Any function which may yet have unwired CallEpis, and so needs full
-    // memory alive until all Calls are wired.
-    if( def instanceof RetNode ) return _live;
-    // Merging exit path, or ConType
-    return def._live;
+    if( i == CTL_IDX ) return Type.ALL;
+    if( i == MEM_IDX ) return _live;
+    if( i == REZ_IDX ) return Type.ALL; // Returning a Scalar, including e.g. a mem ptr
+    if( i == ARG_IDX ) return Type.ALL; // Display must be kept-alive during e.g. parsing.
+    if( i == ARG_IDX+1 ) return TypeStruct.ISUSED;
+    //// Any function which may yet have unwired CallEpis, and so needs full
+    //// memory alive until all Calls are wired.
+    //if( in(i) instanceof RetNode ) return _live;
+    //// Merging exit path, or ConType
+    //return def._live;
+    throw unimpl();             // TODO Test me
   }
   
   @Override public int hashCode() { return 123456789; }

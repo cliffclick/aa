@@ -1,5 +1,6 @@
 package com.cliffc.aa.tvar;
 
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeStruct;
@@ -24,6 +25,8 @@ public class TVErr extends TV3 {
   // Errors other than structural unify errors.
   public Ary<String> _errs;
 
+  public Parse _bad;
+  
   public TVErr() { super(new TV3[XMAX+10]); }
 
   @Override public TVStruct as_struct() { return (TVStruct)arg(XSTR); }
@@ -93,7 +96,7 @@ public class TVErr extends TV3 {
   }
 
   // Make this tvar an error and add an error message
-  @Override public boolean unify_err(String msg, TV3 extra, boolean test) { return false; }
+  @Override public boolean unify_err(String msg, TV3 extra, Parse bad, boolean test) { return false; }
   
   // -------------------------------------------------------------
   // Union/merge subclass specific bits
@@ -154,7 +157,7 @@ public class TVErr extends TV3 {
   }
 
   // Add an error message
-  public boolean err(String err, TV3 extra, boolean test) {
+  public boolean err(String err, TV3 extra, Parse bad, boolean test) {
     assert !unified();
     if( err==null ) return false;
     err = err.intern();
@@ -165,6 +168,7 @@ public class TVErr extends TV3 {
     if( _errs==null ) _errs = new Ary<>(new String[1],0);
     _args[_errs._len+XMAX] = extra;
     _errs.push(err);
+    _bad = bad;
     return true;
   }
 

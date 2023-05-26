@@ -1,8 +1,10 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
+import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.TVErr;
 import com.cliffc.aa.tvar.TVStruct;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
@@ -217,16 +219,14 @@ public class StructNode extends Node {
   }
 
   // Return liveness for a field
-  @Override public Type live_use( Node def ) {
+  @Override public Type live_use( int idx ) {
     if( !(_live instanceof TypeStruct ts) ) return _live;
-    // TODO:
-    int idx = _defs.find(def);        // Get Node index
     String fld = _flds.at(idx);       // Get field name
     // Use name lookup to get liveness for that field
     TypeFld lfld = ts.get(fld);       // Liveness for this field name
     Type live = lfld==null ? ts.oob() : lfld._t.oob();
     // Stacked overloads in struct
-    if( def instanceof StructNode ) return live.oob(TypeStruct.ISUSED);
+    if( in(idx) instanceof StructNode ) return live.oob(TypeStruct.ISUSED);
     return live;
   }
   @Override boolean assert_live(Type live) { return live instanceof TypeStruct; }
@@ -261,5 +261,11 @@ public class StructNode extends Node {
   
   // Structs are pre-unified in set_tvar
   @Override public boolean unify( boolean test ) { return false; }
-  
+
+  @Override public ErrMsg err( boolean fast ) {
+    if( _tvar==null ) return null;
+    if( !(tvar() instanceof TVErr terr) ) return null;
+    if( fast ) return ErrMsg.FAST;
+    return ErrMsg.unresolved(terr._bad,tvar().p());
+  }
 }

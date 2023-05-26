@@ -79,7 +79,7 @@ public class ParmNode extends Node {
     return t.join(_t);
   }
 
-  @Override public Type live_use( Node def ) { return Type.ALL; }
+  @Override public Type live_use( int i ) { return Type.ALL; }
   
   @Override public Node ideal_reduce() {
     if( !(in(0) instanceof FunNode) )
@@ -88,6 +88,7 @@ public class ParmNode extends Node {
     if( fun._val == Type.XCTRL ) return null; // All dead, c-prop will fold up
     Node cp = fun.is_copy(0);
     if( cp!=null ) {            // FunNode is a Copy
+      if( _idx==0 ) return null; // RPC vs a CopyCall, is dead, no semantics
       Node xcp = cp.in(_idx);
       if( xcp == this ) return Env.ANY; // Dead self-cycle
       return Env.GVN.add_reduce(xcp); // So return the copy

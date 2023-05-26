@@ -513,13 +513,20 @@ public abstract class Node implements Cloneable, IntSupplier {
   // TypeMem.FULL, especially if its uses are of unwired functions.
   // It must be monotonic.
   // This is a reverse-flow transfer-function computation.
-  public Type live( ) {
+  public Type live( ) { return live(true); }
+  Type live( boolean all ) {
     // Compute meet/union of all use livenesses
     Type live = Type.ANY;           // Start at lattice top
     for( Node use : _uses )         // Computed across all uses
       if( use._live != Type.ANY ) { // If use is alive, propagate liveness
-        Type ulive = use.live_use(this);
-        live = live.meet(ulive); // Make alive used fields
+        // The same def might be used on several inputs, with separate notions
+        // of liveness
+        for( int i=0; i<use.len(); i++ ) {
+          if( use.in(i)==this && (all || use.is_mem()) ) {
+            Type ulive = use.live_use(i);
+            live = live.meet(ulive); // Make alive used fields
+          }
+        }
       }
     assert live==Type.ANY || live==Type.ALL || assert_live(live);
     return live;
@@ -536,7 +543,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   }
   // Compute local contribution of use liveness to this def.
   // Overridden in subclasses that do per-def liveness.
-  Type live_use( Node def ) { return _live; }
+  Type live_use( int i ) { return _live; }
   boolean assert_live(Type live) { return is_mem()==(live instanceof TypeMem tm && tm.flatten_live_fields()==tm); }
 
   public void add_flow_defs() { Env.GVN.add_flow_defs(this); }
@@ -683,6 +690,7 @@ public abstract class Node implements Cloneable, IntSupplier {
         Env.GVN.add_reduce(call.cepi()); // Can wire
       }
       if( nval.is_con() ) Env.GVN.add_reduce(this); // Replace a constant
+      if( this instanceof RootNode ) add_flow();    // Rerun liveness
     }
     return progress;
   }

@@ -8,7 +8,8 @@ public class KeepNode extends Node {
   @Override public Type value() { return Type.ALL; }
   // All memory, except kills
   @Override public Type live () { return RootNode.def_mem(this); }
-  @Override public Type live_use( Node def ) {
+  @Override public Type live_use( int i ) {
+    Node def = in(i);
     if( def.is_mem() ) return _live;
     if( def instanceof   StructNode ) return TypeStruct.ISUSED;
     if( def instanceof SetFieldNode ) return TypeStruct.ISUSED;

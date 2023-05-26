@@ -17,7 +17,7 @@ public class MProjNode extends ProjNode {
   @Override public String xstr() { return "MProj"+_idx; }
   @Override public boolean is_mem() { return true; }
 
-  @Override public Type live_use( Node def ) { return _live; }
+  @Override public Type live_use( int i ) { return _live; }
 
   @Override public Node ideal_reduce() {
     if( is_prim() ) return null;

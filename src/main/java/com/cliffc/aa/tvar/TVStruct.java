@@ -72,6 +72,9 @@ public class TVStruct extends TVExpanding {
   }
   
   @Override boolean can_progress() { throw unimpl(); }
+
+  // Common accessor not called 'find' which already exists
+  public int idx( String fld ) { return Util.find(_flds,fld); }
   
   public boolean add_fld(String fld, TV3 tvf, boolean pin) {
     if( _max == _flds.length ) {
@@ -110,8 +113,8 @@ public class TVStruct extends TVExpanding {
     return true;
   }
   // Remove field; true if something got removed
-  boolean del_fld(String fld) {
-    int idx = Util.find(_flds,fld);
+  public boolean del_fld(String fld) {
+    int idx = idx(fld);
     return idx != -1 && del_fld(idx);
   }
   
@@ -122,13 +125,13 @@ public class TVStruct extends TVExpanding {
   // Return the TV3 for field 'fld' or null if missing
   public TV3 arg(String fld) {
     assert !unified();
-    int i = Util.find(_flds,fld);
+    int i = idx(fld);
     return i>=0 ? arg(i) : null;
   }
   
   // Return the TV3 for field 'fld' or null if missing, with OUT rollups
   public TV3 debug_arg(String fld) {
-    int i = Util.find(_flds,fld);
+    int i = idx(fld);
     return i>=0 ? debug_arg(i) : null;
   }
 
@@ -181,7 +184,7 @@ public class TVStruct extends TVExpanding {
     for( int i=0; i<thsi._max; i++ ) {
       TV3 fthis = thsi.arg(i);       // Field of this      
       String key = thsi._flds[i];
-      int ti = Util.find(that._flds,key);
+      int ti = that.idx(key);
       if( ti == -1 ) {          // Missing field in that
         if( open || Resolvable.is_resolving(key) )
           that.add_fld(key,fthis,thsi._pins[i]); // Add to RHS
@@ -200,7 +203,7 @@ public class TVStruct extends TVExpanding {
     // Fields on the RHS are aligned with the LHS also
     for( int i=0; i<that._max; i++ ) {
       String key = that._flds[i];
-      int idx = Util.find(thsi._flds,key);
+      int idx = thsi.idx(key);
       if( idx== -1 ) {                               // Missing field in this
         if( Resolvable.is_resolving(key) ) continue; // Do not remove until resolved
         if( !is_open() ) thsi.del_fld(key); // Drop from RHS
@@ -216,14 +219,14 @@ public class TVStruct extends TVExpanding {
     boolean progress = false, missing = false;
     assert !unified() && !tv3.unified();    
 
-    trial_resolve_all(this); assert !unified();
-    progress |= trial_resolve_all((TVStruct)tv3);
+    trial_resolve_all(false,this); assert !unified();
+    progress |= trial_resolve_all(false,(TVStruct)tv3);
     TVStruct that = (TVStruct)tv3.find();
     
     for( int i=0; i<_max; i++ ) {
       TV3 lhs = arg(i);
       boolean resolving = Resolvable.is_resolving(_flds[i]);
-      int ti = Util.find(that._flds,_flds[i]);
+      int ti = that.idx(_flds[i]);
       if( ti == -1 ) {          // Missing in RHS
               
         if( is_open() || that.is_open() || resolving ) {
@@ -258,7 +261,7 @@ public class TVStruct extends TVExpanding {
         }
       }
 
-    progress |= trial_resolve_all(that);
+    progress |= trial_resolve_all(false,that);
     
     // If LHS is closed, force RHS closed
     if( !_open && that._open ) {
@@ -274,7 +277,7 @@ public class TVStruct extends TVExpanding {
   // TODO  move to Resolvable?
   // Attempt to resolve any unresolved fields.
   // Remove any pre-resolved fields.
-  static boolean trial_resolve_all(TVStruct t) {
+  static boolean trial_resolve_all(boolean outie, TVStruct t) {
     boolean progress = false;
     for( int i=0; i<t._max; i++ ) {
       t = ((TVStruct)t.find());
@@ -285,9 +288,9 @@ public class TVStruct extends TVExpanding {
       // Field is still resolving?
       if( res.is_resolving() ) {
         if( !t.is_open() && // More fields possible, so trial_resolve cannot be tried
-            res.trial_resolve(true,t.arg(i),t,t, false) ) { // Attempt resolve
+            res.trial_resolve(outie,t.arg(i),t,t, false) ) { // Attempt resolve
           progress = true;
-          t = (TVStruct)t.find();
+          t = t.find().as_struct();
           i--;                  // Rerun after removing resolved field
         }
       } else {
@@ -303,22 +306,24 @@ public class TVStruct extends TVExpanding {
     return progress;
   }
 
-  @Override boolean _trial_unify_ok_impl( TV3 tv3, boolean extras ) {
+  @Override boolean _trial_unify_ok_impl( TV3 tv3 ) {
     if( this==tv3 ) return true;
     TVStruct that = (TVStruct)tv3; // Invariant when called
     for( int i=0; i<_max; i++ ) {
+      if( Resolvable.is_resolving( _flds[i]) ) continue;
       TV3 lhs = arg(i);
       TV3 rhs = that.arg(_flds[i]); // RHS lookup by field name
-      if( lhs!=rhs && rhs!=null && !lhs._trial_unify_ok(rhs,extras) )
+      if( lhs!=rhs && rhs!=null && !lhs._trial_unify_ok(rhs) )
         return false;           // Child fails to unify
     }
 
     // Allow unification with extra fields.  The normal unification path
     // will not declare an error, it will just remove the extra fields.
-    return (extras || this.mismatched_child(that)) && (that.mismatched_child(this));
+    return this.mismatched_child(that) && that.mismatched_child(this);
   }
 
   private boolean mismatched_child(TVStruct that ) {
+    if( that.is_open() ) return true; // Missing fields may add later
     for( int i=0; i<_max; i++ )
       if( !Resolvable.is_resolving(_flds[i]) &&
           that.arg(_flds[i])==null ) // And missing key in RHS
@@ -348,11 +353,11 @@ public class TVStruct extends TVExpanding {
     return st;
   }
 
-  boolean is_int_clz() { return Util.find(_flds,"!_"  ) >= 0; }
-  boolean is_flt_clz() { return Util.find(_flds,"sin" ) >= 0; }
-  boolean is_str_clz() { return Util.find(_flds,"#_"  ) >= 0; }
-  boolean is_math_clz(){ return Util.find(_flds,"pi"  ) >= 0; }
-  boolean is_top_clz() { return Util.find(_flds,"math") >= 0; }
+  boolean is_int_clz() { return idx("!_"  ) >= 0; }
+  boolean is_flt_clz() { return idx("sin" ) >= 0; }
+  boolean is_str_clz() { return idx("#_"  ) >= 0; }
+  boolean is_math_clz(){ return idx("pi"  ) >= 0; }
+  boolean is_top_clz() { return idx("math") >= 0; }
 
   @Override public VBitSet _get_dups_impl(VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     TV3 clz = debug_arg(".");
@@ -391,7 +396,7 @@ public class TVStruct extends TVExpanding {
     }
     // Print clazz field up front.
     if( clz!=null ) clz._str(sb,visit,dups,debug,prims).p(":");    
-    boolean is_tup = is_tup(debug);
+    boolean is_tup = is_tup(debug), once=_open;
     sb.p(is_tup ? "(" : "@{");
     for( int idx : sorted_flds() ) {
       if( !debug && Util.eq("^",_flds[idx]) ) continue; // Displays are private by default
@@ -404,9 +409,10 @@ public class TVStruct extends TVExpanding {
       if( _args[idx] == null ) sb.p("_");
       else _args[idx]._str(sb,visit,dups,debug,prims);
       sb.p(is_tup ? ", " : "; ");
+      once=true;
     }
     if( _open ) sb.p(" ..., ");
-    if( _args.length>0 ) sb.unchar(2);
+    if( once ) sb.unchar(2);
     sb.p(!is_tup ? "}" : ")");
     return sb;
   }

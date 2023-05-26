@@ -79,7 +79,7 @@ public class TVNil extends TV3 {
 
 
   // -------------------------------------------------------------
-  @Override boolean _trial_unify_ok_impl( TV3 that, boolean extras ) {
+  @Override boolean _trial_unify_ok_impl( TV3 that ) {
     if( that instanceof TVNil ) return true;
     if( that instanceof TVBase base && base._t.must_nil() )
     // Some primitives will unify with NIL

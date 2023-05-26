@@ -27,11 +27,11 @@ public final class ErrNode extends Node {
     Type t = val(0);
     return t == Type.ANY || t == Type.XCTRL ? Type.ANY : Type.ALL; // For dead data errors return ANY (no error)
   }
-  @Override public Type live_use( Node def ) { return Type.ALL; }
+  @Override public Type live_use( int i ) { return Type.ALL; }
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
     TVErr e = new TVErr();
-    e.err(_err.toString(),null,false);
+    e.err(_err.toString(),null,null,false);
     return e;
   }
 

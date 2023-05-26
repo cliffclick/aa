@@ -1,6 +1,7 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.Env;
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.node.ConNode;
 import com.cliffc.aa.node.FreshNode;
 import com.cliffc.aa.node.Node;
@@ -263,12 +264,12 @@ abstract public class TV3 implements Cloneable {
   abstract boolean _unify_impl(TV3 that);
 
   // Make this tvar an error
-  public boolean unify_err(String msg, TV3 extra, boolean test) {
+  public boolean unify_err(String msg, TV3 extra, Parse bad, boolean test) {
     if( test ) return true;
     assert DUPS.isEmpty();
     TVErr err = new TVErr();
     err._unify_err(this);
-    err.err(msg,extra,false);
+    err.err(msg,extra,bad,false);
     DUPS.clear();
     return true;
   }
@@ -467,11 +468,11 @@ abstract public class TV3 implements Cloneable {
   // No change to either side, this is a trial only.
   // Collect leafs and bases on the pattern (this).
   private static final NonBlockingHashMapLong<TV3> TDUPS = new NonBlockingHashMapLong<>();
-  public boolean trial_unify_ok(TV3 that, boolean extras) {
+  public boolean trial_unify_ok(TV3 that) {
     TDUPS.clear();
-    return _trial_unify_ok(that, extras);
+    return _trial_unify_ok(that);
   }
-  boolean _trial_unify_ok(TV3 that, boolean extras) {
+  boolean _trial_unify_ok(TV3 that) {
     if( this==that )             return true; // No error
     assert !unified() && !that.unified();
     long duid = dbl_uid(that._uid);
@@ -480,21 +481,21 @@ abstract public class TV3 implements Cloneable {
     if( this instanceof TVLeaf leaf ) return Resolvable.add_pat_leaf(leaf); // No error
     if( that instanceof TVLeaf leaf ) return Resolvable.add_pat_leaf(leaf); // No error
     // Nil can unify with ints,flts,ptrs
-    if( this instanceof TVNil ) return this._trial_unify_ok_impl(that,extras);
-    if( that instanceof TVNil ) return that._trial_unify_ok_impl(this,extras);
+    if( this instanceof TVNil ) return this._trial_unify_ok_impl(that);
+    if( that instanceof TVNil ) return that._trial_unify_ok_impl(this);
     // Different classes always fail
     if( getClass() != that.getClass() ) {
       // As a special case, allow unify of TVPtr and the Clazz of a Base.
-      if( this instanceof TVPtr ptr && that instanceof TVBase base ) return ptr._trial_unify_base(base,extras);
-      if( that instanceof TVPtr ptr && this instanceof TVBase base ) return ptr._trial_unify_base(base,extras);      
+      if( this instanceof TVPtr ptr && that instanceof TVBase base ) return ptr._trial_unify_base(base);
+      if( that instanceof TVPtr ptr && this instanceof TVBase base ) return ptr._trial_unify_base(base);      
       return false;
     }
     // Subclasses check sub-parts
-    return _trial_unify_ok_impl(that, extras);
+    return _trial_unify_ok_impl(that);
   }
 
   // Subclasses specify on sub-parts
-  boolean _trial_unify_ok_impl( TV3 that, boolean extras ) { throw unimpl(); }
+  boolean _trial_unify_ok_impl( TV3 that ) { throw unimpl(); }
 
   // -----------------
 

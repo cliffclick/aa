@@ -83,6 +83,7 @@ import static com.cliffc.aa.Env.GVN;
 
 public class CallNode extends Node {
   int _rpc;                 // Call-site return PC
+  private final int _reset0_rpc; // Reset, if PrimNode rpcs split  
   boolean _unpacked;        // One-shot flag; call site allows unpacking a tuple
   boolean _is_copy;         // One-shot flag; Call will collapse
   // Example: call(arg1,arg2)
@@ -93,6 +94,7 @@ public class CallNode extends Node {
   public CallNode( boolean unpacked, Parse[] badargs, Node... defs ) {
     super(OP_CALL,defs);
     _rpc = BitsRPC.new_rpc(BitsRPC.ALLX); // Unique call-site index
+    _reset0_rpc = _rpc;
     _unpacked=unpacked;         // Arguments are typically packed into a tuple and need unpacking, but not always
     _badargs = badargs;
     _live=RootNode.def_mem(null);
@@ -100,6 +102,7 @@ public class CallNode extends Node {
 
   @Override public String xstr() { return (_is_copy ? "CopyCall" : (is_dead() ? "Xall" : "Call")); } // Self short name
   String  str() { return xstr(); }       // Inline short name
+  @Override void walk_reset0() { set_rpc(_reset0_rpc); super.walk_reset0(); }
   @Override boolean is_CFG() { return !_is_copy; }
   @Override public boolean is_mem() { return true; }
 
@@ -345,14 +348,15 @@ public class CallNode extends Node {
   }
   
   static final Type FP_LIVE = TypeStruct.UNUSED.add_fldx(TypeFld.make("fp",Type.ALL));
-  @Override public Type live_use(Node def) {
+  @Override public Type live_use( int i ) {
+    Node def = in(i);
     if( _is_copy ) return def._live;
-    if( def==ctl() ) return Type.ALL;
-    if( def==fdx() ) return _unpacked ? FP_LIVE : Type.ALL;
     boolean is_keep = is_keep();
-    if( def==mem() ) return is_keep || _live==Type.ALL ? RootNode.def_mem(def) : _live;
-    if( def==arg(DSP_IDX) && !_unpacked ) return TypeStruct.ISUSED;
-    if( is_keep  ) return Type.ALL; // Still under construction, all alive
+    if( i==CTL_IDX ) return Type.ALL;
+    if( i==MEM_IDX ) return is_keep || _live==Type.ALL ? RootNode.def_mem(def) : _live;
+    if( i==DSP_IDX && !_unpacked ) return TypeStruct.ISUSED;
+    if( i==nargs() ) return _unpacked ? FP_LIVE : Type.ALL;
+    if( is_keep  )   return Type.ALL; // Still under construction, all alive
 
     // Unresolved calls need their inputs alive, so those now-live inputs unify
     // and can be used to resolve.  This gets to a key observation: cannot use

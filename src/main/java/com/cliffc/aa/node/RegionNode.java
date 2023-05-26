@@ -112,7 +112,7 @@ public class RegionNode extends Node {
     return Type.XCTRL;
   }
 
-  @Override public Type live_use(Node def ) { return Type.ALL; }
+  @Override public Type live_use( int i ) { return Type.ALL; }
 
   @Override public boolean has_tvar() { return false; }
 

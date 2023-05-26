@@ -27,9 +27,9 @@ public class FreshNode extends Node {
 
   @Override public Type value() { return id()._val; }
 
-  @Override public Type live_use(Node def ) {
-    if( def==id() ) return _live; // Pass full liveness along
-    return Type.ALL;              // Basic aliveness for control
+  @Override public Type live_use( int i ) {
+    if( i==0 ) return _live;    // Pass full liveness along
+    return Type.ALL;            // Basic aliveness for nongen set
   }
 
   @Override public Node ideal_reduce() {

@@ -49,13 +49,23 @@ public class BindFPNode extends Node {
 
   // Displays are always alive, if the Bind is alive.  However, if the Bind is
   // binding an overload the result is a struct-liveness instead just ALL.
-  @Override public Type live_use(Node def) {
-    if( def==dsp() ) return bind_live("dsp");
-    Type fplive = bind_live("fp");
-    return _over ? fplive.oob(TypeStruct.ISUSED) : fplive;
-  }
-  private Type bind_live(String name) {
-    return _live instanceof TypeStruct ts ? ts.at_def(name): _live;
+
+  
+  @Override public Type live_use( int i ) {
+    // If this bind is binding an overload
+    // - its being used by a resolving field, this _live is some-field live
+    // - the display might be a primitive int/flt or a TMP; its all-alive
+    // - the whole overload is struct-live
+    // Else normal FP bind
+    // - Normal value, normal uses, so struct/fp-or-dsp alive
+    // - The display should be a TMP, and liveness flows
+    // - The funptr should be a TFP, and liveness flows
+    if( _over ) {
+      return i==0 ? TypeStruct.ISUSED // Whole overload is used
+        : Type.ALL;                   // Whole primitive or TMP is alive
+    } else {
+      return _live instanceof TypeStruct ts ? ts.at_def(i==0 ? "fp" : "dsp"): _live;
+    }
   }
   
   // Bind can be used by a Field, and so have a struct-liveness, and the whole of the Bind
@@ -65,16 +75,16 @@ public class BindFPNode extends Node {
     if( _over ) return true; // Used by a Field node which will select which field is alive
     // Normal binds allow on fields "fp" and "dsp"
     for( TypeFld tf : ts )
-      if( !Util.eq(tf._fld,"fp") && Util.eq(tf._fld,"dsp") )
+      if( !Util.eq(tf._fld,"fp") && !Util.eq(tf._fld,"dsp") )
         return false;
     return true;
   }
 
   @Override public Node ideal_reduce() {
     if( !_over && _live instanceof TypeStruct live ) {
-      if( live.at_def("fp" )==Type.ANY ) return set_def(0,null);
-      if( live.at_def("dsp")==Type.ANY ) return set_def(1,null);
-    }
+      if( in(0)!=null && live.at_def("fp" )==Type.ANY ) return set_def(0,null);
+      if( in(1)!=null && live.at_def("dsp")==Type.ANY ) return set_def(1,null);
+    } else deps_add(this);      // Liveness changes, recheck
     return null;
   }
   

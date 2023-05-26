@@ -47,7 +47,7 @@ public class TVPtr extends TV3 {
 
   boolean _unify_base( TVBase base, boolean test ) { return _unify(base.clz(),test); }
 
-  boolean _trial_unify_base( TVBase base, boolean extras ) { return _trial_unify_ok(base.clz(),extras); }
+  boolean _trial_unify_base( TVBase base ) { return _trial_unify_ok(base.clz()); }
   
   // -------------------------------------------------------------
   @Override boolean _fresh_unify_impl(TV3 that, boolean test) {
@@ -63,9 +63,9 @@ public class TVPtr extends TV3 {
   }
   
   // -------------------------------------------------------------
-  @Override boolean _trial_unify_ok_impl( TV3 tv3, boolean extras ) {
+  @Override boolean _trial_unify_ok_impl( TV3 tv3 ) {
     TVPtr that = (TVPtr)tv3; // Invariant when called
-    return _aliases == that._aliases;
+    return load()._trial_unify_ok(that.load());
   }
 
   @Override boolean _exact_unify_impl( TV3 tv3 ) { return true; }

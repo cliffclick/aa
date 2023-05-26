@@ -51,7 +51,7 @@ public abstract class MemPrimNode extends PrimNode {
     public ReadPrimNode( String name, TypeTuple formals, TypeNil ret ) { super(name,formals,ret); }
 
     // The only memory required here is what is needed to support the Load
-    @Override public Type live_use( Node def ) {
+    @Override public Type live_use( int i ) {
       //if( def==adr() ) return TypeMem.ALIVE;
       //if( _defs._len>3 && def==idx() ) return TypeMem.ALIVE;
       //Type tmem = mem()._val;

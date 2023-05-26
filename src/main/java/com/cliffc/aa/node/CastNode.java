@@ -31,8 +31,8 @@ public class CastNode extends Node {
     return _t.join(t);
   }
 
-  @Override public Type live_use(Node def ) {
-    return def==in(0) ? Type.ALL : _live;
+  @Override public Type live_use( int i ) {
+    return i==0 ? Type.ALL : _live;
   }
 
   @Override public Node ideal_reduce() {
@@ -98,10 +98,8 @@ public class CastNode extends Node {
     if( notnil instanceof TVErr nerr && nerr.as_ptr() != null ) notnil = nerr.as_ptr();
     
     // Already an expanded nilable with ptr
-    if( maynil instanceof TVPtr mptr && notnil instanceof TVPtr nptr ) {
-      assert !mptr.load().unify(nptr.load(),true); // Already unified
-      return false;
-    }
+    if( maynil instanceof TVPtr mptr && notnil instanceof TVPtr nptr )
+      return mptr.load().unify(nptr.load(),test);
 
     // Special case of mixing ptrs and bases
     if( maynil instanceof TVBase mbase && notnil instanceof TVPtr nptr ) {

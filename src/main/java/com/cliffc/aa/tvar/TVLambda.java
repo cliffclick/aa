@@ -49,7 +49,7 @@ public class TVLambda extends TV3 {
       that = that.find();      
     }
     if( nargs != tnargs )
-      that.unify_err("Expected "+tnargs+" but found "+nargs,that,false);
+      that.unify_err("Expected "+tnargs+" but found "+nargs,that,null,false);
     return true;
   }
 
@@ -72,12 +72,12 @@ public class TVLambda extends TV3 {
   // -------------------------------------------------------------
   // Sub-classes specify trial_unify on sub-parts.
   // Check arguments, not return nor omem.
-  @Override boolean _trial_unify_ok_impl( TV3 tv3, boolean extras ) {
+  @Override boolean _trial_unify_ok_impl( TV3 tv3 ) {
     TVLambda that = (TVLambda)tv3; // Invariant when called
     if( nargs() != that.nargs() ) return false; // Fails to be equal
     // Check all other arguments
     for( int i=DSP_IDX; i<nargs(); i++ )
-      if( !arg(i)._trial_unify_ok(that.arg(i), extras) )
+      if( !arg(i)._trial_unify_ok(that.arg(i)) )
         return false;           // Arg failed, so trial fails
     return true;                // Unify will work
   }

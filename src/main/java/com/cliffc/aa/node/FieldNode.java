@@ -106,16 +106,16 @@ public class FieldNode extends Node implements Resolvable {
 
   // If the field is resolving, we do not know which field to demand, so demand
   // them all when lifting and none when lowering.  
-  @Override public Type live_use( Node def ) {
+  @Override public Type live_use( int i ) {
     if( is_resolving() ) {
       if( Combo.pre() || Combo.post() || Combo.HM_AMBI )
         return TypeStruct.ISUSED; // Not sure which one, so pick all
       // Still might resolve, and therefore keep alive only the resolved field.
-      deps_add(def);
+      deps_add(in(i));
       return TypeStruct.UNUSED;
     }
     // Struct load, the instance is normal-live
-    if( _str && def==in(0) ) return TypeStruct.ISUSED;
+    if( _str && i==0 ) return TypeStruct.ISUSED;
     // Otherwise normal fields and clazz fields are field-alive.
     return TypeStruct.UNUSED.replace_fld(TypeFld.make(_fld,Type.ALL));
   }
@@ -232,7 +232,7 @@ public class FieldNode extends Node implements Resolvable {
     return true;                // Progress
   }
   private boolean do_miss( TV3 tstr, boolean test) {
-    return tvar().unify_err(resolve_failed_msg(),tstr,test);
+    return tvar().unify_err(resolve_failed_msg(),tstr,null,test);
   }
 
 
@@ -329,11 +329,18 @@ public class FieldNode extends Node implements Resolvable {
     return err;
   }
   
+  public boolean resolve_ambiguous_msg() {
+    TV3 pattern = tvar();
+    TVStruct ts = (TVStruct)tvar(0);
+    boolean progress = ts.del_fld(_fld); // Do not push pinned uphill
+    return ts.unify_err("Ambiguous, matching choices % vs",pattern,_bad,false) | progress;
+  }
+  
   // True if ambiguous (more than one match), false if no matches.
   private boolean ambi(TV3 self, TVStruct tvs) {
     for( int i=0; i<tvs.len(); i++ )
       if( !Resolvable.is_resolving(tvs.fld(i)) &&
-          self.trial_unify_ok(tvs.arg(i),false) )
+          self.trial_unify_ok(tvs.arg(i)) )
         return true;
     return false;
   }

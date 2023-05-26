@@ -30,8 +30,9 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    testerr("( { x -> x*2 }, { x -> x*3 })._ 4", "Ambiguous, matching choices ({ A B -> C }, { D E -> F }) vs { G 4 -> H }",30);
+    test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)","int64","int64");
   }
+  
   static private void assertTrue(boolean t) {
     if( t ) return;
     System.err.println("False");
@@ -77,14 +78,23 @@ public class TestParse {
          null,null,"[13]","[55]");
 
     // TestParse.g_overload_err_00
-    testerr("( { x -> x*2 }, { x -> x*3 })._ 4", "Ambiguous, matching choices ({ A B -> C }, { D E -> F }) vs { G 4 -> H }",30);
+    testerr("( { x -> x*2 }, { x -> x*3 })._ 4", "Ambiguous, matching choices { A 4 -> B } vs({ C:*[9]@{} *[]@{_*_= @{ ...};  ...} -> D }, { C *[]@{_*_= @{ ...};  ...} -> E })",30);
 
     // Variations on a simple wrapped add.  Requires full annotations to type -
     // because in fact it is all ambiguous and cannot be typed without seeing all
     // the usages.
-    testerr("{ x -> x+1 }", "Unable to resolve operator '_+_': { A 1 -> B }",8);       // LHS is not known, unknown clazz, oper (pinned, no clazz to report)
-    testerr("{ x -> 1+x }", "Ambiguous, matching choices ({ int64 int64 -> int64 }, { int64 nflt64 -> flt64 }) vs { 1 A -> B }",8);
-    testerr("{ x y -> x+y }", "Unable to resolve operator '_+_': { A B -> C }",10);
+    test("{ x -> x+1 }","[55]{any,4 -> any}",
+         "{A *[]@{_+_=@{...};...} -> B }", // Something with an '+' operator
+         null, null, null,"[55]");
+    
+    test("{ x -> 1+x }","[55]{any,4 -> %[][]?}",
+         "{A B -> C }", // Something that 1+ works on
+         null, null, null,"[55]");
+    
+    test("{ x -> x+y }","[55]{any,4 -> any}",
+         "{A *[]@{_+_=@{...};...} -> B }", // Something with an '+' operator
+         null, null, null,"[55]");
+    
     testerr("@{x=7}.y",  "Unknown field '.y' in @{x= A}: ",7); // LHS is known, not a clazz, field not found in instance
     testerr("\"abc\".y", "Unknown field '.y' in str:(A): ",6);  // LHS is known, has clazz, field not found in either, field is not oper (not pinned)
     testerr("\"abc\"&1", "Unknown operator '_&_' in str:(97): @{ ...}",5); // LHS is known, has clazz, field not found in either, field it oper (pinned, so report clazz)
@@ -98,17 +108,17 @@ public class TestParse {
 
     // TestHM.b_recursive_05, Y combinator
     test("{ f -> ({ x -> (f (x x))} { x -> (f (x x))})}",
-         "[55]{any,4 -> %[2,5][2,55]? }", "{ A { B C -> C } -> C }",
+         "[55]{any,4 -> %[2][2,55]? }", "{ A { B C -> C } -> C }",
          null, null,
-         "[5]", "[55]" );
+         null, "[55]" );
 
     // TestHM.b_recursive_06
     test("fun = { fx -> math.rand(2) ? 1 : fx(fun(fx),2) }; fun",
-         "[55]{any,4 -> %[2,5][2,55]? }",
+         "[55]{any,4 -> %[2][2,55]? }",
          // Currently allowing 'fun' display to stay alive.
-         "A:{ *[9]@{fun=A} {B int64 int64 -> int64 } -> int64 }",
+         "A:{ *[]@{fun=A} {B int64 int64 -> int64 } -> int64 }",
          null, null,
-         "[5]","[55]");
+         null,"[55]");
 
     // TestHM.b_recursive_02.  The expression "x-1" cannot resolve the operator
     // "_-_" because "x" is a free variable.  It binds in its one use.    
@@ -235,19 +245,19 @@ public class TestParse {
     test("x:=y:=0; z=x++ && y++;(x,y,z)", // increments x, but it starts zero, so y never increments
          "*[11](1, nil,nil)","*[11](int64,A?,B?)",null,null,"[11]",null);
     test("x:=y:=0; x++ && y++; z=x++ && y++; (x,y,z)", // x++; x++; y++; (2,1,0)
-            "*[12](2, 1, nil)","*(int:int64,int:int64,int:int64)", null, null, "[12]", null);
-    test("(x=1) && x+2", "int:3", "int:3"); // Def x in 1st position
+            "*[12](2, 1, nil)","*[12](int64,int64,int)", null, null, "[12]", null);
+    test("(x=1) && x+2", "3", "3"); // Def x in 1st position
 
     testerr("1 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x maybe alive
     testerr("0 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x definitely not alive
-    test("math.rand(2) && (x=2;x*x) || 3 && 4", "int:int8", "int:int64"); // local use of x in short-circuit; requires unzip to find 4
+    test("math.rand(2) && (x=2;x*x) || 3 && 4", "int8", "int"); // local use of x in short-circuit; requires unzip to find 4
   }
 
   @Test public void testParse02() {
     // Anonymous function definition.  Note: { x -> x&1 }; 'x' can be any struct with an operator '_&_'.
     test("{x:int -> x&1}","[55]{any,4 -> int1 }","{A int64 -> int64}",null,null,null,"[55]");
     test("{5}()", "5", "5"); // No args nor -> required; this is simply a function returning 5, being executed
-    testerr("{x:flt y -> x+y}", "Ambiguous, matching choices ({ flt64 flt64 -> flt64 }, { flt64 int64 -> flt64 }) vs { flt64 A -> B }",13); // {Scalar Scalar -> Scalar}
+    test("{x:flt y -> x+y}","[55]{any,5 -> flt64 }","{A flt64 B -> C}",null,null,null,"[55]");
 
     // Function execution and result typing
     test("x=3; andx={y -> x & y}; andx(2)", "2", "2"); // trivially inlined; capture external variable

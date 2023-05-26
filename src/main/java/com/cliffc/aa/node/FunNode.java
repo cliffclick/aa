@@ -4,11 +4,11 @@ import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.NonBlockingHashMap;
 import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.BitSet;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Predicate;
 
@@ -150,7 +150,7 @@ public class FunNode extends Node {
     return Combo.pre();
   }
 
-  private boolean all_uses_are_wired(Node fptr) {
+  private boolean all_uses_are_wired(FunPtrNode fptr) {
     for( Node use : fptr._uses ) {
       use.deps_add(this);
       if( !use_is_wired(fptr,use) )
@@ -158,14 +158,17 @@ public class FunNode extends Node {
     }
     return true;
   }
-  private boolean use_is_wired(Node fptr, Node use) {
+  private boolean use_is_wired(FunPtrNode fptr, Node use) {
     if( use instanceof CallEpiNode ) return true; // Wired to a CEPI
     if( !(use instanceof CallNode call) ) return false; // Unknown use
+    if( call.is_keep() ) return false; // Not wirable yet
+    if( call._is_copy ) return false; // Mid-collapse
     for( int i=DSP_IDX; i<call.nargs(); i++ )
       if( call.in(i)==fptr )
         return false;           // Use as an arg
     assert call.fdx()==fptr;    // Used to directly call
-    return true;
+    // CEPI should be wired to the fptr.
+    return call.cepi()._defs.find(fptr.ret())!= -1;
   }
 
   @Override public Type value() {
@@ -191,8 +194,9 @@ public class FunNode extends Node {
     return progress==null ? null : this;
   }
 
-  @Override public Type live_use( Node def ) {
+  @Override public Type live_use( int i ) {
     if( in(0)==this ) return _live; // Dead self-copy
+    Node def = in(i);
     if( def instanceof RootNode ) throw unimpl();
     if( def instanceof ConNode ) return Type.ANY; // Dead control path
     assert def.is_CFG();
@@ -442,13 +446,13 @@ public class FunNode extends Node {
     }
 
     // Map from old to cloned function body
-    HashMap<Node,Node> map = new HashMap<>();
+    NonBlockingHashMap<Node,Node> map = new NonBlockingHashMap<>();
     // Collect aliases that are cloning.
     BitSet aliases = new BitSet();
     // Clone the function body
     map.put(this,fun);
     for( Node n : body ) {
-      if( n==this ) continue;   // Already cloned the FunNode
+      if( n==this ) continue;     // Already cloned the FunNode
       int old_alias = n instanceof NewNode nnn ? nnn._alias : -1;
       Node c = n.copy(false);     // Make a blank copy with no edges
       map.put(n,c);               // Map from old to new
@@ -466,7 +470,7 @@ public class FunNode extends Node {
       Node c = map.get(n);
       assert c._defs._len==0;
       for( Node def : n._defs ) {
-        Node newdef = map.get(def);// Map old to new
+        Node newdef = def==null ? null : map.get(def);// Map old to new
         c.add_def(newdef==null ? def : newdef);
       }
     }

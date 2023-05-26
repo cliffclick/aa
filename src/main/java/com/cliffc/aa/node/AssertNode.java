@@ -40,8 +40,8 @@ public class AssertNode extends Node {
     return targ.meet(t0).join(t0);
   }
 
-  @Override public Type live_use( Node def ) {
-    if( def==arg() ) return _live; // Alive as I am
+  @Override public Type live_use( int i ) {
+    if( i==REZ_IDX ) return _live; // Alive as I am
     // Memory is alive for errors
     Type t = arg()._val;    
     return t instanceof TypeMemPtr tmp

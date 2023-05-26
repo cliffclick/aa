@@ -396,6 +396,7 @@ public final class CallEpiNode extends Node {
         add_def(ret);
         fun.add_def(call).add_flow();
         fun.add_flow_uses();    // Parms have new inputs
+        Env.GVN.add_reduce(fun); // Last caller wired
         // Swap so ROOT remains last
         if(     in(    len()-2)==Env.ROOT )     _defs.last(    _defs._len-2);
         if( fun.in(fun.len()-2)==Env.ROOT ) fun._defs.last(fun._defs._len-2);
@@ -414,17 +415,18 @@ public final class CallEpiNode extends Node {
 
   @Override public Type live() {
     if( _is_copy ) return _live; // Freeze in place if dying
-    Type live = super.live();
+    Type live = super.live(false);
     if( live instanceof TypeMem ) return live;
     return live.oob(TypeMem.ALLMEM);
   }
 
   // Compute local contribution of use liveness to this def.  If the call is
   // unresolved, then none of CallEpi targets are (yet) alive.
-  @Override public Type live_use(Node def ) {
+  @Override public Type live_use( int i ) {
+    Node def = in(i);
     if( _is_copy ) return def._live; // A copy
     // Not a copy
-    if( def==in(0) ) return _live; // The Call
+    if( i==CTL_IDX ) return _live; // The Call
     if( def instanceof RetNode ret && ret.mem()==null ) return Type.ANY; // No memory input
     // Wired return.
     // The given function is alive, only if the Call will Call it.
@@ -492,7 +494,7 @@ public final class CallEpiNode extends Node {
     progress |= tvar().unify(tfun.ret(),test);
     
     if( tnargs > nargs )  // Missing arguments
-      progress |= tvar().unify_err("Passing "+cnargs+" arguments to a function taking "+tnargs+" arguments",tfun,test);
+      progress |= tvar().unify_err("Passing "+cnargs+" arguments to a function taking "+tnargs+" arguments",tfun,call._badargs[tnargs],test);
     if( cnargs > nargs ) throw unimpl(); // Too many arguments
     
     return progress;

@@ -38,10 +38,11 @@ public class LoadNode extends Node {
 
   // If the Load computes a constant, the address live-ness is determined how
   // Combo deals with constants, and not here.
-  @Override public Type live_use(Node def ) {
+  @Override public Type live_use( int i ) {
     assert _live instanceof TypeStruct ts && ts.flatten_live_fields()==ts;
-    if( def==adr() ) return Type.ALL;
+    if( i==DSP_IDX ) return Type.ALL;
     // Memory demands
+    Node def=in(i);
     adr().deps_add(def);
     Type ptr = adr()._val;
     TypeMemPtr tptr=null;
@@ -60,7 +61,7 @@ public class LoadNode extends Node {
     } else tptr=tptr0;
 
     if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
-    if( tptr._aliases.is_empty() ) return TypeMem.ANYMEM;
+    if( tptr._aliases.is_empty() ) return RootNode.def_mem(def);
     // Demand memory produce the desired structs
     return TypeMem.make(tptr._aliases,(TypeStruct)_live);
   }
@@ -256,7 +257,7 @@ public class LoadNode extends Node {
     TV3 adr = adr().set_tvar();
     if( adr instanceof TVPtr ptr ) ptr.load().unify(self,false);
     else adr.unify(new TVPtr(BitsAlias.EMPTY,self),false);
-    return self;
+    return (_tvar=self.find());
   }
 
   @Override public boolean unify( boolean test ) { return false; }

@@ -22,7 +22,7 @@ public class FP2DSPNode extends Node {
   }
 
   private static final Type DSP_LIVE = TypeStruct.UNUSED.add_fldx(TypeFld.make("dsp",Type.ALL));
-  @Override public Type live_use( Node def ) { return DSP_LIVE; }
+  @Override public Type live_use( int i ) { return DSP_LIVE; }
 
   @Override public Node ideal_reduce() {
     Node fp = fp();

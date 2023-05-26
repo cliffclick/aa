@@ -139,7 +139,7 @@ public class MemJoinNode extends Node {
       t = t.meet(tmem);
     return t;
   }
-  @Override public Type live_use( Node def ) { return _live; }
+  @Override public Type live_use( int i ) { return _live; }
 
   @Override public boolean has_tvar() { return false; }
 

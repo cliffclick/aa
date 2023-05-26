@@ -270,12 +270,7 @@ public class RootNode extends Node {
     // Pre-combo, all memory is alive, except kills
     if( Combo.pre() ) return Env.KEEP_ALIVE._live;
     // During/post combo, check external Call users
-    Type live = Type.ANY;           // Start at lattice top
-    for( Node use : _uses )         // Computed across all uses
-      if( use._live != Type.ANY && use.is_mem() ) { // If use is alive, propagate liveness
-        Type ulive = use.live_use(this);
-        live = live.meet(ulive); // Make alive used fields
-      }
+    Type live = super.live(false);
     if( live==Type.ANY ) return live;
     TypeMem mem = (TypeMem)live;
     for( int kill : KILL_ALIASES )
@@ -289,10 +284,10 @@ public class RootNode extends Node {
     return mem.meet(rlive);
   }
 
-  @Override public Type live_use(Node def) {
-    if( def==in(CTL_IDX) ) return Type.ALL;
-    if( def==in(MEM_IDX) ) return _live;
-    if( def==in(REZ_IDX) ) {
+  @Override public Type live_use( int i ) {
+    if( i==CTL_IDX ) return Type.ALL;
+    if( i==MEM_IDX ) return _live;
+    if( i==REZ_IDX ) {
       // Sharpen liveness for escaping function displays
       if( val(REZ_IDX) instanceof TypeFunPtr tfp ) {
         if( tfp.dsp() instanceof TypeMemPtr tmp ) {
@@ -304,7 +299,7 @@ public class RootNode extends Node {
       if( val(REZ_IDX)==Type.ANY ) return Type.ANY; // TODO: Surely broken
       return Type.ALL;
     }
-    assert def instanceof CallNode || def instanceof RetNode;
+    assert in(i) instanceof CallNode || in(i) instanceof RetNode;
     return _live;               // Global calls take same memory as me
   }
 

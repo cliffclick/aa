@@ -8,6 +8,7 @@ import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVLeaf;
 
 import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.CTL_IDX;
 
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
@@ -71,21 +72,17 @@ public class PhiNode extends Node {
     }
     return t;
   }
-  @Override public Type live_use(Node def ) {
+  @Override public Type live_use( int i ) {
+    if( i == CTL_IDX  ) return Type.ALL; // Self-loop, error
     Node r = in(0);
-    if( r==def  ) return Type.ALL; // Self-loop, error
-    if( r==null ) return _live;    // Mid-collapse, error, pass live thru
-    if( r== Env.XCTRL ) return Type.ANY;
+    if( r == null ) return _live; // Mid-collapse, error, pass live thru
+    if( r == Env.XCTRL ) return Type.ANY;
     if( r.len() != len() ) return _live; // Error, pass live thru
-    // The same def can appear on several inputs; check them all.
-    for( int i=1; i<_defs._len; i++ )
-      if( in(i)==def && !r.val(i).above_center() ) {
-        r.in(i).deps_add(def);
-        return _live==Type.ALL && _t==TypeMem.ALLMEM ? _t : _live;         // This input is as live as i am
-      }
     // If the control changes, recompute live
-    for( int i=1; i<_defs._len; i++ ) if( in(i)==def )  r.in(i).deps_add(def);
-    return Type.ANY;            // All matching defs are not live on any path
+    r.in(i).deps_add(in(i));
+    if( r.val(i).above_center() )
+      return Type.ANY;          // Not control alive
+    return _live==Type.ALL && _t==TypeMem.ALLMEM ? _t : _live;         // This input is as live as i am
   }
 
   // Yes for e.g. ints, flts, memptrs, funptrs.  A Phi corresponds to the

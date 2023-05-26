@@ -77,7 +77,8 @@ public final class FunPtrNode extends Node {
   }
 
   // FunPtrs return RetNode liveness for memory
-  @Override public Type live_use( Node ret ) {
+  @Override public Type live_use( int i ) {
+    Node ret = in(i);
     assert ret instanceof RetNode;
     // Pre-combo, Ret is alive because unwired caller may yet appear and demand
     // all memory
@@ -95,9 +96,14 @@ public final class FunPtrNode extends Node {
   @Override public Node ideal_reduce() {
     // Dead display post-Combo, we can wipe out the display type
     if( _tvar!=null && tvar() instanceof TVLambda lam && !(lam.dsp() instanceof TVLeaf) &&
-        _val instanceof TypeFunPtr tfp && tfp.dsp()==Type.ANY &&
-        xfun()!=null && xfun().parm(DSP_IDX)==null ) {
-      _tvar = ((TVLambda)lam.copy()).clr_dsp();
+        _val instanceof TypeFunPtr tfp && tfp.dsp()==Type.ANY && xfun()!=null ) {
+      Node dsp = xfun().parm(DSP_IDX);
+      if( dsp==null ) {
+        _tvar = ((TVLambda)lam.copy()).clr_dsp();
+        return this;
+      } else {
+        dsp.deps_add(this);     // If parm deletes
+      }
     }
     return null;
   }

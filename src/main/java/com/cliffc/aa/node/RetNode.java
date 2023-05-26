@@ -72,8 +72,8 @@ public final class RetNode extends Node {
     return TypeTuple.make(ctl,mem,val);
   }
 
-  @Override public Type live_use(Node def ) {
-    return def==mem() ? _live : Type.ALL;
+  @Override public Type live_use( int i ) {
+    return i==MEM_IDX ? _live : Type.ALL;
   }
 
   // Funs get special treatment by the H-M algo.

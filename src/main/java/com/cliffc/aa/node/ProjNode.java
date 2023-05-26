@@ -3,6 +3,8 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.type.*;
 
+import static com.cliffc.aa.AA.MEM_IDX;
+
 // Proj data
 public class ProjNode extends Node {
   public int _idx;
@@ -20,7 +22,7 @@ public class ProjNode extends Node {
       return ct._ts[_idx];
     return c.oob();
   }
-  @Override Type live_use( Node def ) { return def.is_mem() ? TypeMem.ANYMEM : _live; }
+  @Override Type live_use( int i ) { return i==MEM_IDX ? TypeMem.ANYMEM : _live; }
   
   // Strictly reducing
   @Override public Node ideal_reduce() {
