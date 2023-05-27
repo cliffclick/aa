@@ -33,22 +33,21 @@ public class StoreNode extends Node {
     Type tval = rez==null ? Type.ANY : rez._val;  // Value
     if( !(tmem instanceof TypeMem    tm ) ) return tmem .oob(TypeMem.ALLMEM);
     if( !(tadr instanceof TypeMemPtr tmp) ) return tadr .oob(TypeMem.ALLMEM);
-    if( tmp._aliases.is_empty() ) return tm; // Stored at nothing
     TypeStruct tvs = tval instanceof TypeStruct ? (TypeStruct)tval : tval.oob(TypeStruct.ISUSED);
+    if( tmp.above_center() ) tvs = TypeStruct.UNUSED;
 
-    //Node str = LoadNode.find_previous_struct(this, adr, tmp._aliases);
-    //boolean precise = adr instanceof NewNode nnn && (nnn.rec()==str); // Precise is replace, imprecise is MEET
-    // TODO: THIS IS A LIE
-    boolean precise=true;
-    if( tmp.above_center() && precise ) {
-      tmp = tmp.dual();
-      tvs = TypeStruct.UNUSED;
-    } else {
-      adr().deps_add(this);     // Depends on adr liveness
-      if( adr()._live==Type.ANY )
-        tvs = TypeStruct.UNUSED;  // Store address is dead, then stored struct is unused
+    // Precise update
+    if( adr instanceof NewNode nnn ) {
+      assert Math.abs(tmp._aliases.abit())==nnn._alias;
+      return tm.set(nnn._alias,tvs);
     }
-    return tm.update(tmp._aliases,tvs,precise);
+    
+    // Meet no aliases into memory
+    if( tmp.above_center() || tmp._aliases.is_empty() )
+      return tm;
+
+    // Must be empty or below center.  Meet into the aliases
+    return tm.update(tmp._aliases,tvs,false);
   }
 
   // Compute the liveness local contribution to def's liveness.  Turns around

@@ -186,9 +186,12 @@ public class TVStruct extends TVExpanding {
       String key = thsi._flds[i];
       int ti = that.idx(key);
       if( ti == -1 ) {          // Missing field in that
-        if( open || Resolvable.is_resolving(key) )
+        if( open ) {
           that.add_fld(key,fthis,thsi._pins[i]); // Add to RHS
-        else
+        } else if( Resolvable.is_resolving(key) ) {
+          that.add_fld(key,fthis,thsi._pins[i]); // Add to RHS
+          add_delay_resolve(that);
+        } else
           that.del_fld(key);    // Remove from RHS
       } else {
         TV3 fthat = that.arg(ti);  // Field of that
@@ -232,9 +235,13 @@ public class TVStruct extends TVExpanding {
         if( is_open() || that.is_open() || resolving ) {
           if( test ) return true; // Will definitely make progress
           TV3 nrhs = lhs._fresh();
-          if( !that.is_open() && !resolving ) // RHS not open, put copy of LHS into RHS with miss_fld error
+          if( resolving ) {
+            progress |= that.add_fld(_flds[i],nrhs,_pins[i]);
+          } else if( that.is_open() ) {
+            progress |= that.add_fld(_flds[i],nrhs,_pins[i]);
+          } else { // RHS not open, put copy of LHS into RHS with miss_fld error
             throw unimpl();                   // miss_fld
-          progress |= that.add_fld(_flds[i],nrhs,_pins[i]);
+          }
         } else missing = true; // Else neither side is open, field is not needed in RHS
         
       } else {
@@ -261,7 +268,10 @@ public class TVStruct extends TVExpanding {
         }
       }
 
-    progress |= trial_resolve_all(false,that);
+    if( trial_resolve_all(false,that) ) {
+      progress = true;
+      trial_resolve_all(false,this);
+    }
     
     // If LHS is closed, force RHS closed
     if( !_open && that._open ) {

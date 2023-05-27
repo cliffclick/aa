@@ -194,34 +194,50 @@ public final class CallEpiNode extends Node {
          len()==1 ||             // Not wired (wireable?)
          !is_CG(true)) )         // Unknown callers?
       return TypeTuple.make(Type.CTRL,RootNode.def_mem(this),Type.ALL); // Unknown callers return e.g. error states
-      
+
     assert is_CG(false);
 
-    // Compute meet over wired called function returns
+    // Pre-Combo:
+    // - fidxs are conservative, and may get removed, and may be e.g. BitsFun.NALL, or may go above center.
+    // - If we get here, we have a conservative set of wired fidxs that are not NALL (checked above).
+    // - If we get here, its conservative correct to meet across returns &
+    //   mixing in the pre-call is required for root or pure calls
+    assert !(Combo.pre() && fidxs==BitsFun.NALL);
+
+    // Combo:
+    // - fidxs are optimistic, and may get added, and start above center and may fall to NALL.
+    // - Above center ones do not wire, so this loop is empty then.
+    // - Might fall through some middle fidxs, then hit NALL.  Middle fidxs wire, and are precise.
+    // - NALL requires mixing in Root def_mem
+    if( !Combo.pre() && fidxs==BitsFun.NALL )
+      return TypeTuple.make(Type.CTRL,CallNode.emem(tcall),tfptr._ret); // Error state
+
+    // Post-Combo:
+    // - fidxs are conservative, may get removed, and will not be NALL (checked above).
+    // - If we get here, its conservative correct to meet across returns &
+    //   mixing in the pre-call is required for root or pure calls
+    
+    // Compute meet over wired called function returns.
     Type tmem = TypeMem.ANYMEM, rmem;
     Type trez = fidxs.above_center() || nwired()==0 ? tfptr._ret : Type.ANY, rrez;
     int fidx;
-    boolean pre_call_mem = false;
     for( int i=1; i<len(); i++ ) {
       if( in(i) instanceof RetNode ret ) {
         fidx = ret._fidx;
         TypeTuple tret = ret._val instanceof TypeTuple tt ? tt : (TypeTuple)ret._val.oob(TypeTuple.RET);
         rmem = tret.at(MEM_IDX);
         rrez = tret.at(REZ_IDX);
-        pre_call_mem |= ret.in(MEM_IDX)==null; // 
       } else {                  // Calling Root, taking Root return value
         assert in(i)==Env.ROOT;
         fidx = BitsFun.EXTX;
         rmem = Env.ROOT.rmem();
         rrez = Env.ROOT.ext_caller();
-        pre_call_mem = true;    // Root might not stomp anything
       }
       if( !fidxs.test_recur(fidx) ) continue;
       tmem = tmem.meet(rmem);
       trez = trez.meet(rrez);
     }
-    if( pre_call_mem )         // Also meet pass-thru memory
-      tmem = tmem.meet(CallNode.emem(tcall)); 
+    tmem = tmem.meet(CallNode.emem(tcall));
 
     // Attempt to lift the result, based on HM types.  Walk the input HM type
     // and GCP flow type in parallel and create a mapping.  Then walk the

@@ -27,8 +27,8 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_GCP=true;
-    DO_HMT=false;
+    DO_GCP=false;
+    DO_HMT=true;
     RSEED=0;
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))","*[13](nil,1,2)","*(int64,A:int64,A)", null, null, "[13]", null);
   }

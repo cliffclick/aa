@@ -4,7 +4,7 @@
 Back to TVMem issues -
 
 From prior ACTION items
-- Dropped TVMem, but bringing it back
+- Dropped TVMem, but thinking about bringing it back
 - TVStructs track a CLZ field (in slot 0 and called ".", if it exists)
 - TVStruct fields can be pinned, and float "up" to lowest CLZ position
 
@@ -33,8 +33,6 @@ FIXES:
 - Flow side, unknown calls cannot futz with final fields.
 - Flow side, pass final fields thru, other fields stay HIGH (this is Combo) in case they get set to some high thing.
 - This never settles out, unless TV3 forces memory shape via as_flow
-- Back to tracking TVMem thru unknown Calls, and Ptrs are shallow again.
-- 
 
 TVNIL HAS NO OPERS
 - Replace TVNil with a TVPtr-struct, unknown alias (works for deep-ptrs, fails for shallow-ptrs+track-mem)
@@ -43,7 +41,7 @@ TVNIL HAS NO OPERS
 - TVPtr picks up oper requests.
 - Optionally: use TVBase (of nil).  Picks up opers same way.
 
-ACTION: try to pass final field flow thru
+*ACTION: try to pass final field flow thru - WOrking
 
 
 
