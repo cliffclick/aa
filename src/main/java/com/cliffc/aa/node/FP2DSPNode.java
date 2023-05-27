@@ -34,6 +34,7 @@ public class FP2DSPNode extends Node {
       if( frsh.id() instanceof BindFPNode bind ) {
         Node frsh2 = frsh.copy(true).set_def(0,bind.dsp());
         frsh2._val = bind.dsp()._val;
+        frsh2._live = _live;
         return frsh2;
       }
       frsh.deps_add(this);

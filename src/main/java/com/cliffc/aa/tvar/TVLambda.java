@@ -6,6 +6,8 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
+import java.util.Arrays;
+
 import static com.cliffc.aa.AA.*;
 
 /** A lambda, higher-order function
@@ -55,18 +57,17 @@ public class TVLambda extends TV3 {
 
   // -------------------------------------------------------------
   // This is fresh, and that._args[i] is missing.  Lambdas with missing arguments
-  boolean _fresh_missing_rhs(TV3 that, int i, boolean test) {
+  @Override boolean _fresh_missing_rhs(TV3 that, int i, boolean test) {
     if( test ) return true;
-    //int len = that._args.length;
-    //while( len<=i ) {
-    //  that._args = Arrays.copyOf(that._args,len+1);
-    //  TVErr err = new TVErr();
-    //  err.err("Bad arg count",arg(i),test);
-    //  that._args[len++] = err;
-    //  arg(i)._fresh_unify(err,false);
-    //}
-    //return true;
-    throw unimpl();
+    TVLambda lam = (TVLambda)that; // Invariant when called
+    int nargs = lam.nargs();
+    assert i>=nargs;
+    lam._args = Arrays.copyOf(lam._args,i+1);
+    TVErr err = new TVErr();
+    err.err("Bad arg count",arg(i),null,test);
+    Arrays.fill(lam._args,nargs,lam.nargs(),err);
+    arg(i)._fresh_unify(err,false);
+    return true;
   }
 
   // -------------------------------------------------------------

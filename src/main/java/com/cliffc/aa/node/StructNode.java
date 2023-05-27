@@ -223,8 +223,7 @@ public class StructNode extends Node {
     if( !(_live instanceof TypeStruct ts) ) return _live;
     String fld = _flds.at(idx);       // Get field name
     // Use name lookup to get liveness for that field
-    TypeFld lfld = ts.get(fld);       // Liveness for this field name
-    Type live = lfld==null ? ts.oob() : lfld._t.oob();
+    Type live = ts.at_def(fld).oob();
     // Stacked overloads in struct
     if( in(idx) instanceof StructNode ) return live.oob(TypeStruct.ISUSED);
     return live;

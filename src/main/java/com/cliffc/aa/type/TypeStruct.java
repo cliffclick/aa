@@ -726,16 +726,6 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     return (TypeStruct)(precise ? ts : meet(ts));
   }
 
-  // Widen all mutable fields to final ALL, for building default Parm inputs.
-  public TypeStruct widen_mut_fields() {
-    TypeFld[] flds = TypeFlds.get(len());
-    for( int i=0; i<_flds.length; i++ )
-      flds[i] = _flds[i]._access==Access.Final
-        ? _flds[i]
-        : _flds[i].make_from(TypeNil.SCALAR, Access.bot());
-    return make_from(flds);
-  }
-
   // Flatten fields for LIVE: only need a per-field any/all indication
   public TypeStruct flatten_live_fields() {
     boolean change=false;

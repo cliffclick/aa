@@ -30,7 +30,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)","int64","int64");
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))","*[13](nil,1,2)","*(int64,A:int64,A)", null, null, "[13]", null);
   }
   
   static private void assertTrue(boolean t) {

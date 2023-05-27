@@ -1,4 +1,53 @@
 =======================================
+05/27/2023
+
+Back to TVMem issues -
+
+From prior ACTION items
+- Dropped TVMem, but bringing it back
+- TVStructs track a CLZ field (in slot 0 and called ".", if it exists)
+- TVStruct fields can be pinned, and float "up" to lowest CLZ position
+
+// Fact is typed as a function taking an 'x' and returning an 'x'.
+// 'x' is typed as anything with operators {<=,-,*}
+fact = { x -> x <= 1 ? x : x*fact(x-1) };
+(fact(0),fact(1),fact(2))
+
+Middle of Combo
+Have an unresolved call.
+What is the "shape" of memory after such a Call?
+
+TWO BUGS:
+ONE: TVNil does not support TVClz operators.  1st fact(0) call does not resolve internally.
+Reports back [[_any_]] memory until it resolves.
+
+TWO:
+There's a Load after the Call asking about Memory.
+Flow-side has no mem info until Call resolves.
+Call cannot resolve without operators to resolve.
+Load can't find 'fact', so 2nd call never makes.
+Since Load doesn't load, Field ".fact" doesn't fall past ANY never unifies.
+Cannot unify ANY Nodes, since those are dead, shouldn't type.
+
+FIXES:
+- Flow side, unknown calls cannot futz with final fields.
+- Flow side, pass final fields thru, other fields stay HIGH (this is Combo) in case they get set to some high thing.
+- This never settles out, unless TV3 forces memory shape via as_flow
+- Back to tracking TVMem thru unknown Calls, and Ptrs are shallow again.
+- 
+
+TVNIL HAS NO OPERS
+- Replace TVNil with a TVPtr-struct, unknown alias (works for deep-ptrs, fails for shallow-ptrs+track-mem)
+- TVPtr is may-nil.
+- No more TVNil.
+- TVPtr picks up oper requests.
+- Optionally: use TVBase (of nil).  Picks up opers same way.
+
+ACTION: try to pass final field flow thru
+
+
+
+=======================================
 05/15/2023
 
 *ACTION: DROP TVMem

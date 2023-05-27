@@ -64,7 +64,7 @@ public class BindFPNode extends Node {
       return i==0 ? TypeStruct.ISUSED // Whole overload is used
         : Type.ALL;                   // Whole primitive or TMP is alive
     } else {
-      return _live instanceof TypeStruct ts ? ts.at_def(i==0 ? "fp" : "dsp"): _live;
+      return _live instanceof TypeStruct ts ? ts.at_def(i==0 ? "fp" : "dsp") : _live;
     }
   }
   

@@ -544,24 +544,6 @@ public class TypeMem extends Type<TypeMem> {
     }
     return true;                // Not modified in any alias
   }
-
-  // For default Parm inputs, widen all non-final fields to final ALL.
-  public TypeMem widen_mut_fields() {
-    TypeStruct to, tof=null;
-    int i; for( i=1; i< _objs.length; i++ ) {
-      if( (to = _objs[i]) != null && (tof = to.widen_mut_fields())!=to )
-        break;
-    }
-    if( i== _objs.length ) return this;
-
-    TypeStruct[] tos = _objs.clone();
-    tos[0] = null;
-    tos[i++] = tof;
-    for( ; i< _objs.length; i++ )
-      if( tos[i] != null )
-        tos[i] = tos[i].widen_mut_fields();
-    return make0(_any,tos);
-  }
   
   // Everything NOT in the 'escs' is flattened to UNUSED.
   // Everything YES in the 'escs' is flattened for live.

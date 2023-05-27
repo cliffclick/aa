@@ -92,7 +92,7 @@ public class TVErr extends TV3 {
       if( !test ) _args[that.eidx()] = that;
       return true;
     }
-    return that._fresh_unify(arg(that.eidx()),test);
+    return that._fresh_unify(tv3,test);
   }
 
   // Make this tvar an error and add an error message
