@@ -260,13 +260,5 @@ public class LoadNode extends Node {
     return (_tvar=self.find());
   }
 
-  @Override public boolean unify( boolean test ) { return false; }
-
-  private static boolean do_base(TVStruct self, TVBase base, boolean test) {
-    // Bases field their prototype via the TypeNil type, and from there the CLZ
-    StructNode proto = FieldNode.clz_node(base._t);
-    TVStruct base_clz = proto.tvar().as_struct();
-    return self.unify(base_clz, test); // Unify against primitive CLZ
-  }
-  
+  @Override public boolean unify( boolean test ) { return false; }  
 }

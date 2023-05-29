@@ -310,6 +310,7 @@ public class TVStruct extends TVExpanding {
         t.del_fld(i);              // Remove resolving key
         TV3 t3 = t.arg(res.fld()); // Get resolved label, if any
         if( t3==null ) t.add_fld(res.fld(),old,true); // Insert resolved-label, even if this is open, since operation is a label replacement
+        else if( outie ) old.unify(t3, false); // Unify into existing (fold labels together)
         else old._unify(t3, false); // Unify into existing (fold labels together)
       }
     }

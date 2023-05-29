@@ -230,7 +230,7 @@ public class FunNode extends Node {
     int path = split_size(body,parms()); // Forcible size-splitting first path
     if( path == -1 ) return null;
     if( !is_prim() ) {
-      if( _cnt_size_inlines >= 5 ) return null;
+      if( _cnt_size_inlines >= 6 ) return null;
       _cnt_size_inlines++; // Disallow infinite size-inlining of recursive non-primitives
     }
     CallNode call = (CallNode)in(path);

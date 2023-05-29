@@ -251,22 +251,6 @@ public class FieldNode extends Node implements Resolvable {
     String clz = clz_str(t);
     return clz==null ? null : Env.PROTOS.get(clz);  // CLZ from instance
   }
-
-  //private static TV3 CLZ;
-  boolean clz_lookup( boolean test ) {
-    //StructNode proto = clz_node(val(0)); // Existing prototypes for int/flt/named-clazz-types
-    //if( proto!=null )                    // Known clazz
-    //  { CLZ = proto.tvar(); return false; }
-    //
-    //// Unknown inferred clazz
-    //if( test ) return true;        // Always progress
-    //TVStruct obj = new TVStruct(new String[]{_fld}, new boolean[]{true}, new TV3[]{tvar()}, true);
-    //CLZ = new TVClz(obj, new TVLeaf());
-    //tvar(0).unify(CLZ, test);
-    //return true;
-    throw unimpl();
-  }
-
   
   private boolean try_resolve( TVStruct str, boolean test ) {
     // If struct is open, more fields might appear and cannot do a resolve.

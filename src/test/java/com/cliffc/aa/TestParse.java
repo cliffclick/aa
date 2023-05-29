@@ -27,10 +27,10 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_GCP=false;
-    DO_HMT=true;
-    RSEED=0;
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))","*[13](nil,1,2)","*(int64,A:int64,A)", null, null, "[13]", null);
+    DO_GCP=true;
+    DO_HMT=false;
+    RSEED=1;
+    test("(math.rand(1) ? 2._+_ : 2._*_) ._ (3)","int64","int64"); // either 2+3 or 2*3, or {5,6} which is INT8.
   }
   
   static private void assertTrue(boolean t) {
@@ -277,10 +277,12 @@ public class TestParse {
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)","int64","int64");
     test("f0 = { x -> x ? 1+(f0(x-1)) : 0 }; f0(2)", "2","2");
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))","*[13](nil,1,2)","*(int64,A:int64,A)", null, null, "[13]", null);
+    // Note that passing in a nil here produces a very interesting type:
+    // any class which has the right unbound operators.  IMHO, the opers should bind.
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(1),fact(2),fact(3))","*[13](1,2,6)","*[13](A:int,A,A)", null, null, "[13]", null);
 
     // Co-recursion requires parallel assignment & type inference across a lexical scope
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", "1", "1" );
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", "int1", "int1" );
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", "int1", "int1" );
 
     // This test merges 2 TypeFunPtrs in a Phi, and then fails to resolve.
