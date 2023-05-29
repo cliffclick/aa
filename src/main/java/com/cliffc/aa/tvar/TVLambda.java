@@ -44,14 +44,20 @@ public class TVLambda extends TV3 {
   @Override boolean _unify_impl(TV3 that ) {
     TV3 thsi = this;
     int nargs = nargs(), tnargs = ((TVLambda)that).nargs();
-    for( int i=0; i<Math.min(nargs,tnargs); i++ ) {
+    int i;
+    for( i=0; i<Math.min(nargs,tnargs); i++ ) {
       if( _args[i]==null ) continue;
       thsi.arg( i )._unify( that.arg( i ), false );
       thsi = thsi.find();
       that = that.find();      
     }
-    if( nargs != tnargs )
-      that.unify_err("Expected "+tnargs+" but found "+nargs,that,null,false);
+    if( nargs != tnargs ) {
+      // Make the arg counts align
+      if( nargs > tnargs ) that._args = _args;
+      // Flag the extra args as errors
+      for( ; i<Math.max(nargs,tnargs); i++ )
+        that.arg(i)._unify_err("Expected "+tnargs+" but found "+nargs,that,null,false);
+    }
     return true;
   }
 
@@ -59,7 +65,7 @@ public class TVLambda extends TV3 {
   // This is fresh, and that._args[i] is missing.  Lambdas with missing arguments
   @Override boolean _fresh_missing_rhs(TV3 that, int i, boolean test) {
     if( test ) return true;
-    TVLambda lam = (TVLambda)that; // Invariant when called
+    TVLambda lam = that.as_lambda(); // Invariant when called
     int nargs = lam.nargs();
     assert i>=nargs;
     lam._args = Arrays.copyOf(lam._args,i+1);

@@ -63,6 +63,7 @@ public class TVErr extends TV3 {
     that._deps_work_clear();              //
     if( !(that instanceof TVLeaf) ) {
       int x = that.eidx();                 // Which part unifies
+      if( arg(x)==that ) return false;
       TV3 ecp = that.copy();               // Make a shallow clone of that
       if( _args[x]==null ) _args[x] = ecp; // Unify shallow clone into others of its kind
       else ecp._unify(arg(x),false);
@@ -163,7 +164,7 @@ public class TVErr extends TV3 {
     err = err.intern();
     int idx;
     if( _errs!=null && (idx=_errs.find(err))!= -1 ) // Prior error?
-      return extra!=null && extra.unify(_args[idx+XMAX],test); // Also progress if unify progresses
+      return extra!=null && extra.unify(arg(idx+XMAX),test); // Also progress if unify progresses
     if( test ) return true;
     if( _errs==null ) _errs = new Ary<>(new String[1],0);
     _args[_errs._len+XMAX] = extra;

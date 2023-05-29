@@ -369,7 +369,7 @@ public class CallNode extends Node {
     // use the call input.  Post-Combo, all is wired, but dead Calls might be
     // unwinding.
     if( dying(def) ) return Type.ANY;
-    if( _uses.len()==1 ) return Type.ALL; // Not wired, assume the worst user
+    if( Combo.pre() && _uses.len()==1 ) return Type.ALL; // Not wired, assume the worst user
 
     // Since wired, we can check all uses to see if this argument is alive.
     Type t = Type.ANY;
@@ -378,16 +378,13 @@ public class CallNode extends Node {
       if( use instanceof CallEpiNode ) continue;
       if( use instanceof RootNode ) return Type.ALL;
       FunNode fun = (FunNode)use;
-      // Find which argument#s are getting liveness computed
-      for( int idx=DSP_IDX; idx<len(); idx++ )
-        if( in(idx)==def ) {    // Can be repeats, so have to check all args
-          ParmNode parm = fun.parm(idx);
-          if( parm!=null ) {    // Parm is in use?
-            parm.deps_add(def);
-            t = t.meet(parm._live); // As alive as the using Parm
-            if( t == Type.ALL ) return Type.ALL;
-          }
-        }      
+      // Find argument getting liveness computed
+      ParmNode parm = fun.parm(i);
+      if( parm!=null ) {    // Parm is in use?
+        parm.deps_add(def);
+        t = t.meet(parm._live); // As alive as the using Parm
+        if( t == Type.ALL ) return Type.ALL;
+      }
     }
     return t;
   }

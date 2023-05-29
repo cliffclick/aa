@@ -29,8 +29,8 @@ public class TestParse {
 
     DO_GCP=true;
     DO_HMT=false;
-    RSEED=1;
-    test("(math.rand(1) ? 2._+_ : 2._*_) ._ (3)","int64","int64"); // either 2+3 or 2*3, or {5,6} which is INT8.
+    RSEED=3;
+    testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
   }
   
   static private void assertTrue(boolean t) {
@@ -294,30 +294,30 @@ public class TestParse {
 
   @Test public void testParse03() {
     // Type annotations
-    test("-1:int", "-1","int:-1");
-    test("(1+2.3):flt", "3.3", "flt:3.3");
-    test("x:int = 1", "int:1", "int:1");
-    test("x:flt = 1", "int:1", "int:1"); // casts for free to a float
+    test("-1:int", "-1","-1");
+    test("(1+2.3):flt", "3.3", "3.3");
+    test("x:int = 1", "1", "1");
+    test("x:flt = 1", "1", "1"); // casts for free to a float
     testerr("x:flt32 = 123456789", "123456789 is not a flt32",0);
     testerr("1:","Syntax error; trailing junk",1); // missing type
     testerr("2:x", "Syntax error; trailing junk", 1);
     testerr("(2:)", "Syntax error; trailing junk", 2);
 
-    test   (" -1 :int1", "-1", "int:-1"); // parses as -(1:int)
+    test   (" -1 :int1", "-1", "-1"); // parses as -(1:int)
     testerr("(-1):int1", "-1 is not a int1",4);
     testerr("\"abc\":int", "*str:(97) is not a int64",5);
     testerr("1:str", "1 is not a *str:(int8)",1);
 
-    test   ("{x:int -> x*2}(1)", "2","int:2"); // Types on parms
+    test   ("{x:int -> x*2}(1)", "2","2"); // Types on parms
     testerr("{x:str -> x}(1)", "1 is not a *str:(int8)", 2);
 
     // Type annotations on dead args are ignored
-    test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", "4","int:4");
+    test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", "4","4");
     testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *str:(int8)",41);
     testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",36);
     // Test that the type-check is on the variable and not the function.
     test   ("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x;y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
-            "*[12](4,4)", "*(A:int:int64,A)", null, null, "[12]", null);
+            "*[12](4,4)", "*(A:int64,A)", null, null, "[12]", null);
     testerr("fun={x y -> x+y}; baz:{int @{x;y} -> int} = fun; (fun(2,3), baz(2,3))",
             "3 is not a *@{x:=Scalar; y:=Scalar; ...}", 66);
     testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> foo(x,y)}; (fun(2,3), baz(2,3))",

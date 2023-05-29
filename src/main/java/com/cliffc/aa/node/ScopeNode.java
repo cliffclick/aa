@@ -17,7 +17,7 @@ import static com.cliffc.aa.type.TypeFld.Access;
 public class ScopeNode extends Node {
 
   // Mapping from type-variables to Types.  Types have a scope lifetime like values.
-  private final HashMap<String,TypeNil> _types; // user-typing type names
+  public final HashMap<String,TypeNil> _types; // user-typing type names
 
   public ScopeNode( HashMap<String,TypeNil> types,  Node ctl, Node mem, Node rez, Node ptr, StructNode dsp) {
     super(OP_SCOPE,ctl,mem,rez,ptr,dsp);

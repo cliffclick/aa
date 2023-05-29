@@ -115,6 +115,7 @@ public class Env implements AutoCloseable {
     SCP_0 = TOP._scope;
     STK_0 = SCP_0.stk();
     PrimNode.PRIMS();           // Initialize
+    Type.init0(SCP_0._types);
     record_for_reset();         // Record for reset between tests
   }
 
@@ -139,10 +140,7 @@ public class Env implements AutoCloseable {
       //PROTOS.put(fname,dsp);
       throw unimpl();
     }
-    HashMap<String,TypeNil> types = new HashMap<>();
-    _scope = new ScopeNode(types,ctrl,mem,XNIL,ptr,dsp).init();
-    if( _par==null )
-      Type.init0(types);
+    _scope = new ScopeNode(new HashMap<>(),ctrl,mem,XNIL,ptr,dsp).init();
     KEEP_ALIVE.add_def(_scope);
     GVN.iter();
   }

@@ -379,7 +379,8 @@ public class TVStruct extends TVExpanding {
     if( !prims && is_top_clz() ) return dups;
     
     if( !debug && clz instanceof TVPtr zptr && _flds.length==2 && Util.eq(_flds[1],"0") ) {
-      if( zptr.load().is_int_clz() || zptr.load().is_flt_clz() )
+      TVStruct zts = zptr.load();
+      if( zts.is_int_clz() || zts.is_flt_clz() || zts.is_str_clz() )
         return _args[1]._get_dups(visit,dups,debug,prims);
     }
     for( int i=0; i<len(); i++ ) {
@@ -402,7 +403,8 @@ public class TVStruct extends TVExpanding {
     // Special hack to print "int:(2)" as "2"
     TV3 clz = debug_arg(".");
     if( !debug && clz instanceof TVPtr zptr && _flds.length==2 && Util.eq(_flds[1],"0") ) {
-      if( zptr.load().is_int_clz() || zptr.load().is_flt_clz() )
+      TVStruct zts = zptr.load();
+      if( zts.is_int_clz() || zts.is_flt_clz() || zts.is_str_clz() )
         return _args[1]._str(sb,visit,dups,debug,prims);
     }
     // Print clazz field up front.

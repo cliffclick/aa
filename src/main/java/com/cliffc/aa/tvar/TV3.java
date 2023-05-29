@@ -274,6 +274,13 @@ abstract public class TV3 implements Cloneable {
     return true;
   }
 
+  public void _unify_err( String msg, TV3 extra, Parse bad, boolean test) {
+    if( test ) return;
+    TVErr err = new TVErr();
+    err._unify_err(this);
+    err.err(msg,extra,bad,false);
+  }
+
   // Neither side is a TVErr, so make one
   boolean _unify_err(TV3 that) {
     assert !(this instanceof TVErr) && !(that instanceof TVErr);
@@ -362,6 +369,7 @@ abstract public class TV3 implements Cloneable {
           : lhs._fresh_unify(rhs,test);
         assert !unified();      // If LHS unifies, VARS is missing the unified key
         that = that.find();
+        assert this.getClass()==that.getClass();
       }
       if( progress && test ) return true;
       // Extra args in RHS

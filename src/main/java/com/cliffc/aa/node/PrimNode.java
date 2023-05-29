@@ -58,11 +58,6 @@ public abstract class PrimNode extends Node {
   public static final NewNode PFLT = new NewNode(BitsAlias.new_alias(BitsAlias.EXTX));
   public static final NewNode PSTR = new NewNode(BitsAlias.STRX);
   public static final NewNode PMATH= new NewNode(BitsAlias.new_alias(BitsAlias.EXTX));
-
-  public static final ConNode  INT = new ConNode(TypeInt. INT64).init();
-  public static final ConNode  FLT = new ConNode(TypeFlt. FLT64).init();
-  public static final ConNode NFLT = new ConNode(TypeFlt.NFLT64).init();
-  public static final ConNode  STR = new ConNode(TypeMemPtr.STRPTR).init();
   
   private static PrimNode[] PRIMS = null; // All primitives
 
@@ -126,9 +121,6 @@ public abstract class PrimNode extends Node {
     Env.KEEP_ALIVE.add_def(ZINT);
     Env.KEEP_ALIVE.add_def(ZFLT);
     Env.KEEP_ALIVE.add_def(ZSTR);
-    Env.KEEP_ALIVE.add_def( INT);
-    Env.KEEP_ALIVE.add_def( FLT);
-    Env.KEEP_ALIVE.add_def(NFLT);
 
     // ClazzClazz
     ZCLZ.close();
