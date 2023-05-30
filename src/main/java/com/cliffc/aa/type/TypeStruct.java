@@ -70,6 +70,9 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   private static boolean check(Type def, TypeFld[] flds) {
     assert !(def instanceof TypeFld);
     for( TypeFld fld : flds ) if( fld!=null && fld._t == def ) return false; // Not canonical
+    for( int i=0; i<flds.length-1; i++ )
+      if( flds[i]._fld.compareTo(flds[i+1]._fld) >= 1 )
+        return false;
     return true;
   }
 
@@ -305,8 +308,8 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   // A fake Type Clazz hierarchy.  Fake because it does not have all the fields
   // found in PrimNode.  Useful for testing.
   public static final TypeStruct XCLZCLZ = ISUSED;
-  public static final TypeStruct XSTRZ = make_test(TypeFld.make(".",XCLZCLZ), TypeFld.make("#_",UNUSED));
-  public static final TypeStruct XINTZ = make_test(TypeFld.make(".",XCLZCLZ), TypeFld.make("!_",UNUSED));
+  public static final TypeStruct XSTRZ = make_test(TypeFld.make("#_",UNUSED), TypeFld.make(".",XCLZCLZ));
+  public static final TypeStruct XINTZ = make_test(TypeFld.make("!_",UNUSED), TypeFld.make(".",XCLZCLZ));
   
   // A bunch of types for tests
   public  static final TypeStruct POINT = make_test(TypeFld.make("x",TypeFlt.FLT64),TypeFld.make("y",TypeFlt.FLT64));
@@ -651,9 +654,9 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return true; }
 
   boolean is_top_clz () { return _flds.length>1 && Util.eq("math",_flds[1]._fld); }
-  boolean is_int_clz () { return _flds.length>1 && Util.eq("!_"  ,_flds[1]._fld); }
-  boolean is_flt_clz () { return _flds.length>1 && Util.eq("-_"  ,_flds[1]._fld); }
-  boolean is_str_clz () { return _flds.length>1 && Util.eq("#_"  ,_flds[1]._fld); }
+  boolean is_int_clz () { return _flds.length>1 && Util.eq("!_"  ,_flds[0]._fld); }
+  boolean is_flt_clz () { return _flds.length>1 && Util.eq("-_"  ,_flds[0]._fld); }
+  boolean is_str_clz () { return _flds.length>1 && Util.eq("#_"  ,_flds[0]._fld); }
   boolean is_math_clz() { return _flds.length>1 && Util.eq("pi"  ,_flds[1]._fld); }
   boolean is_prim_clz() {
     return is_top_clz()

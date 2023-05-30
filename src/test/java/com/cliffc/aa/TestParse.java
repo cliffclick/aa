@@ -29,8 +29,8 @@ public class TestParse {
 
     DO_GCP=true;
     DO_HMT=false;
-    RSEED=3;
-    testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
+    RSEED=0;
+    testerr("1:str", "1 is not a *str:(int8)",1);
   }
   
   static private void assertTrue(boolean t) {
@@ -317,7 +317,7 @@ public class TestParse {
     testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",36);
     // Test that the type-check is on the variable and not the function.
     test   ("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x;y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
-            "*[12](4,4)", "*(A:int64,A)", null, null, "[12]", null);
+            "*[12](4,4)", "*[12](int64,int64)", null, null, "[12]", null);
     testerr("fun={x y -> x+y}; baz:{int @{x;y} -> int} = fun; (fun(2,3), baz(2,3))",
             "3 is not a *@{x:=Scalar; y:=Scalar; ...}", 66);
     testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> foo(x,y)}; (fun(2,3), baz(2,3))",

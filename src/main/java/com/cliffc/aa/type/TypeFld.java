@@ -114,7 +114,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   public static TypeFld make( String fld, Type t, Access access ) { return malloc(fld,t,access).hashcons_free(); }
   public static TypeFld make( String fld, Type t ) { return make(fld,t,Access.Final); }
   public static TypeFld make( String fld ) { return make(fld,TypeNil.SCALAR,Access.Final); }
-  public static TypeFld make( Type def ) { return make(fldBot,def,Access.Final); }
+  //public static TypeFld make( Type def ) { return make(fldBot,def,Access.Final); }
   public static TypeFld make_dsp(Type t) { return make("^",t,Access.Final); }
 
   // Some convenient default constructors
@@ -129,9 +129,9 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   public static final TypeFld NO_DSP  = TypeFld.make_dsp(TypeMemPtr.NO_DISP);
 
   @Override protected TypeFld xdual() {
-    if( Util.eq(_fld,sdual(_fld)) && _t==_t.dual() && _access==_access.dual() )
+    if( _t==_t.dual() && _access==_access.dual() )
       return this;              // Self symmetric
-    return POOLS[TFLD].<TypeFld>malloc().init(sdual(_fld),_t.dual(),_access.dual());
+    return POOLS[TFLD].<TypeFld>malloc().init(_fld,_t.dual(),_access.dual());
   }
   @Override protected void rdual() { _dual._t = _t._dual; }
 
@@ -139,10 +139,9 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     if( this==tf ) return this;
     if( tf._type != TFLD ) throw typerr(tf);
     TypeFld f = (TypeFld)tf;
-    String fld   = smeet(_fld,  f._fld)  ;
     Type   t     = _t     .meet(f._t     );
     Access access= _access.meet(f._access);
-    return make(fld,t,access);
+    return make(_fld,t,access);
   }
 
   public enum Access {
@@ -161,23 +160,6 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     private static final String[] LONGS  = new String[]{"final","read-only","read/write",/*"noaccess",*/"!:=!","!==!","!=!"};
     @Override public String toString() { return LONGS[ordinal()]; }
     public SB str(SB sb) { return sb.p(SHORTS[ordinal()]); }
-  }
-
-  // Field names
-  public static final String fldTop = "\\";
-  public static final String fldBot = "." ;
-  // String dual
-  private static String sdual(String s) {
-    if( Util.eq(s,fldTop) ) return fldBot;
-    if( Util.eq(s,fldBot) ) return fldTop;
-    return s;
-  }
-  // String meet
-  public static String smeet( String s0, String s1 ) {
-    if( Util.eq(s0,s1) ) return s0;
-    if( Util.eq(s0,fldTop) ) return s1;
-    if( Util.eq(s1,fldTop) ) return s0;
-    return fldBot;
   }
 
   public static final TypeFld NO_DISP = make("^",Type.ANY,Access.Final);
