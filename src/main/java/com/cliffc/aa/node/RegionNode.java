@@ -24,6 +24,7 @@ public class RegionNode extends Node {
     // Node, and return-for-progress.
     for( int i=1; i<_defs._len; i++ ) {
       Node cin = in(i);
+      if( cin.is_prim() ) continue;
       if( cin._val==Type.XCTRL ) { // Dead control flow input
         for( Node phi : _uses )
           if( phi instanceof PhiNode )

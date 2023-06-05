@@ -40,6 +40,7 @@ public class PhiNode extends Node {
   }
 
   @Override public Node ideal_reduce() {
+    if( is_prim() ) return null;
     if( in(0)==null ) return null; // Mid-construction
     if( val(0) == Type.XCTRL ) return null;
     RegionNode r = (RegionNode) in(0);

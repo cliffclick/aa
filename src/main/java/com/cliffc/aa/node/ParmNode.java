@@ -39,18 +39,14 @@ public class ParmNode extends Node {
     Type t = Type.ANY;
     int len = fun.len();
     boolean wired_root = fun._defs.last() instanceof RootNode;
-    if( wired_root || is_prim() || fun.unknown_callers(this) ) {
+    if( wired_root || fun.unknown_callers(this) ) {
       if( wired_root ) len--;
       else Env.ROOT.deps_add(this);
       // During/after Combo, use the HM type for the GCP type instead of the given default
       if( _idx==MEM_IDX ) {
         t = Combo.pre() ? RootNode.def_mem(this) : Env.ROOT.rmem();
         Env.ROOT.deps_add(this); // Depends on Root
-      } else if( _t==TypeFunPtr.THUNK ) {
-        // Unknown callers can return an error
-        BitsFun fidxs = Env.ROOT.rfidxs();
-        t = TypeFunPtr.make(false,false,true,fidxs,3,Env.ROOT.ext_caller(),Type.ALL.oob(fidxs.above_center()));
-      } else if( _tvar==null || is_prim() ) {
+      } else if( _tvar==null ) {
         t = _t;
       } else {
         Env.ROOT.deps_add(this); // Depends on Root

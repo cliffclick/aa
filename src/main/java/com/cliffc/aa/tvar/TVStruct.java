@@ -268,17 +268,20 @@ public class TVStruct extends TVExpanding {
         }
       }
 
-    if( trial_resolve_all(false,that) ) {
-      progress = true;
-      trial_resolve_all(false,this);
-    }
-    
     // If LHS is closed, force RHS closed
     if( !_open && that._open ) {
       if( test ) return true;
       that._open = false;
       progress = true;
     }
+
+    if( trial_resolve_all(false,that) ) {
+      progress = true;
+      trial_resolve_all(false,this);
+    }
+    
+    if( _open ) add_delay_fresh(); // If this Struct can add fields, must fresh-unify that Struct
+    
     return progress;
   }
   

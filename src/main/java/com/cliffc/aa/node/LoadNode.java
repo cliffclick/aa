@@ -85,14 +85,12 @@ public class LoadNode extends Node {
     if( adr instanceof FreshNode frsh ) adr = frsh.id();
     // If we can find an exact previous store, fold immediately to the value.
     Node ps = find_previous_struct(this, mem(),adr,tmp._aliases);
-    if( ps!=null ) {
-      if( ps instanceof StoreNode st ) {
-        Node rez = st.rez();
-        if( rez==null ) return null;
-        if( _live.isa(rez._live) ) return rez; // Stall until liveness matches
-        deps_add(this);                        // Self-add if live-ness updates
-        return null;
-      } else throw unimpl();
+    if( ps instanceof StoreNode st ) {
+      Node rez = st.rez();
+      if( rez==null ) return null;
+      if( _live.isa(rez._live) ) return rez; // Stall until liveness matches
+      deps_add(this);                        // Self-add if live-ness updates
+      return null;
     }
 
     // Load can move past a Call if there's no escape.  Not really a reduce,
@@ -174,6 +172,7 @@ public class LoadNode extends Node {
       cnt++; assert cnt < 100; // Infinite loop?
       if( mem instanceof StoreNode st ) {
         if( st.adr()==adr ) return st.err(true)== null ? st : null; // Exact matching store
+        st.adr().deps_add(ldst); // If store address changes
         if( mem == st.mem() ) return null; // Parallel unrelated stores
         // Wrong address.  Look for no-overlap in aliases
         Type tst = st.adr()._val;

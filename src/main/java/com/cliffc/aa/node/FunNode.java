@@ -66,6 +66,8 @@ public class FunNode extends Node {
   private byte _cnt_size_inlines; // Count of size-based inlines; prevents infinite unrolling via inlining
   public static int _must_inline; // Used for asserts
 
+  private boolean _unknown_callers;
+
   // Used to make the primitives at boot time.  Note the empty displays: in
   // theory Primitives should get the top-level primitives-display, but in
   // practice most primitives neither read nor write their own scope.
@@ -82,8 +84,10 @@ public class FunNode extends Node {
     _name = name;
     _fidx = fidx;
     _nargs = nargs;
+    _unknown_callers = true;
   }
   public static void reset_to_init0() { _must_inline=0; }
+  @Override void walk_reset0() { _unknown_callers = true; super.walk_reset0(); }
 
   // Short self name
   @Override public String xstr() { return name(); }
@@ -125,7 +129,6 @@ public class FunNode extends Node {
   // True if more unknown callers may appear on a Fun, Parm, Call, CallEpi, Ret.
   // One-shot transition from having unknown callers to not having.
   // At Combo, all callers are known and stay known: even Root is a known caller.
-  private boolean _unknown_callers = true;
   public boolean unknown_callers( Node dep ) {
     if( _unknown_callers && dep!=null ) deps_add(dep);
     return _unknown_callers;
@@ -140,7 +143,7 @@ public class FunNode extends Node {
   }
 
   private boolean _unknown_callers() {
-    if( is_keep() || is_prim() ) return true; // Still alive
+    if( is_keep() ) return true; // Still alive
     if( is_copy(0)!=null ) return false;      // Copy collapsing
     // Can only track if we can follow all uses of FunPtr
     FunPtrNode fptr = fptr();
@@ -163,12 +166,14 @@ public class FunNode extends Node {
     if( !(use instanceof CallNode call) ) return false; // Unknown use
     if( call.is_keep() ) return false; // Not wirable yet
     if( call._is_copy ) return false; // Mid-collapse
+    CallEpiNode cepi = call.cepi();
+    if( cepi == null ) return false;
     for( int i=DSP_IDX; i<call.nargs(); i++ )
       if( call.in(i)==fptr )
         return false;           // Use as an arg
     assert call.fdx()==fptr;    // Used to directly call
     // CEPI should be wired to the fptr.
-    return call.cepi()._defs.find(fptr.ret())!= -1;
+    return cepi._defs.find(fptr.ret())!= -1;
   }
 
   @Override public Type value() {
@@ -246,7 +251,6 @@ public class FunNode extends Node {
     split_callers(ret,fun,body,path);
     boolean x = fun.set_unknown_callers(); assert x; // Will be false now, so makes progress
     assert Env.ROOT.more_work(true)==0; // Initial conditions are correct
-    //assert Env.ROOT.no_more_ideal();
     return this;
   }
 
@@ -364,7 +368,8 @@ public class FunNode extends Node {
     for( int i=1; i<_defs._len; i++ ) {
       if( !(in(i) instanceof CallNode call) || // Not well-formed (or Root)
           call.nargs() != nargs()  ||          // Will not inline
-          call._val == Type.ALL ) continue;    // Otherwise in-error
+          call._val == Type.ALL ||             // Otherwise in-error
+          call.is_prim() ) continue;           // Never inline into prims
       TypeFunPtr tfp = CallNode.ttfp(call._val);
       int fidx = tfp.fidxs().abit();
       if( fidx < 0 || BitsFun.is_parent(fidx) ) continue;    // Call must only target one fcn

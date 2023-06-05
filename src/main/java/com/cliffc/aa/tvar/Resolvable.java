@@ -28,7 +28,7 @@ public interface Resolvable {
   // - 2+ two or more choices; resolve is ambiguous
   
   // "Pattern leafs" are just any TV3 that, if it changes might effect the match outcome.
-  static Ary<TVExpanding> PAT_LEAFS = new Ary<>(new TVExpanding[1],0);
+  Ary<TVExpanding> PAT_LEAFS = new Ary<>(new TVExpanding[1],0);
   
   default boolean trial_resolve( boolean outie, TV3 pattern, TVStruct lhs, TVStruct rhs, boolean test ) {
     assert !rhs.is_open() && is_resolving();

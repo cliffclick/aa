@@ -231,7 +231,7 @@ public class CallNode extends Node {
     // unknown call targets can appear during GCP and use the args.  After GCP,
     // still must verify all called functions have the arg as dead, because
     // alive args still need to resolve.  
-    if( cepi!=null && ttfp(tcall)._fidxs != BitsFun.NALL && !is_keep() && err(true)==null ) {
+    if( cepi!=null && ttfp(tcall)._fidxs != BitsFun.NALL && !is_keep() && err(true)==null && cepi.is_CG(true) ) {
       // 1 bit for each argument, used to track arg usage
       int abits = 0;
       for( int i=DSP_IDX; i<nargs(); i++ ) if( in(i)!=Env.ANY ) abits |= (1<<i);
@@ -354,8 +354,8 @@ public class CallNode extends Node {
     boolean is_keep = is_keep();
     if( i==CTL_IDX ) return Type.ALL;
     if( i==MEM_IDX ) return is_keep || _live==Type.ALL ? RootNode.def_mem(def) : _live;
-    if( i==DSP_IDX && !_unpacked ) return TypeStruct.ISUSED;
     if( i==nargs() ) return _unpacked ? FP_LIVE : Type.ALL;
+    if( !_unpacked ) return TypeStruct.ISUSED;
     if( is_keep  )   return Type.ALL; // Still under construction, all alive
 
     // Unresolved calls need their inputs alive, so those now-live inputs unify
@@ -363,7 +363,7 @@ public class CallNode extends Node {
     // dead inputs to resolve a call!  The call input *must* have some uses
     // which distinguish which function to call.  Cannot flip this during
     // Combo, as will break monotonicity.
-    if( !LIFTING ) return Type.ALL;
+    if( i>DSP_IDX && !LIFTING ) return Type.ALL;
 
     // Check that all fidxs are wired.  If not wired, a future wired fidx might
     // use the call input.  Post-Combo, all is wired, but dead Calls might be
@@ -407,11 +407,12 @@ public class CallNode extends Node {
   @Override public ErrMsg err( boolean fast ) {
     // Expect a function pointer
     TypeFunPtr tfp = ttfp(_val);
-    if( tfp.is_empty() || tfp.is_full() )
+    if( tfp.is_empty() )
       return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs==null ? null : _badargs[0],"A function is being called, but "+fdx()._val+" is not a function");
 
     BitsFun fidxs = tfp.fidxs();
     if( fidxs.above_center() ) return null; // Not resolved (yet)
+    if( fidxs==BitsFun.NALL ) return null;  // Unknown function
 
     // bad-arg-count
     if( tfp.nargs() != nargs() ) {

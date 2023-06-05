@@ -309,36 +309,40 @@ public class TypeMem extends Type<TypeMem> {
     if( aliases==BitsAlias.NALL  ) return aliases;
     AryInt work = new AryInt();
     VBitSet visit = new VBitSet();
-    for( int alias : aliases )
-      for( int kid=alias; kid!=0; kid = BitsAlias.next_kid(alias,kid) )
-        { work.push(kid); visit.set(kid); }
-
+    _add_all(aliases,visit,work,aliases);
+  
     while( !work.isEmpty() ) {
-      int alias=work.pop();
-      if( alias==0 ) continue;
-      TypeStruct ts = at(alias);
+      if( aliases==BitsAlias.NALL ) return aliases; // Already full
+      TypeStruct ts = at(work.pop());
       if( ts==TypeStruct.ISUSED )
-        return BitsAlias.NALL;  // All structs with all possible pointers
+        aliases = _add_one(BitsAlias.EXTX,visit,work,aliases);
       for( TypeFld tfld : ts ) {
         Type fld = tfld._t;
+        // Called function returns are also tracked
+        while( fld instanceof TypeFunPtr fptr && fptr._ret != fptr ) fld = fptr._ret;
+        // If below a TMP, use the worst TMP
         if( TypeMemPtr.ISUSED.isa(fld) )
-          fld = TypeMemPtr.ISUSED; // All possible pointers
-        if( fld instanceof TypeFunPtr ) fld = ((TypeFunPtr)fld).dsp();
-        if( !(fld instanceof TypeMemPtr) ) continue; // Not a pointer, no more aliases
-        if( ((TypeMemPtr)fld)._aliases.test(1) )
-          return BitsAlias.NALL; // All possible pointers
-        // Walk the possible pointers, and include them in the slice
-        for( int ptralias : ((TypeMemPtr)fld)._aliases )
-          for( int kid=ptralias; kid!=0; kid = BitsAlias.next_kid(ptralias,kid) )
-            if( !visit.tset(kid) ) {
-              work.push(kid);
-              aliases = aliases.set(kid);
-            }
+          fld = TypeMemPtr.ISUSED;
+        if( !(fld instanceof TypeMemPtr tmp) ) continue; // Not a pointer, no more aliases
+        aliases = _add_all(tmp._aliases,visit,work,aliases);
       }
     }
     return aliases;
   }
 
+  private BitsAlias _add_all( BitsAlias bits, VBitSet visit, AryInt work, BitsAlias aliases ) {
+    for( int alias : bits )
+      for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
+        aliases = _add_one( alias, visit, work, aliases );
+    return aliases;
+  }
+  private BitsAlias _add_one( int alias, VBitSet visit, AryInt work, BitsAlias aliases ) {
+    if( visit.tset(alias) ) return aliases;
+    work.push(alias);
+    return aliases.set(alias);
+  }
+  
+    
   // Slice memory by aliases; unnamed aliases are replaced with ~use.
   public TypeMem slice_reaching_aliases(BitsAlias aliases) {
     if( aliases==BitsAlias.NALL ) return this;

@@ -23,11 +23,11 @@ public class MProjNode extends ProjNode {
     if( is_prim() ) return null;
     // Fold dying calls
     Node mem = in(0).is_copy(MEM_IDX);
-    if( mem != null )
+    if( mem != null && _live.isa(mem._live))
       return mem==this ? Env.ANY : mem;
 
     // Fold across pure calls (most primitives)
-    if( in(0) instanceof CallEpiNode cepi ) {
+    if( in(0) instanceof CallEpiNode cepi && !cepi._is_copy ) {
       CallNode call = cepi.call();
       if( call.tfp()._fidxs!=BitsFun.NALL && cepi.nwired()>0 ) {
         boolean pure=true;

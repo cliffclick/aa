@@ -457,8 +457,10 @@ public class Parse implements Comparable<Parse> {
 
     // See if assigning over a forward-ref.
     int idx = scope().stk().find(tok);
-    if( idx != -1 && scope().stk().in(idx) instanceof ForwardRefNode fref )
-      fref.assign(ifex,tok); // Define & assign the forward-ref
+    if( idx != -1 && scope().stk().in(idx) instanceof ForwardRefNode fref ) {
+      fref.assign( ifex, tok ); // Define & assign the forward-ref
+      return ifex; // No need to re-assign; was already assigned at initial ref point
+    }
 
     // Save across display load
     final int iidx = ifex.push();
@@ -1638,11 +1640,13 @@ public class Parse implements Comparable<Parse> {
     CallNode call = (CallNode)gvn(new CallNode(unpack,bads,args));
     CallEpiNode cepi = (CallEpiNode)gvn(new CallEpiNode(call));
     int cidx = cepi.push(); // CallEpi can optimize a lot (e.g. inlining)
-    Node ctrl = gvn(new CProjNode(cepi));
-    set_ctrl(ctrl);
-    set_mem(gvn(new MProjNode(Node.peek(cidx)))); // Return memory from all called functions
-    cepi = (CallEpiNode)Env.GVN.add_flow(Node.pop(cidx)); // Computes live once Keep is removed
-    return gvn(new ProjNode(cepi,REZ_IDX));
+    set_ctrl(gvn(new CProjNode(Node.peek(cidx))));
+    set_mem (gvn(new MProjNode(Node.peek(cidx)))); // Return memory from all called functions
+    Node r = gvn(new  ProjNode(Node.peek(cidx),REZ_IDX));
+    cepi = (CallEpiNode)Node.pop(cidx);
+    Env.GVN.add_unuse(cepi);    // CEPI could be entirely copy/dead at this point
+    if( cepi._is_copy ) cepi.add_flow_defs(); // If copy&dead, revisit input liveness
+    return r.add_flow();
   }
 
   // Whack current control with a syntax error

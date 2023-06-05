@@ -91,6 +91,10 @@ abstract public class TVExpanding extends TV3 {
     }
   }
   public static void do_delay_resolve() {
+    // TODO: Do not have delayed resolve sorted out right
+    //if( Combo.HM_AMBI ) // Having failed alread, will never result
+    //  DELAY_RESOLVE.clear();
+    //else
     while( DELAY_RESOLVE.len() > 0 )
       TVStruct.trial_resolve_all(true,DELAY_RESOLVE.pop().find().as_struct());
   }
@@ -138,7 +142,7 @@ abstract public class TVExpanding extends TV3 {
   // Record that on the delayed fresh list and return that.  If `this` ever
   // unifies to something, we need to Fresh-unify the something with `that`.
   @Override void add_delay_fresh() { if( FRESH_ROOT!=null ) add_delay_fresh(FRESH_ROOT); }
-  void add_delay_fresh( DelayFresh df ) {
+  private void add_delay_fresh( DelayFresh df ) {
     df.update();
     // Lazy make a list to hold
     if( _delay_fresh==null ) _delay_fresh = new Ary<>(new DelayFresh[1],0);

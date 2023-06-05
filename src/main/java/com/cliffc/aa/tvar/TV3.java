@@ -486,8 +486,8 @@ abstract public class TV3 implements Cloneable {
     long duid = dbl_uid(that._uid);
     if( TDUPS.putIfAbsent(duid,this)!=null )
       return true;              // Visit only once, and assume will resolve
-    if( this instanceof TVLeaf leaf ) return Resolvable.add_pat_leaf(leaf); // No error
-    if( that instanceof TVLeaf leaf ) return Resolvable.add_pat_leaf(leaf); // No error
+    if( this instanceof TVLeaf leaf && !(that instanceof TVErr) ) return Resolvable.add_pat_leaf(leaf); // No error
+    if( that instanceof TVLeaf leaf && !(this instanceof TVErr) ) return Resolvable.add_pat_leaf(leaf); // No error
     // Nil can unify with ints,flts,ptrs
     if( this instanceof TVNil ) return this._trial_unify_ok_impl(that);
     if( that instanceof TVNil ) return that._trial_unify_ok_impl(this);
@@ -514,6 +514,8 @@ abstract public class TV3 implements Cloneable {
   private static final VBitSet DEPS_VISIT = new VBitSet();
   public boolean deps_add_deep(Node n ) { DEPS_VISIT.clear(); _deps_add_deep(n); return false; }
   public void _deps_add_deep(Node n ) {
+    // no progress during bulk testing*
+    if( !Node.FLOW_VISIT.isEmpty() ) return;
     if( DEPS_VISIT.tset(_uid) ) return;
     if( _deps==null ) _deps = UQNodes.make(n);
     _deps = _deps.add(n);
@@ -523,6 +525,8 @@ abstract public class TV3 implements Cloneable {
           arg(i)._deps_add_deep(n);
   }
   public void deps_add(Node n ) {
+    // no progress during bulk testing*
+    if( !Node.FLOW_VISIT.isEmpty() ) return;
     if( _deps==null ) _deps = UQNodes.make(n);
     _deps = _deps.add(n);
   }

@@ -45,6 +45,7 @@ public class FieldNode extends Node implements Resolvable {
   @Override public String fld() { assert !is_resolving(); return _fld; }
   // Set the resolved field label
   @Override public String resolve(String label) {
+    assert !Combo.HM_AMBI;  // Must resolve before ambiguous field pass
     unelock();                  // Hash changes since label changes
     String old = _fld;
     _fld = label;
@@ -81,7 +82,10 @@ public class FieldNode extends Node implements Resolvable {
     }
     // Hit on a field
     if( tstr instanceof TypeStruct ts ) {
-      if( ts.find(_fld)!= -1 ) return ts.at(_fld);
+      if( ts.find(_fld)!= -1 ) {
+        Type tf = ts.at(_fld);
+        return _str && !(tf instanceof TypeStruct) ? oob_ret(tf) : tf;
+      }
       // Miss on closed structs looks at superclass.
       // Miss on open structs dunno if the field will yet appear
       if( ts._def==TypeStruct.ISUSED && Util.eq(ts.fld(0)._fld,".") )
@@ -266,7 +270,13 @@ public class FieldNode extends Node implements Resolvable {
   }
 
   @Override public ErrMsg err( boolean fast ) {
-    if( !(tvar() instanceof TVErr tverr) ) return null;
+    TV3 tv = tvar();
+    // TODO: Do not have delayed resolve sorted out right
+    //if( is_resolving() ) {
+    //  resolve_ambiguous_msg();  // Force a TVErr
+    //  tv = tvar(0);             // Get unresolved TVErr from struct
+    //}
+    if( !(tv instanceof TVErr tverr) ) return null;
     Ary<String> errs = tverr._errs;
     if( errs==null ) return null; // Even if an error here, somebody else will report
     if( fast ) return ErrMsg.FAST;
@@ -315,7 +325,7 @@ public class FieldNode extends Node implements Resolvable {
   
   public boolean resolve_ambiguous_msg() {
     TV3 pattern = tvar();
-    TVStruct ts = (TVStruct)tvar(0);
+    TVStruct ts = tvar(0).as_struct();
     boolean progress = ts.del_fld(_fld); // Do not push pinned uphill
     return ts.unify_err("Ambiguous, matching choices % vs",pattern,_bad,false) | progress;
   }

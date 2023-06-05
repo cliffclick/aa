@@ -12,6 +12,7 @@ import java.util.function.IntSupplier;
 import java.util.function.Predicate;
 
 import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.node.FunNode._must_inline;
 
 // Sea-of-Nodes
 public abstract class Node implements Cloneable, IntSupplier {
@@ -250,9 +251,11 @@ public abstract class Node implements Cloneable, IntSupplier {
   Ary<Node> _deps;
   // Add a dep
   void deps_add(Node dep) {
-    assert dep!=null;
     if( _deps==null ) _deps = new Ary<>(new Node[1],0);
-    if( _deps.find(dep)==-1 ) _deps.push(dep);
+    if( _deps.find(dep)==-1 && FLOW_VISIT.isEmpty() /*no progress during bulk testing*/) {
+      assert dep!=null;
+      _deps.push(dep);
+    }
   }
   // Reset deps list to mark (deps added during this idealizing do not count).
   // Add other deps to the flow & reduce lists, and clear the deps.
@@ -659,6 +662,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     Node cc = in(0).is_copy(0);
     if( cc==null ) return null;
     if( cc==this ) return Env.ANY;
+    add_reduce_uses();
     return Env.GVN.add_reduce(set_def(0,cc));
   }
 
@@ -836,7 +840,7 @@ public abstract class Node implements Cloneable, IntSupplier {
                                                          return true; } // Found an ideal call
       if( !Env.GVN.on_grow  (this) ) { x = do_grow  (); if( x != null )
                                                          return true; } // Found an ideal call
-      if( this instanceof FunNode fun && !Env.GVN.on_inline(fun) ) fun.ideal_inline(true);
+      if( this instanceof FunNode fun && !Env.GVN.on_inline(fun) && _must_inline==0 ) fun.ideal_inline(true);
     }
     for( Node def : _defs ) if( def != null && def._more_ideal() ) return true;
     for( Node use : _uses ) if( use != null && use._more_ideal() ) return true;
@@ -844,8 +848,8 @@ public abstract class Node implements Cloneable, IntSupplier {
   }
 
   // Assert all value and liveness calls only go forwards.  Returns >0 for failures.
-  private static final VBitSet FLOW_VISIT = new VBitSet();
-  public  final int more_work( boolean lifting ) { FLOW_VISIT.clear();  return more_work(lifting,0);  }
+  public static final VBitSet FLOW_VISIT = new VBitSet();
+  public  final int more_work( boolean lifting ) { FLOW_VISIT.clear();  int errs = more_work(lifting,0);  FLOW_VISIT.clear(); return errs; }
   private int more_work( boolean lifting, int errs ) {
     if( FLOW_VISIT.tset(_uid) ) return errs; // Been there, done that
     if( Env.GVN.on_dead(this) ) return errs; // Do not check dying nodes
@@ -865,10 +869,8 @@ public abstract class Node implements Cloneable, IntSupplier {
         oliv!=Type.ANY && oval!=Type.ANY && // Alive in any way
         has_tvar() &&                       // Doing TVar things
         (!Env.GVN.on_flow(this) || Combo.HM_FREEZE) ) { // Not already on worklist, or past freezing
-      if( unify(true) ) {
-        if( Combo.HM_FREEZE ) errs += _report_bug("Progress after freezing");
-        errs += _report_bug("Progress bug");
-      }
+      if( unify(true) )
+        errs += _report_bug(Combo.HM_FREEZE ? "Progress after freezing" : "Progress bug");
     }
     for( Node def : _defs ) if( def != null ) errs = def.more_work(lifting,errs);
     for( Node use : _uses ) if( use != null ) errs = use.more_work(lifting,errs);

@@ -46,15 +46,22 @@ public final class CallEpiNode extends Node {
     CallNode call = call();
     Type tc = call._val;
     if( !(tc instanceof TypeTuple tcall) ) return null;
-    if( CallNode.tctl(tcall) != Type.CTRL ) return null; // Call not executable
-
+    
+    // Wait until broken things clear out before wiring or inlining
+    int len = _defs._len - (_defs.last() instanceof RootNode ? 1 : 0);
+    for( int i=1; i<len; i++ )
+      if( ((RetNode)in(i)).is_copy() )
+        return null;
+    
     // Add or remove Call Graph edges according to fidxs
     if( CG_wire() ) return this;
+
+    if( CallNode.tctl(tcall) != Type.CTRL ) return null; // Call not executable
 
     // The one allowed function is already wired?  Then directly inline.
     // Requires this calls 1 target, and the 1 target is only called by this.
     BitsFun fidxs = CallNode.ttfp(tcall).fidxs();
-    if( !unknown_callers() && nwired()==1 && wired(0) instanceof RetNode ret && !ret.is_prim() ) { // Wired to 1 target
+    if( !unknown_callers() && nwired()==1 && wired(0) instanceof RetNode ret && !ret.is_prim() && !call.is_prim() ) { // Wired to 1 target
       assert fidxs.abit() == ret._fidx; // Correct call graph
       FunNode fun = ret.fun();
       if( fun != null && fun.len()==2 && !fun.unknown_callers(this) && // Function is only called by 1 (and not the unknown caller)
@@ -84,6 +91,7 @@ public final class CallEpiNode extends Node {
 
     // Call allows 1 function not yet inlined, sanity check it.
     if( nwired()!=1 ) return null; // More than 1 wired, inline only via FunNode
+    if( is_prim() ) return null; // Only inline via FunNode
     int cnargs = call.nargs();
     RetNode ret = RetNode.get(fidx);
     if( ret==null ) return null;
@@ -113,8 +121,11 @@ public final class CallEpiNode extends Node {
 
     // Check for constant body
     Type trez = rrez._val;
-    if( trez.is_con() && rctl==fun && cmem == rmem && inline )
-      return unwire(call,ret,fun).set_is_copy(cctl,cmem,Node.con(trez));
+    if( trez.is_con() && rctl==fun && cmem == rmem && inline ) {
+      Node c = Node.con(trez);
+      c._live = Type.ALL;
+      return unwire(call,ret,fun).set_is_copy(cctl,cmem,c);
+    }
 
     // Check for a 1-op body using only constants or parameters and no memory effects.
     boolean can_inline=!(rrez instanceof ParmNode) && rmem==cmem && inline;
@@ -209,8 +220,10 @@ public final class CallEpiNode extends Node {
     // - Above center ones do not wire, so this loop is empty then.
     // - Might fall through some middle fidxs, then hit NALL.  Middle fidxs wire, and are precise.
     // - NALL requires mixing in Root def_mem
-    if( !Combo.pre() && fidxs==BitsFun.NALL )
-      return TypeTuple.make(Type.CTRL,CallNode.emem(tcall),tfptr._ret); // Error state
+    if( !Combo.pre() && fidxs==BitsFun.NALL ) {
+      Env.ROOT.deps_add(this);
+      return TypeTuple.make(Type.CTRL,Env.ROOT.rmem().meet(CallNode.emem(tcall)),tfptr._ret); // Error state
+    }
 
     // Post-Combo:
     // - fidxs are conservative, may get removed, and will not be NALL (checked above).
@@ -279,10 +292,13 @@ public final class CallEpiNode extends Node {
     assert is_CG(true);
     remove(_defs.find(ret));
     fun.remove(fun._defs.find(call));
+    fun.add_flow_uses(); // One less caller of function, parms can lift
+    fun.add_flow();
     return this;
   }
 
   private CallEpiNode set_is_copy( Node ctl, Node mem, Node rez ) {
+    assert !is_prim();
     CallNode call = call();
     if( FunNode._must_inline == call._uid ) // Assert an expected inlining happens
       FunNode._must_inline = 0;
@@ -403,6 +419,13 @@ public final class CallEpiNode extends Node {
           if( fun2==null ) continue; // Broken function
           if( call.nargs() != tfp.nargs() || tfp.nargs() != fun2.nargs() )
             continue; // Mismatched
+          ParmNode mem = fun2.parm(MEM_IDX);
+          if( mem != null ) {
+            // Call liveness are already meeting EXTMEM.
+            // We can wire if the meet-over-all-wired liveness is below the current liveness.
+            TypeMem mlive = (TypeMem)mem._live.meet(TypeMem.EXTMEM);
+            if(  LIFTING && !mlive.isa(call._live) ) return progress;
+          }
           ret = ret2; fun = fun2;
         }
         if( _defs.find(ret) != -1  ) continue; // Already present
@@ -440,9 +463,15 @@ public final class CallEpiNode extends Node {
   // unresolved, then none of CallEpi targets are (yet) alive.
   @Override public Type live_use( int i ) {
     Node def = in(i);
-    if( _is_copy ) return def._live; // A copy
+    if( _is_copy ) {            // A copy
+      if( is_keep() ) return def._live;
+      ProjNode p = ProjNode.proj(this,i);
+      if( p==null ) return Type.ANY;
+      p.deps_add(in(i));
+      return p._live;
+    }
     // Not a copy
-    if( i==CTL_IDX ) return _live; // The Call
+    if( i==CTL_IDX ) return _live;
     if( def instanceof RetNode ret && ret.mem()==null ) return Type.ANY; // No memory input
     // Wired return.
     // The given function is alive, only if the Call will Call it.
@@ -499,6 +528,15 @@ public final class CallEpiNode extends Node {
     int cnargs = call.nargs();
     int nargs = Math.min(tnargs,cnargs);
     for( int i=DSP_IDX; i<nargs; i++ ) {
+      // TODO:
+      //// Do not unify against dead args.
+      //// If the call arg is dead, then all called fcns must have that arg dead as well.
+      //// If the call arg is alive, it might have other, non-fcn-arg, uses.
+      //// Tighter test: if all called fcns are dead on that arg, do not unify.
+      //if( call.in(i)._live.above_center() ) {
+      //  call.in(i).deps_add(this);
+      //  continue;
+      //}
       TV3 formal = tfun.arg(i);
       TV3 actual = call.tvar(i);
       progress |= actual.unify(formal,test);

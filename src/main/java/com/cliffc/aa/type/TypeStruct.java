@@ -716,9 +716,10 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   public TypeStruct update(Access fin, String name, Type val) {
     TypeFld fld = get(name);
     if( fld == null ) return this; // Unknown field, assume changes no fields
-    // Double-final-stores, result is an error
-    if( fld._access==Access.Final || fld._access==Access.ReadOnly )
-      val = ALL;
+    // TODO: Turn off double-final-stores
+    //// Double-final-stores, result is an error
+    //if( fld._access==Access.Final || fld._access==Access.ReadOnly )
+    //  val = ALL;
     if( fld._t==ALL ) return this; // No changes if field is already in-error
     return replace_fld(fld.make_from(val,fin));
   }

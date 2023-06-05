@@ -13,6 +13,7 @@ public class IfNode extends Node {
   @Override boolean is_CFG() { return is_copy(0)==null; }
 
   @Override public Node ideal_reduce() {
+    if( is_prim() ) return null;
     Node cc = fold_ccopy();
     if( cc!=null ) return cc;
     Node ctl = in(0);

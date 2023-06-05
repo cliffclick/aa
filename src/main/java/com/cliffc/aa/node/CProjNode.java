@@ -29,6 +29,7 @@ public class CProjNode extends ProjNode {
   @Override public Node ideal_reduce() {
     Node c = in(0).is_copy(_idx);
     if( c != null ) {
+      if( c==this ) return null; // Dead self-loop
       // Folding IF control flow against a half CopyCal, might need to fold again
       if( c._live instanceof TypeMem )
         return null;            // Stall till parent folds
