@@ -27,6 +27,10 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
 
+    DO_GCP=true;
+    DO_HMT=false;
+    RSEED=0;
+    test("x=2; y=x+1; x*y", "6", "6");
     DO_GCP=false;
     DO_HMT=true;
     RSEED=0;

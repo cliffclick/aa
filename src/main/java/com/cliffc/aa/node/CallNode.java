@@ -363,6 +363,15 @@ public class CallNode extends Node {
     // dead inputs to resolve a call!  The call input *must* have some uses
     // which distinguish which function to call.  Cannot flip this during
     // Combo, as will break monotonicity.
+    //
+    // Example:
+    // N482: Fresh  N___ VAL=3                 , LIVE=ANY     , HMT=    V504            // Since not live, no unify
+    // N479: ._     N251 VAL={pair of hi funcs}, LIVE=FP-alone, HMT={ 2 V504 -> +V460 } // Since V504 is a leaf, does not pick between FP or INT adds so unresolved
+    // N483: Call   Nctl Nmem _2_ N482 N479 VAL={Ctrl,Mem,2,3,pair-o-hi-funcs}, LIVE=[[ALIVE_no_mem]]
+    //
+    // Here Call is alive, but not wired... so if I leave the args not-alive:
+    // THEN Fresh is not alive and does not unify V504 and Int:3
+    // THEN V504 in the Resolving N479 Field is Leaf not Int, and does not resolve.
     if( i>DSP_IDX && !LIFTING ) return Type.ALL;
 
     // Check that all fidxs are wired.  If not wired, a future wired fidx might
