@@ -287,6 +287,9 @@ public class CallNode extends Node {
   // are all being constructed; this Call is still alive.  After Combo, a dying
   // Call might also have no CEPI (with or without uses).
   private boolean dying(Node def) {
+    if( in(0)==Env.XCTRL ) return true;
+    in(0).deps_add(this);
+    if( def!=null ) in(0).deps_add(def);
     CallEpiNode cepi = cepi();
     if( cepi!=null ) { cepi.deps_add(def) ; return false; }
     if( _uses.find(GVNGCM.KEEP_ALIVE)!=-1 ) return false;
@@ -446,7 +449,7 @@ public class CallNode extends Node {
           ParmNode parm = fun.parm(j);
           if( parm==null ) continue;   // Formal is dead
           Type formal = parm._t;
-          if( actual.isa(formal) ) continue; // Actual is a formal
+          if( formal==TypeNil.SCALAR || actual.isa(formal) ) continue; // Actual is a formal
           if( fast ) return ErrMsg.FAST;     // Fail-fast
           if( ts==null ) ts = new Ary<>(new Type[1],0);
           if( ts.find(formal) == -1 ) // Dup filter

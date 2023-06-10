@@ -139,11 +139,13 @@ public abstract class Combo {
 
     // Set all values to ANY and lives to DEAD, their most optimistic types.
     // Set all type-vars to Leafs.
+    PrimNode.ZINT.init_tvar();
+    PrimNode.ZFLT.init_tvar();
     PrimNode.PINT.set_tvar();
     PrimNode.PFLT.set_tvar();
+    PrimNode.ZINT._set_tvar();
+    PrimNode.ZFLT._set_tvar();
     PrimNode.PSTR.set_tvar();
-    PrimNode.ZINT.set_tvar();
-    PrimNode.ZFLT.set_tvar();
     PrimNode.ZSTR.set_tvar();
     RootNode.combo_def_mem();
     Env.ROOT.walk_initype(new VBitSet());

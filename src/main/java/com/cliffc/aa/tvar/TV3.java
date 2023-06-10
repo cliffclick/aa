@@ -2,9 +2,7 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.node.ConNode;
-import com.cliffc.aa.node.FreshNode;
-import com.cliffc.aa.node.Node;
+import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 
@@ -46,7 +44,7 @@ import static com.cliffc.aa.AA.unimpl;
  */
 
 abstract public class TV3 implements Cloneable {
-  public static final boolean WIDEN = true, WIDEN_FRESH=false; // WIDEN currently turned off
+  public static final boolean WIDEN = true;
   
   private static int CNT=1;
   public int _uid=CNT++; // Unique dense int, used in many graph walks for a visit bit
@@ -133,8 +131,6 @@ abstract public class TV3 implements Cloneable {
   abstract int eidx();
   public TVStruct as_struct() { throw unimpl(); }
   public TVLambda as_lambda() { throw unimpl(); }
-  public TVBase   as_int   () { throw unimpl(); }
-  public TVBase   as_flt   () { throw unimpl(); }
   public TVNil    as_nil   () { throw unimpl(); }
   public TVPtr    as_ptr   () { throw unimpl(); }
 
@@ -147,9 +143,9 @@ abstract public class TV3 implements Cloneable {
   // Set an error if both may_nil and use-nil.
   boolean add_may_nil(boolean test) {
     if( _may_nil ) return false;   // No change
-    if( test ) return true;        // Will be progress
+    if( test ) return ptrue();     // Will be progress
     if( _use_nil ) throw unimpl(); // unify_errs("May be nil",work);
-    return (_may_nil=true);        // Progress
+    return (_may_nil=ptrue());     // Progress
   }
   // Set use_nil flag. Set an error if both may_nil and use-nil.
   void add_use_nil() {
@@ -159,6 +155,14 @@ abstract public class TV3 implements Cloneable {
     }
   }
 
+  public static boolean HALT_IF_PROGRESS = false;
+  boolean ptrue() {
+    if( HALT_IF_PROGRESS ) {
+      System.err.println("progress ");
+    }
+    return true;
+  }
+  
   // -----------------
   // U-F union; this becomes that; returns 'that'.
   // No change if only testing, and reports progress.
@@ -177,7 +181,7 @@ abstract public class TV3 implements Cloneable {
     that._union_deps(this);
     // Actually make "this" into a "that"
     _uf = that;                 // U-F union
-    return true;
+    return ptrue();
   }
 
   // Merge subclass specific bits
@@ -234,15 +238,11 @@ abstract public class TV3 implements Cloneable {
     if( !(that instanceof TVNil) && this instanceof TVNil nil ) return nil._unify_nil(that,test);
 
     // If 'this' and 'that' are different classes, unify both into an error
-    if( getClass() != that.getClass() ) {
-      // As a special case, allow unify of TVPtr and the Clazz of a Base.
-      if( this instanceof TVPtr ptr && that instanceof TVBase base ) return ptr._unify_base(base,test);
-      if( that instanceof TVPtr ptr && this instanceof TVBase base ) return ptr._unify_base(base,test);
-      if( test ) return true;
-      return that instanceof TVErr
-        ? that._unify_err(this)
-        : this._unify_err(that);
-    }
+    if( getClass() != that.getClass() )
+      return test ||
+        (that instanceof TVErr
+         ? that._unify_err(this)
+         : this._unify_err(that));
 
     // Cycle check
     long luid = dbl_uid(that);    // long-unique-id formed from this and that
@@ -252,12 +252,12 @@ abstract public class TV3 implements Cloneable {
     DUPS.put(luid,that);        // Close cycles
 
 
-    if( test ) return true;     // Always progress from here
+    if( test ) return ptrue();  // Always progress from here
     // Same classes.   Swap to keep uid low.
     // Do subclass unification.
     if( _uid > that._uid ) { this._unify_impl(that);  find().union(that.find()); }
     else                   { that._unify_impl(this);  that.find().union(find()); }
-    return true;
+    return ptrue();
   }
 
   // Must always return true; used in flow-coding in many places
@@ -265,13 +265,13 @@ abstract public class TV3 implements Cloneable {
 
   // Make this tvar an error
   public boolean unify_err(String msg, TV3 extra, Parse bad, boolean test) {
-    if( test ) return true;
+    if( test ) return ptrue();
     assert DUPS.isEmpty();
     TVErr err = new TVErr();
     err._unify_err(this);
     err.err(msg,extra,bad,false);
     DUPS.clear();
-    return true;
+    return ptrue();
   }
 
   public void _unify_err( String msg, TV3 extra, Parse bad, boolean test) {
@@ -328,24 +328,19 @@ abstract public class TV3 implements Cloneable {
 
     // Special handling for nilable
     if( !(that instanceof TVNil) && this instanceof TVNil nil ) return vput(that,nil._unify_nil_l(that,test));
-    if( !(this instanceof TVNil) && that instanceof TVNil nil ) return vput(nil._unify_nil_r(this,test),true);
+    if( !(this instanceof TVNil) && that instanceof TVNil nil ) return vput(nil._unify_nil_r(this,test),ptrue());
 
     // Two unrelated classes usually make an error
-    if( getClass() != that.getClass() ) {
-      // As a special case, allow unify of TVPtr and the Clazz of a Base.
-      if( this instanceof TVPtr && that instanceof TVBase base )
-        return this._fresh_unify(base.clz(),test);
-      if( that instanceof TVPtr && this instanceof TVBase base ) return base.clz()._fresh_unify(that,test);
+    if( getClass() != that.getClass() )
       return that instanceof TVErr terr
         ? terr._fresh_unify_err_fresh(this,test)
         : this._fresh_unify_err      (that,test);
-    }
     boolean progress = false;
 
     // Progress on parts
     if( _may_nil && !that._may_nil ) {
-      if( test ) return true;
-      progress = that._may_nil = true;
+      if( test ) return ptrue();
+      progress = that._may_nil = ptrue();
     }
 
     // Early set, to stop cycles
@@ -362,16 +357,16 @@ abstract public class TV3 implements Cloneable {
     if( _args != null ) {
       for( int i=0; i<_args.length; i++ ) {
         if( _args[i]==null ) continue; // Missing LHS is no impact on RHS
+        assert this.getClass()==that.getClass();
+        assert !unified();      // If LHS unifies, VARS is missing the unified key
         TV3 lhs = arg(i);
         TV3 rhs = i<that._args.length ? that.arg(i) : null;
         progress |= rhs == null // Missing RHS?
           ? _fresh_missing_rhs(that,i,test)
           : lhs._fresh_unify(rhs,test);
-        assert !unified();      // If LHS unifies, VARS is missing the unified key
         that = that.find();
-        assert this.getClass()==that.getClass();
       }
-      if( progress && test ) return true;
+      if( progress && test ) return progress;
       // Extra args in RHS
       for( int i=_args.length; i<that._args.length; i++ )
         throw unimpl();
@@ -379,20 +374,24 @@ abstract public class TV3 implements Cloneable {
     return progress;
   }
 
-  private boolean vput(TV3 that, boolean progress) { VARS.put(this,that); return progress; }
+  private boolean vput(TV3 that, boolean progress) {
+    VARS.put(this,that);
+    VARS.put(that,that);
+    return progress;
+  }
 
   // This is fresh, and neither is a TVErr, and they are different classes
   boolean _fresh_unify_err(TV3 that, boolean test) {
     assert !(this instanceof TVErr) && !(that instanceof TVErr);
     assert this.getClass() != that.getClass();
-    if( test ) return true;
+    if( test ) return ptrue();
     TVErr terr = new TVErr();
     return terr._fresh_unify_err_fresh(this,test) | terr._unify_err(that);
   }
 
   // This is fresh, and RHS is missing.  Possibly Lambdas with missing arguments
   boolean _fresh_missing_rhs(TV3 that, int i, boolean test) {
-    if( test ) return true;
+    if( test ) return ptrue();
 
     //if( !that.unify_miss_fld(key,work) )
     //  return false;
@@ -420,7 +419,7 @@ abstract public class TV3 implements Cloneable {
     // clone it down to the leaves - and keep all the nongen leaves.
     // Stopping here preserves the cyclic structure instead of unrolling it.
     if( nongen_in() ) {
-      VARS.put(this,this);
+      vput(this,true);
       return this;
     }
 
@@ -430,7 +429,7 @@ abstract public class TV3 implements Cloneable {
     // nested ones tho, will need a new fresh-deps from old to new
     TV3 t = copy();
     add_delay_fresh();          // Related via fresh, so track updates
-    VARS.put(this,t);           // Stop cyclic structure looping
+    vput(t,true);   ;           // Stop cyclic structure looping
     if( _args!=null )
       for( int i=0; i<t.len(); i++ )
         if( _args[i]!=null )
@@ -481,7 +480,7 @@ abstract public class TV3 implements Cloneable {
     return _trial_unify_ok(that);
   }
   boolean _trial_unify_ok(TV3 that) {
-    if( this==that )             return true; // No error
+    if( this==that ) return true; // No error
     assert !unified() && !that.unified();
     long duid = dbl_uid(that._uid);
     if( TDUPS.putIfAbsent(duid,this)!=null )
@@ -492,12 +491,7 @@ abstract public class TV3 implements Cloneable {
     if( this instanceof TVNil ) return this._trial_unify_ok_impl(that);
     if( that instanceof TVNil ) return that._trial_unify_ok_impl(this);
     // Different classes always fail
-    if( getClass() != that.getClass() ) {
-      // As a special case, allow unify of TVPtr and the Clazz of a Base.
-      if( this instanceof TVPtr ptr && that instanceof TVBase base ) return ptr._trial_unify_base(base);
-      if( that instanceof TVPtr ptr && this instanceof TVBase base ) return ptr._trial_unify_base(base);      
-      return false;
-    }
+    if( getClass() != that.getClass() ) return false;
     // Subclasses check sub-parts
     return _trial_unify_ok_impl(that);
   }
@@ -566,11 +560,17 @@ abstract public class TV3 implements Cloneable {
       }
       yield new TVStruct(ss,tvs,ts._def==Type.ANY);
     }
-    case TypeInt ti -> TVBase.make(ti);
-    case TypeFlt tf -> TVBase.make(tf);
+    case TypeInt ti -> ((TVPtr)PrimNode.PINT.tvar()).make_from(ti);
+    case TypeFlt tf -> ((TVPtr)PrimNode.PFLT.tvar()).make_from(tf);
+    // TODO
+    //case TypeInt ti -> {
+    //  TVPtr ptr = (TVPtr)PrimNode.PINT.tvar();
+    //  yield ptr._t==ti ? ptr : ptr.make_from(ti);
+    //}
+
     case TypeNil tn -> tn == TypeNil.NIL
       ? new TVNil( new TVLeaf() )
-      : TVBase.make(tn);
+      : ((TVPtr)PrimNode.PINT.tvar()).make_from(tn);
     case Type tt -> {
       if( tt == Type.ANY || tt == Type.ALL ) yield new TVLeaf();
       throw unimpl();
@@ -595,10 +595,10 @@ abstract public class TV3 implements Cloneable {
     assert !unified();
     if( !WIDEN ) return false;
     if( _widen>=widen )  return false;
-    if( test ) return true;
+    if( test ) return ptrue();
     _widen = widen;
     _widen(widen);
-    return true;
+    return ptrue();
   }
   // Used to initialize primitives
   public void set_widen() { _widen=2; }
@@ -676,20 +676,21 @@ abstract public class TV3 implements Cloneable {
   SB _str(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     boolean dup = dups.get(_uid);
     if( !debug && unified() ) return find()._str(sb,visit,dups,debug,prims);
-    if( debug && !unified() && _widen==1 ) sb.p('+');
-    if( debug && !unified() && _widen==2 ) sb.p('!');
     if( unified() || this instanceof TVLeaf ) {
       vname(sb,debug,true);
       return unified() ? _uf._str(sb.p(">>"), visit, dups, debug, prims) : sb;
     }
     // Dup printing for all but bases (which are short, just repeat them)
-    if( dup && (debug || !(this instanceof TVBase)) ) {
+    boolean is_base = this instanceof TVPtr ptr && ptr._t!=null;
+    if( dup && (debug || !is_base) ) {
       vname(sb,debug,false);           // Leading V123
-      if( visit.tset(_uid) && !(this instanceof TVBase ) ) return sb; // V123 and nothing else
+      if( visit.tset(_uid) && !is_base ) return sb; // V123 and nothing else
       sb.p(':');                        // V123:followed_by_type_descr
     } else {
       //if( visit.tset(_uid) ) return sb;  // Internal missing dup bug?
     }
+    if( debug && _widen==1 ) sb.p('+');
+    if( debug && _widen==2 ) sb.p('!');
     return _str_impl(sb,visit,dups,debug,prims);
   }
 

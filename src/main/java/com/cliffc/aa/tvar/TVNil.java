@@ -81,9 +81,11 @@ public class TVNil extends TV3 {
   // -------------------------------------------------------------
   @Override boolean _trial_unify_ok_impl( TV3 that ) {
     if( that instanceof TVNil ) return true;
-    if( that instanceof TVBase base && base._t.must_nil() )
-    // Some primitives will unify with NIL
-      return true;
+    if( that instanceof TVPtr ptr ) {
+      if( ptr._t!=null && ptr._t.must_nil() )   // Some primitives will unify with NIL
+        return true;
+      return ptr._may_nil;
+    }
     if( that instanceof TVStruct ts ) {
       //TV3 self = ts.arg(TypeStruct.SELF);
       //if( self==null ) return false;

@@ -6,6 +6,7 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.DSP_IDX;
 
 // Bind a 'this' into an unbound function pointer.  Inverse of FP2DSP.  The
 // function input can also be a struct (overload) of function pointers.
@@ -85,6 +86,11 @@ public class BindFPNode extends Node {
       if( in(0)!=null && live.at_def("fp" )==Type.ANY ) return set_def(0,null);
       if( in(1)!=null && live.at_def("dsp")==Type.ANY ) return set_def(1,null);
     } else deps_add(this);      // Liveness changes, recheck
+    if( !_over && fp() instanceof FunPtrNode fp ) {
+      FunNode fun = fp.xfun();
+      if( fun!=null && fun.parm(DSP_IDX)==null )
+        return fp;              // No display to bind, no need for a bind
+    }
     return null;
   }
   

@@ -11,6 +11,7 @@ public class RegionNode extends Node {
   @Override boolean is_CFG() { return is_copy(0)==null; }
 
   @Override public Node ideal_reduce() {
+    if( is_prim() ) return null;
     // TODO: The unzip xform, especially for FunNodes doing type-specialization
     // TODO: treat _cidx like U/F and skip_dead it also
 
@@ -24,7 +25,6 @@ public class RegionNode extends Node {
     // Node, and return-for-progress.
     for( int i=1; i<_defs._len; i++ ) {
       Node cin = in(i);
-      if( cin.is_prim() ) continue;
       if( cin._val==Type.XCTRL ) { // Dead control flow input
         for( Node phi : _uses )
           if( phi instanceof PhiNode )

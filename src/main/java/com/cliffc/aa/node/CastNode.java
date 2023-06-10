@@ -88,26 +88,12 @@ public class CastNode extends Node {
     if( maynil instanceof TVNil tmaynil && tmaynil.not_nil() == notnil )
       return false;
 
-    // Expand nilable to either base
-    if( maynil instanceof TVBase maybase && notnil instanceof TVBase notbase ) {
-      assert maybase._t == notbase._t.meet(TypeNil.NIL);
-      return false;
-    }
-
     if( maynil instanceof TVErr merr && merr.as_ptr() != null ) maynil = merr.as_ptr();
     if( notnil instanceof TVErr nerr && nerr.as_ptr() != null ) notnil = nerr.as_ptr();
     
     // Already an expanded nilable with ptr
     if( maynil instanceof TVPtr mptr && notnil instanceof TVPtr nptr )
       return mptr.load().unify(nptr.load(),test);
-
-    // Special case of mixing ptrs and bases
-    if( maynil instanceof TVBase mbase && notnil instanceof TVPtr nptr ) {
-      return mbase.clz().unify(nptr,test);
-    }
-    if( maynil instanceof TVPtr mptr && notnil instanceof TVBase nbase ) {
-      throw unimpl();
-    }
 
     // Can be nilable of nilable; fold the layer
     if( maynil instanceof TVNil && notnil instanceof TVNil )

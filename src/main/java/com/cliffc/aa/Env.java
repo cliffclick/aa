@@ -147,7 +147,7 @@ public class Env implements AutoCloseable {
 
   // Top-level Env.  Contains, e.g. the primitives.
   // Above any file-scope level Env.
-  private Env( ) { this(null,null,0,CTL_0,MEM_0,XNIL,null); }
+  private Env( ) { this(null,null,0,CTL_0,MEM_0,NIL,null); }
 
   // Gather and report errors and typing
   TypeEnv gather_errors(ErrMsg err) {

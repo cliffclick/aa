@@ -58,13 +58,13 @@ public class TVLambda extends TV3 {
       for( ; i<Math.max(nargs,tnargs); i++ )
         that.arg(i)._unify_err("Expected "+tnargs+" but found "+nargs,that,null,false);
     }
-    return true;
+    return ptrue();
   }
 
   // -------------------------------------------------------------
   // This is fresh, and that._args[i] is missing.  Lambdas with missing arguments
   @Override boolean _fresh_missing_rhs(TV3 that, int i, boolean test) {
-    if( test ) return true;
+    if( test ) return ptrue();
     TVLambda lam = that.as_lambda(); // Invariant when called
     int nargs = lam.nargs();
     assert i>=nargs;
@@ -73,7 +73,7 @@ public class TVLambda extends TV3 {
     err.err("Bad arg count",arg(i),null,test);
     Arrays.fill(lam._args,nargs,lam.nargs(),err);
     arg(i)._fresh_unify(err,false);
-    return true;
+    return ptrue();
   }
 
   // -------------------------------------------------------------

@@ -88,7 +88,13 @@ public class NewNode extends Node {
   @Override public boolean has_tvar() { /*assert used(); */ return true; }
 
   @Override public TV3 _set_tvar() {
-    return new TVPtr(BitsAlias.make0(_alias), new TVStruct(true) );
+    // Used to close the cycle between the ints and flts
+    TypeNil t=null;
+    TVStruct ts=null;
+    if( this==PrimNode.PINT ) { t = TypeInt.INT64; ts = PrimNode.ZINT._tvar.as_struct(); }
+    if( this==PrimNode.PFLT ) { t = TypeFlt.FLT64; ts = PrimNode.ZFLT._tvar.as_struct(); }
+    if( ts==null ) ts = new TVStruct(true);
+    return new TVPtr(BitsAlias.make0(_alias), ts, t );
   }
 
   // clones during inlining all become unique new sites

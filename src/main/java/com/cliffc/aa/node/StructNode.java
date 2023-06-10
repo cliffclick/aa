@@ -248,10 +248,15 @@ public class StructNode extends Node {
   
   @Override public boolean has_tvar() { return true; }
 
+  // Used to close the cycle between the ints and flts
+  public void init_tvar() {
+    _tvar = new TVStruct(_flds);
+  }
+
   // Self is always @{flds...}
-  @Override TV3 _set_tvar() {
-    TVStruct ts = new TVStruct(_flds);
-    _tvar = ts;                 // Close cycle
+  @Override public TV3 _set_tvar() {
+    if( _tvar==null ) init_tvar();
+    TVStruct ts = (TVStruct)_tvar;
     // Unify all fields
     for( int i=0; i<len(); i++ )
       ts.arg(i).unify(in(i).set_tvar(),false); // Unify (possible cycle)

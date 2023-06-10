@@ -92,7 +92,7 @@ public class TVStruct extends TVExpanding {
     tvf.widen(_widen,false);
     // Changed struct shape, move delayed-fresh updates to now
     move_delay();
-    return true;
+    return ptrue();
   }
 
   // Remove
@@ -110,7 +110,7 @@ public class TVStruct extends TVExpanding {
     // UN-Pinned fields are re-inserted into the next open super-clazz
     if( !pin )
       throw unimpl();
-    return true;
+    return ptrue();
   }
   // Remove field; true if something got removed
   public boolean del_fld(String fld) {
@@ -149,7 +149,7 @@ public class TVStruct extends TVExpanding {
   public boolean half_unify( TVStruct that, String skip, boolean test ) {
     boolean progress = false;
     for( int i=0; i<_max; i++ ) {
-      if( test && progress ) return true;
+      if( test && progress ) return progress;
       if( Util.eq(skip,_flds[i]) ) continue; // Skip field
       TV3 lhs = arg(i);
       TV3 rhs = that.arg(_flds[i]); // Match by field name, not position
@@ -159,7 +159,7 @@ public class TVStruct extends TVExpanding {
   }
 
   private boolean _miss_fld( TVStruct that, int i, TV3 lhs, boolean test ) {
-    if( test ) return true;
+    if( test ) return ptrue();
     return that.is_open()
       ? that.add_fld(_flds[i],lhs,_pins[i])
       : this.del_fld(i);
@@ -214,7 +214,7 @@ public class TVStruct extends TVExpanding {
     }
 
     assert !that.unified(); // Missing a find
-    return true;
+    return ptrue();
   }
   
   // -------------------------------------------------------------
@@ -233,7 +233,7 @@ public class TVStruct extends TVExpanding {
       if( ti == -1 ) {          // Missing in RHS
               
         if( is_open() || that.is_open() || resolving ) {
-          if( test ) return true; // Will definitely make progress
+          if( test ) return ptrue(); // Will definitely make progress
           TV3 nrhs = lhs._fresh();
           if( resolving ) {
             progress |= that.add_fld(_flds[i],nrhs,_pins[i]);
@@ -251,7 +251,7 @@ public class TVStruct extends TVExpanding {
       }
       assert !unified();      // If LHS unifies, VARS is missing the unified key
       that = (TVStruct)that.find(); // Might have to update
-      if( progress && test ) return true;
+      if( progress && test ) return progress;
     }
 
     // Fields in RHS and not the LHS are also merged; if the LHS is open we'd
@@ -263,20 +263,20 @@ public class TVStruct extends TVExpanding {
         if( Resolvable.is_resolving(that._flds[i]) ) continue;
         TV3 lhs = arg(that._flds[i]); // Lookup vis field name
         if( lhs==null ) {
-          if( test ) return true;
+          if( test ) return ptrue();
           progress |= that.del_fld(i--);
         }
       }
 
     // If LHS is closed, force RHS closed
     if( !_open && that._open ) {
-      if( test ) return true;
+      progress = ptrue();
+      if( test ) return progress;
       that._open = false;
-      progress = true;
     }
 
     if( trial_resolve_all(false,that) ) {
-      progress = true;
+      progress = ptrue();
       trial_resolve_all(false,this);
     }
     

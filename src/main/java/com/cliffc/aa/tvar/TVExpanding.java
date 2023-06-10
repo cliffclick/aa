@@ -84,10 +84,12 @@ abstract public class TVExpanding extends TV3 {
   // Called from Combo after a Node unification; allows incremental update of
   // Fresh unification.
   public static void do_delay_fresh() {
+    int cnt=0;
     while( DELAY_FRESH.len() > 0 ) {
       DelayFresh df = DELAY_FRESH.pop();
-      df._lhs.find().fresh_unify(df._frsh,df._rhs.find(),df._nongen,false);
+      boolean progress = df._lhs.find().fresh_unify(df._frsh,df._rhs.find(),df._nongen,false);
       df._frsh.add_flow();
+      assert cnt++ < 20;
     }
   }
   public static void do_delay_resolve() {

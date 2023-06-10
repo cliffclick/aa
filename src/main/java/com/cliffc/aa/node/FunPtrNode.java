@@ -1,10 +1,11 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.tvar.*;
+import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.TVLambda;
+import com.cliffc.aa.tvar.TVLeaf;
 import com.cliffc.aa.type.*;
 
-import static com.cliffc.aa.AA.MEM_IDX;
 import static com.cliffc.aa.AA.DSP_IDX;
 import static com.cliffc.aa.AA.REZ_IDX;
 
@@ -114,9 +115,7 @@ public final class FunPtrNode extends Node {
     RetNode ret = ret();
     Node rez = ret.rez();
     if( rez==null ) return new TVLeaf(); // Happens for broken Lambdas
-    Node imem = ret.fun().parm(MEM_IDX);
     Node dsp  = ret.fun().parm(DSP_IDX);
-    Node omem = ret.mem();
     TV3   tdsp  = dsp  == null ? new TVLeaf() :       dsp .set_tvar();
     return new TVLambda(nargs(),tdsp,rez.set_tvar());
   }

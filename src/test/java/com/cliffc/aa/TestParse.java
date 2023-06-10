@@ -30,11 +30,12 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    test("x=2; y=x+1; x*y", "6", "6");
-    DO_GCP=false;
-    DO_HMT=true;
+    test("0== !!1",  "nil", "A?");
+
+    DO_GCP=true;
+    DO_HMT=false;
     RSEED=0;
-    test("math.rand(2) && (x=2;x*x) || 3 && 4", "int8", "int"); // local use of x in short-circuit; requires unzip to find 4
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(0)","*[13](1,2,6)","*[13](int64,int64,int64)", null, null, "[13]", null);
   }
   
   static private void assertTrue(boolean t) {
@@ -252,12 +253,12 @@ public class TestParse {
     test("x:=y:=0; z=x++ && y++;(x,y,z)", // increments x, but it starts zero, so y never increments
          "*[11](1, nil,nil)","*[11](int64,A?,B?)",null,null,"[11]",null);
     test("x:=y:=0; x++ && y++; z=x++ && y++; (x,y,z)", // x++; x++; y++; (2,1,0)
-            "*[12](2, 1, nil)","*[12](int64,int64,int)", null, null, "[12]", null);
+            "*[12](2, 1, nil)","*[12](int64,int64,int64)", null, null, "[12]", null);
     test("(x=1) && x+2", "3", "3"); // Def x in 1st position
 
     testerr("1 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x maybe alive
     testerr("0 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x definitely not alive
-    test("math.rand(2) && (x=2;x*x) || 3 && 4", "int8", "int"); // local use of x in short-circuit; requires unzip to find 4
+    test("math.rand(2) && (x=2;x*x) || 3 && 4", "int8", "int64"); // local use of x in short-circuit; requires unzip to find 4
   }
 
   @Test public void testParse02() {
@@ -286,7 +287,8 @@ public class TestParse {
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
     // Note that passing in a nil here produces a very interesting type:
     // any class which has the right unbound operators.  IMHO, the opers should bind.
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(1),fact(2),fact(3))","*[13](1,2,6)","*[13](A:int,A,A)", null, null, "[13]", null);
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(1),fact(2),fact(3))","*[13](1,2,6)","*[13](int64,int64,int64)", null, null, "[13]", null);
+    //test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(1),fact(2.5),fact(0))","*[13](1,2,6)","*[13](int64,int64,int64)", null, null, "[13]", null);
 
     // Co-recursion requires parallel assignment & type inference across a lexical scope
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", "int1", "int1" );

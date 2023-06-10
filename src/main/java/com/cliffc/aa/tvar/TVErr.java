@@ -15,24 +15,20 @@ public class TVErr extends TV3 {
 
   static final int XSTR=0;
   static final int XFUN=1;
-  static final int XINT=2;
-  static final int XFLT=3;
-  static final int XNIL=4;
-  static final int XPTR=5;
-  static final int XMEM=6;
-  static final int XMAX=7;
+  static final int XNIL=2;
+  static final int XPTR=3;
+  static final int XMEM=4;
+  static final int XMAX=5;
   
   // Errors other than structural unify errors.
   public Ary<String> _errs;
 
   public Parse _bad;
   
-  public TVErr() { super(new TV3[XMAX+10]); }
+  public TVErr() { super(new TV3[XMAX+XMAX]); }
 
   @Override public TVStruct as_struct() { return (TVStruct)arg(XSTR); }
   @Override public TVLambda as_lambda() { return (TVLambda)arg(XFUN); }
-  @Override public TVBase   as_int   () { return (TVBase  )arg(XINT); }
-  @Override public TVBase   as_flt   () { return (TVBase  )arg(XFLT); }
   @Override public TVNil    as_nil   () { return (TVNil   )arg(XNIL); }
   @Override public TVPtr    as_ptr   () { return (TVPtr   )arg(XPTR); }
 
@@ -125,7 +121,7 @@ public class TVErr extends TV3 {
         if( terr.arg(i)==null ) terr._args[i] = tv3;
         else tv3._unify(terr.arg(i),false);
     }
-    return true;
+    return ptrue();
   }
   
   // -------------------------------------------------------------
