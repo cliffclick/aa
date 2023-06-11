@@ -6,8 +6,8 @@ import java.util.*;
 import java.util.function.*;
 
 import static com.cliffc.aa.AA.*;
-import static com.cliffc.aa.type.TypeFlds.sbefore;
 import static com.cliffc.aa.type.TypeFld.Access;
+import static com.cliffc.aa.type.TypeFld.scmp;
 
 /** A memory-based collection of named fields.  This is a recursive type,
  *  produced by NewNode and structure or tuple constants.  Fields can be
@@ -66,13 +66,13 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     return this;
   }
 
-  // No instance of the default
+  // No instance of the default, fields alpha sorted
   private static boolean check(Type def, TypeFld[] flds) {
     assert !(def instanceof TypeFld);
     for( TypeFld fld : flds ) if( fld!=null && fld._t == def ) return false; // Not canonical
     for( int i=0; i<flds.length-1; i++ )
-      if( flds[i]._fld.compareTo(flds[i+1]._fld) >= 1 )
-        return false;
+      if( scmp(flds[i]._fld,flds[i+1]._fld) >= 0 )
+        return false;           // Not alpha sorted
     return true;
   }
 
@@ -308,8 +308,8 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   // A fake Type Clazz hierarchy.  Fake because it does not have all the fields
   // found in PrimNode.  Useful for testing.
   public static final TypeStruct XCLZCLZ = ISUSED;
-  public static final TypeStruct XSTRZ = make_test(TypeFld.make("#_",UNUSED), TypeFld.make(".",XCLZCLZ));
-  public static final TypeStruct XINTZ = make_test(TypeFld.make("!_",UNUSED), TypeFld.make(".",XCLZCLZ));
+  public static final TypeStruct XSTRZ = make_test(TypeFld.make_dsp(XCLZCLZ), TypeFld.make("#_",UNUSED) );
+  public static final TypeStruct XINTZ = make_test(TypeFld.make_dsp(XCLZCLZ), TypeFld.make("!_",UNUSED));
   
   // A bunch of types for tests
   public  static final TypeStruct POINT = make_test(TypeFld.make("x",TypeFlt.FLT64),TypeFld.make("y",TypeFlt.FLT64));
@@ -384,7 +384,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
       String    s0 = fld0._fld    ,   s1 = fld1._fld;
       if( fld0==fld1 )          { i++; j++; if( fld0._t!=def ) flds2[k++] = fld0; } // Fast-path shortcut
       else if( Util.eq(s0,s1) ) { i++; j++; k = add_fld(flds2,k,s0,def,fld0._t.meet(fld1._t),fld0._access.meet(fld1._access)); }
-      else if( sbefore(s0,s1) ) { i++;      k = add_fld(flds2,k,s0,def,fld0,that._def); }
+      else if( scmp(s0,s1)<0  ) { i++;      k = add_fld(flds2,k,s0,def,fld0,that._def); }
       else                      {      j++; k = add_fld(flds2,k,s1,def,fld1,this._def); }
     }
     for( ; i<this.len(); i++ )  k = add_fld(flds2,k,this._flds[i]._fld,def,this._flds[i],that._def);
@@ -452,7 +452,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
       String    s0 = fld0._fld    ,   s1 = fld1._fld;
       if( fld0==fld1 )          { i++; j++; FLDS.push(fld0); } // Fast-path shortcut
       else if( Util.eq(s0,s1) ) { i++; j++; add_fldc(s0,fld0._access.meet(fld1._access)); }
-      else if( sbefore(s0,s1) ) { i++;      add_fldc(fld0); }
+      else if( scmp(s0,s1)<0  ) { i++;      add_fldc(fld0); }
       else                      { j++;      add_fldc(fld1); }
     }
     for( ; i<this.len(); i++ )  add_fldc(this._flds[i]);
@@ -590,7 +590,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   static boolean isDigit(char c) { return '0' <= c && c <= '9'; }
   public boolean is_tup() {
     int len = len();
-    if( len==0 || (len==1 && get("^")!=null) ) return true;
+    if( len==0 || (len==1 && get(TypeFld.CLZ)!=null) ) return true;
     for( int i=0; i<len; i++ )
       if( isDigit(_flds[i]._fld.charAt(0)) ) return true;
     return false;
@@ -628,12 +628,12 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     // Set the indent flag once for the entire struct.  Indent if any field is complex.
     boolean ind = false;
     for( TypeFld fld : this )
-      if( (debug || !Util.eq(fld._fld,"^")) && (fld._t!=null && fld._t._str_complex(visit,dups)) )
+      if( (debug || !Util.eq(fld._fld,TypeFld.CLZ)) && (fld._t!=null && fld._t._str_complex(visit,dups)) )
         ind=indent;           // Field is complex, indent if asked to do so
     if( ind ) sb.ii(1);
     boolean sep=false;
     for( TypeFld fld : _flds ) {
-      if( !debug && Util.eq(fld._fld,"^") ) continue;
+      if( !debug && Util.eq(fld._fld,TypeFld.CLZ) ) continue;
       if( fld==TypeFld.ANY_DSP ) sb.p('_'); // Short-cut the ever-present display
       else {
         if( ind ) sb.nl().i();
@@ -684,7 +684,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     while(true) {
       if( P.peek("...") ) { assert any; break; }
       if( P.peek('$') )
-        { ts._def = (TypeNil)P.type(null,false,-2); break; }
+        { ts._def = P.type(null,false,-2); break; }
       TypeFld fld = ts.len()==0 && P.peek('_')
         ? TypeFld.ANY_DSP
         // Request a parse of:

@@ -135,11 +135,10 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public static final TypeStruct DISPLAY;
   public static final TypeMemPtr DISPLAY_PTR;
   public static final TypeFld    DISP_FLD;
-  public static final TypeNil    NO_DISP= TypeNil.XSCALAR;
   static {
     // Install a (to be cyclic) DISPLAY.  Not cyclic during the install, since
     // we cannot build the cycle all at once.
-    DISP_FLD = TypeFld.malloc("^",null,TypeFld.Access.Final);
+    DISP_FLD = TypeFld.malloc(TypeFld.CLZ,null,TypeFld.Access.Final);
     TypeStruct.RECURSIVE_MEET++;
     TypeFld[] flds = TypeFlds.make(DISP_FLD);
     TypeStruct.RECURSIVE_MEET--;

@@ -73,7 +73,7 @@ public class TestApprox {
     int a3 = BitsAlias.new_alias(BitsAlias.ALLX);
     int f7 = BitsFun.new_fidx(BitsFun.ALLX);
     int f2 = BitsFun.new_fidx(BitsFun.ALLX);
-    Type ND = TypeMemPtr.NO_DISP;
+    Type ND = TypeNil.NO_DSP;
     TypeFld S0 = TypeFld.make_tup(TypeNil. SCALAR,ARG_IDX+0);
     TypeFld X0 = TypeFld.make_tup(TypeNil.XSCALAR,ARG_IDX+0);
     TypeFld S1 = TypeFld.make_tup(TypeNil. SCALAR,ARG_IDX+1);

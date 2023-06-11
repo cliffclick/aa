@@ -243,7 +243,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     if( _hash==0 ) sb.p("!!!");
 
     // Some early cutouts for common bulky cases
-    if( this==TypeStruct.ISUSED ) return sb.p("()"); // Shortcut for common case
+    if( this instanceof TypeStruct && this==TypeStruct.ISUSED ) return sb.p("()"); // Shortcut for common case
 
     // Print a dups label, and optionally the type
     String s = dups.get(_uid);
@@ -932,7 +932,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       return oldx==_x ? null : _str.substring(oldx,_x).intern();
     }
     // Skip whitespace and parse a field label.
-    // Specifically allows numbers.
+    // Specifically allows numbers and "."
     String id_num() {
       skipWS();
       int oldx=_x;  char c;
@@ -942,7 +942,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     }
     // Rules for an ID character
     private static boolean isId0(char c) {
-      return c=='^' || c=='_' ||
+      return c=='.' || c=='_' ||
         ('A' <= c && c <= 'Z') ||
         ('a' <= c && c <= 'z');
     }

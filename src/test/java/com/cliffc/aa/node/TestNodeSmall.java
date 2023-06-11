@@ -10,7 +10,7 @@ import java.util.Set;
 
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
-import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
+import static com.cliffc.aa.type.TypeNil.NO_DSP;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -204,7 +204,7 @@ public class TestNodeSmall {
   /** Validate monotonicity of CallNode.resolve().  There are only a couple of
    *  interesting variants; this test also tests e.g. XCTRL for correctness but
    *  its implementation is a simple cutout, same for the display arg "^" being
-   *  NO_DISP.
+   *  NO_DSP.
    *
    *  === High mul fptr (e.g. GCP) ===
    *  arg1  arg2    fptr*      resolve
@@ -254,7 +254,7 @@ public class TestNodeSmall {
     ConNode mem  = gvn.init(new ConNode<>(TypeMem.ALLMEM));
     ConNode arg1 = gvn.init(new ConNode<>(TypeNil.SCALAR));
     ConNode arg2 = gvn.init(new ConNode<>(TypeNil.SCALAR));
-    Node dsp = gvn.xform(new ConNode<>(TypeMemPtr.NO_DISP));
+    Node dsp = gvn.xform(new ConNode<>(TypeNil.NO_DSP));
     CallNode call = (CallNode)gvn.xform(new CallNode(true, null, ctrl, mem, dsp, arg1, arg2, fp_mul));
     CallEpiNode cepi = (CallEpiNode)gvn.xform(new CallEpiNode(call)); // Unwired
 
@@ -288,7 +288,7 @@ public class TestNodeSmall {
     TypeFunPtr tmint = v(mint,gvn), tmintX = tmint.dual();
     TypeFunPtr tmflt = v(mflt,gvn), tmfltX = tmflt.dual();
 
-    TypeFunPtr tmul1E = TypeFunPtr.make(false,BitsFun.EMPTY,0,NO_DISP,null); // All bad choices
+    TypeFunPtr tmul1E = TypeFunPtr.make(false,BitsFun.EMPTY,0,NO_DSP,null); // All bad choices
 
     assert tadd1X.isa(tnum1X) && tnum1X.isa(tflt1X) && tflt1X.isa(tnum1) && tnum1.isa(tadd1);
 
@@ -399,7 +399,7 @@ public class TestNodeSmall {
     // Make a Unknown/CallNode/CallEpi combo.  Unwired.
     ConNode ctrl = (ConNode)gvn.xform(new ConNode<>(Type.CTRL));
     ConNode mem  = (ConNode)gvn.xform(new ConNode<>(TypeMem.ALLMEM));
-    ConNode dsp  = (ConNode)gvn.xform(new ConNode<>(TypeMemPtr.NO_DISP));
+    ConNode dsp  = (ConNode)gvn.xform(new ConNode<>(TypeNil.NO_DSP));
     ConNode arg3 = gvn.init(new ConNode<>(TypeNil.SCALAR));
     ConNode arg4 = gvn.init(new ConNode<>(TypeNil.SCALAR));
     ConNode fdx  = gvn.init(new ConNode<>(fp_add._val));

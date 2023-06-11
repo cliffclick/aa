@@ -311,7 +311,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     return make(BitsFun.new_fidx(parent),nargs,dsp,ret);
   }
   public static TypeFunPtr make( BitsFun fidxs, int nargs) {
-    return make(fidxs.above_center(),fidxs,nargs,TypeMemPtr.NO_DISP,TypeNil.SCALAR);
+    return make(fidxs.above_center(),fidxs,nargs,TypeNil.NO_DSP,TypeNil.SCALAR);
   }
   public TypeFunPtr make_from( Type dsp ) { return make(_any, _fidxs,_nargs, dsp,_ret); }
   public TypeFunPtr make_from( BitsFun fidxs ) {

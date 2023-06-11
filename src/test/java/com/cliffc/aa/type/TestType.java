@@ -6,7 +6,7 @@ import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import org.junit.Test;
 
-import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
+import static com.cliffc.aa.type.TypeNil.NO_DSP;
 import static org.junit.Assert.*;
 
 
@@ -37,7 +37,7 @@ public class TestType {
   // Test for a collection of Strings, that toString and valueOf are a bijection
   @Test public void testValueOf() {
     //PrimNode.PRIMS();
-    Type ignore = TypeMemPtr.NO_DISP;
+    Type ignore = TypeNil.NO_DSP;
     String[] ss = new String[] {
       "Scalar",                 // The Scalars and Nils
       "nScalar",
@@ -110,7 +110,7 @@ public class TestType {
     assertTrue(wx1.isa(wx2));
     assertTrue(wx2.isa(wx3));  // CHECK MONOTONIC
   }
-  static TypeFunPtr make( BitsFun fidxs, Type ret) { return TypeFunPtr.makex(false,fidxs,1,TypeMemPtr.NO_DISP,ret); }
+  static TypeFunPtr make( BitsFun fidxs, Type ret) { return TypeFunPtr.makex(false,fidxs,1,TypeNil.NO_DSP,ret); }
 
   @Test public void testBits0() {
 
@@ -403,7 +403,7 @@ public class TestType {
 
     // TypeTuple structure demands the shortest Tuple wins the "length
     // war" (determines the length of the result based on short's any/all flag).
-    TypeFunPtr f1i2i = TypeFunPtr.make_new_fidx(BitsFun.ALLX,2,NO_DISP,TypeInt.INT64);
+    TypeFunPtr f1i2i = TypeFunPtr.make_new_fidx(BitsFun.ALLX,2,NO_DSP,TypeInt.INT64);
     // To be a GF result, GF has to be shorter and high; the isa does a meet of
     // TypeFunPtrs which does a *join* of args, which duals the GF args down
     // low.  GF is zero length and low, and wins the meet.
@@ -413,20 +413,20 @@ public class TestType {
     //assertTrue(gf.dual().isa(f1i2i)); // To be short result, short must be low
 
     assertTrue(f1i2i.isa(gf));
-    TypeFunPtr f1f2f = TypeFunPtr.make_new_fidx(BitsFun.ALLX,2,NO_DISP,TypeFlt.FLT64);
+    TypeFunPtr f1f2f = TypeFunPtr.make_new_fidx(BitsFun.ALLX,2,NO_DSP,TypeFlt.FLT64);
     assertTrue(f1f2f.isa(gf));
     TypeFunPtr mt = (TypeFunPtr)f1i2i.meet(f1f2f);
     int fidx0 = f1i2i.fidx();
     int fidx1 = f1f2f.fidx();
     BitsFun funs = BitsFun.make0(fidx0).meet(BitsFun.make0(fidx1));
     Type tu = TypeInt.INT64.meet(TypeFlt.FLT64);
-    TypeFunPtr f3i2r = TypeFunPtr.make(false,funs,2,NO_DISP,tu);
+    TypeFunPtr f3i2r = TypeFunPtr.make(false,funs,2,NO_DSP,tu);
     assertEquals(f3i2r,mt);
     assertTrue(f3i2r.isa(gf));
     assertTrue(f1i2i.isa(f3i2r));
     assertTrue(f1f2f.isa(f3i2r));
 
-    TypeFunPtr f2 = TypeFunPtr.make(false,BitsFun.make0(fidx1),2,NO_DISP,TypeInt.INT64); // Some generic function (happens to be #23, '&')
+    TypeFunPtr f2 = TypeFunPtr.make(false,BitsFun.make0(fidx1),2,NO_DSP,TypeInt.INT64); // Some generic function (happens to be #23, '&')
     assertTrue(f2.isa(gf));
   }
 
@@ -592,12 +592,6 @@ public class TestType {
       t1.dual(),
       t2,
       t1,
-    };
-    TypeMemPtr[] tmps1 = new TypeMemPtr[]{
-      TypeMemPtr.make(-alias1,TypeStruct.UNUSED),
-      TypeMemPtr.make(-alias2,TypeStruct.UNUSED),
-      TypeMemPtr.make( alias2,TypeStruct.ISUSED), // testing 5-obj & ISUSED [1....:use] vs MEM_ABC
-      TypeMemPtr.make( alias1,TypeStruct.ISUSED),
     };
     for( int i=0; i<tmps.length-1; i++ )
       assertTrue(tmps[i].isa(tmps[i+1]));

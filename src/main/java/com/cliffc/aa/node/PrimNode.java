@@ -43,7 +43,7 @@ public abstract class PrimNode extends Node {
     for( int i=DSP_IDX; i<formals._ts.length; i++ ) assert formals._ts[i] instanceof TypeNil || formals._ts[i]==Type.ANY;
     _formals = formals;
     _ret = ret;
-    _tfp=TypeFunPtr.make(fidx,formals.len(),TypeMemPtr.NO_DISP,ret);
+    _tfp=TypeFunPtr.make(fidx,formals.len(),TypeNil.NO_DSP,ret);
     _badargs=null;
   }
 

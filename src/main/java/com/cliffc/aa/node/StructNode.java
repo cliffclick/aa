@@ -214,7 +214,7 @@ public class StructNode extends Node {
     for( int i=0; i<_flds.len(); i++ )
       flds[i] = TypeFld.make(_flds.at(i),val(i),_accesses.at(i));
     // Fields are sorted in TypeStruct so I can merge-sort
-    Arrays.sort(flds,( tf0, tf1) -> tf0._fld.compareTo(tf1._fld));
+    Arrays.sort(flds,( tf0, tf1) -> TypeFld.scmp(tf0._fld,tf1._fld));
     return TypeStruct.make_flds(_def,flds);
   }
 

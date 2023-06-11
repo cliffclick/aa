@@ -42,13 +42,6 @@ public class TypeFlds extends AryI<TypeFld> {
   
   public static final TypeFld[] EMPTY = hash_cons(get(0));
 
-  // Are the fields in order?
-  public static boolean sbefore(String s0, String s1) {
-    if( Util.eq(s0,"^") ) return true;
-    if( Util.eq(s1,"^") ) return false;
-    return s0.compareTo(s1) < 0;
-  }
-
   // Change a field.  Preserves the original.  Does not hash-cons
   public static TypeFld[] make_from(TypeFld[] flds, int idx, TypeFld fld) {
     TypeFld[] tfs = clone(flds);
@@ -62,7 +55,7 @@ public class TypeFlds extends AryI<TypeFld> {
     TypeFld[] fs = copyOf(flds,flds.length+1);
     fs[flds.length]=fld;
     int i=0;
-    while( i<flds.length && sbefore(flds[i]._fld,fld._fld) ) i++;
+    while( i<flds.length && TypeFld.scmp(flds[i]._fld,fld._fld)<0 ) i++;
     fs[i]=fld;
     System.arraycopy(flds,i,fs,i+1,flds.length-i);
     return fs;

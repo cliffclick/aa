@@ -209,7 +209,7 @@ public class TypeMem extends Type<TypeMem> {
     TypeStruct[] as = new TypeStruct[alias+1];
     as[1] = TypeStruct.UNUSED;
     as[alias] = oop;
-    return make(false,as);
+    return make(oop.above_center(),as);
   }
   public static TypeMem make(BitsAlias aliases, TypeStruct oop ) {
     TypeStruct[] as = new TypeStruct[aliases.max()+1];
@@ -239,7 +239,6 @@ public class TypeMem extends Type<TypeMem> {
 
   static {
     // Every alias is used in the worst way
-    Type ignore = TypeMemPtr.NO_DISP; // Cyclic clinit
     ALLMEM = make0(false,new TypeStruct[]{null,TypeStruct.ISUSED});
     ANYMEM = ALLMEM.dual();
     EXTMEM = make(BitsAlias.EXTX,TypeStruct.ISUSED);

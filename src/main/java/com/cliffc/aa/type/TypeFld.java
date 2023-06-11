@@ -13,6 +13,15 @@ import java.util.function.BinaryOperator;
 // accesses make a small lattice of: {choice,r/w,final,r-o}.  Note that mixing
 // r/w and final moves to r-o and loses the final property.  No field order.
 public class TypeFld extends Type<TypeFld> implements Cyclic {
+  public static final String CLZ = "."; // Class field name
+
+  // Are the fields in order?  Ties report true.
+  public static int scmp(String s0, String s1) {
+    if( Util.eq(s0,CLZ) ) return -1;
+    if( Util.eq(s1,CLZ) ) return  1;
+    return s0.compareTo(s1);
+  }
+  
   // Field names are never null, and never zero-length.  Names can be fldTop or fldBot.
   public String _fld;           // The field name
   public Type _t;               // Field type.  Usually some type of Scalar, or ANY or ALL.
@@ -115,18 +124,18 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   public static TypeFld make( String fld, Type t ) { return make(fld,t,Access.Final); }
   public static TypeFld make( String fld ) { return make(fld,TypeNil.SCALAR,Access.Final); }
   //public static TypeFld make( Type def ) { return make(fldBot,def,Access.Final); }
-  public static TypeFld make_dsp(Type t) { return make("^",t,Access.Final); }
+  public static TypeFld make_dsp(Type t) { return make(CLZ,t,Access.Final); }
 
   // Some convenient default constructors
-  static final String[] ARGS = new String[]{" ctl", " mem", "^","x","y","z"};
-  static final String[] TUPS = new String[]{" ctl", " mem", "^","0","1","2"};
+  static final String[] ARGS = new String[]{" ctl", " mem", CLZ,"x","y","z"};
+  static final String[] TUPS = new String[]{" ctl", " mem", CLZ,"0","1","2"};
   public static TypeFld make_arg( Type t, int order ) { return make(ARGS[order],t,Access.Final);  }
   public static TypeFld make_tup( Type t, int order ) { return make(TUPS[order],t,Access.Final);  }
   public TypeFld make_from(Type t) { return t==_t ? this : make(_fld,t,_access); }
   public TypeFld make_from(Type t, Access a) { return (t==_t && a==_access) ? this : make(_fld,t,a); }
   // For some tests
-  public static final TypeFld ANY_DSP = TypeFld.make_dsp(Type.ANY);
-  public static final TypeFld NO_DSP  = TypeFld.make_dsp(TypeMemPtr.NO_DISP);
+  public static final TypeFld ANY_DSP = make_dsp(Type.ANY);
+  public static final TypeFld NO_DSP  = make_dsp(TypeNil.NO_DSP);
 
   @Override protected TypeFld xdual() {
     if( _t==_t.dual() && _access==_access.dual() )
@@ -162,7 +171,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     public SB str(SB sb) { return sb.p(SHORTS[ordinal()]); }
   }
 
-  public static final TypeFld NO_DISP = make("^",Type.ANY,Access.Final);
+  public static final TypeFld NO_DISP = make(CLZ,Type.ANY,Access.Final);
 
   // Setting the type during recursive construction.
   public TypeFld setX(Type t) {
@@ -191,4 +200,3 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   // Used for assertions
   @Override boolean intern_check1() { return _t.intern_get()!=null; }
 }
-
