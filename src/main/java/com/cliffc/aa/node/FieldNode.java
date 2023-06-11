@@ -77,6 +77,7 @@ public class FieldNode extends Node implements Resolvable {
       if( clazz ==null ) return oob_ret(t);
       tstr = clazz._val;        // Value from clazz
       // Add a dep edge to the clazz, so value changes propagate permanently
+      // TODO: Busted when mixing compatible classes, e.g. generic factorial with ints & flts.
       if( len()==2 ) assert in(1)==clazz;
       else add_def(clazz);
     }

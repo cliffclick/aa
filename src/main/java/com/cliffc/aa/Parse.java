@@ -1404,7 +1404,7 @@ public class Parse implements Comparable<Parse> {
     TypeFld[] tflds = TypeFlds.get(flds.len());
     System.arraycopy(flds._es,0,tflds,0,flds._len);
     TypeStruct ts = TypeStruct.make_flds(Type.ANY,tflds);
-    return TypeMemPtr.make(BitsAlias.INTX,ts);
+    return TypeMemPtr.make(BitsAlias.LOCX,ts);
   }
 
   // Parse an const ifex.

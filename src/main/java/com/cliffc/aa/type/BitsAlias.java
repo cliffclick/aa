@@ -24,7 +24,9 @@ public class BitsAlias extends Bits<BitsAlias> {
   @Override public Tree<BitsAlias> tree() { return TREE; }
   public static final int ALLX = TREE.split(0);   // Split from 0
   public static final int EXTX = new_alias(ALLX); // External aliases
-  public static final int INTX = new_alias(ALLX); // Internal aliases
+  public static final int LOCX = new_alias(ALLX); // Internal aliases
+  public static final int INTX = new_alias(EXTX); // Integer-clazz alias
+  public static final int FLTX = new_alias(EXTX); // Float-clazz alias
   public static final int STRX = new_alias(EXTX); // String alias
   // The All-Memory alias class
   public  static final BitsAlias NALL = new BitsAlias().make_impl(ALLX,null); // All aliases, no nil
@@ -33,7 +35,9 @@ public class BitsAlias extends Bits<BitsAlias> {
   private static final BitsAlias  ANY = ALL.dual();
 
   public static final BitsAlias EXT = make0(EXTX);
+  public static final BitsAlias LOC = make0(LOCX);
   public static final BitsAlias INT = make0(INTX);
+  public static final BitsAlias FLT = make0(FLTX);
   public static final BitsAlias STR = make0(STRX);
 
   public static final BitsAlias EMPTY = new BitsAlias().make(); // No bits; its its own dual
@@ -57,7 +61,7 @@ public class BitsAlias extends Bits<BitsAlias> {
   public BitsAlias or( int bit ) { return set(bit); }
 
   // Default new aliases are all internal
-  public static int  new_alias() { return new_alias(INTX); }
+  public static int  new_alias() { return new_alias(LOCX); }
   public static int  new_alias(int par) { return set_alias(par); }
   private static int set_alias(int par) { return TREE.split(par); }
   public static void free(int fidx) { TREE.free(fidx); }

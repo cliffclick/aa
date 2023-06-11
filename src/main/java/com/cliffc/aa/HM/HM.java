@@ -1482,7 +1482,7 @@ public class HM {
       _ids=ids;
       _flds=flds;
       // Make a TMP
-      _alias = user ? BitsAlias.new_alias(BitsAlias.INTX) : -1;
+      _alias = user ? BitsAlias.new_alias(BitsAlias.LOCX) : -1;
       if( user ) ALIASES.setX(_alias,this);
     }
     @Override SB str(SB sb) {
@@ -1874,7 +1874,7 @@ public class HM {
             var1=T2.make_leaf(),
             var2=T2.make_leaf(),
             T2.make_ptr(T2.make_struct(FLDS,new T2[]{var1,var2})));
-      _alias = BitsAlias.new_alias(BitsAlias.INTX);
+      _alias = BitsAlias.new_alias(BitsAlias.LOCX);
       ALIASES.setX(_alias,this);
     }
     @Override public T2 t2() { return find().get(RET); }
@@ -1914,7 +1914,7 @@ public class HM {
             var2=T2.make_leaf(),
             var3=T2.make_leaf(),
             T2.make_ptr(T2.make_struct(FLDS,new T2[]{var1,var2,var3})));
-      _alias = BitsAlias.new_alias(BitsAlias.INTX);
+      _alias = BitsAlias.new_alias(BitsAlias.LOCX);
       ALIASES.setX(_alias,this);
     }
     @Override public T2 t2() { return find().get(RET); }
