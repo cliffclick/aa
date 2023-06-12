@@ -170,10 +170,10 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   public static final TypeNil  NIL = make(true ,true,false); // One of many nil choices
   public static final TypeNil AND_XSCALAR = make(true,false,false); // Odd choice: 0&~Scalar
 
-  public static final TypeNil INTERNAL = make(false,false,false,BitsAlias.INT,BitsFun.INT);
+  public static final TypeNil INTERNAL = make(false,false,false,BitsAlias.LOC,BitsFun.INT);
   public static final TypeNil EXTERNAL = make(false,false,false,BitsAlias.EXT,BitsFun.EXT);
   public static final TypeNil TEST0 = make(false,true,false,BitsAlias.EXT,BitsFun.INT);
-  
+  public static final TypeNil NO_DSP = XSCALAR;
   // Collection of sample types for checking type lattice properties.
   static final TypeNil[] TYPES = new TypeNil[]{SCALAR,NSCALR,XNIL,(TypeNil)AND_XSCALAR._dual,INTERNAL,TEST0};
 
@@ -204,7 +204,7 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   
 
   // Meet into a new TypeNil subclass, without interning
-  N ymeet( N tn ) {
+  final N ymeet( N tn ) {
     N rez = copy();
     rez._any = _any & tn._any;
     rez._nil = _nil & tn._nil;
@@ -215,7 +215,7 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   }
   
   // LHS is TypeNil directly; RHS is a TypeNil subclass.
-  final Type nmeet(TypeNil tsub) {
+  final TypeNil nmeet(TypeNil tsub) {
     assert _type==TNIL && tsub._type!=TNIL;
     if( !_any ) {               // Falling past 'tsub' to a low TypeNil
       TypeNil tn = tsub.widen_sub();
@@ -224,7 +224,7 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     // Keep subclass structure.  
     TypeNil rez = tsub.ymeet(this);
     rez._nil &= _sub & tsub._sub; // Disallow the xnil->nil edge
-    return rez.canonicalize().hashcons_free();
+    return (TypeNil)rez.canonicalize().hashcons_free();
   }
 
   N canonicalize() { return (N)this; }
