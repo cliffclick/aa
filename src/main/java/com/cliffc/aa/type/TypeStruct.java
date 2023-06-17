@@ -654,9 +654,9 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return true; }
 
   boolean is_top_clz () { return _flds.length>1 && Util.eq("math",_flds[1]._fld); }
-  boolean is_int_clz () { return _flds.length>1 && Util.eq("!_"  ,_flds[0]._fld); }
-  boolean is_flt_clz () { return _flds.length>1 && Util.eq("-_"  ,_flds[0]._fld); }
-  boolean is_str_clz () { return _flds.length>1 && Util.eq("#_"  ,_flds[0]._fld); }
+  boolean is_int_clz () { return _flds.length>1 && Util.eq("!_"  ,_flds[1]._fld); }
+  boolean is_flt_clz () { return _flds.length>1 && Util.eq("-_"  ,_flds[1]._fld); }
+  boolean is_str_clz () { return _flds.length>1 && Util.eq("#_"  ,_flds[1]._fld); }
   boolean is_math_clz() { return _flds.length>1 && Util.eq("pi"  ,_flds[1]._fld); }
   boolean is_prim_clz() {
     return is_top_clz()

@@ -64,7 +64,7 @@ public class ParmNode extends Node {
         Type tcall = call._val, t2;
         // Parm RPC grabs the RPC from the Call directly, not any Call value 
         if( _idx==0 ) t2 = TypeRPC.make(call._rpc);
-        else if( !(tcall instanceof TypeTuple tt) ) t2 = tcall.oob(_t);
+        else if( !(tcall instanceof TypeTuple tt) ) t2 = tcall;
         else if( call._is_copy || _idx < call.nargs() ) t2 = tt.at(_idx);
         else t2 = Type.ALL;       // Error, arg out of range
         t = t.meet(t2);
