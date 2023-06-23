@@ -47,15 +47,15 @@ public abstract class PrimNode extends Node {
     _badargs=null;
   }
 
-  public static final StructNode ZCLZ = new StructNode(0,false,null, Type.ALL);
+  public static final StructNode ZCLZ = new StructNode(0,false,null, Type.ANY);
   
   // Int/Float/String primitives.  
-  public static final StructNode ZINT = new StructNode(0,false,null, Type.ALL);
-  public static final StructNode ZFLT = new StructNode(0,false,null, Type.ALL);
-  public static final StructNode ZSTR = new StructNode(0,false,null, Type.ALL);
-  public static final StructNode ZMATH= new StructNode(0,false,null, Type.ALL);
-  public static final NewNode PINT = new NewNode(BitsAlias.new_alias(BitsAlias.EXTX));
-  public static final NewNode PFLT = new NewNode(BitsAlias.new_alias(BitsAlias.EXTX));
+  public static final StructNode ZINT = new StructNode(0,false,null, TypeNil.EXTERNAL);
+  public static final StructNode ZFLT = new StructNode(0,false,null, TypeNil.EXTERNAL);
+  public static final StructNode ZSTR = new StructNode(0,false,null, TypeNil.EXTERNAL);
+  public static final StructNode ZMATH= new StructNode(0,false,null, TypeNil.EXTERNAL);
+  public static final NewNode PINT = new NewNode(BitsAlias.INTX);
+  public static final NewNode PFLT = new NewNode(BitsAlias.FLTX);
   public static final NewNode PSTR = new NewNode(BitsAlias.STRX);
   public static final NewNode PMATH= new NewNode(BitsAlias.new_alias(BitsAlias.EXTX));
   
@@ -196,7 +196,7 @@ public abstract class PrimNode extends Node {
       // display argument is always of the primitive type, and the other
       // arguments may vary, and the correct primitive is picked using overload
       // resolution.
-      StructNode over = new StructNode(0,false,null,Type.ALL);
+      StructNode over = new StructNode(0,false,null,TypeNil.EXTERNAL);
       int cnt=0;
       for( PrimNode prim : prims ) {
         String fld = (""+cnt++).intern();
@@ -291,7 +291,8 @@ public abstract class PrimNode extends Node {
 
   // Set escaping primitives into memory
   static TypeMem primitive_memory( Node def, TypeMem tmem ) {
-    tmem = tmem.set(BitsAlias.EXTX,TypeStruct.ISUSED);
+    TypeStruct ts = TypeStruct.make(false,TypeNil.EXTERNAL,TypeFlds.EMPTY);
+    tmem = tmem.set(BitsAlias.EXTX,ts);
     tmem = tmem.set(BitsAlias.STRX,TypeMemPtr.STRPTR._obj);
     tmem = tmem.set(PINT ._alias,TypeStruct.as_struct(ZINT ._val));
     tmem = tmem.set(PFLT ._alias,TypeStruct.as_struct(ZFLT ._val));

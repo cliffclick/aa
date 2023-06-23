@@ -538,8 +538,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       // LHS is TypeNil directly
       if( t0._type==TNIL ) return t0.nmeet(t1);
       if( t1._type==TNIL ) return t1.nmeet(t0);
-      TypeNil t2 = t0.cross_flt(t1);
-      if( t2!=null ) return t2;
       // Mis-matched TypeNil subclasses
       return t0.widen_sub().meet(t1.widen_sub());
     }

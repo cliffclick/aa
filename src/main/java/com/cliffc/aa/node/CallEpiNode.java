@@ -29,6 +29,7 @@ public final class CallEpiNode extends Node {
   public CallEpiNode( Node... nodes ) {
     super(OP_CALLEPI,nodes);
     Env.GVN.add_reduce(call());
+    Env.GVN.add_flow_defs(call()); // All call inputs liveness change
     _live=RootNode.def_mem(this);
   }
   @Override public String xstr() {// Self short name

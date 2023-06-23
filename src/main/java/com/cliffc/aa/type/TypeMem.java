@@ -276,7 +276,7 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   // Shallow meet of all possible loadable values.  Used in Node.value calls, so must be monotonic.
-  public TypeStruct ld( TypeMemPtr ptr ) {
+  public TypeStruct ld( TypeNil ptr ) {
     if( ptr._nil )
       return TypeStruct.UNUSED; // Loading from nil
     if( ptr._aliases == BitsAlias.EMPTY ) {

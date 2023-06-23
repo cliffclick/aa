@@ -101,16 +101,12 @@ public class BindFPNode extends Node {
           progress |= lam.dsp().unify(dsp().tvar(), test);
     } else if( fptv instanceof TVLambda lam ) {
       progress |= lam.dsp().unify(dsp().tvar(),test);
+    } else {
+      fptv.deps_add(this);
     }
     return progress;
   }
-  private boolean _unify(Type t, TV3 tv, boolean test ) {
-    if( t instanceof TypeFunPtr && tv instanceof TVLambda lam ) {
-      return lam.dsp().unify(dsp().tvar(),test);
-    }
-    return false;
-  }
-  
+
   // Error to double-bind
   @Override public ErrMsg err( boolean fast ) {
     if( fp()._val instanceof TypeFunPtr tfp && tfp.has_dsp() &&

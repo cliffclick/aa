@@ -19,7 +19,7 @@ I use Lists as a stand-in for any collection.  You may freely substitute Array
 or Dict.  I use leading Uppercase for Types, and lower case for variables and
 values: '`List` vs `list`; `Int` vs `int`; `Str` vs `str`.
 
-I use `<angle brackets>` for generic types: `List<Int>` vs `Ary<Str>`.
+I use `<angle brackets>` for generic types: `List<Int>` and `Ary<Str>`.
 
 There are interfaces, e.g. static structural typing (not duck typing, which is
 the weakly typed runtime-only equivalent), and there are classes with
@@ -117,9 +117,12 @@ void doObjectExtract(Extractor<Object> extract) { Object o = extractor.first(); 
 void doStringExtract(Extractor<String> extract) { String s = extractor.first(); }
 
 
-Basically, it's a 2x2 matrix with one axis being consumer vs. producer (Logger vs. Extractor) and the other being base vs. derived (Object vs. String) for the type parameter of the generic type.
+Basically, it's a 2x2 matrix with one axis being consumer vs. producer (Logger
+vs. Extractor) and the other being base vs. derived (Object vs. String) for the
+type parameter of the generic type.
 
-Now let's create an implementation class that implements the example List type, which is both a Logger and Extractor:
+Now let's create an implementation class that implements the example List type,
+which is both a Logger and Extractor:
 
 class ListImpl<T> implements List<T> {...} 
 
@@ -140,8 +143,12 @@ doObjectExtracting(objList);
 doObjectExtracting(strList);
 doStringExtracting(objList);
 doStringExtracting(strList);
+
 Cameron - Yesterday at 10:25 AM
-Let's start by eliminating the obviously correct ones, for which there is no debate, since they follow the type invariant model (which is always assumed to be correct):
+
+Let's start by eliminating the obviously correct ones, for which there is no
+debate, since they follow the type invariant model (which is always assumed to
+be correct):
 
 doObjectLogging(objList);
 doStringLogging(strList);
@@ -159,10 +166,15 @@ That leaves only three variance cases to examine in detail. Let's explain the ea
 
 doStringLogging(objList);
 
+Here we have a function that logs strings to a logger, and a logger instance
+that takes any object. A strictly type invariant language (a type system
+without allowance for type variance) would disallow this, but it seems fairly
+self-evident (and type safe) that a Logger<Object> can be used anywhere that a
+Logger<String> is called for, and List<Object> is a Logger<Object>.
 
-Here we have a function that logs strings to a logger, and a logger instance that takes any object. A strictly type invariant language (a type system without allowance for type variance) would disallow this, but it seems fairly self-evident (and type safe) that a Logger<Object> can be used anywhere that a Logger<String> is called for, and List<Object> is a Logger<Object>.
-
-Almost identical is the ability to extract "any object" from a list of strings. The same logic applies here: Since a string is an object, it makes sense (and is type safe) to be able to extract objects from a list of strings: 
+Almost identical is the ability to extract "any object" from a list of
+strings. The same logic applies here: Since a string is an object, it makes
+sense (and is type safe) to be able to extract objects from a list of strings:
 
 doObjectExtracting(strList);
 
@@ -172,16 +184,23 @@ That leaves just one problem case:
 doObjectLogging(strList);
 
 
-Common sense says that we cannot log objects to a logger that only takes strings, so at a surface level, common sense says that this type of variance should be disallowed.
+Common sense says that we cannot log objects to a logger that only takes
+strings, so at a surface level, common sense says that this type of variance
+should be disallowed.
  
-But there's a hidden gotcha in the example, and here it is: If a String is an Object, then can we also say that a List<String> is a List<Object>? And here we can see why some languages say "no!" -- because List both consumes and produces T, so a List<String> cannot be passed to a function as a List<Object> because the function may call the add method -- passing any Object and not just a String! -- on the underlying List<String>.
+But there's a hidden gotcha in the example, and here it is: If a String is an
+Object, then can we also say that a List<String> is a List<Object>? And here we
+can see why some languages say "no!" -- because List both consumes and produces
+T, so a List<String> cannot be passed to a function as a List<Object> because
+the function may call the add method -- passing any Object and not just a
+String! -- on the underlying List<String>.
 
 
 
 
 I'd suggest that there is no "figuring out" to do here. It's not a right
 vs. wrong question; rather, it is a decision made to either allow or disallow a
-certain form of type variance, based on some fundamental principles. This is,
+certain form of type variance, based on some fundamental principles.  This is,
 for example, the difference between Java arrays (a String[] "is a" Object[])
 and Java collections (a List<String> is not a List<Object>) We call this "the
 fourth quadrant problem". Here's an early design note on the topic:
@@ -204,5 +223,13 @@ Tying the numbers from the numbered quadrants to our example:
 If number 3 is disallowed, then List<String> is not and cannot be a List<Object>.
 
 If number 3 is allowed, then List<String> can be a List<Object>.
-For the record, we were determined to make number 3 work, yet still with as much compile-time type safely and as few explicit casts as possible. And at this point, I think I can say that we achieved that.
-(What I'm writing up here is the distillation of four different engineers working on this one problem for hundreds of -- and maybe even a thousand -- hours, so don't be surprised if it feels overwhelmingly complex. Among other things, I'm writing it down here and trying to explain it in a followable sequence as another way of trying to re-digest it myself.)
+
+For the record, we were determined to make number 3 work, yet still with as
+much compile-time type safely and as few explicit casts as possible. And at
+this point, I think I can say that we achieved that.
+
+(What I'm writing up here is the distillation of four different engineers
+working on this one problem for hundreds of -- and maybe even a thousand --
+hours, so don't be surprised if it feels overwhelmingly complex. Among other
+things, I'm writing it down here and trying to explain it in a followable
+sequence as another way of trying to re-digest it myself.)

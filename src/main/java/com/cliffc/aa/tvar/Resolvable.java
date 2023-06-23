@@ -30,7 +30,7 @@ public interface Resolvable {
   // "Pattern leafs" are just any TV3 that, if it changes might effect the match outcome.
   Ary<TVExpanding> PAT_LEAFS = new Ary<>(new TVExpanding[1],0);
   
-  default boolean trial_resolve( boolean outie, TV3 pattern, TVStruct lhs, TVStruct rhs, boolean test ) {
+  default boolean trial_resolve( boolean outie, TV3 pattern, TVStruct rhs, boolean test ) {
     assert !rhs.is_open() && is_resolving();
 
     // Not yet resolved.  See if there is exactly 1 choice.
@@ -61,15 +61,15 @@ public interface Resolvable {
     if( test ) return true;     // Will be progress to resolve
 
     String old_fld = resolve(lab);      // Change field label
-    boolean old = lhs.del_fld(old_fld); // Remove old label from lhs, if any
-    TV3 prior = lhs.arg(lab);           // Get prior matching lhs label, if any
+    boolean old = rhs.del_fld(old_fld); // Remove old label from rhs, if any
+    TV3 prior = rhs.arg(lab);           // Get prior matching rhs label, if any
     if( prior==null ) {
       assert old;               // Expect an unresolved label
-      //lhs.add_fld(lab,pattern); // Add label and pattern, basically replace unresolved old_fld with lab
+      //rhs.add_fld(lab,pattern); // Add label and pattern, basically replace unresolved old_fld with lab
       throw unimpl(); // todo needs pinned
     } else {
-      if( outie ) prior. unify(pattern,test); // Merge pattern and prior label in LHS
-      else        prior._unify(pattern,test); // Merge pattern and prior label in LHS
+      if( outie ) prior. unify(pattern,test); // Merge pattern and prior label in RHS
+      else        prior._unify(pattern,test); // Merge pattern and prior label in RHS
     }
     return true;              // Progress
   }

@@ -282,19 +282,6 @@ public class CallNode extends Node {
     }
     return null;
   }
-
-  // During parse a Call will have no uses, no keep and no CEPI - because these
-  // are all being constructed; this Call is still alive.  After Combo, a dying
-  // Call might also have no CEPI (with or without uses).
-  private boolean dying(Node def) {
-    if( in(0)==Env.XCTRL ) return true;
-    in(0).deps_add(this);
-    if( def!=null ) in(0).deps_add(def);
-    CallEpiNode cepi = cepi();
-    if( cepi!=null ) { cepi.deps_add(def) ; return false; }
-    if( _uses.find(GVNGCM.KEEP_ALIVE)!=-1 ) return false;
-    return Combo.post() || _uses._len>0; // Was wired once, so dying
-  }
   
   // Pass thru all inputs directly - just a direct gather/scatter.  The gather
   // enforces SESE which in turn allows more precise memory and aliasing.  The
@@ -308,7 +295,7 @@ public class CallNode extends Node {
     // Lift to ANY and let DCE remove final uses.  Complex test is to avoid
     // killing a Call under construction during Parse: will have no uses, no
     // Keep and no cepi (for a tiny short time).
-    if( dying(this) ) return Type.ANY;
+    if( val(0)==Type.XCTRL || val(0)==Type.ANY ) return Type.ANY;
 
     // Result type includes a type-per-input, plus one for the function
     final Type[] ts = Types.get(_defs._len);
@@ -341,14 +328,6 @@ public class CallNode extends Node {
 
     return TypeTuple.make(ts);
   }
-
-  @Override public Type live() {
-    if( _is_copy ) return _live;
-    CallEpiNode cepi = cepi();
-    if( cepi==null )  return dying(null) ? Type.ANY : RootNode.def_mem(null);
-    if( cepi._live==Type.ANY ) return Type.ANY;
-    return super.live();                        // Ok, take liveness from all users
-  }
   
   static final Type FP_LIVE = TypeStruct.UNUSED.add_fldx(TypeFld.make("fp",Type.ALL));
   @Override public Type live_use( int i ) {
@@ -380,8 +359,13 @@ public class CallNode extends Node {
     // Check that all fidxs are wired.  If not wired, a future wired fidx might
     // use the call input.  Post-Combo, all is wired, but dead Calls might be
     // unwinding.
-    if( dying(def) ) return Type.ANY;
-    if( Combo.pre() && _uses.len()==1 ) return Type.ALL; // Not wired, assume the worst user
+    if( val(0)==Type.XCTRL ) return Type.ANY;
+    CallEpiNode cepi = cepi();
+    if( cepi==null ) {
+      deps_add(def);
+      return Type.ALL.oob(Combo.post());
+    }
+    if( !cepi.is_CG(true) ) return Type.ALL; // Not fully wired, assume the worse user yet to come
 
     // Since wired, we can check all uses to see if this argument is alive.
     Type t = Type.ANY;

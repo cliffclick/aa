@@ -27,15 +27,13 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_GCP=true;
-    DO_HMT=false;
+    DO_GCP=false;
+    DO_HMT=true;
     RSEED=0;
-    testerr("\"abc\":int", "*str:(97) is not a int64",5);
-
-    DO_GCP=true;
-    DO_HMT=false;
-    RSEED=0;
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(2),fact(2.2))","*[15](nil,1,2)","*[15](int64,int64,int64)", null, null, "[15]", null);
+    test("{ x -> x+1 }","[55]{any,4 -> %[2][2,55]? }",
+            "{A *[]@{_+_=@{...};...} -> B }", // Something with an '+' operator
+            null, null, null,"[55]");
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(2),fact(2.2))","*[14](nil,1,2)","*[14](int64,int64,int64)", null, null, "[14]", null);
   }
   
   static private void assertTrue(boolean t) {
@@ -65,12 +63,12 @@ public class TestParse {
     // Simple no-arg anonymous function, being called
     test("{5}()", "5", "5");
     // TestHM.a_basic_01
-    test("{ x -> ( 3, x )}", "[55]{any,4 -> *[13](3, %[2,13][2,55]?) }", "{ A B -> *[13](3, B) }", null, null, "[13]", "[55]");
+    test("{ x -> ( 3, x )}", "[55]{any,4 -> *[12](3, %[2,12][2,55]?) }", "{ A B -> *[12](3, B) }", null, null, "[12]", "[55]");
     // TestHM.a_basic_02
-    test("{ z -> ((z 0), (z \"abc\")) }", "[55]{any,4 -> *[14](%[2,13,14][2,55]?, %[2,13,14][2,55]?) }",
-         "{A {B *[13]str:(97)? -> C } -> *[14](C,C) }",
+    test("{ z -> ((z 0), (z \"abc\")) }", "[55]{any,4 -> *[13](%[2,12,13][2,55]?, %[2,12,13][2,55]?) }",
+         "{A {B *[12]str:(97)? -> C } -> *[13](C,C) }",
          null, null,
-         "[13,14]", "[55]" );
+         "[12,13]", "[55]" );
 
    
     // TestHM.a_basic_05
@@ -78,21 +76,21 @@ public class TestParse {
     // 'g' is not-fresh in function 'f'.
     // 'f' IS fresh in the body of 'g' pair.
     test("{ g -> f = { ignore -> g }; (f 3, f \"abc\")}",
-         "[55]{any,4 -> *[15](%[2,15][2,55]?, %[2,15][2,55]?) }",
-         "{ A B -> *[15]( B, B) }",
-         null,null,"[15]","[55]");
+         "[55]{any,4 -> *[14](%[2,14][2,55]?, %[2,14][2,55]?) }",
+         "{ A B -> *[14]( B, B) }",
+         null,null,"[14]","[55]");
 
     // TestParse.g_overload_err_00
-    testerr("( { x -> x*2 }, { x -> x*3 })._ 4", "Ambiguous, matching choices { A 4 -> B } vs({ C:*[11]@{} *[]@{_*_= @{ ...};  ...} -> D }, { C *[]@{_*_= @{ ...};  ...} -> E })",30);
+    testerr("( { x -> x*2 }, { x -> x*3 })._ 4", "Ambiguous, matching choices { A 4 -> B } vs({ C:*[10]@{} D -> E }, { C F -> G })",30);
 
     // Variations on a simple wrapped add.  Requires full annotations to type -
     // because in fact it is all ambiguous and cannot be typed without seeing all
     // the usages.
-    test("{ x -> x+1 }","[55]{any,4 -> any}",
+    test("{ x -> x+1 }","[55]{any,4 -> %[2][2,55]? }",
          "{A *[]@{_+_=@{...};...} -> B }", // Something with an '+' operator
          null, null, null,"[55]");
     
-    test("{ x -> 1+x }","[55]{any,4 -> %[][]?}",
+    test("{ x -> 1+x }","[55]{any,4 -> %[4,5][]?}",
          "{A B -> C }", // Something that 1+ works on
          null, null, null,"[55]");
     
@@ -128,11 +126,11 @@ public class TestParse {
     // TestHM.b_recursive_02.  The expression "x-1" cannot resolve the operator
     // "_-_" because "x" is a free variable.  It binds in its one use.    
     test("fun = { fx x -> x ? fx( fun(fx,x-1) ) : 1 }; fun(2._*_._, 99)",
-            "int64",
-            "int64");
+            "1",
+            "1");
 
     // Build a cyclic type using a function
-    test("a = (1,b(1));  b = { x -> (1,a) }; b(1);", "PA:*[14](FA:0=1, *[12](FA, 1=PA))","A:*[14](1,*[12](1,A)?)", null, null, "[12,14]", null);
+    test("a = (1,b(1));  b = { x -> (1,a) }; b(1);", "PA:*[13](FA:0=1, *[11](FA, 1=PA))","A:*[13](1,*[11](1,A)?)", null, null, "[11,13]", null);
   }
 
   @Test public void testParse00() {
@@ -251,9 +249,9 @@ public class TestParse {
     test("0 && 1 || 2 && 3", "3","3");    // Precedence
 
     test("x:=y:=0; z=x++ && y++;(x,y,z)", // increments x, but it starts zero, so y never increments
-         "*[13](1, nil,nil)","*[13](int64,A?,B?)",null,null,"[13]",null);
+         "*[12](1, nil,nil)","*[12](int64,A?,B?)",null,null,"[12]",null);
     test("x:=y:=0; x++ && y++; z=x++ && y++; (x,y,z)", // x++; x++; y++; (2,1,0)
-            "*[14](2, 1, nil)","*[14](int64,int64,int64)", null, null, "[14]", null);
+            "*[13](2, 1, nil)","*[13](int64,int64,int64)", null, null, "[13]", null);
     test("(x=1) && x+2", "3", "3"); // Def x in 1st position
 
     testerr("1 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x maybe alive
@@ -287,8 +285,8 @@ public class TestParse {
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
     // Note that passing in a nil here produces a very interesting type:
     // any class which has the right unbound operators.  IMHO, the opers should bind.
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(1),fact(2),fact(3))","*[15](1,2,6)","*[15](int64,int64,int64)", null, null, "[15]", null);
-    //test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(1),fact(2.5),fact(0))","*[15](1,2,6)","*[15](int64,int64,int64)", null, null, "[15]", null);
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(1),fact(2),fact(3))","*[14](1,2,6)","*[14](int64,int64,int64)", null, null, "[14]", null);
+    //test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(1),fact(2.5),fact(0))","*[14](1,2,6)","*[14](int64,int64,int64)", null, null, "[14]", null);
 
     // Co-recursion requires parallel assignment & type inference across a lexical scope
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", "int1", "int1" );
@@ -326,7 +324,7 @@ public class TestParse {
     testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",36);
     // Test that the type-check is on the variable and not the function.
     test   ("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x;y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
-            "*[14](4,4)", "*[14](int64,int64)", null, null, "[14]", null);
+            "*[13](4,4)", "*[13](int64,int64)", null, null, "[13]", null);
     testerr("fun={x y -> x+y}; baz:{int @{x;y} -> int} = fun; (fun(2,3), baz(2,3))",
             "3 is not a *@{x:=Scalar; y:=Scalar; ...}", 66);
     testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> foo(x,y)}; (fun(2,3), baz(2,3))",

@@ -12,12 +12,25 @@ public class TypeFlt extends TypeNil<TypeFlt> {
   // _any dictates high or low
   public  byte _z;        // bitsiZe, one of: 32,64
   private double _con;      // constant
-  private TypeFlt init(boolean any, boolean nil, boolean sub, int z, double con ) {
-    super.init(any,nil,sub,BitsAlias.EMPTY,BitsFun.EMPTY);
+  private TypeFlt init(boolean any, boolean nil, boolean sub, int z, double con, BitsAlias aliases ) {
+    super.init(any,nil,sub,aliases,BitsFun.EMPTY);
     _z=(byte)z;
     _con = con;
     return this;
   }
+  
+  @Override TypeFlt chk() {
+    assert _z!=0 || !_any; // Constants are centerline, ignore "any", so "all" is canonical
+    assert _aliases.test_recur(BitsAlias.FLTX);
+    assert _fidxs==BitsFun.EMPTY;
+    return super.chk();
+  }
+
+  static BitsAlias bits(boolean any) {
+    return any ? BitsAlias.FLT.dual() : BitsAlias.FLT;
+  }
+  @Override boolean has_alias(BitsAlias aliases) { return aliases.test_recur(BitsAlias.FLTX); }
+  
   @Override protected TypeFlt copy() {
     TypeFlt tf = super.copy();
     tf._z = _z;
@@ -49,14 +62,16 @@ public class TypeFlt extends TypeNil<TypeFlt> {
   }
   static { new Pool(TFLT,new TypeFlt()); }
   public static TypeFlt make( boolean any, boolean nil, boolean sub, int z, double con ) {
+    return make(any,nil,sub,z,con,bits(any));
+  }
+  public static TypeFlt make( boolean any, boolean nil, boolean sub, int z, double con, BitsAlias aliases ) {
     TypeFlt t1 = POOLS[TFLT].malloc();
-    return t1.init(any,nil,sub,z,con).canonicalize().hashcons_free();
+    return t1.init(any,nil,sub,z,con,aliases).canonicalize().chk().hashcons_free();
   }
   @Override TypeFlt canonicalize() {
     if( _con!=0 ) {
       assert !_any && !_nil;
       if( !_sub ) { _z=(byte)log(_con); _con=0; } // constant plus zero is no longer a constant
-      else { _z=0; }
     }
     return this;
   }
@@ -68,7 +83,6 @@ public class TypeFlt extends TypeNil<TypeFlt> {
   public static final TypeFlt FLT32 = make(false,false,false,32,0);
   public static final TypeFlt NFLT64= make(false,false,true ,64,0);
   public static final TypeFlt NFLT32= make(false,false,true ,32,0);
-  public static final TypeFlt ZERO  = con(0.0);
   public static final TypeFlt PI    = con(Math.PI);
   public static final TypeFlt HALF  = con(0.5);
   public static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,PI,FLT32,NFLT32,HALF};
@@ -101,7 +115,7 @@ public class TypeFlt extends TypeNil<TypeFlt> {
       // Both are high, not constants.  Narrow size.
       rez._z = (byte)Math.min(_z,ti._z);
     }
-    return rez.hashcons_free();
+    return rez.chk().hashcons_free();
   }
   static int log( double con ) { return ((double)(float)con)==con ? 32 : 64; }
 
@@ -109,8 +123,9 @@ public class TypeFlt extends TypeNil<TypeFlt> {
     if( !_nil && _sub ) return NFLT64;
     return FLT64;
   }
-  @Override TypeNil cross_flt(TypeNil i) {
-    return  i instanceof TypeInt ii ? ii.cross_flt(this) : null;
+  @Override TypeNil widen_sub() {
+    BitsAlias aliases = _aliases.above_center() ? _aliases.dual() : _aliases;
+    return make(false,_nil,_sub,aliases,_fidxs);
   }
   @Override public boolean is_con() { return _z==0; }
 }

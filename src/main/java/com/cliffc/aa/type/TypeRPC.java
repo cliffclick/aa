@@ -10,9 +10,14 @@ public class TypeRPC extends TypeNil<TypeRPC> {
 
   private TypeRPC init( boolean any, boolean nil, boolean sub, BitsRPC rpcs ) {
     super.init(any,nil,sub, BitsAlias.EMPTY, BitsFun.EMPTY);
-    assert _any==rpcs.above_center() || rpcs==BitsRPC.EMPTY;
     _rpcs = rpcs;
     return this;
+  }
+  
+  @Override TypeRPC chk() {
+    assert _aliases==BitsAlias.EMPTY && _fidxs==BitsFun.EMPTY;
+    assert _any==_rpcs.above_center() || _rpcs==BitsRPC.EMPTY;
+    return super.chk();
   }
 
   @Override protected TypeRPC copy() {
@@ -39,7 +44,7 @@ public class TypeRPC extends TypeNil<TypeRPC> {
     P.require('#');
     var rpcs = P.bits(BitsRPC.EMPTY);
     assert any==rpcs.above_center() || rpcs.is_empty();
-    TypeRPC rpc = malloc(any, rpcs.test(0),true, rpcs.clear(0)).val_nil(P).hashcons_free();
+    TypeRPC rpc = malloc(any, rpcs.test(0),true, rpcs.clear(0)).val_nil(P).chk().hashcons_free();
     if( cid!=null ) P._dups.put(cid,rpc);
     return rpc;
   }
@@ -48,7 +53,7 @@ public class TypeRPC extends TypeNil<TypeRPC> {
   public static TypeRPC malloc( boolean any, boolean nil, boolean sub, BitsRPC rpcs ) {
     return POOLS[TRPC].<TypeRPC>malloc().init(any,nil,sub,rpcs);
   }
-  public static TypeRPC make( boolean any, boolean nil, boolean sub, BitsRPC rpcs ) { return malloc(any,nil,sub,rpcs).hashcons_free(); }
+  public static TypeRPC make( boolean any, boolean nil, boolean sub, BitsRPC rpcs ) { return malloc(any,nil,sub,rpcs).chk().hashcons_free(); }
 
   public static TypeRPC make( int rpc ) { return make(false,false,true,BitsRPC.make0(rpc)); }
   public static final TypeRPC ALL_CALL = make(false,false,true,BitsRPC.NALL);
@@ -65,7 +70,7 @@ public class TypeRPC extends TypeNil<TypeRPC> {
     TypeRPC rpc = (TypeRPC)t;
     TypeRPC rez = ymeet(rpc);
     rez._rpcs = _rpcs.meet( rpc._rpcs );
-    return rez.hashcons_free();
+    return rez.chk().hashcons_free();
   }
 
   public int rpc() { return _rpcs.getbit(); }

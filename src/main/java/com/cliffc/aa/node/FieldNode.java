@@ -66,7 +66,7 @@ public class FieldNode extends Node implements Resolvable {
       boolean lo = _tvar==null || Combo.HM_AMBI;
       if( t instanceof TypeStruct ts )
         return lo ? meet(ts) : join(ts);
-      return oob_ret(t);
+      return TypeNil.EXTERNAL;
     }
 
     // Field from Base looks in the base CLZ.
@@ -76,10 +76,7 @@ public class FieldNode extends Node implements Resolvable {
       StructNode clazz = clz_node(t);
       if( clazz ==null ) return oob_ret(t);
       tstr = clazz._val;        // Value from clazz
-      // Add a dep edge to the clazz, so value changes propagate permanently
       // TODO: Busted when mixing compatible classes, e.g. generic factorial with ints & flts.
-      if( len()==2 ) assert in(1)==clazz;
-      else add_def(clazz);
     }
     // Hit on a field
     if( tstr instanceof TypeStruct ts ) {
@@ -89,8 +86,9 @@ public class FieldNode extends Node implements Resolvable {
       }
       // Miss on closed structs looks at superclass.
       // Miss on open structs dunno if the field will yet appear
-      if( ts._def==TypeStruct.ISUSED && Util.eq(ts.fld(0)._fld,".") )
-        throw unimpl();        
+      if( ts.len()>=1 &&  Util.eq(ts.fld(0)._fld,".") )
+        throw unimpl();
+      return _str ? ts._def : ts.oob(Type.ALL);
     }
     return oob_ret(tstr);
   }
@@ -229,7 +227,7 @@ public class FieldNode extends Node implements Resolvable {
     return tvar().unify(fld,test);
   }
   private boolean do_resolve( TVStruct tstr, boolean test ) {
-    if( Combo.HM_AMBI ) return false; // Failed earlier, can never resolve
+    //if( Combo.HM_AMBI ) return false; // Failed earlier, can never resolve
     boolean progress = try_resolve(tstr,test);
     if( is_resolving() || test ) return progress; // Failed to resolve, or resolved but testing
     // Known to be resolved and in RHS
@@ -263,7 +261,7 @@ public class FieldNode extends Node implements Resolvable {
       str.deps_add(this);
       return false;
     }
-    if( trial_resolve(true, tvar(), str, str, test) )
+    if( trial_resolve(true, tvar(), str, test) )
       return true;              // Resolve succeeded!
     // No progress, try again if self changes
     if( !test ) tvar().deps_add_deep(this);
@@ -326,9 +324,10 @@ public class FieldNode extends Node implements Resolvable {
   
   public boolean resolve_ambiguous_msg() {
     TV3 pattern = tvar();
-    TVStruct ts = tvar(0).as_struct();
+    TV3 tv0 = tvar(0);
+    TVStruct ts = tv0.as_struct();
     boolean progress = ts.del_fld(_fld); // Do not push pinned uphill
-    return ts.unify_err("Ambiguous, matching choices % vs",pattern,_bad,false) | progress;
+    return tv0.unify_err("Ambiguous, matching choices % vs",pattern,_bad,false) | progress;
   }
   
   // True if ambiguous (more than one match), false if no matches.

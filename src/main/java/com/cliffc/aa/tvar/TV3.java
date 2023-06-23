@@ -536,10 +536,8 @@ abstract public class TV3 implements Cloneable {
   // -----------------
   public static TV3 from_flow(Type t) {
     return switch( t ) {
-    case TypeFunPtr tfp -> {
-      if( !tfp.is_full() ) throw unimpl(); //return new TVLeaf(); // TODO
-      yield new TVLeaf(); // Generic Function Ptr
-    }
+    case TypeFunPtr tfp ->  tfp.is_full() ? new TVLeaf() // Generic Function Ptr
+      : new TVLambda(tfp.nargs(),from_flow(tfp.dsp()),from_flow(tfp._ret));
     case TypeMemPtr tmp -> new TVPtr(tmp._aliases,(TVStruct)from_flow(tmp._obj));
     case TypeStruct ts -> {
       // need to handle CLZ in slot 0

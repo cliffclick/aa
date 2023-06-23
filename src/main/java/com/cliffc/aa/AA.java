@@ -61,7 +61,7 @@ public abstract class AA {
   private static int ASSERT_CNT;
   public static boolean once_per() { return once_per(8); }
   public static boolean once_per(int log) {
-    return (ASSERT_CNT++ & ((1L<<(log-1))-1))!=0;
+    return (ASSERT_CNT++ & ((1L<<log)-1))!=0;
   }
   static void reset() { ASSERT_CNT=0; }
 }

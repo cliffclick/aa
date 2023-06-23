@@ -200,17 +200,17 @@ public class FunNode extends Node {
   }
 
   @Override public Type live_use( int i ) {
-    if( in(0)==this ) return _live; // Dead self-copy
     Node def = in(i);
     if( def instanceof RootNode ) throw unimpl();
     if( def instanceof ConNode ) return Type.ANY; // Dead control path
-    assert def.is_CFG();
+    if( def==this ) return Type.ANY; // Dead self-copy
+    assert def instanceof CallNode;
     ParmNode pmem = parm(MEM_IDX);
     if( pmem==null ) return TypeMem.ANYMEM; // No mem parm, so pure function
     pmem.deps_add(def);
     if( !(pmem._live instanceof TypeMem mem) ) return Type.ANY;
-    TypeMem mem2 = mem.remove(RootNode.KILL_ALIASES);
-    return mem2;                // Pass through mem liveness
+    // Pass through mem liveness
+    return mem.remove(RootNode.KILL_ALIASES);
   }
 
   // ----

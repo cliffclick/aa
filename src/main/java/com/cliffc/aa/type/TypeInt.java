@@ -12,13 +12,25 @@ public class TypeInt extends TypeNil<TypeInt> {
   // _any dictates high or low
   public  byte _z;        // bitsiZe, one of: 1,8,16,32,64
   private long _con;      // constant
-  private TypeInt init(boolean any, boolean nil, boolean sub, int z, long con ) {
-    super.init(any,nil,sub,BitsAlias.EMPTY,BitsFun.EMPTY);
+  private TypeInt init(boolean any, boolean nil, boolean sub, int z, long con, BitsAlias aliases ) {
+    super.init(any,nil,sub,aliases,BitsFun.EMPTY);
     _z=(byte)z;
     _con = con;
     return this;
   }
 
+  @Override TypeInt chk() {
+    assert _z!=0 || !_any; // Constants are centerline, ignore "any", so "all" is canonical
+    assert _aliases.test_recur(BitsAlias.INTX);
+    assert _fidxs==BitsFun.EMPTY;
+    return super.chk();
+  }
+
+  static BitsAlias bits(boolean any) {
+    return any ? BitsAlias.INT.dual() : BitsAlias.INT;
+  }
+  @Override boolean has_alias(BitsAlias aliases) { return aliases.test_recur(BitsAlias.INTX); }
+  
   @Override protected TypeInt copy() {
     TypeInt ti = super.copy();
     ti._z = _z;
@@ -53,8 +65,11 @@ public class TypeInt extends TypeNil<TypeInt> {
   }
   static { new Pool(TINT,new TypeInt()); }
   public static TypeInt make( boolean any, boolean nil, boolean sub, int z, long con ) {
+    return make(any,nil,sub,z,con,bits(any));
+  }
+  public static TypeInt make( boolean any, boolean nil, boolean sub, int z, long con, BitsAlias aliases ) {
     TypeInt t1 = POOLS[TINT].malloc();
-    return t1.init(any,nil,sub,z,con).canonicalize().hashcons_free();
+    return t1.init(any,nil,sub,z,con,aliases).canonicalize().chk().hashcons_free();
   }
   @Override TypeInt canonicalize() {
     if( _con!=0 ) {
@@ -113,7 +128,7 @@ public class TypeInt extends TypeNil<TypeInt> {
       // Both are high, not constants.  Narrow size.
       rez._z = (byte)Math.min(_z,ti._z);
     }
-    return rez.hashcons_free();
+    return rez.chk().hashcons_free();
   }
 
   private static int log( long con ) {
@@ -125,18 +140,10 @@ public class TypeInt extends TypeNil<TypeInt> {
   }
 
   @Override public TypeInt widen() { return INT64; }
-  
-  @Override TypeNil cross_flt(TypeNil f) {
-    if( !(f instanceof TypeFlt flt) ) return null;
-    // If the float is high, inject it into the next smaller high int  .
-    // If the int   is high, inject it into the smallest     low float.
-    // If the int   is low , inject it into the next larger  low  float.
-    if( flt._any )  return TypeInt.make(flt._any,flt._nil,flt._sub,flt._z>>1,0).xmeet(this);
-    int z = _z==0 ? log(_con) : _z;
-    if( !_any && z==64 ) return null;    
-    return TypeFlt.make(false,_nil,_sub,_any || z<32 ? 32 : 64,_con).xmeet(flt);
+  @Override TypeNil widen_sub() {
+    BitsAlias aliases = _aliases.above_center() ? _aliases.dual() : _aliases;
+    return make(false,_nil,_sub,aliases,_fidxs);
   }
-
   
   @Override public boolean is_con()  { return _z==0; }
   public TypeInt minsize(TypeInt ti) {

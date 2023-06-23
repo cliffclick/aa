@@ -27,6 +27,7 @@ public class BitsAlias extends Bits<BitsAlias> {
   public static final int LOCX = new_alias(ALLX); // Internal aliases
   public static final int INTX = new_alias(EXTX); // Integer-clazz alias
   public static final int FLTX = new_alias(EXTX); // Float-clazz alias
+  public static final int RPCX = new_alias(EXTX); // RPC-clazz alias
   public static final int STRX = new_alias(EXTX); // String alias
   // The All-Memory alias class
   public  static final BitsAlias NALL = new BitsAlias().make_impl(ALLX,null); // All aliases, no nil
@@ -38,6 +39,7 @@ public class BitsAlias extends Bits<BitsAlias> {
   public static final BitsAlias LOC = make0(LOCX);
   public static final BitsAlias INT = make0(INTX);
   public static final BitsAlias FLT = make0(FLTX);
+  public static final BitsAlias RPC = make0(RPCX);
   public static final BitsAlias STR = make0(STRX);
 
   public static final BitsAlias EMPTY = new BitsAlias().make(); // No bits; its its own dual

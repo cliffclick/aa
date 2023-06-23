@@ -20,17 +20,20 @@ public class LoadNode extends Node {
   Node mem() { return in(MEM_IDX); }
   Node adr() { return in(DSP_IDX); }
   private Node set_mem(Node a) { return set_def(MEM_IDX,a); }
-  //public TypeFld find(TypeStruct ts) { return ts.get(_fld); }
 
   @Override public Type value() {
     Type tadr = adr()._val;
-    Type tmem = mem()._val;       // Memory
-    return switch(tadr ) {
-    case TypeMemPtr tmp ->    // Loading from a pointer
-      tmem instanceof TypeMem tm ? tm.ld(tmp) : tmem.oob();
-    case TypeNil tn -> tn;      // Load from prototype/primitive is a no-op
-    default -> tadr.oob();      // Nothing sane
-    };
+    Type tmem = mem()._val;
+    if( (tadr instanceof TypeStruct ts) )
+      return ts;                // Happens if user directly calls an oper
+    if( !(tadr instanceof TypeNil ta) )
+      return tadr.oob(TypeStruct.ISUSED); // Not a address
+    if( !(tmem instanceof TypeMem tm) )
+      return tmem.oob(TypeStruct.ISUSED); // Not a memory
+    if( ta==TypeNil.NIL || ta==TypeNil.XNIL )
+      ta = (TypeNil)ta.meet(PrimNode.PINT._val);
+
+    return tm.ld(ta);
   }
 
   // The only memory required here is what is needed to support the Load.
@@ -75,16 +78,11 @@ public class LoadNode extends Node {
     // We allow Loads against structs to allow for nested (inlined) structs.
     //if( tadr instanceof TypeStruct ) return adr();
     
-    // We allow Loads against unwrapped primitives, as part of the normal Oper
-    // expansion in the Parser.  These are no-ops.
-    if( tadr instanceof TypeInt ) return adr;
-    if( tadr instanceof TypeFlt ) return adr;
-    if( tadr instanceof TypeStruct ) return adr; // Overload struct
     // Dunno about other things than pointers
-    if( !(tadr instanceof TypeMemPtr tmp) ) return null;
+    if( !(tadr instanceof TypeNil tn) ) return null;
     if( adr instanceof FreshNode frsh ) adr = frsh.id();
     // If we can find an exact previous store, fold immediately to the value.
-    Node ps = find_previous_struct(this, mem(),adr,tmp._aliases);
+    Node ps = find_previous_struct(this, mem(),adr,tn._aliases);
     if( ps instanceof StoreNode st ) {
       Node rez = st.rez();
       if( rez==null ) return null;
@@ -249,15 +247,32 @@ public class LoadNode extends Node {
   }
   
   @Override public boolean has_tvar() { return true; }
-  @Override public TV3 _set_tvar() {
-    // Self is just an open struct
-    TVStruct self = new TVStruct(true);
-    _tvar = self;               // Stop cycles
-    TV3 adr = adr().set_tvar();
-    if( adr instanceof TVPtr ptr ) ptr.load().unify(self,false);
-    else adr.unify(new TVPtr(BitsAlias.EMPTY,self),false);
-    return (_tvar=self.find());
+  @Override public TV3 _set_tvar() { return new TVStruct(true); }
+
+  // All field loads might actually be against a pointer OR a plain struct.  So
+  // we have to stall until the input decides it is either a ptr or struct.  This
+  // is because fields can themselves hold embedded structs, and do so for the
+  // primitives in general.  The parser cannot tell the difference from a
+  // load-from-ptr-then-field-extract vs just the field-extract part.
+  @Override public boolean unify( boolean test ) {
+    TV3 self = tvar();
+    TV3 tadr = adr().tvar();
+    if( tadr instanceof TVLeaf ) {
+      tadr.deps_add(this);
+      return false;           // Stall until not a leaf
+    }
+    // Check for being a ptr
+    TVPtr ptr = null;
+    if( tadr instanceof TVErr err ) ptr = err.as_ptr();
+    if( tadr instanceof TVPtr ptr0) ptr = ptr0;
+    if( ptr!=null ) return ptr.load().unify(self,false);
+    // Check for being a struct
+    TVStruct ts = null;
+    if( tadr instanceof TVErr err   ) ts = err.as_struct();
+    if( tadr instanceof TVStruct ts0) ts = ts0;
+    if( ts!=null ) return ts.unify(self,false);
+    // Some kind of error now
+    return tadr.unify(new TVPtr(BitsAlias.EMPTY,self.as_struct()),false);
   }
 
-  @Override public boolean unify( boolean test ) { return false; }  
 }

@@ -74,7 +74,10 @@ public class TVStruct extends TVExpanding {
   @Override boolean can_progress() { throw unimpl(); }
 
   // Common accessor not called 'find' which already exists
-  public int idx( String fld ) { return Util.find(_flds,fld); }
+  public int idx( String fld ) {
+    for( int i=0; i<_max; i++ ) if( _flds[i]==fld ) return i;
+    return -1;
+  }
   
   public boolean add_fld(String fld, TV3 tvf, boolean pin) {
     if( _max == _flds.length ) {
@@ -301,7 +304,7 @@ public class TVStruct extends TVExpanding {
       // Field is still resolving?
       if( res.is_resolving() ) {
         if( !t.is_open() && // More fields possible, so trial_resolve cannot be tried
-            res.trial_resolve(outie,t.arg(i),t,t, false) ) { // Attempt resolve
+            res.trial_resolve(outie,t.arg(i),t, false) ) { // Attempt resolve
           progress = true;
           t = t.find().as_struct();
           i--;                  // Rerun after removing resolved field

@@ -42,6 +42,12 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     return (N)this;
   }
 
+  N chk() {
+    // Invariant: above/below match on aliases, except for EMPTY (so we both a hi and lo empty)
+    //assert _aliases.above_center()==_any || _aliases==BitsAlias.EMPTY ;
+    return (N)this;
+  }
+  
   static BitsAlias balias(boolean any) { return any ? BitsAlias.NANY : BitsAlias.NALL; }
   static BitsFun   bfun  (boolean any) { return any ? BitsFun  .NANY : BitsFun  .NALL; }
   
@@ -133,7 +139,7 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     P.require('%');
     var aliases = P.bits(BitsAlias.EMPTY);
     var fidxs   = P.bits(BitsFun  .EMPTY);
-    TypeNil tn = (TypeNil)malloc(any,false,true,aliases,fidxs).val_nil(P).hashcons_free();
+    TypeNil tn = (TypeNil)malloc(any,false,true,aliases,fidxs).val_nil(P).chk().hashcons_free();
     if( cid!=null ) P._dups.put(cid,tn);
     return tn;
   }
@@ -146,11 +152,11 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     return tn.init(any, nil, sub, aliases, fidxs);
   }
   public static TypeNil make( boolean any, boolean nil, boolean sub, BitsAlias aliases, BitsFun fidxs ) {
-    return (TypeNil)malloc(any, nil, sub, aliases, fidxs).hashcons_free();
+    return (TypeNil)malloc(any, nil, sub, aliases, fidxs).chk().hashcons_free();
   }
   static TypeNil make( boolean any, boolean nil, boolean sub ) {
     TypeNil tn = POOLS[TNIL].malloc();
-    return (TypeNil)tn.init(any, nil, sub).hashcons_free();
+    return (TypeNil)tn.init(any, nil, sub).chk().hashcons_free();
   }
   
   // Plain TypeNil (no subclass) has 8 possibilities:
@@ -196,7 +202,7 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     if( rez.nil_ish() &&
         (tn.xnil_ish() || xnil_ish()) )
        rez._nil=false;
-    return (TypeNil)rez.hashcons_free();
+    return (TypeNil)rez.chk().hashcons_free();
   }
   final boolean xnil_ish() { return  _any && yes_ish(); }
   final boolean  nil_ish() { return !_any && yes_ish(); }
@@ -217,22 +223,21 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   // LHS is TypeNil directly; RHS is a TypeNil subclass.
   final TypeNil nmeet(TypeNil tsub) {
     assert _type==TNIL && tsub._type!=TNIL;
-    if( !_any ) {               // Falling past 'tsub' to a low TypeNil
+    if( !_any || !tsub.has_alias(_aliases) ) {
       TypeNil tn = tsub.widen_sub();
       return tn==this ? this : xmeet(tn);
     }
     // Keep subclass structure.  
     TypeNil rez = tsub.ymeet(this);
     rez._nil &= _sub & tsub._sub; // Disallow the xnil->nil edge
-    return (TypeNil)rez.canonicalize().hashcons_free();
+    return (TypeNil)rez.canonicalize().chk().hashcons_free();
   }
+  boolean has_alias(BitsAlias alias) { return true; }
 
   N canonicalize() { return (N)this; }
 
   // Widen subtype to a TypeNil, losing its sub structure.
   TypeNil widen_sub() { assert _type!= TNIL; return make(false,_nil,_sub,_aliases,_fidxs); }
-  // Support small ints in floats
-  TypeNil cross_flt(TypeNil t) { return null; }
   
   // Type must support a nil
   @Override public boolean must_nil() { return !_sub; }
