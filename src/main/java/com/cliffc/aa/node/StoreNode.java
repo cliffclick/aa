@@ -125,8 +125,6 @@ public class StoreNode extends Node {
         TypeStruct ts0 = (_live instanceof TypeMem tm ? tm : _live.oob(TypeMem.ALLMEM)).ld(tmp);
         if( ts0==TypeStruct.UNUSED ) {
           if( mem._val == _val ) return mem; // Same/same or no readers, just delete
-          //if( _uses._len==1 )
-          //  return mem;
           if( rez()!=null )
             return Env.GVN.add_reduce(set_def(3,null)); // Don't store, keep until monotonic
         }
@@ -229,7 +227,7 @@ public class StoreNode extends Node {
   //    ptr.load().unify(rez)
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
-    assert rez()!=null;         // Should have cleared out during iter
+    if( rez()==null ) return null; // Did not clear out during iter
     TV3 adr = adr().set_tvar();
     TV3 rez = rez().set_tvar();
     TVStruct stz;

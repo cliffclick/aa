@@ -600,7 +600,7 @@ public class Parse implements Comparable<Parse> {
   }
 
   private Node _fresh_field(GVNGCM.Build<Node> X, Node stk_now, String fld) {
-    Node val = X.xform(new FieldNode(stk_now,fld,false,null));  // Dunno clazz or not
+    Node val = X.xform(new FieldNode(stk_now,fld,null));  // Dunno clazz or not
     return X.xform(new FreshNode(val,_e));
   }
 
@@ -681,9 +681,11 @@ public class Parse implements Comparable<Parse> {
       // reference for a clazz field lookup.
       Node val = gvn(new LoadNode(mem(),lhs,err));
       // Get the overloaded operator field, always late binding
-      Node over = gvn(new FieldNode(val,binop._name,true,err));
+      Node over = gvn(new FieldNode(val,binop._name,err));
+      // Get the set of primitive choices
+      Node tuple = gvn(new LoadNode(mem(),over,err));
       // Get the resolved operator from the overload
-      Node fun = gvn(new FieldNode(over,"_",false,err));
+      Node fun = gvn(new FieldNode(tuple,"_",err));
       int fidx = fun.push();
       // Parse the RHS operand
       Node rhs = binop._lazy
@@ -799,9 +801,11 @@ public class Parse implements Comparable<Parse> {
       // otherwise this converts a reference to a value.
       Node val = gvn(new LoadNode(mem(),e0,err));
       // Load from the clazz value
-      Node over = gvn(new FieldNode(val,op._name,true,err));
+      Node over = gvn(new FieldNode(val,op._name,err));
+      // Load tuple of primitive choices
+      Node tuple = gvn(new LoadNode(mem(),over,err));
       // Selects the correct function from the TypeStruct overload tuple.
-      Node fun = gvn(new FieldNode(over,"_",false,err));
+      Node fun = gvn(new FieldNode(tuple,"_",err));
       // Call the operator
       n = do_call(errMsgs(oldx,oldx),args(Node.pop(e0idx),fun));
     } else {
@@ -850,7 +854,7 @@ public class Parse implements Comparable<Parse> {
           Node ld = gvn(new LoadNode(mem(),castnn,bad));
           // Using a plain underscore for the field name is a Resolving field.
           // If an oper load, then load from the clazz and not local struct.
-          Node fd = gvn(new FieldNode(ld,tok,is_oper,bad)); // Dunno if not oper, should be clz or not
+          Node fd = gvn(new FieldNode(ld,tok/*,is_oper*/,bad)); // Dunno if not oper, should be clz or not
           // Loading an explicit Oper-name field Binds late (now), and
           // binds on the loaded overload.
           castnn = Node.pop(cidx);
@@ -941,7 +945,7 @@ public class Parse implements Comparable<Parse> {
     Node ptr = get_display_ptr(scope);
     Node ld = gvn(new LoadNode(mem(),ptr,bad));
     int ld_x = ld.push();
-    Node fd = gvn(new FieldNode(ld,tok,false,bad)); // Since field is mutating, not in clz
+    Node fd = gvn(new FieldNode(ld,tok,bad)); // Since field is mutating, not in clz
     if( fd.is_forward_ref() )    // Prior is actually a forward-ref
       return err_ctrl1(ErrMsg.forward_ref(this,(FunPtrNode)fd));
     Node n = gvn(new FreshNode(fd,_e));
@@ -949,8 +953,10 @@ public class Parse implements Comparable<Parse> {
     // Do a full lookup on "+", and execute the function
     // Get the overloaded operator field, always late binding
     Node clz = gvn(new LoadNode(mem(),n,bad));
-    Node overplus = gvn(new FieldNode(clz,"_+_",true,bad)); // Plus operator overload
-    Node plus = gvn(new FieldNode(overplus,"_",false,bad)); // Resolve overload
+    Node overplus = gvn(new FieldNode(clz,"_+_",bad)); // Plus operator overload
+    // Load tuple of primitive choices
+    Node tuple = gvn(new LoadNode(mem(),overplus,bad));
+    Node plus = gvn(new FieldNode(tuple,"_",bad)); // Resolve overload
     Node inc = con(TypeInt.con(d));
     Node sum = do_call0(true,errMsgs(_x-2,_x,_x), args(Node.peek(nidx),inc,plus));
     Node stf = gvn(new SetFieldNode(tok,Access.RW,Node.peek(ld_x),sum,bad));
@@ -1046,7 +1052,7 @@ public class Parse implements Comparable<Parse> {
     Node ld = gvn(new LoadNode(mem(),dsp,bad));
 
     // Load the resolved field from the struct.
-    Node fd = gvn(new FieldNode(ld,tok,false,bad)); // Dunno clazz or not
+    Node fd = gvn(new FieldNode(ld,tok,bad)); // Dunno clazz or not
 
     // If in the middle of a definition (e.g. a HM Let, or recursive assign)
     // then no Fresh per normal HM rules.  If loading from normal Lambda
@@ -1617,7 +1623,7 @@ public class Parse implements Comparable<Parse> {
       Node dsp = gvn(new LoadNode(mmem,ptr,null)); // Gen linked-list walk code, walking display slot
       while( dsp instanceof SetFieldNode ) // Bypass partial frame updates
         dsp = dsp.in(0); // Never set the display, so bypass
-      ptr = gvn(new FieldNode(dsp,"^",false,null)); // Not clz, this is an instance field up-link
+      ptr = gvn(new FieldNode(dsp,"^",null)); // Not clz, this is an instance field up-link
       e = e._par;                                 // Walk linked-list in parser also
     }
   }

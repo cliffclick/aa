@@ -1,6 +1,7 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.*;
+import com.cliffc.aa.node.PrimNode;
 
 import java.util.Arrays;
 import java.util.BitSet;
@@ -118,9 +119,11 @@ public class TypeMem extends Type<TypeMem> {
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
 
   @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
-    for( TypeStruct ts : _objs )
-      if( ts!=null )
+    for( int i = 1; i< _objs.length; i++ ) {
+      TypeStruct ts = _objs[i];
+      if( ts!=null && i>BitsAlias.EXTX && i<PrimNode.MAX_PRIM_ALIAS && !ts.is_prim_clz() )
         ts._str_dups(visit,dups,ucnt);
+    }
   }
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
@@ -132,6 +135,8 @@ public class TypeMem extends Type<TypeMem> {
     if( indent ) sb.ii(1).nl(); // Indent memory
     for( int i = 1; i< _objs.length; i++ )
       if( _objs[i] != null ) {
+        if( i>BitsAlias.EXTX && i<PrimNode.MAX_PRIM_ALIAS && !_objs[i].is_prim_clz() )
+          continue;             // Skip all the redundant prims
         if( indent ) sb.i();
         _objs[i]._str(visit,dups, sb.p(i).p(':'), debug, indent).p(",");
         if( indent ) sb.nl();

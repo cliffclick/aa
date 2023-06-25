@@ -1,4 +1,66 @@
 =======================================
+06/25/2023
+
+More on overloads
+( A B ) vs pattern ( 7 ) // Ambiguous, either A or B could become int or flt
+( @{name:str, ... } @{ age=A } ) -vs- @{ age=B } // Ambiguous, first struct could pick up age, 2nd struct A & B could fail later
+( @{name:str      } @{ age=A } ) -vs- @{ age=B } // Ambiguous, first struct is a clear miss  , 2nd struct A & B could fail later
+( @{name:str      } @{ age=A } ) -vs- @{ age=A } // OK, A & A cannot miss
+( @{name:str, ... } @{ age=A } ) -vs- @{ age=A } // Ambiguous, first struct could pick up age=A
+
+So each match has the following 3 choices
+- hard no , something structural is wrong
+- hard yes, all parts match, even leaf-for-leaf.  No open struct in pattern.
+- maybe   , all parts match, except leafs.  Leafs might expand later and fail.
+
+Actions
+
+- Hard-no: would be nice to be efficient and cut this out of the match choices.
+  Can't change the container (directly), but might add side-data?
+  Note: same match and same pattern can each be used in other contexts.
+- 0-Hard-yes & 1+maybes: Wait.
+- 1-Hard-yes & 1+maybes: Wait.
+- 1-Hard-yes & 0-maybes: Resolve it!
+- 2-Hard-yes & 0+maybes: Unify yes's with ambi error.  Maybes become yes's also unify.
+
+End of pass#1, Apply-Lift goes conservative.
+
+End of pass#2, flip HM_AMBI.
+- Between passes, 1-Hard-yes & 1+maybes: Resolve ALL of them, at once!  This
+  can cascade resolves, and in turn break other delayed resolves.
+- Otherwise SAME.
+- We can argue a repeat loop here, if any progress.
+
+End of pass#3
+- 0-Hard-yes & 1+maybes: Left around.  Actual resolve has to wait until module is linked against other modules.
+
+Argues for a pass# change in Combo:
+
+while( progress ) {
+  - Normal unify
+    - 0-Hard-yes & 1+maybes: Wait.
+    - 1-Hard-yes & 1+maybes: Wait.
+    - 1-Hard-yes & 0-maybes: Resolve it!
+    - 2-Hard-yes & 0+maybes: Unify yes's with ambi error.  Maybes become yes's also unify.
+      Specifically, TVErr on the Match YESes, since 2+ hard yes's MUST be ambiguous against any pattern.
+      
+  - Resolve all 1-hard-yes + some-maybes, all at once.  May cause errors.  Report progress.
+    Done in parallel to remove an ordering ambiguity.
+}
+Apply-quits-lifting-leaves.
+Repeat above loop.
+
+
+Might also invert TVErr -
+normal TVar has a null TVErr field.
+when error, fills in the _err field, but leafs the TVar alone.
+Another TVar in error, uses the same TVErr field.
+TVErr still points back at the TVars.
+Removes the as_struct/as_ptr problems.
+
+
+
+=======================================
 05/27/2023
 
 Back to TVMem issues -

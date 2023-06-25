@@ -402,14 +402,38 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer>, Comp
   // Note no special nil handling; both sides need to either handle nil or not
   public boolean isa(B bs) { return meet(bs) == bs; }
 
-  public Bits subtract(Bits bs) {
-    Bits bs0 = this;
-    for( int alias : this )
-      for( int kid=alias; kid!=0; kid = tree().next_kid(alias,kid) )
-        if( bs.test_recur(kid) )
-          bs0 = bs0.clear(kid);
-    return bs0;
+  public B subtract(B bits) {
+    if( !_overlaps(bits) ) return (B)this;
+
+    long[] bs = _bits==null ? bits(_con) : _bits.clone();
+    if( _bits==null ) or(bs,_con);
+    Tree<B> tree = tree();
+    for( int bit : bits )
+      _subtract_recur(tree,bs,bit);
+    return make(false,bs);
   }
+
+  private void _subtract_recur( Tree<B> tree, long[] bs, int bit ) {
+    if( !test(bs,bit) ) {
+      int par = tree.parent(bit);
+      _subtract_recur(tree,bs,par); // Go up to parent, to expand
+      // expand parent to my sibling bits
+      int[] kids = tree._kids[par];
+      for( int i=1; i<kids[0]; i++ )
+        or(bs,kids[i]);
+    }
+    and(bs,bit);                // Bit is directly set, so clear it and return
+  }
+  
+  // Shallow 1-sided overlap test
+  public boolean _overlaps(B bs) {
+    for( int alias : bs )
+      if( test_recur(alias) )   // Any bit in bs occur (recursive) in this?
+        return true;
+    return false;
+  }
+
+        
   // Two bitmaps overlap, including parent/child overlaps.
   public boolean overlaps(Bits<B> bs) {
     if( this==bs ) return true;
@@ -449,6 +473,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer>, Comp
         if( par==kid ) return true;
       return false;             // Kid will be a larger number
     }
+    public int next_available_bit() { return _cnt; }
 
     @Override public String toString() { return toString(new SB(),1).toString(); }
     private SB toString(SB sb,int i) {

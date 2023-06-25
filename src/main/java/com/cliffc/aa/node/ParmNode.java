@@ -47,7 +47,7 @@ public class ParmNode extends Node {
         t = Combo.pre() ? RootNode.def_mem(this) : Env.ROOT.rmem();
         Env.ROOT.deps_add(this); // Depends on Root
       } else if( _tvar==null ) {
-        t = _t;
+        t = _t==TypeNil.SCALAR ? Env.ROOT.ext_scalar(this) : _t;
       } else {
         Env.ROOT.deps_add(this); // Depends on Root
         t = tvar().as_flow(this);

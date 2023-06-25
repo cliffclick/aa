@@ -25,7 +25,7 @@ public class LoadNode extends Node {
     Type tadr = adr()._val;
     Type tmem = mem()._val;
     if( (tadr instanceof TypeStruct ts) )
-      return ts;                // Happens if user directly calls an oper
+      throw unimpl(); // return ts; // Happens if user directly calls an oper
     if( !(tadr instanceof TypeNil ta) )
       return tadr.oob(TypeStruct.ISUSED); // Not a address
     if( !(tmem instanceof TypeMem tm) )
@@ -47,26 +47,16 @@ public class LoadNode extends Node {
     // Memory demands
     Node def=in(i);
     adr().deps_add(def);
-    Type ptr = adr()._val;
-    TypeMemPtr tptr=null;
-    if( !(ptr instanceof TypeMemPtr tptr0) ) {
-      // Go from the incoming primitive to a Clazz struct
-      StructNode clz = FieldNode.clz_node(ptr);
-      if( clz==null ) return RootNode.def_mem(def);
-      // Use the One True Alias for the primitive Clazz
-      for( Node use : clz._uses ) {
-        if( use instanceof StoreNode st ) {
-          if( st.adr() instanceof NewNode nnn ) tptr = nnn._tptr;
-          break;
-        }
-      }
-      if( tptr==null ) return ptr.oob(TypeMem.ALLMEM);
-    } else tptr=tptr0;
+    Type adr = adr()._val;
+    if( adr==Type.ANY ) return TypeMem.ANYMEM;
+    if( !(adr instanceof TypeNil ptr) )
+      return adr.oob(RootNode.def_mem(def));
 
-    if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
-    if( tptr._aliases.is_empty() ) return RootNode.def_mem(def);
+    if( ptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
+    if( ptr._aliases.is_empty() ) return RootNode.def_mem(def);
     // Demand memory produce the desired structs
-    return TypeMem.make(tptr._aliases,(TypeStruct)_live);
+    if( ptr._aliases==BitsAlias.NALL ) return RootNode.def_mem(def);
+    return TypeMem.make(ptr._aliases,(TypeStruct)_live);
   }
   // Only structs are demanded from a Load
   @Override boolean assert_live(Type live) { return live instanceof TypeStruct; }
@@ -247,32 +237,15 @@ public class LoadNode extends Node {
   }
   
   @Override public boolean has_tvar() { return true; }
-  @Override public TV3 _set_tvar() { return new TVStruct(true); }
-
-  // All field loads might actually be against a pointer OR a plain struct.  So
-  // we have to stall until the input decides it is either a ptr or struct.  This
-  // is because fields can themselves hold embedded structs, and do so for the
-  // primitives in general.  The parser cannot tell the difference from a
-  // load-from-ptr-then-field-extract vs just the field-extract part.
-  @Override public boolean unify( boolean test ) {
-    TV3 self = tvar();
-    TV3 tadr = adr().tvar();
-    if( tadr instanceof TVLeaf ) {
-      tadr.deps_add(this);
-      return false;           // Stall until not a leaf
-    }
-    // Check for being a ptr
-    TVPtr ptr = null;
-    if( tadr instanceof TVErr err ) ptr = err.as_ptr();
-    if( tadr instanceof TVPtr ptr0) ptr = ptr0;
-    if( ptr!=null ) return ptr.load().unify(self,false);
-    // Check for being a struct
-    TVStruct ts = null;
-    if( tadr instanceof TVErr err   ) ts = err.as_struct();
-    if( tadr instanceof TVStruct ts0) ts = ts0;
-    if( ts!=null ) return ts.unify(self,false);
-    // Some kind of error now
-    return tadr.unify(new TVPtr(BitsAlias.EMPTY,self.as_struct()),false);
+  @Override public TV3 _set_tvar() {
+    TV3 ptr = adr().set_tvar();
+    TVStruct tstr = new TVStruct(true);
+    if( ptr instanceof TVPtr tptr ) tptr.load().unify(tstr,false);
+    else ptr.unify(new TVPtr(BitsAlias.NALL,tstr),false);
+    return tstr;
   }
+
+  // All field loads against a pointer.
+  @Override public boolean unify( boolean test ) { return false; }
 
 }

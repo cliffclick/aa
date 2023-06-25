@@ -226,7 +226,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     return malloc(false,ALL,TypeFlds.make(fld0,fld1));
   }
   public static TypeStruct malloc_test( TypeStruct clz, TypeFld fld0, TypeFld fld1 ) {
-    return malloc(false,ALL,TypeFlds.make(TypeFld.make(".",clz),fld0,fld1));
+    return malloc(false,ALL,TypeFlds.make(TypeFld.make_clz(clz),fld0,fld1));
   }
   public TypeStruct hashcons_free() {
     // All subparts already interned
@@ -263,7 +263,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   public static TypeStruct make_test(           TypeFld fld0, TypeFld fld1 ) { return make(TypeFlds.make(fld0,fld1)); }
   public static TypeStruct make_test( Type def, TypeFld fld0, TypeFld fld1 ) { return make(false,def,TypeFlds.make(fld0,fld1)); }
   public static TypeStruct make_test( Type def, TypeStruct clz, TypeFld fld0, TypeFld fld1 ) {
-    return make(false,def,TypeFlds.make(TypeFld.make(".",clz),fld0,fld1));
+    return make(false,def,TypeFlds.make(TypeFld.make_clz(clz),fld0,fld1));
   }
 
   // Add a field to an under construction TypeStruct; _flds is not interned.
@@ -657,7 +657,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   boolean is_int_clz () { return _flds.length>1 && Util.eq("!_"  ,_flds[1]._fld); }
   boolean is_flt_clz () { return _flds.length>1 && Util.eq("-_"  ,_flds[1]._fld); }
   boolean is_str_clz () { return _flds.length>1 && Util.eq("#_"  ,_flds[1]._fld); }
-  boolean is_math_clz() { return _flds.length>1 && Util.eq("pi"  ,_flds[1]._fld); }
+  boolean is_math_clz() { return _flds.length>1 && Util.eq("pi"  ,_flds[0]._fld); }
   boolean is_prim_clz() {
     return is_top_clz()
       ||   is_int_clz()

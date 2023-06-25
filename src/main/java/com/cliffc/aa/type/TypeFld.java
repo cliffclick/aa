@@ -125,6 +125,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   public static TypeFld make( String fld ) { return make(fld,TypeNil.SCALAR,Access.Final); }
   //public static TypeFld make( Type def ) { return make(fldBot,def,Access.Final); }
   public static TypeFld make_dsp(Type t) { return make(CLZ,t,Access.Final); }
+  public static TypeFld make_clz(Type t) { return make(CLZ,t,Access.Final); }
 
   // Some convenient default constructors
   static final String[] ARGS = new String[]{" ctl", " mem", CLZ,"x","y","z"};

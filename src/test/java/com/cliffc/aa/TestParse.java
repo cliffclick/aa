@@ -1,5 +1,6 @@
 package com.cliffc.aa;
 
+import com.cliffc.aa.node.PrimNode;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
@@ -27,12 +28,12 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_GCP=false;
-    DO_HMT=true;
+    DO_GCP=true;
+    DO_HMT=false;
     RSEED=0;
-    test("{ x -> x+1 }","[55]{any,4 -> %[2][2,55]? }",
-            "{A *[]@{_+_=@{...};...} -> B }", // Something with an '+' operator
-            null, null, null,"[55]");
+    test("{ x -> 1+x }","[%f0]{any,4 -> %[2][2,55]?}",
+            "{A B -> C }", // Something that 1+ works on
+            null, null, null,"[%f0]");
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(2),fact(2.2))","*[14](nil,1,2)","*[14](int64,int64,int64)", null, null, "[14]", null);
   }
   
@@ -63,12 +64,12 @@ public class TestParse {
     // Simple no-arg anonymous function, being called
     test("{5}()", "5", "5");
     // TestHM.a_basic_01
-    test("{ x -> ( 3, x )}", "[55]{any,4 -> *[12](3, %[2,12][2,55]?) }", "{ A B -> *[12](3, B) }", null, null, "[12]", "[55]");
+    test("{ x -> ( 3, x )}", "[%f0]{any,4 -> *[%a2](3, %[2,%a2][2,%f0]?) }", "{ A B -> *[%a2](3, B) }", null, null, "[%a2]", "[%f0]");
     // TestHM.a_basic_02
-    test("{ z -> ((z 0), (z \"abc\")) }", "[55]{any,4 -> *[13](%[2,12,13][2,55]?, %[2,12,13][2,55]?) }",
-         "{A {B *[12]str:(97)? -> C } -> *[13](C,C) }",
+    test("{ z -> ((z 0), (z \"abc\")) }", "[%f0]{any,4 -> *[%a3](%[2,%a2,%a3][2,%f0]?, %[2,%a2,%a3][2,%f0]?) }",
+         "{A {B *[%a2]str:(97)? -> C } -> *[%a3](C,C) }",
          null, null,
-         "[12,13]", "[55]" );
+         "[%a2,%a3]", "[%f0]" );
 
    
     // TestHM.a_basic_05
@@ -76,52 +77,53 @@ public class TestParse {
     // 'g' is not-fresh in function 'f'.
     // 'f' IS fresh in the body of 'g' pair.
     test("{ g -> f = { ignore -> g }; (f 3, f \"abc\")}",
-         "[55]{any,4 -> *[14](%[2,14][2,55]?, %[2,14][2,55]?) }",
-         "{ A B -> *[14]( B, B) }",
-         null,null,"[14]","[55]");
+         "[%f0]{any,4 -> *[%a4](%[2,%a4][2,%f0]?, %[2,%a4][2,%f0]?) }",
+         "{ A B -> *[%a4]( B, B) }",
+         null,null,"[%a4]","[%f0]");
 
     // TestParse.g_overload_err_00
-    testerr("( { x -> x*2 }, { x -> x*3 })._ 4", "Ambiguous, matching choices { A 4 -> B } vs({ C:*[10]@{} D -> E }, { C F -> G })",30);
+    testerr("( { x -> x*2 }, { x -> x*3 })._ 4",
+            "Ambiguous, matching choices { A 4 -> B } vs({ C:*[%a0]@{} *[nALL]@{_*_= *[nALL]( ...);  ...} -> D }, { C *[nALL]@{_*_= *[nALL]( ...);  ...} -> E })",30);
 
     // Variations on a simple wrapped add.  Requires full annotations to type -
     // because in fact it is all ambiguous and cannot be typed without seeing all
     // the usages.
-    test("{ x -> x+1 }","[55]{any,4 -> %[2][2,55]? }",
-         "{A *[]@{_+_=@{...};...} -> B }", // Something with an '+' operator
-         null, null, null,"[55]");
+    test("{ x -> x+1 }","[%f0]{any,4 -> %[2][2,%f0]? }",
+         "{A *[nALL]@{_+_=*[nALL](...);...} -> B }", // Something with an '+' operator
+         null, null, null,"[%f0]");
     
-    test("{ x -> 1+x }","[55]{any,4 -> %[4,5][]?}",
+    test("{ x -> 1+x }","[%f0]{any,4 -> %[4,5][]?}",
          "{A B -> C }", // Something that 1+ works on
-         null, null, null,"[55]");
+         null, null, null,"[%f0]");
     
-    test("{ x -> x+y }","[55]{any,4 -> any}",
+    test("{ x -> x+y }","[%f0]{any,4 -> any}",
          "{A *[]@{_+_=@{...};...} -> B }", // Something with an '+' operator
-         null, null, null,"[55]");
+         null, null, null,"[%f0]");
     
     testerr("@{x=7}.y",  "Unknown field '.y' in @{x= A}: ",7); // LHS is known, not a clazz, field not found in instance
     testerr("\"abc\".y", "Unknown field '.y' in str:(A): ",6);  // LHS is known, has clazz, field not found in either, field is not oper (not pinned)
     testerr("\"abc\"&1", "Unknown operator '_&_' in str:(97): @{ ...}",5); // LHS is known, has clazz, field not found in either, field it oper (pinned, so report clazz)
-    test("{x:flt y:int -> x+y}", "[55]{any,5 -> flt64 }", "{ A flt64 int64 -> flt64 }", null, null, null, "[55]");
+    test("{x:flt y:int -> x+y}", "[%f0]{any,5 -> flt64 }", "{ A flt64 int64 -> flt64 }", null, null, null, "[%f0]");
 
     // error, missing a comma
     testerr("{ x -> ( 3 x )}", "A function is being called, but 3 is not a function",11);
 
     // TestHM.b_recursive_01
-    test("{ f -> (f f) }", "[55]{any,4 -> %[2][2,55]? }", "{A B:{C B -> D } -> D }", null, null, "[]", "[55]" );
+    test("{ f -> (f f) }", "[%f0]{any,4 -> %[2][2,%f0]? }", "{A B:{C B -> D } -> D }", null, null, "[]", "[%f0]" );
 
     // TestHM.b_recursive_05, Y combinator
     test("{ f -> ({ x -> (f (x x))} { x -> (f (x x))})}",
-         "[55]{any,4 -> %[2][2,55]? }", "{ A { B C -> C } -> C }",
+         "[%f0]{any,4 -> %[2][2,%f0]? }", "{ A { B C -> C } -> C }",
          null, null,
-         null, "[55]" );
+         null, "[%f0]" );
 
     // TestHM.b_recursive_06
     test("fun = { fx -> math.rand(2) ? 1 : fx(fun(fx),2) }; fun",
-         "[55]{any,4 -> %[2][2,55]? }",
+         "[%f0]{any,4 -> %[2][2,%f0]? }",
          // Currently allowing 'fun' display to stay alive.
          "A:{ *[]@{fun=A} {B int64 int64 -> int64 } -> int64 }",
          null, null,
-         null,"[55]");
+         null,"[%f0]");
 
     // TestHM.b_recursive_02.  The expression "x-1" cannot resolve the operator
     // "_-_" because "x" is a free variable.  It binds in its one use.    
@@ -979,23 +981,28 @@ HashTable = {@{
     if( gcp != null && (err==null || cur_off<0) ) {
       assertNull(te._errs);
       Type actual = te._t;      // Sharpen any memory pointers
-      Type expect = Type.valueOf(gcp);
+      String gcp_a = format_alias(gcp);
+      String gcp_b = format_fidx(gcp_a);
+      Type expect = Type.valueOf(gcp_b);
       assertEquals(expect,actual);
     }
     // Check HMT result
     if( hmt != null && err==null ) {
       assertNull(te._errs);
+      String hmt_a = format_alias(hmt);
       TV3 actual = te._hmt;
       String actual_str = actual.p();
-      assertEquals(stripIndent(hmt),stripIndent(actual_str));
+      assertEquals(stripIndent(hmt_a),stripIndent(actual_str));
     }
     // If ran both, also track expected Root escapes
     if( gcp != null && hmt != null && (err==null || cur_off<0) ) {
       assertNull(te._errs);
-      String esc_ptrs2 = "*"+esc_ptrs+"()";
-      String esc_funs2 =     esc_funs+"{any,3->Scalar}";
-      BitsAlias aliases = esc_ptrs==null ? BitsAlias.EMPTY : ((TypeMemPtr)Type.valueOf(esc_ptrs2))._aliases;
-      BitsFun   fidxs   = esc_funs==null ? BitsFun  .EMPTY : ((TypeFunPtr)Type.valueOf(esc_funs2)).fidxs() ;
+      String esc_ptrs2 = format_alias(esc_ptrs);
+      String esc_funs2 = format_fidx (esc_funs);
+      String esc_ptrs3 = "*"+esc_ptrs2+"()";
+      String esc_funs3 =     esc_funs2+"{any,3->Scalar}";
+      BitsAlias aliases = esc_ptrs==null ? BitsAlias.EMPTY : ((TypeMemPtr)Type.valueOf(esc_ptrs3))._aliases;
+      BitsFun   fidxs   = esc_funs==null ? BitsFun  .EMPTY : ((TypeFunPtr)Type.valueOf(esc_funs3)).fidxs() ;
       aliases = aliases.set(BitsAlias.EXTX);
       fidxs   = fidxs  .set(BitsFun  .EXTX);
       assertEquals(fidxs  ,te._fidxs  );
@@ -1008,13 +1015,16 @@ HashTable = {@{
          // everything has a default input, so many things cannot resolve.
          (gcp==null && hmt!=null)) ) {
       assertTrue(te._errs != null && te._errs.size()>=1);
+      String err2 = format_alias(err );
+      String err3 = format_fidx (err2);
+      String actual = te._errs.get(0).toString();
       if( cur_off>=0 ) {
         String cursor = new String(new char[cur_off]).replace('\0', ' ');
-        String err2 = new SB().p("test:1:").p(err).nl().p(program).nl().p(cursor).p('^').nl().toString();
-        assertEquals(err2,te._errs.get(0).toString());
+        String err4 = new SB().p("test:1:").p(err3).nl().p(program).nl().p(cursor).p('^').nl().toString();
+        assertEquals(err4,actual);
       } else {
-        String err2 = new SB().p("test:1:").p(err).nl().toString();
-        assertTrue(te._errs.get(0).toString().startsWith(err2));
+        String err4 = new SB().p("test:1:").p(err3).nl().toString();
+        assertTrue(actual.startsWith(err4));
       }
     }
   }
@@ -1052,6 +1062,31 @@ HashTable = {@{
     _test2(program,gcp,hmt,gcp_both,hmt_both,esc_ptrs,esc_funs,null,0);
   }
 
+  // Alias numbers change (alot) as I add or remove basic primitive overloads.
+  // Make the golden Type strings use a format for the alias number, which I
+  // can base from a single point here.  
+  //     "[55]{any,4 -> *[ 12](3, %[2, 12][2,55]?) }"  // Instead of this
+  //     "[55]{any,4 -> *[%a0](3, %[2,%a0][2,55]?) }"  // I write this
+  static private String format_alias( String s ) { return format_base(s,'a',PrimNode.MAX_PRIM_ALIAS); }
+  static private String format_fidx ( String s ) { return format_base(s,'f',PrimNode.MAX_PRIM_FIDX ); }
+  static private String format_base ( String s, char f, int base ) {
+    if( s==null ) return s;
+    SB sb = new SB();
+    for( int i=0; i<s.length(); i++ ) {
+      char c = s.charAt(i);
+      if( c=='%' && s.charAt(i+1)==f ) {
+        i+=2;
+        int num=0;
+        while( Parse.isDigit((byte)(c=s.charAt(i++))) )
+          num = num*10 + (c-'0');
+        sb.p(num+base); i--;
+      }
+      sb.p(c);
+    }
+    return sb.toString();
+  }
+
+  
   // Run a program in all 3 modes, yes function returns, no errors
   private void test( String program, Function<Type,Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect ) {
     //_test2(program,gcp_maker,formals_maker,hmt_expect,null,0);

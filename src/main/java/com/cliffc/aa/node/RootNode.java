@@ -41,7 +41,7 @@ public class RootNode extends Node {
 
   // Used by TV3 as_flow for an external Leaf value.
   public TypeNil ext_scalar(Node dep) {
-    assert Combo.HM_FREEZE;
+    //assert Combo.HM_FREEZE;
     return (TypeNil)(_val instanceof TypeTuple tt
                      ? tt.at(3)
                      : _val.oob(TypeNil.EXTERNAL));
@@ -56,10 +56,10 @@ public class RootNode extends Node {
   // Output value is:
   // [Ctrl, All_Mem_Minus_Dead, Rezult, global_escaped_[fidxs, aliases]]
   @Override public TypeTuple value() {
-    // Conservative final result.  Until Combo external calls can still wire, and escape arguments
     Node rez = in(REZ_IDX);
+    // Conservative final result.  Until Combo external calls can still wire, and escape arguments
     if( rez==null || Combo.pre() )
-      return TypeTuple.make(Type.CTRL,def_mem(this),TypeRPC.ALL_CALL,TypeNil.SCALAR);
+      return TypeTuple.make(Type.CTRL,def_mem(this),TypeNil.SCALAR,TypeNil.SCALAR);
     Type trez = rez._val;
     // Conservative final memory
     Node mem = in(MEM_IDX);
@@ -120,6 +120,11 @@ public class RootNode extends Node {
         }
       }
     }
+
+    // Kill the killed
+    escs = TypeNil.make(false,false,false,escs._aliases.subtract(KILL_ALIASES),escs._fidxs);
+
+    
     // RootNode value is a 4-pack
     return TypeTuple.make(Type.CTRL, tmem, trez, escs);
   }
@@ -152,7 +157,7 @@ public class RootNode extends Node {
     if( dep!=null ) deps_add(dep);
     BitsAlias ralias = ralias();
     if( ralias==BitsAlias.NALL ) return BitsAlias.NALL;
-    BitsAlias aliases = BitsAlias.EMPTY;
+    BitsAlias aliases = BitsAlias.EXT;
     for( int alias : ralias )
       if( alias>BitsAlias.EXTX && !BitsAlias.EXT.test_recur(alias) &&
           tv3.exact_unify_ok(NewNode.get(alias).tvar()) )
@@ -232,6 +237,7 @@ public class RootNode extends Node {
         } else if( tfp.dsp()==Type.ANY )
           return CallNode.FP_LIVE;
       }
+      deps_add(in(REZ_IDX));
       if( val(REZ_IDX)==Type.ANY ) return Type.ANY; // TODO: Surely broken
       return Type.ALL;
     }

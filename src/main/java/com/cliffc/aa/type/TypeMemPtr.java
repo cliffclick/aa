@@ -125,7 +125,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public static TypeMemPtr make_str(Type t) { return make_str(BitsAlias.make0(STR_ALIAS),t); }
   public static TypeMemPtr make_str(BitsAlias aliases, Type t) {
     // Make a string object
-    TypeStruct ts = TypeStruct.make_test(Type.ANY,TypeFld.make(".",TypeStruct.XSTRZ),TypeFld.make_tup(t, AA.ARG_IDX));
+    TypeStruct ts = TypeStruct.make_test(Type.ANY,TypeFld.make_clz(TypeStruct.XSTRZ),TypeFld.make_tup(t, AA.ARG_IDX));
     return TypeMemPtr.make(aliases.test(0),aliases.clear(0),ts);
   }
   public boolean is_str() { return _obj.is_str(); }

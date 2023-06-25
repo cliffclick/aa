@@ -142,8 +142,16 @@ public abstract class PrimNode extends Node {
     
     Env.GVN.iter();
 
+    // Used for test cases
+    MAX_PRIM_ALIAS = BitsAlias.NALL.tree().next_available_bit();
+    MAX_PRIM_FIDX  = BitsFun  .NALL.tree().next_available_bit();
+    
     return PRIMS;
   }
+  // Used for test cases; changes the golden-rule expected alias/fidx based on
+  // how many get consumed by the primitives.  Means I can add/remove prims and
+  // not have to renumber all the golden-rule tests.
+  public static int MAX_PRIM_ALIAS, MAX_PRIM_FIDX;
 
   // Primitive wrapped as a simple function.
   // Fun Parm_dsp [Parm_y] prim Ret
@@ -190,7 +198,7 @@ public abstract class PrimNode extends Node {
 
   // Make and install a primitive Clazz.
   private static void make_prim( StructNode clz, String clzname, NewNode ptr, PrimNode[][] primss ) {
-    clz.add_fld(".",Access.Final,ZCLZ,null);
+    clz.add_fld(TypeFld.CLZ,Access.Final,ZCLZ,null);
     for( PrimNode[] prims : primss ) {
       // Primitives are grouped into overload groups, where the 'this' or
       // display argument is always of the primitive type, and the other
@@ -204,7 +212,9 @@ public abstract class PrimNode extends Node {
       }
       over.init();
       over.close();
-      clz.add_fld(prims[0]._name,Access.Final,over,null);
+      NewNode ptr2 = new NewNode(BitsAlias.new_alias(BitsAlias.EXTX));
+      Env.SCP_0.set_mem(new StoreNode(Env.SCP_0.mem(),ptr2.add_flow(),over,null).init());
+      clz.add_fld(prims[0]._name,Access.Final,ptr2,null);
     }
     clz.close();
     Env.PROTOS.put(clzname,clz); // global mapping

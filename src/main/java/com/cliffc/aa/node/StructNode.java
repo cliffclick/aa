@@ -183,7 +183,7 @@ public class StructNode extends Node {
           if( !parent.is_prim() ) {
             parent.add_fld(fref._name,TypeFld.Access.RW,fref,_fld_starts.at(i)).xval();
             // Stomp field locally to load from parent
-            FieldNode fld = new FieldNode(parent,fref._name,false,_fld_starts.at(i));
+            FieldNode fld = new FieldNode(parent,fref._name,_fld_starts.at(i));
             fld._val = val(i);
             set_def(i,fld);
             Env.GVN.add_work_new(fld);
@@ -238,7 +238,7 @@ public class StructNode extends Node {
       Node progress=null;
       for( int i=0; i<_flds._len; i++ ) 
         if( in(i)!=Env.ANY && live.at_def(_flds.at(i)).above_center() &&
-            !Util.eq(_flds.at(i),".") )  // Leave a dead CLZ for error messages
+            !Util.eq(_flds.at(i),TypeFld.CLZ) )  // Leave a dead CLZ for error messages
           progress = set_def(i,Env.ANY);
       if( progress!=null ) return this;
     }

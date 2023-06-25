@@ -24,18 +24,14 @@ public class FieldNode extends Node implements Resolvable {
   // Field being loaded from a TypeStruct.  If "_", the field name is inferred
   // from amongst the field choices.  If not present, then error.
   public       String _fld;
-  // Value is TypeStruct and not a TypeNil
-  public final boolean _str;
   // Where to report errors
   public final Parse _bad;
 
-  public FieldNode(Node struct, String fld, boolean str, Parse bad) {
+  public FieldNode(Node struct, String fld, Parse bad) {
     super(OP_FIELD,struct);
     // A plain "_" field is a resolving field
     _fld = resolve_fld_name(fld);
     _bad = bad;
-    _str = str;
-    assert !(str && is_resolving()); // One or the other for now
   }
   // A plain "_" field is a resolving field
   private String resolve_fld_name(String fld) { return Util.eq(fld,"_") ? ("&"+_uid).intern() : fld; }
@@ -73,27 +69,19 @@ public class FieldNode extends Node implements Resolvable {
     // One of TypeInt, TypeFlt, NIL or XNIL
     Type tstr = t;
     if( t instanceof TypeNil && !(t instanceof TypeStruct) ) {
-      StructNode clazz = clz_node(t);
-      if( clazz ==null ) return oob_ret(t);
-      tstr = clazz._val;        // Value from clazz
-      // TODO: Busted when mixing compatible classes, e.g. generic factorial with ints & flts.
+      throw unimpl();
     }
     // Hit on a field
     if( tstr instanceof TypeStruct ts ) {
-      if( ts.find(_fld)!= -1 ) {
-        Type tf = ts.at(_fld);
-        return _str && !(tf instanceof TypeStruct) ? oob_ret(tf) : tf;
-      }
+      if( ts.find(_fld)!= -1 ) return ts.at(_fld);
       // Miss on closed structs looks at superclass.
       // Miss on open structs dunno if the field will yet appear
-      if( ts.len()>=1 &&  Util.eq(ts.fld(0)._fld,".") )
+      if( ts.len()>=1 && Util.eq(ts.fld(0)._fld,TypeFld.CLZ) )
         throw unimpl();
-      return _str ? ts._def : ts.oob(Type.ALL);
+      return ts._def;
     }
-    return oob_ret(tstr);
+    return tstr.oob(Type.ALL);
   }
-
-  private Type oob_ret(Type t) { return t.oob(_str ? TypeStruct.ISUSED : Type.ALL); }
 
   private static Type meet(TypeStruct ts) {
     if( ts.len()==0 ) return ts._def;
@@ -117,8 +105,6 @@ public class FieldNode extends Node implements Resolvable {
       deps_add(in(i));
       return TypeStruct.UNUSED;
     }
-    // Struct load, the instance is normal-live
-    if( _str && i==0 ) return TypeStruct.ISUSED;
     // Otherwise normal fields and clazz fields are field-alive.
     return TypeStruct.UNUSED.replace_fld(TypeFld.make(_fld,Type.ALL));
   }
@@ -157,7 +143,7 @@ public class FieldNode extends Node implements Resolvable {
     // Field from a Bind of a Struct (overload)
     if( _live==Type.ALL && in(0) instanceof BindFPNode bind && bind.fp() instanceof StructNode sn ) {
       assert bind._over;
-      Node fp = new FieldNode(sn,_fld,false,_bad).init();
+      Node fp = new FieldNode(sn,_fld,_bad).init();
       return new BindFPNode(fp,bind.dsp(),false).init();
     }
     
@@ -176,7 +162,7 @@ public class FieldNode extends Node implements Resolvable {
       if( fcnt>0 ) {
         Node lphi = new PhiNode(TypeNil.SCALAR,phi._badgc,phi.in(0));
         for( int i=1; i<phi.len(); i++ )
-          lphi.add_def(Env.GVN.add_work_new(new FieldNode(phi.in(i),_fld,false,_bad)));
+          lphi.add_def(Env.GVN.add_work_new(new FieldNode(phi.in(i),_fld,_bad)));
         return lphi;
       }
     }
@@ -195,21 +181,16 @@ public class FieldNode extends Node implements Resolvable {
     if( t0 instanceof TVStruct ts0 ) ts = ts0;
     else t0.unify(ts=new TVStruct(true),false);
     // If resolving, force insert
-    if( is_resolving() ) {
+    if( is_resolving() )
       TVField.FIELDS.put(_fld,this); // Track resolving field names
-      ts.add_fld(_fld,self,true);
-      // No need to try-resolve or deal with recursive set_tvar already
-      // resolving!  The Field's normal unify will attempt a resolve which will
-      // set delay_resolve as needed on any complex shape 'self' has already
-      // been unified to.
-    }
     return _tvar;
   }
 
   @Override public boolean unify( boolean test ) {
     TVStruct tstr = tvar(0).as_struct();  TV3 fld;
     // Attempt resolve
-    if( is_resolving() ) return do_resolve(tstr,test);
+    if( is_resolving() )
+      return try_resolve(tstr,test);
     // Search up the super-clazz chain
     for( ; tstr!=null; tstr = tstr.clz() ) {
       // If the field is in the struct, unify and done
@@ -219,23 +200,12 @@ public class FieldNode extends Node implements Resolvable {
       if( tstr.is_open() ) return tstr.add_fld(_fld,tvar(),false);
     }
     
-    //  struct is end-of-super-chain, miss_field
-    return do_miss(tvar(0),test);
+    // struct is end-of-super-chain, miss_field
+    return tvar().unify_err(resolve_failed_msg(),tvar(0),null,test);
   }
   
   private boolean do_fld( TV3 fld, boolean test ) {
     return tvar().unify(fld,test);
-  }
-  private boolean do_resolve( TVStruct tstr, boolean test ) {
-    //if( Combo.HM_AMBI ) return false; // Failed earlier, can never resolve
-    boolean progress = try_resolve(tstr,test);
-    if( is_resolving() || test ) return progress; // Failed to resolve, or resolved but testing
-    // Known to be resolved and in RHS
-    do_fld(((TVStruct)tstr.find()).arg(_fld),test);
-    return true;                // Progress
-  }
-  private boolean do_miss( TV3 tstr, boolean test) {
-    return tvar().unify_err(resolve_failed_msg(),tstr,null,test);
   }
 
 
@@ -270,11 +240,6 @@ public class FieldNode extends Node implements Resolvable {
 
   @Override public ErrMsg err( boolean fast ) {
     TV3 tv = tvar();
-    // TODO: Do not have delayed resolve sorted out right
-    //if( is_resolving() ) {
-    //  resolve_ambiguous_msg();  // Force a TVErr
-    //  tv = tvar(0);             // Get unresolved TVErr from struct
-    //}
     if( !(tv instanceof TVErr tverr) ) return null;
     Ary<String> errs = tverr._errs;
     if( errs==null ) return null; // Even if an error here, somebody else will report

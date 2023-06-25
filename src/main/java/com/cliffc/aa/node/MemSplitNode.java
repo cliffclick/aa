@@ -80,7 +80,7 @@ public class MemSplitNode extends Node {
   }
   void remove_alias( int idx ) {
     // Remove (non-overlapping) bits from the rollup
-    _escs.set(0,(BitsAlias)_escs.at(0).subtract(_escs.at(idx)));
+    _escs.set(0,_escs.at(0).subtract(_escs.at(idx)));
     _escs.remove(idx);          // Remove the escape set
     xval();                     // Reduce tuple result
     // Renumber all trailing projections to match

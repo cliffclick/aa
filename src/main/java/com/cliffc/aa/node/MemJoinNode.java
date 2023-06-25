@@ -96,7 +96,7 @@ public class MemJoinNode extends Node {
     // Get the escaping set being moved.
     // Remove esc set from lower rollup and add to upper
     BitsAlias esc = msp._escs.pop();
-    msp._escs.set(0,(BitsAlias)msp._escs.at(0).subtract(esc));
+    msp._escs.set(0,msp._escs.at(0).subtract(esc));
     int idx = head.add_alias(esc);
     assert idx!=0; // No partial overlaps; actually we could just legit bail here, no assert
     if( idx == mjn._defs._len ) // Add edge Join->Split as needed
