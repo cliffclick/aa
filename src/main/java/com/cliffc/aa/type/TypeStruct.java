@@ -634,7 +634,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     boolean sep=false;
     for( TypeFld fld : _flds ) {
       if( !debug && Util.eq(fld._fld,TypeFld.CLZ) ) continue;
-      if( fld==TypeFld.ANY_DSP ) sb.p('_'); // Short-cut the ever-present display
+      if( fld==TypeFld.ANY_CLZ ) sb.p('_'); // Short-cut the ever-present display
       else {
         if( ind ) sb.nl().i();
         fld._str(visit,dups, sb, debug, indent ); // Field name, access mod, type
@@ -686,7 +686,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
       if( P.peek('$') )
         { ts._def = P.type(null,false,-2); break; }
       TypeFld fld = ts.len()==0 && P.peek('_')
-        ? TypeFld.ANY_DSP
+        ? TypeFld.ANY_CLZ
         // Request a parse of:
         //   label:=type (yielding a TypeFld); label can be a number; or
         //   type (yielding a "fld_num=" type TypeFld) or

@@ -135,9 +135,8 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   public TypeFld make_from(Type t) { return t==_t ? this : make(_fld,t,_access); }
   public TypeFld make_from(Type t, Access a) { return (t==_t && a==_access) ? this : make(_fld,t,a); }
   // For some tests
-  public static final TypeFld ANY_DSP = make_dsp(Type.ANY);
-  public static final TypeFld NO_DSP  = make_dsp(TypeNil.NO_DSP);
-
+  public static final TypeFld ANY_CLZ = make(CLZ,Type.ANY,Access.Final);
+  
   @Override protected TypeFld xdual() {
     if( _t==_t.dual() && _access==_access.dual() )
       return this;              // Self symmetric
@@ -171,8 +170,6 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     @Override public String toString() { return LONGS[ordinal()]; }
     public SB str(SB sb) { return sb.p(SHORTS[ordinal()]); }
   }
-
-  public static final TypeFld NO_DISP = make(CLZ,Type.ANY,Access.Final);
 
   // Setting the type during recursive construction.
   public TypeFld setX(Type t) {

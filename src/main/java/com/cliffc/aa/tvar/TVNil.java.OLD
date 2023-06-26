@@ -22,7 +22,6 @@ public class TVNil extends TV3 {
   public TVLeaf not_nil() { return (TVLeaf)arg(0); }
 
   @Override int eidx() { return TVErr.XNIL; }
-  @Override public TVNil as_nil() { return this; }
   
   // -------------------------------------------------------------
   // No sub-parts to union
@@ -79,20 +78,18 @@ public class TVNil extends TV3 {
 
 
   // -------------------------------------------------------------
-  @Override boolean _trial_unify_ok_impl( TV3 that ) {
-    if( that instanceof TVNil ) return true;
+  @Override int _trial_unify_ok_impl( TV3 that ) {
+    if( that instanceof TVNil nil )
+      return not_nil()._trial_unify_ok(nil.not_nil());
     if( that instanceof TVPtr ptr ) {
+      if( ptr.load()!=null )
+        throw unimpl();
       if( ptr._t!=null && ptr._t.must_nil() )   // Some primitives will unify with NIL
-        return true;
-      return ptr._may_nil;
+        return 1;
+      return ptr._may_nil ? 1 : 0;
     }
-    if( that instanceof TVStruct ts ) {
-      //TV3 self = ts.arg(TypeStruct.SELF);
-      //if( self==null ) return false;
-      //return _trial_unify_ok_impl(self,extras);
-      throw unimpl();
-    }
-    return false;
+    //return -1;
+    throw unimpl();
   }
 
   @Override boolean _exact_unify_impl( TV3 tv3 ) { throw unimpl(); }

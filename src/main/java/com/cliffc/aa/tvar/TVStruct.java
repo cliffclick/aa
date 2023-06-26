@@ -2,6 +2,7 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeFld;
 import com.cliffc.aa.util.*;
 
 import java.util.Arrays;
@@ -56,13 +57,13 @@ public class TVStruct extends TVExpanding {
   // Made from a Field or SetField; fields are pinned known but might be open
   public TVStruct( String[] flds, TV3[] tvs, boolean open ) {
     super(tvs);
-    assert Util.find(flds,".")<=0;
     _flds = flds;
     _pins = new boolean[flds.length];
     Arrays.fill(_pins,true);
     _open = open;
     _max = flds.length;
     assert tvs.length==_max;
+    assert idx(TypeFld.CLZ)<=0;
   }
 
   // Clazz for this struct, or null for ClazzClazz
@@ -323,20 +324,20 @@ public class TVStruct extends TVExpanding {
     return progress;
   }
 
-  @Override boolean _trial_unify_ok_impl( TV3 tv3 ) {
-    if( this==tv3 ) return true;
-    TVStruct that = (TVStruct)tv3; // Invariant when called
-    for( int i=0; i<_max; i++ ) {
-      if( Resolvable.is_resolving( _flds[i]) ) continue;
-      TV3 lhs = arg(i);
-      TV3 rhs = that.arg(_flds[i]); // RHS lookup by field name
-      if( lhs!=rhs && rhs!=null && !lhs._trial_unify_ok(rhs) )
-        return false;           // Child fails to unify
-    }
-
-    // Allow unification with extra fields.  The normal unification path
-    // will not declare an error, it will just remove the extra fields.
-    return this.mismatched_child(that) && that.mismatched_child(this);
+  @Override int _trial_unify_ok_impl( TV3 tv3 ) {
+    TVStruct that = tv3.as_struct(); // Invariant when called
+    //for( int i=0; i<_max; i++ ) {
+    //  if( Resolvable.is_resolving( _flds[i]) ) continue;
+    //  TV3 lhs = arg(i);
+    //  TV3 rhs = that.arg(_flds[i]); // RHS lookup by field name
+    //  if( lhs!=rhs && rhs!=null && !lhs._trial_unify_ok(rhs) )
+    //    return false;           // Child fails to unify
+    //}
+    //
+    //// Allow unification with extra fields.  The normal unification path
+    //// will not declare an error, it will just remove the extra fields.
+    //return this.mismatched_child(that) && that.mismatched_child(this);
+    throw unimpl();
   }
 
   private boolean mismatched_child(TVStruct that ) {

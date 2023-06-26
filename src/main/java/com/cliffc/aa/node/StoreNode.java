@@ -236,7 +236,7 @@ public class StoreNode extends Node {
       rez.unify(stz = new TVStruct(true),false);
 
     if( adr instanceof TVPtr ptr ) ptr.load().unify(stz,false);
-    else adr.unify(new TVPtr(BitsAlias.EMPTY,stz),false);
+    else adr.unify(new TVPtr(BitsAlias.NALL,stz),false);
     return null;
   }
 

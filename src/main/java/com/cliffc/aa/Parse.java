@@ -677,7 +677,7 @@ public class Parse implements Comparable<Parse> {
       int lhsidx = lhs.push();
       Parse err = errMsg(opx);
       // Load against LHS pointer.  If this is a primitive, the Load produces
-      // the primitive clazz.  Otherwise this loads the clazz from the
+      // the primitive clazz.  Otherwise, this loads the clazz from the
       // reference for a clazz field lookup.
       Node val = gvn(new LoadNode(mem(),lhs,err));
       // Get the overloaded operator field, always late binding
@@ -686,15 +686,16 @@ public class Parse implements Comparable<Parse> {
       Node tuple = gvn(new LoadNode(mem(),over,err));
       // Get the resolved operator from the overload
       Node fun = gvn(new FieldNode(tuple,"_",err));
-      int fidx = fun.push();
+      Node bind= gvn(new BindFPNode(fun,Node.peek(lhsidx),false));
+      int fidx = bind.push();
       // Parse the RHS operand
       Node rhs = binop._lazy
         ? _lazy_expr(binop)
         : _expr_higher_require(binop);
       // Emit the call to both terms
-      fun = Node.pop(fidx);
+      bind = Node.pop(fidx);
       // LHS in unhooked prior to optimizing/replacing.
-      lhs = do_call(errMsgs(opx,lhsx,rhsx), args(Node.pop(lhsidx),rhs,fun));
+      lhs = do_call(errMsgs(opx,lhsx,rhsx), args(Node.pop(lhsidx),rhs,bind));
       // Invariant: LHS is unhooked
     }
   }
@@ -858,6 +859,7 @@ public class Parse implements Comparable<Parse> {
           // Loading an explicit Oper-name field Binds late (now), and
           // binds on the loaded overload.
           castnn = Node.pop(cidx);
+
           n = is_oper ? gvn(new BindFPNode(fd, castnn, true)) : fd;
           if( !is_oper ) { Env.GVN.add_flow(Env.GVN.add_reduce(castnn)); kill(castnn); }
         }
@@ -1213,8 +1215,8 @@ public class Parse implements Comparable<Parse> {
       
       _e = e._par;            // Pop nested environment; pops nongen also
       Node fptr = gvn(new FunPtrNode(ret));
-      // Anonymous functions early-bind
-      Node bind = gvn(new BindFPNode(fptr,scope().ptr(),false));
+      // Anonymous functions early-bind.  Functions in structs become "methods" and late-bind.
+      Node bind = scope().stk().is_closure() ? gvn(new BindFPNode(fptr,scope().ptr(),false)) : fptr;
       Node.pop(fun_idx);        // Now FunNode thinks it is being used
       bptr_idx = bind.push();   // Return function; close-out and DCE 'e'
     }

@@ -30,13 +30,13 @@ public class TVLambda extends TV3 {
   public TV3 ret () { return arg(0); }
   public TV3 dsp () { return arg(DSP_IDX); }
   public int nargs(){ return len(); }
-  public TVLambda clr_dsp() { _args[DSP_IDX] = new TVLeaf(); return this; }
+  public TVLambda clr_dsp() { _args[DSP_IDX] = null; return this; }
 
   @Override public TVLambda as_lambda() { return this; }
 
   @Override int eidx() { return TVErr.XFUN; }
 
-  @Override TV3 find_nil() { return this; } // TODO: Push down to each child
+  //@Override TV3 find_nil() { return this; } // TODO: Push down to each child
 
   // -------------------------------------------------------------
   @Override public void _union_impl( TV3 tv3) { }
@@ -46,7 +46,7 @@ public class TVLambda extends TV3 {
     int nargs = nargs(), tnargs = ((TVLambda)that).nargs();
     int i;
     for( i=0; i<Math.min(nargs,tnargs); i++ ) {
-      if( _args[i]==null ) continue;
+      if( _args[i]==null ) { assert that._args[i]==null; continue; }
       thsi.arg( i )._unify( that.arg( i ), false );
       thsi = thsi.find();
       that = that.find();      
@@ -79,14 +79,17 @@ public class TVLambda extends TV3 {
   // -------------------------------------------------------------
   // Sub-classes specify trial_unify on sub-parts.
   // Check arguments, not return nor omem.
-  @Override boolean _trial_unify_ok_impl( TV3 tv3 ) {
+  @Override int _trial_unify_ok_impl( TV3 tv3 ) {
     TVLambda that = (TVLambda)tv3; // Invariant when called
-    if( nargs() != that.nargs() ) return false; // Fails to be equal
+    if( nargs() != that.nargs() ) return -1; // Fails to be equal
     // Check all other arguments
-    for( int i=DSP_IDX; i<nargs(); i++ )
-      if( !arg(i)._trial_unify_ok(that.arg(i)) )
-        return false;           // Arg failed, so trial fails
-    return true;                // Unify will work
+    int cmp = 1;
+    for( int i=DSP_IDX; i<nargs(); i++ ) {
+      int acmp = arg(i)._trial_unify_ok(that.arg(i));
+      if( acmp == -1 ) return -1; // Arg failed so trial fails
+      cmp &= acmp;                // Maybe arg makes trial a maybe
+    }
+    return cmp;                   // Trial result
   }
 
   @Override boolean _exact_unify_impl( TV3 tv3 ) { return true; }

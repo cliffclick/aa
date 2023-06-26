@@ -1,9 +1,9 @@
 package com.cliffc.aa.tvar;
 
-import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.node.FieldNode;
 import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.NonBlockingHashMapLong;
 
 import static com.cliffc.aa.AA.unimpl;
 
@@ -22,44 +22,77 @@ public interface Resolvable {
   TV3 match_tvar();
   
   // Attempt to resolve an unresolved field.  No change if test, but reports progress.
-  // Returns:
-  // - 0  zero matching choices
-  // - 1  exactly one choice; resolvable (and resolved if not testing)
-  // - 2+ two or more choices; resolve is ambiguous
+  // ( @{name:str, ... } @{ age=A } ) -vs- @{ age=B } // Ambiguous, first struct could pick up age, 2nd struct A & B could fail later
+  // ( @{name:str      } @{ age=A } ) -vs- @{ age=B } // Ambiguous, first struct is a clear miss  , 2nd struct A & B could fail later
+  // ( @{name:str      } @{ age=A } ) -vs- @{ age=A } // OK, A & A cannot miss
+  // ( @{name:str, ... } @{ age=A } ) -vs- @{ age=A } // Ambiguous, first struct could pick up age=A
+  // 
+  // So each match has the following 3 choices
+  // - hard no , something structural is wrong
+  // - hard yes, all parts match, even leaf-for-leaf.  No open struct in pattern.
+  // - maybe   , all parts match, except leafs.  Leafs might expand later and fail.
   
   // "Pattern leafs" are just any TV3 that, if it changes might effect the match outcome.
   Ary<TVExpanding> PAT_LEAFS = new Ary<>(new TVExpanding[1],0);
+
+  // A cache for hard-no answers.  Once a no, always a no.  Faster to lookup
+  // than to fail the trial again.
+  NonBlockingHashMapLong<TV3> HARD_NO = new NonBlockingHashMapLong<>();
   
   default boolean trial_resolve( boolean outie, TV3 pattern, TVStruct rhs, boolean test ) {
     assert !rhs.is_open() && is_resolving();
 
     // Not yet resolved.  See if there is exactly 1 choice.
     PAT_LEAFS.clear();
-    String lab = null;
+    int yes=0, maybe=0;
+    String lab=null;
     for( int i=0; i<rhs.len(); i++ ) {
       String id = rhs.fld(i);
       if( is_resolving(id) ) continue;
-      if( pattern.trial_unify_ok(rhs.arg(id)) ) {
-        if( lab==null ) lab=id;   // No choices yet, so take this one
-        else {
-          // 2nd choice; ambiguous; either cannot resolve (yet), or too late
-          // and will never resolve.  Record all pattern leaves in the RHS
-          // delay list which may later expand and force the resolve.
-          if( Combo.HM_AMBI ) {
-            return ((FieldNode)this).resolve_ambiguous_msg();
-          } else {
-            // Not resolvable (yet).  Delay until it can resolve.
-            while( PAT_LEAFS._len>0 )
-              PAT_LEAFS.pop().add_delay_resolve(rhs);
-          }
-          return false;
-        }
+      TV3 rhsx = rhs.arg(id);
+      // Quick fail check: having failed once, just fail again
+      long dbl_uid = pattern.dbl_uid(rhsx);
+      TV3 fail = HARD_NO.get(dbl_uid);
+      if( fail != null ) {
+        assert fail==rhsx;
+        assert pattern.trial_unify_ok(rhsx)== -1;
+        continue;
+      }
+      // Count YES, NO, and MAYBEs
+      switch( pattern.trial_unify_ok( rhsx ) ) {
+      case -1 -> HARD_NO.put( dbl_uid, rhsx ); // Cheaper fail next time
+      case 0 ->   maybe++;
+      case 1 -> { yes++; lab = id; } // Also track a sample YES label
       }
     }
-    if( lab==null ) return false; // No match, so error and never resolves
-    // Field can be resolved to label
-    if( test ) return true;     // Will be progress to resolve
 
+    switch( yes ) {
+    case 0:
+      // No YESes, no MAYBES, this is an error
+      if( maybe==0 ) return ((FieldNode)this).resolve_failed_no_match();
+      // no YESes, but more maybes: wait.
+      else return stall(rhs);
+    case 1:
+      // Exactly one yes and no maybes: we can resolve this now
+      if( maybe==0 ) return test || resolve_it(outie,pattern,rhs,lab);
+      // Got a YES, but some maybe might become another hard YES, which is an error.
+      else return stall(rhs);
+    default:
+      // 2+ hard-yes.  This is a hard error, and can never resolve.
+      throw unimpl();
+    }
+  }
+
+  // Stall the resolve, and see if we can resolve later
+  default boolean stall(TVStruct rhs) {
+    // Not resolvable (yet).  Delay until it can resolve.
+    while( PAT_LEAFS._len>0 )
+      PAT_LEAFS.pop().add_delay_resolve(rhs);
+    return false;
+  }
+  
+  // Field can be resolved to label    
+  default boolean resolve_it(boolean outie, TV3 pattern, TVStruct rhs, String lab ) {
     String old_fld = resolve(lab);      // Change field label
     boolean old = rhs.del_fld(old_fld); // Remove old label from rhs, if any
     TV3 prior = rhs.arg(lab);           // Get prior matching rhs label, if any
@@ -68,16 +101,18 @@ public interface Resolvable {
       //rhs.add_fld(lab,pattern); // Add label and pattern, basically replace unresolved old_fld with lab
       throw unimpl(); // todo needs pinned
     } else {
-      if( outie ) prior. unify(pattern,test); // Merge pattern and prior label in RHS
-      else        prior._unify(pattern,test); // Merge pattern and prior label in RHS
+      if( outie ) prior. unify(pattern,false); // Merge pattern and prior label in RHS
+      else        prior._unify(pattern,false); // Merge pattern and prior label in RHS
     }
     return true;              // Progress
   }
-
-  static boolean add_pat_leaf(TVExpanding leaf) {
+  
+  // Track expanding terms; this need to recheck the match if they expand.
+  // Already return 0 for a "maybe".
+  static int add_pat_dep(TVExpanding leaf) {
     if( PAT_LEAFS.find(leaf)== -1 )
       PAT_LEAFS.add(leaf);
-    return true;
+    return 0;                   // Always reports a "maybe"
   }
     
   // Resolve failed; if ambiguous report that; if nothing present report that;
@@ -89,4 +124,7 @@ public interface Resolvable {
     fld.deps_work_clear();
   }
   
+  public static void reset_to_init0() {
+    HARD_NO.clear();
+  }
 }

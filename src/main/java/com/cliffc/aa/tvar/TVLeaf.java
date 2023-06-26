@@ -17,7 +17,7 @@ public class TVLeaf extends TVExpanding {
   @Override int eidx() { throw unimpl(); }
 
   // No improvement, return the not-nil leader
-  @Override TV3 find_nil() { throw unimpl(); }
+  //@Override TV3 find_nil() { throw unimpl(); }
 
   // -------------------------------------------------------------
   @Override boolean _unify_impl(TV3 that ) {
@@ -38,8 +38,8 @@ public class TVLeaf extends TVExpanding {
     else that._deps.addAll(_deps);
   }
 
-  // Always unifies
-  @Override boolean _trial_unify_ok_impl( TV3 tv3 ) { return true; }
+  // Always maybe unifies
+  @Override int _trial_unify_ok_impl( TV3 tv3 ) { return 0; }
 
   // Never unifies
   @Override boolean _exact_unify_impl( TV3 tv3 ) { return false; }

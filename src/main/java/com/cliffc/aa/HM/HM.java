@@ -2188,7 +2188,7 @@ public class HM {
     // Assemble a rich / deep pointer from parts
     default TypeMemPtr _tmp(int alias, String[] ids, Type[] ts) {
       TypeFld[] tfs = TypeFlds.get(1);  // Display
-      tfs[0] = TypeFld.NO_DISP;
+      tfs[0] = null;// NO_DSP
       for( int i=0; i<ts.length; i++ )                // Insert and alpha sort 
         tfs = TypeFlds.add_sort(tfs,TypeFld.make(ids[i],ts[i]));
       return TypeMemPtr.make(alias,TypeStruct.make_flds(Type.ALL,tfs));

@@ -5,8 +5,6 @@ import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import org.jetbrains.annotations.NotNull;
 
-import static com.cliffc.aa.AA.unimpl;
-
 // Gain precision after an If-test.
 public class CastNode extends Node {
   public final Type _t;
@@ -73,42 +71,28 @@ public class CastNode extends Node {
   @Override public boolean unify( boolean test ) {
     TV3 maynil = tvar(1); // arg in HM
     TV3 notnil = tvar();  // ret in HM
+    // If the cast is already satisfied, then no change
+    if( maynil==notnil ) return false;
 
     // Cast-notnil vs Cast-other
 
-    // If the maynil is already nil-checked, can be a nilable of a nilable.
-    // If the cast is already satisfied, then no change
-    if( maynil==notnil ) return false;
+    if( maynil instanceof TVErr merr && merr.as_ptr() != null ) maynil = merr.as_ptr();
+    if( notnil instanceof TVErr nerr && nerr.as_ptr() != null ) notnil = nerr.as_ptr();
 
     // Never a nilable nor nil
     if( maynil instanceof TVStruct )
       return notnil.unify(maynil,test);
 
-    // Already an expanded nilable
-    if( maynil instanceof TVNil tmaynil && tmaynil.not_nil() == notnil )
-      return false;
-
-    if( maynil instanceof TVErr merr && merr.as_ptr() != null ) maynil = merr.as_ptr();
-    if( notnil instanceof TVErr nerr && nerr.as_ptr() != null ) notnil = nerr.as_ptr();
-    
     // Already an expanded nilable with ptr
     if( maynil instanceof TVPtr mptr && notnil instanceof TVPtr nptr )
       return mptr.load().unify(nptr.load(),test);
-
-    // Can be nilable of nilable; fold the layer
-    if( maynil instanceof TVNil && notnil instanceof TVNil )
-      throw unimpl(); // return maynil.unify(notnil,work);
 
     // Stall, until notnil becomes a TVNilable or a TVStruct
     if( maynil instanceof TVLeaf )
       return maynil.deps_add_deep(this);
 
-    // TODO: Probably need to as_struct or as_base or as_ptr all of these
-    if( maynil instanceof TVErr && notnil instanceof TVErr )
-      return false;
-
     // Unify the maynil with a nilable version of notnil
-    return new TVNil(notnil).find().unify(maynil,test);
+    return notnil.unify(maynil,test);
   }
 
   @Override public @NotNull CastNode copy( boolean copy_edges) {

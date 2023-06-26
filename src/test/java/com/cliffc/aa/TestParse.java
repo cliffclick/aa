@@ -1,4 +1,4 @@
-package com.cliffc.aa;
+  package com.cliffc.aa;
 
 import com.cliffc.aa.node.PrimNode;
 import com.cliffc.aa.tvar.TV3;
@@ -31,9 +31,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    test("{ x -> 1+x }","[%f0]{any,4 -> %[2][2,55]?}",
-            "{A B -> C }", // Something that 1+ works on
-            null, null, null,"[%f0]");
+    testerr("-1== --", "Missing term after operator '-_'",7);
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(2),fact(2.2))","*[14](nil,1,2)","*[14](int64,int64,int64)", null, null, "[14]", null);
   }
   
@@ -64,9 +62,9 @@ public class TestParse {
     // Simple no-arg anonymous function, being called
     test("{5}()", "5", "5");
     // TestHM.a_basic_01
-    test("{ x -> ( 3, x )}", "[%f0]{any,4 -> *[%a2](3, %[2,%a2][2,%f0]?) }", "{ A B -> *[%a2](3, B) }", null, null, "[%a2]", "[%f0]");
+    test("{ x -> ( 3, x )}", "[%f0]{---,4 -> *[%a2](3, %[2,%a2][2,%f0]?) }", "{ A B -> *[%a2](3, B) }", null, null, "[%a2]", "[%f0]");
     // TestHM.a_basic_02
-    test("{ z -> ((z 0), (z \"abc\")) }", "[%f0]{any,4 -> *[%a3](%[2,%a2,%a3][2,%f0]?, %[2,%a2,%a3][2,%f0]?) }",
+    test("{ z -> ((z 0), (z \"abc\")) }", "[%f0]{---,4 -> *[%a3](%[2,%a2,%a3][2,%f0]?, %[2,%a2,%a3][2,%f0]?) }",
          "{A {B *[%a2]str:(97)? -> C } -> *[%a3](C,C) }",
          null, null,
          "[%a2,%a3]", "[%f0]" );
@@ -77,7 +75,7 @@ public class TestParse {
     // 'g' is not-fresh in function 'f'.
     // 'f' IS fresh in the body of 'g' pair.
     test("{ g -> f = { ignore -> g }; (f 3, f \"abc\")}",
-         "[%f0]{any,4 -> *[%a4](%[2,%a4][2,%f0]?, %[2,%a4][2,%f0]?) }",
+         "[%f0]{---,4 -> *[%a4](%[2,%a4][2,%f0]?, %[2,%a4][2,%f0]?) }",
          "{ A B -> *[%a4]( B, B) }",
          null,null,"[%a4]","[%f0]");
 
@@ -139,22 +137,22 @@ public class TestParse {
     test("1", "1", "1");
     // Unary operator
     test("-1", "-1", "-1");
-    test("!1", "nil", "A?");
+    test("!1", "nil", "*[0](...)?");
     // Binary operators
     test("1+2", "3", "3");
     test("1-2", "-1",  "-1");
     test("1+2*3", "7", "7");
     test("1  < 2", "1", "1");
     test("1  <=2", "1", "1");
-    test("1  > 2", "nil", "A?");
-    test("1  >=2", "nil", "A?");
-    test("1  ==2", "nil", "A?");
+    test("1  > 2", "nil", "*[0](...)?");
+    test("1  >=2", "nil", "*[0](...)?");
+    test("1  ==2", "nil", "*[0](...)?");
     test("1  !=2", "1", "1");
     test("1.2< 2", "1", "1");
     test("1.2<=2", "1", "1");
-    test("1.2> 2", "nil", "A?");
-    test("1.2>=2", "nil", "A?");
-    test("1.2==2", "nil", "A?");
+    test("1.2> 2", "nil", "*[0](...)?");
+    test("1.2>=2", "nil", "*[0](...)?");
+    test("1.2==2", "nil", "*[0](...)?");
     test("1.2!=2", "1", "1");
 
     // Binary with precedence check
@@ -194,9 +192,9 @@ public class TestParse {
     test("1._+_._(2;3)", "4", "4"); // statements in arguments
     // Operators squished together
     test("-1== -1",  "1",  "1");
-    test("0== !!1",  "nil", "A?");
-    test("2==-1",    "nil", "A?");
-    test("-1==--1",  "nil", "A?");
+    test("0== !!1",  "nil", "*[0](...)?");
+    test("2==-1",    "nil", "*[0](...)?");
+    test("-1==--1",  "nil", "*[0](...)?");
     test("-1==---1", "1",  "1");
     testerr("-1== --", "Missing term after operator '-_'",7);
   }

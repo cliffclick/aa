@@ -121,7 +121,7 @@ public class TypeMem extends Type<TypeMem> {
   @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
     for( int i = 1; i< _objs.length; i++ ) {
       TypeStruct ts = _objs[i];
-      if( ts!=null && i>BitsAlias.EXTX && i<PrimNode.MAX_PRIM_ALIAS && !ts.is_prim_clz() )
+      if( ts!=null && i>BitsAlias.STRX && i<PrimNode.MAX_PRIM_ALIAS && !ts.is_prim_clz() )
         ts._str_dups(visit,dups,ucnt);
     }
   }
@@ -135,7 +135,7 @@ public class TypeMem extends Type<TypeMem> {
     if( indent ) sb.ii(1).nl(); // Indent memory
     for( int i = 1; i< _objs.length; i++ )
       if( _objs[i] != null ) {
-        if( i>BitsAlias.EXTX && i<PrimNode.MAX_PRIM_ALIAS && !_objs[i].is_prim_clz() )
+        if( i>BitsAlias.STRX && i<PrimNode.MAX_PRIM_ALIAS && !_objs[i].is_prim_clz() )
           continue;             // Skip all the redundant prims
         if( indent ) sb.i();
         _objs[i]._str(visit,dups, sb.p(i).p(':'), debug, indent).p(",");
@@ -438,7 +438,7 @@ public class TypeMem extends Type<TypeMem> {
   // Not-null if found a dull ptr, null if all ptrs sharp
   private static TypeMemPtr _is_sharp(Type t) {
     if( DULLV.tset(t._uid) ) return null;
-    if( !(t instanceof Cyclic cyc) ) return null;
+    if( !(t instanceof Cyclic) ) return null;
     if( t instanceof TypeMemPtr tmp && tmp._obj==TypeStruct.ISUSED ) return tmp;
     return t.walk((fld,ignore) -> _is_sharp(fld), (x,y)-> x==null ? y : x);
   }

@@ -10,7 +10,6 @@ import java.util.Set;
 
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
-import static com.cliffc.aa.type.TypeNil.NO_DSP;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -288,7 +287,7 @@ public class TestNodeSmall {
     TypeFunPtr tmint = v(mint,gvn), tmintX = tmint.dual();
     TypeFunPtr tmflt = v(mflt,gvn), tmfltX = tmflt.dual();
 
-    TypeFunPtr tmul1E = TypeFunPtr.make(false,BitsFun.EMPTY,0,NO_DSP,null); // All bad choices
+    TypeFunPtr tmul1E = TypeFunPtr.make(false,BitsFun.EMPTY,0,TypeNil.NO_DSP,null); // All bad choices
 
     assert tadd1X.isa(tnum1X) && tnum1X.isa(tflt1X) && tflt1X.isa(tnum1) && tnum1.isa(tadd1);
 

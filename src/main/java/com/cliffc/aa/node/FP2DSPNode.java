@@ -18,7 +18,9 @@ public class FP2DSPNode extends Node {
   @Override public Type value() {
     Type fpt = fp()._val;
     if( fpt == Type.ANY || fpt == Type.ALL ) return fpt;
-    return (fpt instanceof TypeFunPtr tfp) ? tfp.dsp() : fpt.oob();
+    return (fpt instanceof TypeFunPtr tfp)
+      ? (tfp.has_dsp() ? tfp.dsp() : Type.ANY )
+      : fpt.oob();
   }
 
   private static final Type DSP_LIVE = TypeStruct.UNUSED.add_fldx(TypeFld.make("dsp",Type.ALL));

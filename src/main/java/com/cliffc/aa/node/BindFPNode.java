@@ -33,8 +33,10 @@ public class BindFPNode extends Node {
   }
 
   private Type bind(Type fun, Type dsp, boolean over) {    
-    if( !over && fun instanceof TypeFunPtr tfp )
-      return tfp.make_from(dsp);
+    if( !over && fun instanceof TypeFunPtr tfp ) {
+      if( tfp.has_dsp() ) return tfp; // Already bound
+      return tfp.make_from(dsp);      // Bind it
+    }
     
     // Push Bind down into overloads
     if( over && fun instanceof TypeStruct ts ) {
@@ -94,19 +96,30 @@ public class BindFPNode extends Node {
   @Override public boolean unify( boolean test ) {
     boolean progress = false;
     TV3 fptv = fp().tvar();
-    if( _over && fptv instanceof TVStruct tvs ) {
+    if( _over && fptv instanceof TVPtr ptr ) {
+      TVStruct tvs = ptr.load();
       for( int i = 0; i < tvs.len(); i++ )
         if( !Resolvable.is_resolving(tvs.fld(i)) &&
             tvs.arg(i) instanceof TVLambda lam )
-          progress |= lam.dsp().unify(dsp().tvar(), test);
-    } else if( fptv instanceof TVLambda lam ) {
-      progress |= lam.dsp().unify(dsp().tvar(),test);
+          progress |= dsp_unify(lam.dsp(), dsp(), test);
+    } else if( fptv instanceof TVLambda lam ) {      
+      progress |= dsp_unify(lam.dsp(), dsp(), test);
     } else {
       fptv.deps_add(this);
     }
     return progress;
   }
 
+  private static boolean dsp_unify( TV3 dsp0, Node dsp, boolean test ) {
+    // Unbound Lambda becomes bound 1st time only
+    if( dsp0 == null ) {
+      TV3 dsp1 = dsp.tvar();
+      throw unimpl();
+    }
+    // Already bound, do not bind again
+    return false; // dsp0.unify(dsp1,test);
+  }
+  
   // Error to double-bind
   @Override public ErrMsg err( boolean fast ) {
     if( fp()._val instanceof TypeFunPtr tfp && tfp.has_dsp() &&

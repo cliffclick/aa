@@ -146,7 +146,7 @@ public class FieldNode extends Node implements Resolvable {
       Node fp = new FieldNode(sn,_fld,_bad).init();
       return new BindFPNode(fp,bind.dsp(),false).init();
     }
-    
+
     return null;
   }
   
@@ -260,7 +260,8 @@ public class FieldNode extends Node implements Resolvable {
   //                       Ambiguous, matching choices ({ int:int64 int:int64 -> int:int64 }, { int:int64 flt:nflt64 -> flt:flt64 }) vs { int:1 A -> B }
   //   ( { x -> x*2 }, { x -> x*3 })._ 4                             - LHS   known, no  clazz, ambiguous, report choices and match
   //                       Ambiguous, matching choices ({ A B -> C }, { D E -> F }) vs { G int:4 -> H }
-  public String resolve_failed_msg() {
+
+  private String resolve_failed_msg() {
     FieldNode fldn = this;
     String fld = null;          // Overloaded field name
     // If overloaded field lookup, reference field name in message
@@ -270,27 +271,38 @@ public class FieldNode extends Node implements Resolvable {
         fld = fldn._fld;        // Overloaded field name
       }
     } else fld = _fld;
-    boolean oper = fld!=null && Oper.is_oper(fld); // Is an operator?
+    if( fld==null ) return "";
+    return (Oper.is_oper(fld) ? " operator '" : " field '.") + fld + "'";
+    //boolean oper = fld!=null && Oper.is_oper(fld); // Is an operator?
     //if( oper && !_clz ) {
     //  String clz = FieldNode.clz_str(fldn.val(0));
     //  if( clz!=null ) fld = clz+fld; // Attempt to be clazz specific operator
     //}
-    TVStruct tvs = match_tvar() instanceof TVStruct ts ? ts : null;
-    String err, post;
-    if( !is_resolving() ) { err = "Unknown"; post=" in %: "; }
-    else if( tvs!=null && ambi(tvar(),tvs) ) { err = "Ambiguous, matching choices %"; post = " vs "; }
-    else if( unable(tvs) ) { err = "Unable to resolve"; post=": "; }
-    else { err = "No choice % resolves"; post=": "; }
-    if( fld!=null )
-      err += (oper ? " operator '" : " field '.")+fld+"'";
-    err += post;
-    return err;
+    //TVStruct tvs = match_tvar() instanceof TVStruct ts ? ts : null;
+    //String err, post;
+    //if( !is_resolving() ) { err = "Unknown"; post=" in %: "; }
+    //else if( tvs!=null && ambi(tvar(),tvs) ) { err = "Ambiguous, matching choices %"; post = " vs "; }
+    //else if( unable(tvs) ) { err = "Unable to resolve"; post=": "; }
+    //else { err = "No choice % resolves"; post=": "; }
+    //if( fld!=null )
+    //  err += (oper ? " operator '" : " field '.")+fld+"'";
+    //err += post;
+    //return err;
+  }
+
+  // No matches to pattern (no YESes, no MAYBEs).  Empty patterns might have no NOs.
+  public boolean resolve_failed_no_match() {
+    String err = "No choice % resolves"+resolve_failed_msg()+": ";
+    TV3 pattern = tvar();
+    TV3 tv0 = tvar(0);
+    assert tv0.as_struct().idx(_fld)==-1;             // No resolving field on RHS?  TODO: Delete & progress
+    return tv0.unify_err(err,pattern,_bad,false);
   }
   
   public boolean resolve_ambiguous_msg() {
     TV3 pattern = tvar();
     TV3 tv0 = tvar(0);
-    TVStruct ts = tv0.as_struct();
+    TVStruct ts = (TVStruct)tv0;
     boolean progress = ts.del_fld(_fld); // Do not push pinned uphill
     return tv0.unify_err("Ambiguous, matching choices % vs",pattern,_bad,false) | progress;
   }
@@ -298,9 +310,11 @@ public class FieldNode extends Node implements Resolvable {
   // True if ambiguous (more than one match), false if no matches.
   private boolean ambi(TV3 self, TVStruct tvs) {
     for( int i=0; i<tvs.len(); i++ )
-      if( !Resolvable.is_resolving(tvs.fld(i)) &&
-          self.trial_unify_ok(tvs.arg(i)) )
-        return true;
+      if( !Resolvable.is_resolving(tvs.fld(i)) )
+        //
+        //  self.trial_unify_ok(tvs.arg(i)) )
+        //return true;
+        throw unimpl();
     return false;
   }
   private static boolean unable( TVStruct tvs ) {

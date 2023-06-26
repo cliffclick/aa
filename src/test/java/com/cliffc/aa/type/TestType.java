@@ -6,19 +6,17 @@ import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import org.junit.Test;
 
-import static com.cliffc.aa.type.TypeNil.NO_DSP;
 import static org.junit.Assert.*;
 
 
 public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
-    //Object dummy = Env.TOP;
     Ary<Type> ts = Type.ALL_TYPES();
     
-    Type i = TypeInt.BOOL;
-    Type f = TypeFlt.FLT32;
-    Type mt = i.meet(f);
+    TypeFunPtr tfp0 = TypeFunPtr.NO_DSP_FUNPTR;
+    TypeFunPtr tfp1 = tfp0.make_from(null,TypeNil.SCALAR);
+    Type mt = tfp0.meet(tfp1);
     //assertSame(mt,f);
   }
 
@@ -403,7 +401,7 @@ public class TestType {
 
     // TypeTuple structure demands the shortest Tuple wins the "length
     // war" (determines the length of the result based on short's any/all flag).
-    TypeFunPtr f1i2i = TypeFunPtr.make_new_fidx(BitsFun.ALLX,2,NO_DSP,TypeInt.INT64);
+    TypeFunPtr f1i2i = TypeFunPtr.make_new_fidx(BitsFun.ALLX,2,TypeNil.NO_DSP,TypeInt.INT64);
     // To be a GF result, GF has to be shorter and high; the isa does a meet of
     // TypeFunPtrs which does a *join* of args, which duals the GF args down
     // low.  GF is zero length and low, and wins the meet.
@@ -413,20 +411,20 @@ public class TestType {
     //assertTrue(gf.dual().isa(f1i2i)); // To be short result, short must be low
 
     assertTrue(f1i2i.isa(gf));
-    TypeFunPtr f1f2f = TypeFunPtr.make_new_fidx(BitsFun.ALLX,2,NO_DSP,TypeFlt.FLT64);
+    TypeFunPtr f1f2f = TypeFunPtr.make_new_fidx(BitsFun.ALLX,2,TypeNil.NO_DSP,TypeFlt.FLT64);
     assertTrue(f1f2f.isa(gf));
     TypeFunPtr mt = (TypeFunPtr)f1i2i.meet(f1f2f);
     int fidx0 = f1i2i.fidx();
     int fidx1 = f1f2f.fidx();
     BitsFun funs = BitsFun.make0(fidx0).meet(BitsFun.make0(fidx1));
     Type tu = TypeInt.INT64.meet(TypeFlt.FLT64);
-    TypeFunPtr f3i2r = TypeFunPtr.make(false,funs,2,NO_DSP,tu);
+    TypeFunPtr f3i2r = TypeFunPtr.make(false,funs,2,TypeNil.NO_DSP,tu);
     assertEquals(f3i2r,mt);
     assertTrue(f3i2r.isa(gf));
     assertTrue(f1i2i.isa(f3i2r));
     assertTrue(f1f2f.isa(f3i2r));
 
-    TypeFunPtr f2 = TypeFunPtr.make(false,BitsFun.make0(fidx1),2,NO_DSP,TypeInt.INT64); // Some generic function (happens to be #23, '&')
+    TypeFunPtr f2 = TypeFunPtr.make(false,BitsFun.make0(fidx1),2,TypeNil.NO_DSP,TypeInt.INT64); // Some generic function (happens to be #23, '&')
     assertTrue(f2.isa(gf));
   }
 

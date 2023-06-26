@@ -89,13 +89,14 @@ abstract public class TV3 implements Cloneable {
   // Find the leader, with rollup.  Used in many, many places.
   public TV3 find() {
     TV3 leader = _find0();
-    // Additional read-barrier for TVNil to collapse nil-of-something
-    if( !(leader instanceof TVNil tnil) ) return leader;
-    TV3 nnn = leader.arg(0);
-    if( nnn instanceof TVLeaf ) return leader; // No change
-    nnn = nnn.find_nil();
-    leader.union(nnn);
-    return nnn;
+    return leader;
+    //// Additional read-barrier for TVNil to collapse nil-of-something
+    //if( !(leader instanceof TVNil tnil) ) return leader;
+    //TV3 nnn = leader.arg(0);
+    //if( nnn instanceof TVLeaf ) return leader; // No change
+    //nnn = nnn.find_nil();
+    //leader.union(nnn);
+    //return nnn;
   }
   public TV3 _find0() {
     if( _uf    ==null ) return this;// Shortcut, no rollup
@@ -106,13 +107,14 @@ abstract public class TV3 implements Cloneable {
   private TV3 _find() {
     TV3 leader = _uf._uf.debug_find();    // Leader
     TV3 u = this;
+    // Rollup.  Critical to the O(lg lg n) running time of the UF algo.
     while( u!=leader ) { TV3 next = u._uf; u._uf=leader; u=next; }
     return leader;
   }
 
   // Bases return the not-nil base; pointers return the not-nil pointer.
   // Nested nils collapse.
-  TV3 find_nil() { throw unimpl(); }
+  //TV3 find_nil() { throw unimpl(); }
 
   // Fetch a specific arg index, with rollups
   public TV3 arg( int i ) {
@@ -131,10 +133,10 @@ abstract public class TV3 implements Cloneable {
   abstract int eidx();
   public TVStruct as_struct() { throw unimpl(); }
   public TVLambda as_lambda() { throw unimpl(); }
-  public TVNil    as_nil   () { throw unimpl(); }
+  //public TVNil    as_nil   () { throw unimpl(); }
   public TVPtr    as_ptr   () { throw unimpl(); }
 
-  private long dbl_uid(TV3 t) { return dbl_uid(t._uid); }
+  public  long dbl_uid(TV3 t) { return dbl_uid(t._uid); }
   private long dbl_uid(long uid) { return ((long)_uid<<32)|uid; }
 
   TV3 strip_nil() { _may_nil = false; return this; }
@@ -233,9 +235,9 @@ abstract public class TV3 implements Cloneable {
     if( !(this instanceof TVLeaf) && that instanceof TVLeaf ) return test || that._unify_impl(this);
     if( !(that instanceof TVLeaf) && this instanceof TVLeaf ) return test || this._unify_impl(that);
 
-    // Nil can unify with a non-nil anything, typically
-    if( !(this instanceof TVNil) && that instanceof TVNil nil ) return nil._unify_nil(this,test);
-    if( !(that instanceof TVNil) && this instanceof TVNil nil ) return nil._unify_nil(that,test);
+    //// Nil can unify with a non-nil anything, typically
+    //if( !(this instanceof TVNil) && that instanceof TVNil nil ) return nil._unify_nil(this,test);
+    //if( !(that instanceof TVNil) && this instanceof TVNil nil ) return nil._unify_nil(that,test);
 
     // If 'this' and 'that' are different classes, unify both into an error
     if( getClass() != that.getClass() )
@@ -326,9 +328,9 @@ abstract public class TV3 implements Cloneable {
     if( that instanceof TVLeaf    ) // RHS is a tvar; union with a deep copy of LHS
       return test || vput(that,that.union(_fresh()));
 
-    // Special handling for nilable
-    if( !(that instanceof TVNil) && this instanceof TVNil nil ) return vput(that,nil._unify_nil_l(that,test));
-    if( !(this instanceof TVNil) && that instanceof TVNil nil ) return vput(nil._unify_nil_r(this,test),ptrue());
+    //// Special handling for nilable
+    //if( !(that instanceof TVNil) && this instanceof TVNil nil ) return vput(that,nil._unify_nil_l(that,test));
+    //if( !(this instanceof TVNil) && that instanceof TVNil nil ) return vput(nil._unify_nil_r(this,test),ptrue());
 
     // Two unrelated classes usually make an error
     if( getClass() != that.getClass() )
@@ -471,33 +473,33 @@ abstract public class TV3 implements Cloneable {
   // -------------------------------------------------------------
 
   // Do a trial unification between this and that.
-  // Report back false if any error happens, or true if no error.
+  // Report back -1 for hard-no, +1 for hard-yes, and 0 for maybe.
   // No change to either side, this is a trial only.
-  // Collect leafs and bases on the pattern (this).
+  // Collect leafs and bases and open structs on the pattern (this).
   private static final NonBlockingHashMapLong<TV3> TDUPS = new NonBlockingHashMapLong<>();
-  public boolean trial_unify_ok(TV3 that) {
+  public int trial_unify_ok(TV3 that) {
     TDUPS.clear();
     return _trial_unify_ok(that);
   }
-  boolean _trial_unify_ok(TV3 that) {
-    if( this==that ) return true; // No error
+  int _trial_unify_ok(TV3 that) {
+    if( this==that ) return 1; // hard-yes
     assert !unified() && !that.unified();
     long duid = dbl_uid(that._uid);
     if( TDUPS.putIfAbsent(duid,this)!=null )
-      return true;              // Visit only once, and assume will resolve
-    if( this instanceof TVLeaf leaf && !(that instanceof TVErr) ) return Resolvable.add_pat_leaf(leaf); // No error
-    if( that instanceof TVLeaf leaf && !(this instanceof TVErr) ) return Resolvable.add_pat_leaf(leaf); // No error
-    // Nil can unify with ints,flts,ptrs
-    if( this instanceof TVNil ) return this._trial_unify_ok_impl(that);
-    if( that instanceof TVNil ) return that._trial_unify_ok_impl(this);
+      return 1;                 // Visit only once, and assume will resolve
+    if( this instanceof TVLeaf leaf && !(that instanceof TVErr) ) return Resolvable.add_pat_dep(leaf); // No error
+    if( that instanceof TVLeaf leaf && !(this instanceof TVErr) ) return Resolvable.add_pat_dep(leaf); // No error
+    //// Nil can unify with ints,flts,ptrs, which are a different class.
+    //if( this instanceof TVNil ) return this._trial_unify_ok_impl(that);
+    //if( that instanceof TVNil ) return that._trial_unify_ok_impl(this);
     // Different classes always fail
-    if( getClass() != that.getClass() ) return false;
+    if( getClass() != that.getClass() ) return -1;
     // Subclasses check sub-parts
     return _trial_unify_ok_impl(that);
   }
 
   // Subclasses specify on sub-parts
-  boolean _trial_unify_ok_impl( TV3 that ) { throw unimpl(); }
+  int _trial_unify_ok_impl( TV3 that ) { throw unimpl(); }
 
   // -----------------
 
@@ -567,7 +569,7 @@ abstract public class TV3 implements Cloneable {
     //}
 
     case TypeNil tn -> tn == TypeNil.NIL
-      ? new TVNil( new TVLeaf() )
+      ? new TVPtr( BitsAlias.make0(0), new TVStruct(true) )
       : ((TVPtr)PrimNode.PINT.tvar()).make_from(tn);
     case Type tt -> {
       if( tt == Type.ANY || tt == Type.ALL ) yield new TVLeaf();
@@ -737,5 +739,6 @@ abstract public class TV3 implements Cloneable {
     TVField.reset_to_init0();
     TVStruct.reset_to_init0();
     TVExpanding.reset_to_init0();
+    Resolvable.reset_to_init0();
   }
 }

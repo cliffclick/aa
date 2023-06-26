@@ -32,14 +32,14 @@ public class TVPtr extends TV3 {
   
   @Override int eidx() { return TVErr.XPTR; }
 
-  // Make the leader a nilable version of 'this' child
-  @Override TV3 find_nil() {
-    TVPtr ptr = (TVPtr)copy();
-    if( ptr._t!=null )
-      ptr._t = (TypeNil)ptr._t.meet(TypeNil.NIL);
-    ptr.add_may_nil(false);
-    return ptr;
-  }
+  //// Make the leader a nilable version of 'this' child
+  //@Override TV3 find_nil() {
+  //  TVPtr ptr = (TVPtr)copy();
+  //  if( ptr._t!=null )
+  //    ptr._t = (TypeNil)ptr._t.meet(TypeNil.NIL);
+  //  ptr.add_may_nil(false);
+  //  return ptr;
+  //}
 
   // -------------------------------------------------------------
   // Union aliases
@@ -80,14 +80,14 @@ public class TVPtr extends TV3 {
   }
   
   // -------------------------------------------------------------
-  @Override boolean _trial_unify_ok_impl( TV3 tv3 ) {
+  @Override int _trial_unify_ok_impl( TV3 tv3 ) {
     TVPtr that = (TVPtr)tv3; // Invariant when called
     if( _t!=null && that._t!=null ) {
       if( _t.getClass() != that._t.getClass() ) {
-        // Mixed int/flat is bad, but always can mix in a nil
+        // Mixed int/float is bad, but always can mix in a nil
         if( _t!=TypeNil. NIL && that._t!=TypeNil. NIL && 
             _t!=TypeNil.XNIL && that._t!=TypeNil.XNIL )
-          return false;         // Wrong kind of bases
+          return -1;            // Wrong kind of bases
       }
     }
     return load()._trial_unify_ok(that.load());

@@ -51,12 +51,156 @@ Apply-quits-lifting-leaves.
 Repeat above loop.
 
 
-Might also invert TVErr -
-normal TVar has a null TVErr field.
-when error, fills in the _err field, but leafs the TVar alone.
-Another TVar in error, uses the same TVErr field.
-TVErr still points back at the TVars.
-Removes the as_struct/as_ptr problems.
+THIS MIGHT NOT WORK....  UNWOUND.
+#######################
+#Might also invert TVErr -
+#normal TVar has a null TVErr field.
+#when error, fills in the _err field, but leafs the TVar alone.
+#Another TVar in error, uses the same TVErr field.
+#TVErr still points back at the TVars.
+#Removes the as_struct/as_ptr problems.
+
+
+THIS MIGHT BE WORKING!!!
+#And I can kill TVNil since unify TVPtr & TVBase?
+# Still not checking polymorphic nil on map:
+     map( [A ] {A ->B} -> [B] ) vs
+     map( [A?] {A?->B} -> [B] )
+
+
+----------------------
+ACTION ITEMS:
+*- Add TypeFunPtr BOUND vs UNBOUND check.
+*- error to meet/join BOUND and UNBOUND
+- Make decent defaults for BOUND/UNBOUND
+*- Add TVLambda BOUND vs UNBOUND check.
+*- error to unify BOUND/UNBOUND.
+*- Load/Field are brainless about overloads
+- - PONDER FOLDING LOAD/FIELD BACK TOGETHER
+*- Lambda/Func in parser: if called from field-assign, no-bind; else bind.
+*- TVErr inversion: UNWIND?
+*- Back to Prim-Overs not ptrs
+
+
+- Bind knows opers
+- if no TFP/TVLambda, then NO-OP.
+- No oper, if   BOUND, then NO-OP.
+-          if UNBOUND, then BIND a TFP/TVLambda
+- Yes oper,
+- - Must be a TMP/TVPtr
+- - To a TypeStruct/TVStruct
+- - ForAll fields
+- - - Must be UNBOUND LAMBDA;
+- - - Then BIND it.
+
+
+Load/Field/Bind-vs-prims & overloads
+- Need a TypeFunPtr which can tell *bound* from *unbound*.
+- - DSP=ANY === UNBOUND        The Combo initial BOUND display is ANY.
+- - DSP=  all else === BOUND.  The Combo initial BOUND display is XSCALAR.
+- - typerror to meet/join BOUND and UNBOUND!!!!
+- - tverr    to unify     BOUND and UNBOUND!!!!
+- Bind XFER applies binding to unbound
+- Bind shallow fresh unifies allowing a binding.
+- - V123:( unbound Varg0 Varg1 -> Vres )  produces
+- - V456:( Vdsp    Varg0 Varg1 -> Vres )
+
+- Fold together Load/Field/Bind
+- - if Load becomes a TVLambda/TFP -
+- - - If unbound, bind it.
+- - - If   bound, do not change binding.
+- - if Load becomes a TVStruct/TMP
+- - - Repeat for all fields
+- - - - if TVLambda/TFP, assert UNbound; bind them
+- - if Load is other, no binding
+
+User writes "1._+_._(2)"
+- 1 is TVPtr of int klass
+- ._+_ is Load/Field/Bind, is oper, goes deep binding
+- ._   is Load/Field/Bind, but pre-bound, no more binding.
+
+Normal ".x"
+- .x is Load/Field/Bind, does the 1-deep bound/unbound check and binds as needed
+
+User writes "1._+_.0(2)"
+- 1 is TVPtr of int klass
+- ._+_ is Load/Field/Bind, is oper, goes deep binding
+- .0   is Load/Field/Bind, but pre-bound, no more binding.
+
+
+Back to Prims-Overs-as-Tuples
+Patterns allowed
+"1+2"   - Load(1)[@{INT}] -> Field _+_ [(choices)] -> Field _ [lambda] -> Call w/dsp(1), arg(2), and lambda
+
+"1._+_" - Load(1)[@{INT}] -> Field _+_ [(choices)] -> Bind_over [(bound_choices)]
+
+"x.y" - Load(ptr) [struct         ] -> Field y [field       ] -> Bind(ptr) [lambda ? bind_lambda : field]
+"x.y" - Load(str)![(bound_choices)] -> Field y [bound_choice] -> Bind(str)![bound_choice]
+
+
+
+
+Still bare lambdas get Bind, so maybe not fold Load/Field with Bind.
+( { a -> b } 123 ) // No load, so pre-bind to the current display.
+
+@{ str = { -> ..._pretty_print_self... } } // Lambda is stored.  No bind.
+
+// Makeing sure binding rules are sane for scopes/structs/classes:
+cnt:=0;
+sq = { x -> cnt++; x*x }; // Lambda is stored; bind to current stack display
+
+..{...    // Some scopes later
+  sq(5);  // sq is load/field from up-scope display; pre-bound when used.
+..}       // Close later scopes
+
+
+Base = :@{
+  cnt := 0;
+  vcall = { cnt++; }
+  sq = { x -> vcall(); x*x; }  // unbound since store in struct, dsp is typed as self-struct.
+}
+
+Child = Base:@{
+  vcall = { cnt += 2; }
+}
+
+b:Base = rand ? Base() : Child();
+b.sq(s); // Increments cnt by 1 or 2?  Binds sq here.
+
+
+
+----------------------
+Independent of Prims wanting to bind 2 layers down, I have a theory problem with early/late binding
+
+sq = { x -> x*x }; // In closure scope, early bind.
+z = @{
+  x = rnd             // Should HM Type-Error, mixing early and late-bound functions
+    ? sq              // Early bound
+    : { x -> x*x*x; } // Late bound
+}
+q = z.x; // Should I bind z into x or not???
+// Since z.x is a load, I always insert a Bind
+// Load should start as "unknown binding"
+//  - And falls to "early bind" or "late-bind".
+// I can imagine starting the Lambda there as a no-dsp/late-bind.
+// Then perhaps late-bind.
+// Then later, IF unifies sq-dsp with z-as-dsp & errors (badly).
+
+z0.x0 = z .x ; // Bind?
+z1.x1 = z0.x0; // Bind?
+z2.x2 = z1.x1; // Bind?
+z2.x2(args);   // Bind?  Then call...
+
+// I claim...
+Bind happens exactly once on all paths
+meet/unify of bound & unbound is an error state.
+- DSP goes to ALL or TVErr of the blend
+So DSP is either both bound or both unbound.
+Bind can use liveness to keep the fp unbound (if display is dead, still do not bind)
+
+
+
+
 
 
 

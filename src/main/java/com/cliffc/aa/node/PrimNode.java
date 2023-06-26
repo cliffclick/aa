@@ -43,7 +43,7 @@ public abstract class PrimNode extends Node {
     for( int i=DSP_IDX; i<formals._ts.length; i++ ) assert formals._ts[i] instanceof TypeNil || formals._ts[i]==Type.ANY;
     _formals = formals;
     _ret = ret;
-    _tfp=TypeFunPtr.make(fidx,formals.len(),TypeNil.NO_DSP,ret);
+    _tfp=TypeFunPtr.make(fidx,formals.len(),null,ret);
     _badargs=null;
   }
 
@@ -212,9 +212,7 @@ public abstract class PrimNode extends Node {
       }
       over.init();
       over.close();
-      NewNode ptr2 = new NewNode(BitsAlias.new_alias(BitsAlias.EXTX));
-      Env.SCP_0.set_mem(new StoreNode(Env.SCP_0.mem(),ptr2.add_flow(),over,null).init());
-      clz.add_fld(prims[0]._name,Access.Final,ptr2,null);
+      clz.add_fld(prims[0]._name,Access.Final,over,null);
     }
     clz.close();
     Env.PROTOS.put(clzname,clz); // global mapping

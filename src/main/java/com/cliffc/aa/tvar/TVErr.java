@@ -29,7 +29,7 @@ public class TVErr extends TV3 {
 
   @Override public TVStruct as_struct() { return (TVStruct)arg(XSTR); }
   @Override public TVLambda as_lambda() { return (TVLambda)arg(XFUN); }
-  @Override public TVNil    as_nil   () { return (TVNil   )arg(XNIL); }
+  //@Override public TVNil    as_nil   () { return (TVNil   )arg(XNIL); }
   @Override public TVPtr    as_ptr   () { return (TVPtr   )arg(XPTR); }
 
   @Override int eidx() { throw unimpl(); }
@@ -39,7 +39,7 @@ public class TVErr extends TV3 {
     return (_args[XSTR] = new TVLeaf());
   }
   
-  @Override TV3 find_nil() { return this; }
+  //@Override TV3 find_nil() { return this; }
 
   // This is Fresh, that is TVErr and missing index i.
   // Fresh copy LHS into RHS.
