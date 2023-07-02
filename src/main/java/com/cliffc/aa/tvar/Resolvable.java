@@ -1,5 +1,6 @@
 package com.cliffc.aa.tvar;
 
+import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.node.FieldNode;
 import com.cliffc.aa.util.Ary;
@@ -83,8 +84,11 @@ public interface Resolvable {
     }
   }
 
-  // Stall the resolve, and see if we can resolve later
+  // Stall the resolve, and see if we can resolve later.
+  // After HM_AMBI, it is too late, and we will never resolve.
   default boolean stall(TVStruct rhs) {
+    if( Combo.HM_AMBI )
+      return ((FieldNode)this).resolve_ambiguous_msg();
     // Not resolvable (yet).  Delay until it can resolve.
     while( PAT_LEAFS._len>0 )
       PAT_LEAFS.pop().add_delay_resolve(rhs);

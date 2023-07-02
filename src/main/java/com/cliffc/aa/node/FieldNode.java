@@ -262,14 +262,11 @@ public class FieldNode extends Node implements Resolvable {
   //                       Ambiguous, matching choices ({ A B -> C }, { D E -> F }) vs { G int:4 -> H }
 
   private String resolve_failed_msg() {
-    FieldNode fldn = this;
     String fld = null;          // Overloaded field name
     // If overloaded field lookup, reference field name in message
     if( is_resolving() ) {
-      if( in(0) instanceof FieldNode xfld ) {
-        fldn = xfld;            // Use parent field
-        fld = fldn._fld;        // Overloaded field name
-      }
+      if( in(0) instanceof FieldNode xfld )
+        fld = xfld._fld;        // Overloaded field name
     } else fld = _fld;
     if( fld==null ) return "";
     return (Oper.is_oper(fld) ? " operator '" : " field '.") + fld + "'";
@@ -302,9 +299,10 @@ public class FieldNode extends Node implements Resolvable {
   public boolean resolve_ambiguous_msg() {
     TV3 pattern = tvar();
     TV3 tv0 = tvar(0);
-    TVStruct ts = (TVStruct)tv0;
-    boolean progress = ts.del_fld(_fld); // Do not push pinned uphill
-    return tv0.unify_err("Ambiguous, matching choices % vs",pattern,_bad,false) | progress;
+    TVStruct ts = tv0.as_struct();
+    assert ts.idx(_fld)==-1;             // No longer storing overload in pattern
+    //boolean progress = ts.del_fld(_fld); // Do not push pinned uphill
+    return tv0.unify_err("Ambiguous, matching choices % vs ",pattern,_bad,false)/* | progress*/;
   }
   
   // True if ambiguous (more than one match), false if no matches.

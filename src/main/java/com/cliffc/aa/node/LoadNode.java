@@ -71,13 +71,13 @@ public class LoadNode extends Node {
   // Combo deals with constants, and not here.
   @Override public Type live_use( int i ) {
     assert _live instanceof TypeStruct ts && ts.flatten_live_fields()==ts;
+    Type adr = adr()._val;
     if( i==DSP_IDX )
       // If the input is a Struct and not a Pointer, this Load is a nop
-      return adr()._val instanceof TypeStruct ? _live : Type.ALL;
+      return adr instanceof TypeStruct ? _live : adr.oob();
     // Memory demands
     Node def=in(i);
     adr().deps_add(def);
-    Type adr = adr()._val;
     if( adr==Type.ANY ) return TypeMem.ANYMEM;
     if( !(adr instanceof TypeNil ptr) )
       return adr.oob(RootNode.def_mem(def));
