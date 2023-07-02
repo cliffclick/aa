@@ -15,7 +15,7 @@ import static com.cliffc.aa.AA.*;
 //"x.y"
 // Op   Adr   Value
 // Load ptr   TypeStruct
-// Field y    field       
+// Field y    field
 // Bind ptr   bound lambda, or original field
 //
 //"1._+_._"
@@ -85,14 +85,14 @@ public class LoadNode extends Node {
     if( ptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
     // Loading from a struct does not require memory
     if( ptr instanceof TypeStruct ) return TypeMem.ANYMEM;
-    
+
     // Demand memory produce the desired structs
     if( ptr._aliases==BitsAlias.NALL ) return RootNode.def_mem(def);
     return TypeMem.make(ptr._aliases,(TypeStruct)_live);
   }
   // Only structs are demanded from a Load
   @Override boolean assert_live(Type live) { return live instanceof TypeStruct; }
-  
+
   // Strictly reducing optimizations
   @Override public Node ideal_reduce() {
     Node adr = adr();
@@ -100,7 +100,7 @@ public class LoadNode extends Node {
     // We allow Loads against structs to allow for inlined structs.
     // The Load is a no-op
     if( tadr instanceof TypeStruct ) return adr();
-    
+
     // Dunno about other things than pointers
     if( !(tadr instanceof TypeNil tn) ) return null;
     if( adr instanceof FreshNode frsh ) adr = frsh.id();
@@ -125,7 +125,7 @@ public class LoadNode extends Node {
         } else adr.deps_add(this);
       }
     } else mem.deps_add(this);
-    
+
     return null;
   }
 
@@ -182,7 +182,7 @@ public class LoadNode extends Node {
       return false;
     return true;
   }
-  
+
   // Find a matching prior Store - matching address.
   // Returns null if highest available memory does not match address.
   static Node find_previous_struct(Node ldst, Node mem, Node adr, BitsAlias aliases ) {
@@ -247,7 +247,7 @@ public class LoadNode extends Node {
             // Peek through call
             mem = call.mem();
           }
-        } 
+        }
 
         case null, default -> throw unimpl(); // decide cannot be equal, and advance, or maybe-equal and return null
         }
@@ -268,7 +268,7 @@ public class LoadNode extends Node {
       }
     }
   }
-  
+
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
     TV3 ptr = adr().set_tvar();
@@ -280,13 +280,14 @@ public class LoadNode extends Node {
   // All field loads against a pointer.
   @Override public boolean unify( boolean test ) {
     TV3 ptr = adr().tvar();
-    if( ptr instanceof TVPtr tptr )
-      return tptr.load().unify(tvar(),test);
     // No-Op load against an inlined struct
-    if( ptr instanceof TVStruct ts )
-      throw unimpl();
+    if( adr()._val instanceof TypeStruct ts )
+      return tvar().unify(ptr,test);
+    if( ptr instanceof TVPtr tptr )
+      return tvar().unify(tptr.load(),test);
     // Stall
     assert ptr instanceof TVLeaf || ptr instanceof TVErr;
+    ptr.deps_add(this);
     return false;
   }
 

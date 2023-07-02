@@ -318,7 +318,7 @@ public class CallNode extends Node {
           });
       yield TypeFunPtr.make(tn.above_center(),tn._fidxs,nargs,tn.oob(),tn.oob());
     }
-    default -> fdx._val.oob(TypeFunPtr.GENERIC_FUNPTR);
+    default -> fdx._val.oob(in(DSP_IDX)==Env.ANY ? TypeFunPtr.NO_DSP_FUNPTR : TypeFunPtr.GENERIC_FUNPTR);
     };
     // Copy args for called functions.  FIDX is already refined.
     // Also gather all aliases from all args.

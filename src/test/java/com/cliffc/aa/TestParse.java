@@ -21,7 +21,7 @@ public class TestParse {
   private static boolean JIG=false, DO_HMT=false, DO_GCP=false;
   private static int RSEED=0;
   @BeforeClass
-  public static void jig_setup() {  
+  public static void jig_setup() {
     JIG=false;
     Object dummy = Env.GVN;
   }
@@ -32,10 +32,10 @@ public class TestParse {
     DO_HMT=false;
     RSEED=0;
     testerr("( { x -> x*2 }, { x -> x*3 })._ 4",
-            "Ambiguous, matching choices { A 4 -> B } vs({ C:*[%a0]@{} *[nALL]@{_*_= *[nALL]( ...);  ...} -> D }, { C *[nALL]@{_*_= *[nALL]( ...);  ...} -> E })",30);
+            "Ambiguous, matching choices { A 4 -> B } vs ({ C D -> E }, { F G -> H })",30);
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(2),fact(2.2))","*[14](nil,1,2)","*[14](int64,int64,int64)", null, null, "[14]", null);
   }
-  
+
   static private void assertTrue(boolean t) {
     if( t ) return;
     System.err.println("False");
@@ -70,7 +70,7 @@ public class TestParse {
          null, null,
          "[%a2,%a3]", "[%f0]" );
 
-   
+
     // TestHM.a_basic_05
     // example that demonstrates generic and non-generic variables:
     // 'g' is not-fresh in function 'f'.
@@ -82,23 +82,23 @@ public class TestParse {
 
     // TestParse.g_overload_err_00
     testerr("( { x -> x*2 }, { x -> x*3 })._ 4",
-            "Ambiguous, matching choices { A 4 -> B } vs({ C:*[%a0]@{} *[nALL]@{_*_= *[nALL]( ...);  ...} -> D }, { C *[nALL]@{_*_= *[nALL]( ...);  ...} -> E })",30);
+            "Ambiguous, matching choices { A 4 -> B } vs ({ C D -> E }, { F G -> H })",30);
 
     // Variations on a simple wrapped add.  Requires full annotations to type -
     // because in fact it is all ambiguous and cannot be typed without seeing all
     // the usages.
-    test("{ x -> x+1 }","[%f0]{any,4 -> %[2][2,%f0]? }",
-         "{A *[nALL]@{_+_=*[nALL](...);...} -> B }", // Something with an '+' operator
+    test("{ x -> x+1 }","[%f0]{---,4 -> %[2][2,%f0]? }",
+         "{A B -> C }", // Something with an '+' operator
          null, null, null,"[%f0]");
-    
-    test("{ x -> 1+x }","[%f0]{any,4 -> %[4,5][]?}",
+
+    test("{ x -> 1+x }","[%f0]{---,4 -> %[4,5][]?}",
          "{A B -> C }", // Something that 1+ works on
          null, null, null,"[%f0]");
-    
-    test("{ x -> x+y }","[%f0]{any,4 -> any}",
+
+    test("{ x -> x+y }","[%f0]{---,4 -> any}",
          "{A *[]@{_+_=@{...};...} -> B }", // Something with an '+' operator
          null, null, null,"[%f0]");
-    
+
     testerr("@{x=7}.y",  "Unknown field '.y' in @{x= A}: ",7); // LHS is known, not a clazz, field not found in instance
     testerr("\"abc\".y", "Unknown field '.y' in str:(A): ",6);  // LHS is known, has clazz, field not found in either, field is not oper (not pinned)
     testerr("\"abc\"&1", "Unknown operator '_&_' in str:(97): @{ ...}",5); // LHS is known, has clazz, field not found in either, field it oper (pinned, so report clazz)
@@ -125,7 +125,7 @@ public class TestParse {
          null,"[%f0]");
 
     // TestHM.b_recursive_02.  The expression "x-1" cannot resolve the operator
-    // "_-_" because "x" is a free variable.  It binds in its one use.    
+    // "_-_" because "x" is a free variable.  It binds in its one use.
     test("fun = { fx x -> x ? fx( fun(fx,x-1) ) : 1 }; fun(2._*_._, 99)",
             "1",
             "1");
@@ -1063,7 +1063,7 @@ HashTable = {@{
 
   // Alias numbers change (alot) as I add or remove basic primitive overloads.
   // Make the golden Type strings use a format for the alias number, which I
-  // can base from a single point here.  
+  // can base from a single point here.
   //     "[55]{any,4 -> *[ 12](3, %[2, 12][2,55]?) }"  // Instead of this
   //     "[55]{any,4 -> *[%a0](3, %[2,%a0][2,55]?) }"  // I write this
   static private String format_alias( String s ) { return format_base(s,'a',PrimNode.MAX_PRIM_ALIAS); }
@@ -1085,7 +1085,7 @@ HashTable = {@{
     return sb.toString();
   }
 
-  
+
   // Run a program in all 3 modes, yes function returns, no errors
   private void test( String program, Function<Type,Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect ) {
     //_test2(program,gcp_maker,formals_maker,hmt_expect,null,0);

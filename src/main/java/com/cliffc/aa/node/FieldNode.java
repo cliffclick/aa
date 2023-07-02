@@ -298,11 +298,18 @@ public class FieldNode extends Node implements Resolvable {
   
   public boolean resolve_ambiguous_msg() {
     TV3 pattern = tvar();
-    TV3 tv0 = tvar(0);
-    TVStruct ts = tv0.as_struct();
-    assert ts.idx(_fld)==-1;             // No longer storing overload in pattern
-    //boolean progress = ts.del_fld(_fld); // Do not push pinned uphill
-    return tv0.unify_err("Ambiguous, matching choices % vs ",pattern,_bad,false)/* | progress*/;
+    TVStruct rhs = tvar(0).as_struct();
+    assert rhs.idx(_fld)==-1;   // No resolving field on RHS?
+    boolean progress=false;
+    // TODO: I tried fresh_unify the pattern against each valid choice.
+    // TODO: throws too many false positives?
+    //for( int i=0; i<rhs.len(); i++ ) {
+    //  TV3 rhsx = rhs.arg(i);
+    //  if( pattern.trial_unify_ok( rhsx ) >= 0 ) {
+    //    progress |= pattern.fresh_unify(null,rhsx,null,false);
+    //  }
+    //}
+    return tvar(0).unify_err("Ambiguous, matching choices % vs ",pattern,_bad,false) | progress;
   }
   
   // True if ambiguous (more than one match), false if no matches.

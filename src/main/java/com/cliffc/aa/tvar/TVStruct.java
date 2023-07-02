@@ -326,27 +326,29 @@ public class TVStruct extends TVExpanding {
 
   @Override int _trial_unify_ok_impl( TV3 tv3 ) {
     TVStruct that = tv3.as_struct(); // Invariant when called
-    //for( int i=0; i<_max; i++ ) {
-    //  if( Resolvable.is_resolving( _flds[i]) ) continue;
-    //  TV3 lhs = arg(i);
-    //  TV3 rhs = that.arg(_flds[i]); // RHS lookup by field name
-    //  if( lhs!=rhs && rhs!=null && !lhs._trial_unify_ok(rhs) )
-    //    return false;           // Child fails to unify
-    //}
-    //
-    //// Allow unification with extra fields.  The normal unification path
-    //// will not declare an error, it will just remove the extra fields.
-    //return this.mismatched_child(that) && that.mismatched_child(this);
-    throw unimpl();
+    int cmp = 1;                     // Assume trial is a YES
+    for( int i=0; i<_max; i++ ) {
+      assert !Resolvable.is_resolving( _flds[i] ); // No longer storing resolving fields?
+      TV3 lhs = arg(i);
+      TV3 rhs = that.arg(_flds[i]); // RHS lookup by field name
+      if( lhs!=rhs && rhs!=null ) {
+        int acmp = lhs._trial_unify_ok(rhs);
+        if( acmp == -1 ) return -1; // Arg failed so trial fails
+        cmp &= acmp;                // Maybe arg makes trial a maybe
+      }
+    }
+
+    // Allow unification with extra fields.  The normal unification path
+    // will not declare an error, it will just remove the extra fields.
+    return cmp & this.mismatched_child(that) & that.mismatched_child(this);
   }
 
-  private boolean mismatched_child(TVStruct that ) {
-    if( that.is_open() ) return true; // Missing fields may add later
+  private int mismatched_child(TVStruct that ) {
+    if( that.is_open() ) return 0; // Missing fields maybe add later
     for( int i=0; i<_max; i++ )
-      if( !Resolvable.is_resolving(_flds[i]) &&
-          that.arg(_flds[i])==null ) // And missing key in RHS
-        return false;          // Trial unification failed
-    return true;
+      if( that.arg(_flds[i])==null ) // Missing key in RHS
+        return -1;                   // Trial unification failed
+    return 1;
   }
 
   @Override boolean _exact_unify_impl( TV3 tv3 ) {
