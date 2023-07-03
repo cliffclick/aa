@@ -20,7 +20,7 @@ import static com.cliffc.aa.AA.unimpl;
 // field.  Once resolved the Field name changes to match.
 
 public class FieldNode extends Node implements Resolvable {
-  
+
   // Field being loaded from a TypeStruct.  If "_", the field name is inferred
   // from amongst the field choices.  If not present, then error.
   public       String _fld;
@@ -49,9 +49,9 @@ public class FieldNode extends Node implements Resolvable {
     in(0).add_flow(); // Liveness sharpens to specific field
     return old;
   }
-  
+
   @Override public TV3 match_tvar() { return tvar(0); }
-  
+
   @Override public Type value() {
     Type t = val(0);
     if( t==Type.ANY || t==Type.ALL ) return t;
@@ -96,7 +96,7 @@ public class FieldNode extends Node implements Resolvable {
   }
 
   // If the field is resolving, we do not know which field to demand, so demand
-  // them all when lifting and none when lowering.  
+  // them all when lifting and none when lowering.
   @Override public Type live_use( int i ) {
     if( is_resolving() ) {
       if( Combo.pre() || Combo.post() || Combo.HM_AMBI )
@@ -110,8 +110,15 @@ public class FieldNode extends Node implements Resolvable {
   }
 
   @Override public Node ideal_reduce() {
+    // Field from a Bind of a Struct (overload)
+    if( in(0) instanceof BindFPNode bind && bind._val instanceof TypeStruct && bind._uses._len==1 ) {
+      assert bind._over;
+      Node fp = new FieldNode(bind.fp(),_fld,_bad).init();
+      return new BindFPNode(fp,bind.dsp(),false).init();
+    }
+
     if( is_resolving() ) return null;
-    
+
     // Back-to-back SetField/Field
     if( in(0) instanceof SetFieldNode sfn ) {
       if( sfn.err(true)==null ) {
@@ -140,17 +147,10 @@ public class FieldNode extends Node implements Resolvable {
       in(0).deps_add(this); // Revisit if input changes
     }
 
-    // Field from a Bind of a Struct (overload)
-    if( _live==Type.ALL && in(0) instanceof BindFPNode bind && bind.fp() instanceof StructNode sn ) {
-      assert bind._over;
-      Node fp = new FieldNode(sn,_fld,_bad).init();
-      return new BindFPNode(fp,bind.dsp(),false).init();
-    }
-
     return null;
   }
-  
-    
+
+
   @Override public Node ideal_grow() {
     // Load from a memory Phi; split through in an effort to sharpen the memory.
     // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
@@ -171,9 +171,9 @@ public class FieldNode extends Node implements Resolvable {
   }
 
   @Override public boolean has_tvar() { return true; }
-  
+
   @Override public TV3 _set_tvar() {
-    TVLeaf self = new TVLeaf(); 
+    TVLeaf self = new TVLeaf();
     _tvar = self;               // Stop cycles
     // Force input to be a struct
     TV3 t0 = in(0).set_tvar();
@@ -199,12 +199,13 @@ public class FieldNode extends Node implements Resolvable {
       // Field is not pinned, because it might belong in a superclazz
       if( tstr.is_open() ) return tstr.add_fld(_fld,tvar(),false);
     }
-    
+
     // struct is end-of-super-chain, miss_field
     return tvar().unify_err(resolve_failed_msg(),tvar(0),null,test);
   }
-  
+
   private boolean do_fld( TV3 fld, boolean test ) {
+    if( tvar() instanceof TVLeaf leaf ) leaf.set_no_progress();
     return tvar().unify(fld,test);
   }
 
@@ -224,7 +225,7 @@ public class FieldNode extends Node implements Resolvable {
     String clz = clz_str(t);
     return clz==null ? null : Env.PROTOS.get(clz);  // CLZ from instance
   }
-  
+
   private boolean try_resolve( TVStruct str, boolean test ) {
     // If struct is open, more fields might appear and cannot do a resolve.
     if( str.is_open() ) {
@@ -295,7 +296,7 @@ public class FieldNode extends Node implements Resolvable {
     assert tv0.as_struct().idx(_fld)==-1;             // No resolving field on RHS?  TODO: Delete & progress
     return tv0.unify_err(err,pattern,_bad,false);
   }
-  
+
   public boolean resolve_ambiguous_msg() {
     TV3 pattern = tvar();
     TVStruct rhs = tvar(0).as_struct();
@@ -311,7 +312,7 @@ public class FieldNode extends Node implements Resolvable {
     //}
     return tvar(0).unify_err("Ambiguous, matching choices % vs ",pattern,_bad,false) | progress;
   }
-  
+
   // True if ambiguous (more than one match), false if no matches.
   private boolean ambi(TV3 self, TVStruct tvs) {
     for( int i=0; i<tvs.len(); i++ )
@@ -329,7 +330,7 @@ public class FieldNode extends Node implements Resolvable {
         return false;
     return true;
   }
-  
+
   // clones during inlining change resolvable field names
   @Override public @NotNull FieldNode copy(boolean copy_edges) {
     FieldNode nnn = (FieldNode)super.copy(copy_edges);
