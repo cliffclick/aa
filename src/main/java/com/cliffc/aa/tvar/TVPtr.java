@@ -17,19 +17,19 @@ public class TVPtr extends TV3 {
 
   // Ground term
   TypeNil _t;
-  
+
   public TVPtr( BitsAlias aliases, TVStruct str ) { this(aliases,str,null); }
   public TVPtr( BitsAlias aliases, TVStruct str, TypeNil tn ) {
     super(aliases.test(0),str);
     _aliases = aliases;
     _t = tn;
   }
-  public TVPtr make_from(TypeNil t) { return new TVPtr(_aliases,load(),t); }
+  public TVPtr make_from(TypeNil t) { return t==_t ? this : new TVPtr(_aliases,load(),t); }
 
   @Override public TVPtr as_ptr() { return this; }
 
   public TVStruct load() { return arg(0).as_struct(); }
-  
+
   @Override int eidx() { return TVErr.XPTR; }
 
   //// Make the leader a nilable version of 'this' child
@@ -73,19 +73,19 @@ public class TVPtr extends TV3 {
     if( t != ptr._t ) {
       ptr._t = t;
       progress = ptrue();
-    }    
+    }
     if( test && progress ) return progress;
-    
+
     return super._fresh_unify_impl(that,test) | progress;
   }
-  
+
   // -------------------------------------------------------------
   @Override int _trial_unify_ok_impl( TV3 tv3 ) {
     TVPtr that = (TVPtr)tv3; // Invariant when called
     if( _t!=null && that._t!=null ) {
       if( _t.getClass() != that._t.getClass() ) {
         // Mixed int/float is bad, but always can mix in a nil
-        if( _t!=TypeNil. NIL && that._t!=TypeNil. NIL && 
+        if( _t!=TypeNil. NIL && that._t!=TypeNil. NIL &&
             _t!=TypeNil.XNIL && that._t!=TypeNil.XNIL )
           return -1;            // Wrong kind of bases
       }
@@ -94,7 +94,7 @@ public class TVPtr extends TV3 {
   }
 
   @Override boolean _exact_unify_impl( TV3 tv3 ) { return true; }
-  
+
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) {
     if( _t instanceof TypeInt ti ) return ti;
@@ -112,7 +112,7 @@ public class TVPtr extends TV3 {
     _t = tw;
     _deps_work_clear();
   }
-  
+
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     if( !prims ) {
       if( _aliases == PrimNode.PINT ._tptr._aliases ) return sb.p(_t);

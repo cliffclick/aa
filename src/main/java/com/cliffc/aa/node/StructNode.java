@@ -5,6 +5,7 @@ import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVErr;
+import com.cliffc.aa.tvar.TVLeaf;
 import com.cliffc.aa.tvar.TVStruct;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
@@ -45,7 +46,7 @@ public class StructNode extends Node {
 
   // Still adding fields or not.  Helps with asserting in the Parser
   private boolean _closed;
-  
+
   // True if forward-ref.  Again, helps with the Parser.
   // Only modify if !_closed
   private boolean _forward_ref;
@@ -57,7 +58,7 @@ public class StructNode extends Node {
   // Default type for unnamed fields.  Frequently 'ALL' except for primitive
   // classes which support direct lattice isa() tests vs XNIL.
   public final Type _def;
-  
+
   // Field names mapped one-to-one with inputs.  Not sorted.
   // Order is IGNORED for H-M purposes.
   // Only modify if !_closed
@@ -66,7 +67,7 @@ public class StructNode extends Node {
   // R/W vs Read-only status of fields
   // Only modify if !_closed
   final Ary<TypeFld.Access> _accesses;
-  
+
   // Parser helper for error reports on arg tuples, start of tuple/struct is in
   // _paren_start, and the args are in _fld_starts.
   // Example: "  ( x,y)\n"
@@ -136,7 +137,7 @@ public class StructNode extends Node {
 
   public boolean is_nongen(String fld) { return _nargs!=0 && find(fld)<_nargs; }
   public boolean is_closure() { return _nargs>0; }
-  
+
   // One-time transition when defining a forward ref
   public void define() { assert _forward_ref && _closed; _forward_ref=false; }
   @Override public boolean is_forward_type() { return _forward_ref; }
@@ -206,7 +207,7 @@ public class StructNode extends Node {
         c._uses.del(this);
       }
   }
-  
+
   // Gather inputs into a TypeStruct.
   @Override public Type value() {
     assert _defs._len==_flds.len();
@@ -236,7 +237,7 @@ public class StructNode extends Node {
     if( _live instanceof TypeStruct live ) {
       deps_add(this);           // If self-live lifts, self reduce makes progress
       Node progress=null;
-      for( int i=0; i<_flds._len; i++ ) 
+      for( int i=0; i<_flds._len; i++ )
         if( in(i)!=Env.ANY && live.at_def(_flds.at(i)).above_center() &&
             !Util.eq(_flds.at(i),TypeFld.CLZ) )  // Leave a dead CLZ for error messages
           progress = set_def(i,Env.ANY);
@@ -245,7 +246,7 @@ public class StructNode extends Node {
     return null;
   }
 
-  
+
   @Override public boolean has_tvar() { return true; }
 
   // Used to close the cycle between the ints and flts
@@ -262,7 +263,7 @@ public class StructNode extends Node {
       ts.arg(i).unify(in(i).set_tvar(),false); // Unify (possible cycle)
     return _tvar;
   }
-  
+
   // Structs are pre-unified in set_tvar
   @Override public boolean unify( boolean test ) { return false; }
 

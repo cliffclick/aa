@@ -582,6 +582,8 @@ public abstract class PrimNode extends Node {
       // primitive with a clazz reference
       for( int i=DSP_IDX; i<_formals.len(); i++ )
         if( _formals.at(i)!=Type.ANY )
+          // Only StrLen has a Memory input, so the offset here is off-by-one
+          // from the default _set_tvar
           in(i-MEM_IDX).set_tvar().unify(wrap_base(_formals.at(i)),false);
       // Return is some primitive
       return wrap_base(_ret);

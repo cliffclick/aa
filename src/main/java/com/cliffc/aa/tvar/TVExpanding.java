@@ -136,7 +136,7 @@ abstract public class TVExpanding extends TV3 {
 
   // True if this TV3 can progress in-place.
   // Leafs unify and so become some other thing - so cannot update-in-place.
-  // Bases can fall, until the Type hits bottom, e.g. TypeInt.INT64.
+  // Ptr/Bases can fall, until the Type hits bottom, e.g. TypeInt.INT64.
   // Structs can add fields while open, can close, and then can remove fields
   // until empty.
   abstract boolean can_progress();

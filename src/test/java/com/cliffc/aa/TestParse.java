@@ -31,8 +31,7 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    testerr("( { x -> x*2 }, { x -> x*3 })._ 4",
-            "Ambiguous, matching choices { A 4 -> B } vs ({ C D -> E }, { F G -> H })",30);
+    test("x=2; y=x+1; x*y", "6", "6");
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(2),fact(2.2))","*[14](nil,1,2)","*[14](int64,int64,int64)", null, null, "[14]", null);
   }
 
