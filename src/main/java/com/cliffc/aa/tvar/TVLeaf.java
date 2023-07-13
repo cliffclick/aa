@@ -11,13 +11,19 @@ import static com.cliffc.aa.AA.unimpl;
 
 public class TVLeaf extends TVExpanding {
 
-  @Override boolean can_progress() { return false; }
+  // Leafs can unify and thus make progress, but then tney are not a Leaf
+  // anymore.  At some point, all possible unifications may have happened to a
+  // Leaf, and if it could have progressed - it would have.  At this point we
+  // can declare the Leaf makes no more progress.
+
+  // This matters for Resolving and trial_unify, as a progress-able Leaf is a
+  // Maybe, but a no-progress Leaf will never fail a trial and so is a Yes.
+  private boolean _no_progress;
+  @Override boolean can_progress() { return !_no_progress; }
+  public void set_no_progress() { _no_progress=true; }
   
   // Leafs never show up in errors
   @Override int eidx() { throw unimpl(); }
-
-  // No improvement, return the not-nil leader
-  //@Override TV3 find_nil() { throw unimpl(); }
 
   // -------------------------------------------------------------
   @Override boolean _unify_impl(TV3 that ) {

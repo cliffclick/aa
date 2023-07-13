@@ -30,7 +30,7 @@ public class ForwardRefNode extends Node {
 
   @Override public Type value() {
     if( is_forward_ref() )
-      return TypeFunPtr.make(false,BitsFun.NALL,1,TypeNil.SCALAR,Type.ALL);
+      return TypeFunPtr.make(false,BitsFun.NALL,1,Type.ALL,Type.ALL);
     return in(1)._val;
   }
 
@@ -42,7 +42,7 @@ public class ForwardRefNode extends Node {
     e.err("Unknown ref '"+_name+"'",null,_bad,false);
     return e;
   }
-  
+
   // True if this is a forward_ref
   public boolean is_forward_ref() { return _defs._len==0 || _fref<=1; }
   // One-time flip _fref, no longer a forward ref
@@ -61,8 +61,8 @@ public class ForwardRefNode extends Node {
     if( def._val instanceof TypeFunPtr tfp )
       RetNode.get(tfp.fidxs()).funptr()._name = tok;
   }
-  
-  
+
+
   @Override public Node is_copy(int idx) { return _defs._len==2 ? in(1) : null; }
   @Override public int hashCode() { return super.hashCode()+(_bad==null ? 0 : _bad.hashCode()); }
   @Override public boolean equals(Object o) {

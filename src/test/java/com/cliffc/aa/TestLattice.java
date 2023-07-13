@@ -77,7 +77,7 @@ import static org.junit.Assert.*;
 
 
 public class TestLattice {
-  private static class N {
+  static class N {
     private static int ID=0;
     static Ary<N> NS=new Ary<>(new N[1],0);
     static void reset() { NS.clear(); ID=0; }
@@ -184,7 +184,7 @@ public class TestLattice {
   }
 
   // Complete the lattice and test it
-  private static void test(N top) {
+  static void test(N top) {
     // Fill in the reverse edges
     top.walk_set_sup(new BitSet());
     // Pretty print
@@ -1943,7 +1943,7 @@ public class TestLattice {
   // Dual outside-in:
   //   ~A1 <-> A2,   ~B1 <-> B2, C1 <-> C2,  B1 <-> ~B2, A1 <-> ~A2
 
-  private static N[] lattice_extender( N[] ns, String lowrap, String hiwrap) {
+  static N[] lattice_extender( N[] ns, String lowrap, String hiwrap) {
 
     // Clone without edges, wrap names.
     int len = ns.length;

@@ -83,7 +83,7 @@ import static com.cliffc.aa.Env.GVN;
 
 public class CallNode extends Node {
   int _rpc;                 // Call-site return PC
-  private final int _reset0_rpc; // Reset, if PrimNode rpcs split  
+  private final int _reset0_rpc; // Reset, if PrimNode rpcs split
   boolean _unpacked;        // One-shot flag; call site allows unpacking a tuple
   boolean _is_copy;         // One-shot flag; Call will collapse
   // Example: call(arg1,arg2)
@@ -210,7 +210,7 @@ public class CallNode extends Node {
         while( _uses._len>0 ) {
           Node use = _uses.last();
           assert use instanceof FunNode;
-          use.remove(use._defs.find(this));          
+          use.remove(use._defs.find(this));
         }
       }
       return set_def(0,Env.XCTRL);
@@ -230,7 +230,7 @@ public class CallNode extends Node {
     // Check for dead args and trim; must be after all wiring is done because
     // unknown call targets can appear during GCP and use the args.  After GCP,
     // still must verify all called functions have the arg as dead, because
-    // alive args still need to resolve.  
+    // alive args still need to resolve.
     if( cepi!=null && ttfp(tcall)._fidxs != BitsFun.NALL && !is_keep() && err(true)==null && cepi.is_CG(true) ) {
       // 1 bit for each argument, used to track arg usage
       int abits = 0;
@@ -282,7 +282,7 @@ public class CallNode extends Node {
     }
     return null;
   }
-  
+
   // Pass thru all inputs directly - just a direct gather/scatter.  The gather
   // enforces SESE which in turn allows more precise memory and aliasing.  The
   // full scatter lets users decide the meaning; e.g. wired FunNodes will take
@@ -318,7 +318,7 @@ public class CallNode extends Node {
           });
       yield TypeFunPtr.make(tn.above_center(),tn._fidxs,nargs,tn.oob(),tn.oob());
     }
-    default -> fdx._val.oob(in(DSP_IDX)==Env.ANY ? TypeFunPtr.NO_DSP_FUNPTR : TypeFunPtr.GENERIC_FUNPTR);
+    default -> fdx._val.oob(TypeFunPtr.GENERIC_FUNPTR);
     };
     // Copy args for called functions.  FIDX is already refined.
     // Also gather all aliases from all args.
@@ -328,7 +328,7 @@ public class CallNode extends Node {
 
     return TypeTuple.make(ts);
   }
-  
+
   static final Type FP_LIVE = TypeStruct.UNUSED.add_fldx(TypeFld.make("fp",Type.ALL));
   @Override public Type live_use( int i ) {
     Node def = in(i);
@@ -365,7 +365,7 @@ public class CallNode extends Node {
       deps_add(def);
       return Type.ALL.oob(Combo.post());
     }
-    if( !cepi.is_CG(true) ) return Type.ALL; // Not fully wired, assume the worse user yet to come
+    if( !cepi.is_CG(true) ) return Type.ALL; // Not fully wired, assume a worse user yet to come
 
     // Since wired, we can check all uses to see if this argument is alive.
     Type t = Type.ANY;

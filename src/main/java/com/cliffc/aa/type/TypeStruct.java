@@ -310,7 +310,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   public static final TypeStruct XCLZCLZ = ISUSED;
   public static final TypeStruct XSTRZ = make_test(TypeFld.make_dsp(XCLZCLZ), TypeFld.make("#_",UNUSED) );
   public static final TypeStruct XINTZ = make_test(TypeFld.make_dsp(XCLZCLZ), TypeFld.make("!_",UNUSED));
-  
+
   // A bunch of types for tests
   public  static final TypeStruct POINT = make_test(TypeFld.make("x",TypeFlt.FLT64),TypeFld.make("y",TypeFlt.FLT64));
   public  static final TypeStruct POINT3D = make(TypeFlds.make(TypeFld.make("x",TypeFlt.FLT64),TypeFld.make("y",TypeFlt.FLT64),TypeFld.make("z",TypeFlt.FLT64)));
@@ -507,6 +507,8 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     return make_from(flds);
   }
 
+  @Override boolean chk(BitsAlias aliases) { return true; }
+
   // ------ Utilities -------
   // All fields for iterating.
   public int len() { return _flds.length; } // Count of fields
@@ -663,7 +665,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
       ||   is_int_clz()
       ||   is_flt_clz()
       ||   is_str_clz()
-      ||   is_math_clz();        
+      ||   is_math_clz();
   }
   // Instance of a string object
   boolean is_str() {
@@ -771,7 +773,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   public static TypeStruct as_struct( Type t ) {
     return t instanceof TypeStruct ts ? ts : t.oob(ISUSED);
   }
-  
+
   // Used for assertions
   @Override boolean intern_check1() {
     for( TypeFld fld : this )

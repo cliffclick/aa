@@ -74,7 +74,7 @@ public final class FunPtrNode extends Node {
       return TypeFunPtr.EMPTY;
     RetNode ret = ret();
     TypeTuple tret = (TypeTuple)(ret._val instanceof TypeTuple ? ret._val : ret._val.oob(TypeTuple.RET));
-    return TypeFunPtr.make(ret._fidx,nargs(),null,tret.at(REZ_IDX));
+    return TypeFunPtr.make(ret._fidx,nargs(),Type.ALL,tret.at(REZ_IDX));
   }
 
   // FunPtrs return RetNode liveness for memory
@@ -93,7 +93,7 @@ public final class FunPtrNode extends Node {
       return Env.ROOT._live;    // Whatever Root requires, we do also
     return TypeMem.ANYMEM;      // Dead, no memory demand
   }
-  
+
   @Override public Node ideal_reduce() {
     // Dead display post-Combo, we can wipe out the display type
     if( _tvar!=null && tvar() instanceof TVLambda lam && !(lam.dsp() instanceof TVLeaf) &&

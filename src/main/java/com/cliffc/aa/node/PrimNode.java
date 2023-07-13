@@ -43,13 +43,13 @@ public abstract class PrimNode extends Node {
     for( int i=DSP_IDX; i<formals._ts.length; i++ ) assert formals._ts[i] instanceof TypeNil || formals._ts[i]==Type.ANY;
     _formals = formals;
     _ret = ret;
-    _tfp=TypeFunPtr.make(fidx,formals.len(),null,ret);
+    _tfp=TypeFunPtr.make(fidx,formals.len(),Type.ALL,ret);
     _badargs=null;
   }
 
   public static final StructNode ZCLZ = new StructNode(0,false,null, Type.ANY);
-  
-  // Int/Float/String primitives.  
+
+  // Int/Float/String primitives.
   public static final StructNode ZINT = new StructNode(0,false,null, TypeNil.EXTERNAL);
   public static final StructNode ZFLT = new StructNode(0,false,null, TypeNil.EXTERNAL);
   public static final StructNode ZSTR = new StructNode(0,false,null, TypeNil.EXTERNAL);
@@ -58,7 +58,7 @@ public abstract class PrimNode extends Node {
   public static final NewNode PFLT = new NewNode(BitsAlias.FLTX);
   public static final NewNode PSTR = new NewNode(BitsAlias.STRX);
   public static final NewNode PMATH= new NewNode(BitsAlias.new_alias(BitsAlias.EXTX));
-  
+
   private static PrimNode[] PRIMS = null; // All primitives
 
   public static PrimNode[] PRIMS() {
@@ -99,7 +99,7 @@ public abstract class PrimNode extends Node {
     PrimNode[][] STRS = new PrimNode[][] {
       { new StrLen() }
     };
-    
+
     // Other primitives, not binary operators
     PrimNode rand = new RandI64();
     PrimNode[] others = new PrimNode[] {
@@ -107,7 +107,7 @@ public abstract class PrimNode extends Node {
       //rand,
       //new ConvertI64F64(),
 
-      //new EQ_OOP(), new NE_OOP(), 
+      //new EQ_OOP(), new NE_OOP(),
       //// These are balanced-ops, called by Parse.term()
       //new MemPrimNode.ReadPrimNode.LValueRead  (), // Read  an L-Value: (ary,idx) ==> elem
       //new MemPrimNode.ReadPrimNode.LValueWrite (), // Write an L-Value: (ary,idx,elem) ==> elem
@@ -139,13 +139,13 @@ public abstract class PrimNode extends Node {
 
     // Math package
     Env.STK_0.add_fld("math",Access.Final,make_math(rand),null).xval();
-    
+
     Env.GVN.iter();
 
     // Used for test cases
     MAX_PRIM_ALIAS = BitsAlias.NALL.tree().next_available_bit();
     MAX_PRIM_FIDX  = BitsFun  .NALL.tree().next_available_bit();
-    
+
     return PRIMS;
   }
   // Used for test cases; changes the golden-rule expected alias/fidx based on
@@ -173,7 +173,7 @@ public abstract class PrimNode extends Node {
     // Primitives all late-bind by default, so no BindFP here.
     return new FunPtrNode(_name,ret).init();
   }
-  
+
   // Primitive wrapped as a simple function.
   // String memory, then DSP as first arg.
   FunPtrNode as_fun_str( ) {
@@ -229,7 +229,7 @@ public abstract class PrimNode extends Node {
     Env.SCP_0.set_mem(mem);
     return PMATH;
   }
-  
+
   // Apply uses the same alignment as the arguments, ParmNodes, _formals.
   abstract TypeNil apply( TypeNil[] args ); // Execute primitive
   // Pretty print short primitive signature based on first argument:
@@ -311,7 +311,7 @@ public abstract class PrimNode extends Node {
     return tmem;
   }
 
-  
+
   // Prims are equal for same-name-same-signature (and same inputs).
   // E.g. float-minus of x and y is NOT the same as int-minus of x and y
   // despite both names being '-'.
@@ -338,11 +338,11 @@ public abstract class PrimNode extends Node {
   }
 
   static class MinusF64 extends Prim1OpF64 { MinusF64() { super("-_"); } double op( double d ) { return -d; } }
-  
+
   static class SinF64 extends Prim1OpF64 {
     SinF64() { super("sin"); }
     @Override boolean is_oper() { return false; }
-    @Override double op( double d ) { throw AA.unimpl(); } 
+    @Override double op( double d ) { throw AA.unimpl(); }
   }
 
   // 1Ops have uniform input/output types, so take a shortcut on name printing
@@ -462,7 +462,7 @@ public abstract class PrimNode extends Node {
       }
       // Preserve width
       return t0i.minsize(t1i);
-    }    
+    }
     @Override long op( long l, long r ) { throw unimpl(); }
   }
 
@@ -589,7 +589,7 @@ public abstract class PrimNode extends Node {
       return wrap_base(_ret);
     }
   }
-  
+
 
   public static class RandI64 extends PrimNode {
     public RandI64() { super("rand",TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, Type.ANY, TypeInt.INT64),TypeInt.INT64); }

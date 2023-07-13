@@ -378,21 +378,20 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // excludes state of Memory and Ctrl.  Scalars are stateless and "free" to
   // make copies.
   static final byte TNIL    = 5; // Scalars, nil
-  static final byte TINT    = 6; // All Integers, including signed/unsigned and various sizes; see TypeInt
-  static final byte TFLT    = 7; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
-  static final byte TRPC    = 8; // Return PCs; Continuations; call-site return points; see TypeRPC
-  static final byte TMEMPTR = 9; // Memory pointer type; a collection of Alias#s
-  static final byte TFUNPTR =10; // Function pointer, refers to a collection of concrete functions
-  static final byte TSCALAR =11; // Some kinda scalar (tracks alias#s and fidx#s)
-  static final byte TNILABLE=12;
-  public boolean is_nil() { return _type < TNILABLE; }
+  static final byte TFUNPTR = 6; // Function pointer, refers to a collection of concrete functions
+  static final byte TRPC    = 7; // Return PCs; Continuations; call-site return points; see TypeRPC
+  static final byte TMEMPTR = 8; // Memory pointer type; a collection of Alias#s
+  static final byte TINT    = 9; // All Integers, including signed/unsigned and various sizes; see TypeInt
+  static final byte TFLT    =10; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
+  static final byte TNILABLE=11;
+
   // Collections of Scalars, Memory, Fields.  Not Nilable.
-  static final byte TSTRUCT =13; // Memory Structs; tuples with named fields
-  static final byte TTUPLE  =14; // Tuples; finite collections of unrelated Types, kept in parallel
-  static final byte TARY    =15; // Tuple of indexed fields; only appears in a TSTRUCT
-  static final byte TFLD    =16; // Fields in structs
-  static final byte TMEM    =17; // Memory type; a map of Alias#s to TOBJs
-  static final byte TLAST   =18; // Type check
+  static final byte TSTRUCT =12; // Memory Structs; tuples with named fields
+  static final byte TTUPLE  =13; // Tuples; finite collections of unrelated Types, kept in parallel
+  static final byte TARY    =14; // Tuple of indexed fields; only appears in a TSTRUCT
+  static final byte TFLD    =15; // Fields in structs
+  static final byte TMEM    =16; // Memory type; a map of Alias#s to TOBJs
+  static final byte TLAST   =17; // Type check
 
   // Object Pooling to handle frequent (re)construction of temp objects being
   // interned.  This is a performance hack and a big one: big because its
@@ -515,7 +514,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     if( t == this ) return this;
     // Short-cut for seeing this meet before
     Type mt = Key.get(this,t);
-    if( mt != null ) return mt;
+    //if( mt != null ) return mt;
     // Compute meet without filtering
     mt = ymeet(t);
     // Record this meet, to short-cut next time
@@ -534,13 +533,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     if(   is_simple() ) return this.xmeet(t   );
     if( t.is_simple() ) return t   .xmeet(this);
     // Triangulate on is_nil without being the same class
-    if( this instanceof TypeNil t0 && t instanceof TypeNil t1 ) {
-      // LHS is TypeNil directly
-      if( t0._type==TNIL ) return t0.nmeet(t1);
-      if( t1._type==TNIL ) return t1.nmeet(t0);
-      // Mis-matched TypeNil subclasses
-      return t0.widen_sub().meet(t1.widen_sub());
-    }
+    if( this instanceof TypeNil t0 && t instanceof TypeNil t1 )
+      return t0._type < t1._type ? t0.nmeet(t1) : t1.nmeet(t0);
     return Type.ALL;        // Mixing 2 unrelated types not subclassing TypeNil
   }
 
@@ -705,7 +699,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     return false;
   }
 
-  
+
   // True if value is above the centerline (no definite value, ambiguous)
   public boolean above_center() {
     return switch( _type ) {

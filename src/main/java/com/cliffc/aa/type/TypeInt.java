@@ -29,8 +29,7 @@ public class TypeInt extends TypeNil<TypeInt> {
   static BitsAlias bits(boolean any) {
     return any ? BitsAlias.INT.dual() : BitsAlias.INT;
   }
-  @Override boolean has_alias(BitsAlias aliases) { return aliases.test_recur(BitsAlias.INTX); }
-  
+
   @Override protected TypeInt copy() {
     TypeInt ti = super.copy();
     ti._z = _z;
@@ -78,7 +77,7 @@ public class TypeInt extends TypeNil<TypeInt> {
     }
     return this;
   }
-
+  
   public static TypeInt con(long con) { return make(false,false,true,0,con); }
 
   public  static final TypeInt NINT64= make(false,false, true,64,0);
@@ -139,12 +138,24 @@ public class TypeInt extends TypeNil<TypeInt> {
     return 64;
   }
 
+  // Mixing TypeInt subclasses.
+  @Override TypeNil nmeet(TypeNil tsub) {
+    assert _type==TINT && tsub._type>TINT;
+    if( tsub._type==TFLT ) {
+      // Could imagine small ints inject into large floats
+      return (TypeMemPtr)TypeMemPtr.INTPTR.meet(TypeMemPtr.FLTPTR);
+    }
+    return (TypeNil)tsub.widen_sub().meet(widen_sub());
+  }
+  @Override boolean chk(BitsAlias aliases) { return aliases.test_recur(BitsAlias.INTX); }
+  @Override TypeInt nil_meet() { return xmeet(make(true,false,false,64,0)); }
+
   @Override public TypeInt widen() { return INT64; }
   @Override TypeNil widen_sub() {
-    BitsAlias aliases = _aliases.above_center() ? _aliases.dual() : _aliases;
-    return make(false,_nil,_sub,aliases,_fidxs);
+    if( !_fidxs.is_empty() ) throw com.cliffc.aa.AA.unimpl();
+    return TypeMemPtr.INTPTR;
   }
-  
+
   @Override public boolean is_con()  { return _z==0; }
   public TypeInt minsize(TypeInt ti) {
     int zs =    _z==0 ? log(   _con) :    _z;

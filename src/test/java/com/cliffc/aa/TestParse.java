@@ -30,8 +30,8 @@ public class TestParse {
 
     DO_GCP=true;
     DO_HMT=false;
-    RSEED=0;
-    test("x=2; y=x+1; x*y", "6", "6");
+    RSEED=1;
+    //test("1+2*3", "7", "7");
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(2),fact(2.2))","*[14](nil,1,2)","*[14](int64,int64,int64)", null, null, "[14]", null);
   }
 

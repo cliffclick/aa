@@ -95,7 +95,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     TypeMemPtr t1 = POOLS[TMEMPTR].malloc();
     return t1.init(any,nil,sub,aliases,obj);
   }
-  // Convenience for some callers, supports half as many choices    
+  // Convenience for some callers, supports half as many choices
   public static TypeMemPtr malloc(boolean any, boolean haz_nil, BitsAlias aliases, TypeStruct obj ) {
     return malloc(any, any & haz_nil, any | !haz_nil, aliases, obj );
   }
@@ -153,6 +153,8 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public  static final TypeMemPtr ISUSED = make(false,BitsAlias.NALL,TypeStruct.ISUSED); // Excludes nil
   public  static final TypeMemPtr EMTPTR = malloc(false,false,BitsAlias.EMPTY,TypeStruct.UNUSED).hashcons_free();
   public  static final TypeMemPtr DISP_SIMPLE= make(false,BitsAlias.NALL,TypeStruct.ISUSED); // closed display
+  public  static final TypeMemPtr INTPTR = make(false,BitsAlias.INT,TypeStruct.ISUSED);
+  public  static final TypeMemPtr FLTPTR = make(false,BitsAlias.FLT,TypeStruct.ISUSED);
   public  static final TypeMemPtr STRPTR = make_str(TypeInt.INT8);
 
   static final Type[] TYPES = new Type[]{ISUSED0,EMTPTR,DISPLAY,DISPLAY_PTR};
@@ -177,6 +179,21 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     boolean sub = _sub & ptr._sub;
     return malloc(any,nil,sub,aliases, to).hashcons_free();
   }
+
+  // Mixing TypeNil subclasses.  TypeMemPtr surrounds TypeInt and TypeFlt.
+  @Override TypeNil nmeet(TypeNil tsub) {
+    assert _type==TMEMPTR && tsub._type>TMEMPTR;
+    // Keep the subtype for Int, Flt.
+    // Fall for e.g. Struct, RPC
+    if( _any && ((tsub._type==TINT || tsub._type==TFLT) && tsub.chk(_aliases)) ) {
+      TypeNil ty = tsub.ymeet(this);
+      ty._nil = tsub._nil;      // Keep original nil-ness, not from the aliases
+      return (TypeNil)ty.canonicalize().chk().hashcons_free();
+    }
+    // Fall
+    return (TypeNil)meet(tsub.widen_sub());
+  }
+
 
   // Widens, not lowers.
   @Override public TypeMemPtr simple_ptr() {
@@ -270,7 +287,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   }
 
   @Override public Type sharptr2( TypeMem mem ) { return mem.sharpen(this); }
-  
+
   @Override BitsFun _all_reaching_fidxs( TypeMem tmem) {
     BitsFun fidxs = BitsFun.EMPTY;
     if( Type.ARF.tset(_uid) || tmem==null ) return fidxs;

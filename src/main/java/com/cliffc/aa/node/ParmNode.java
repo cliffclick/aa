@@ -98,6 +98,8 @@ public class ParmNode extends Node {
   @Override public boolean has_tvar() { return !(_t instanceof TypeRPC) && !is_mem(); }
   
   @Override public TV3 _set_tvar() {
+    if( is_prim() && _t==TypeInt.INT64 ) return PrimNode.PINT.tvar();
+    if( is_prim() && _t==TypeFlt.FLT64 ) return PrimNode.PFLT.tvar();
     TV3 tv = new TVLeaf();
     tv.deps_add(this);          // with Root input, value depends on tvar
     return tv;

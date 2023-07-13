@@ -45,7 +45,7 @@ import static com.cliffc.aa.AA.unimpl;
 
 abstract public class TV3 implements Cloneable {
   public static final boolean WIDEN = true;
-  
+
   private static int CNT=1;
   public int _uid=CNT++; // Unique dense int, used in many graph walks for a visit bit
 
@@ -65,6 +65,10 @@ abstract public class TV3 implements Cloneable {
   boolean _may_nil;
   // Cannot NOT be a nil (e.g. used as ptr.fld)
   boolean _use_nil;
+
+  // Always compatible in trial_unify, either because tested so before or
+  // because cloned from Fresh copy.
+  TV3 _uf_trial;
 
   // Nodes to put on a worklist, if this TV3 is modified.
   UQNodes _deps;
@@ -136,8 +140,8 @@ abstract public class TV3 implements Cloneable {
   //public TVNil    as_nil   () { throw unimpl(); }
   public TVPtr    as_ptr   () { throw unimpl(); }
 
-  public  long dbl_uid(TV3 t) { return dbl_uid(t._uid); }
-  private long dbl_uid(long uid) { return ((long)_uid<<32)|uid; }
+  public  long dbl_uid( TV3 t ) { assert !t.unified(); return dbl_uid(t._uid); }
+  private long dbl_uid(long uid) {  assert !unified(); return ((long)_uid<<32)|uid; }
 
   TV3 strip_nil() { _may_nil = false; return this; }
 
@@ -164,7 +168,7 @@ abstract public class TV3 implements Cloneable {
     }
     return true;
   }
-  
+
   // -----------------
   // U-F union; this becomes that; returns 'that'.
   // No change if only testing, and reports progress.
@@ -174,6 +178,7 @@ abstract public class TV3 implements Cloneable {
     if( _may_nil ) that.add_may_nil(false);
     if( _use_nil ) that.add_use_nil();
     if( that._may_nil && that._use_nil ) throw unimpl();
+    union_trial(that);
     _union_impl(that); // Merge subclass specific bits into that
     that.widen(_widen,false);
 
@@ -204,8 +209,50 @@ abstract public class TV3 implements Cloneable {
       if( arg(i) != null )
         arg(i).merge_delay_fresh(dfs);
   }
-  
-  
+
+  // U-F on the _uf_trial field.  Things in the same set (same leader) will
+  // always unify successfully.
+  final void union_trial(TV3 that) {
+    if( this==that ) return;
+    assert !unified() && !that.unified(); // Cannot union twice
+    // Invariant: always the smaller UID is the leader.
+    TV3 ufs = this.find_trial();
+    TV3 uft = that.find_trial();
+    if( ufs._uid < uft._uid ) uft._union_trial(ufs);
+    else                      ufs._union_trial(uft);
+  }
+  private void _union_trial(TV3 that) {
+    if( this==that ) return;
+    assert _uf_trial==null || _uf_trial==that;
+    _uf_trial=that;
+  }
+
+
+  // Invariant to restore: _uf_trial runs _uids downhill.
+  // Plan B: do not bother?
+  // Do the "uf find update" pattern.
+  // If the normal find updates, just keep chaining thru it.
+  final TV3 find_trial() { return _find_trial(0); }
+  final TV3 _find_trial(int cnt) {
+    assert !unified();
+    assert cnt<3;
+    TV3 utf = _find_trial();
+    if( utf == null ) return this;
+    TV3 utf2 = utf._find_trial();
+    if( utf2 == utf ) return utf;
+    if( this==utf2 ) { _uf_trial = null; return this; }
+    _uf_trial = utf2;
+    return _find_trial(cnt+1);
+  }
+  final TV3 _find_trial() {
+    TV3 uf = _uf_trial;
+    if( uf==null ) return this;
+    uf = uf.find();
+    if( uf == _uf_trial ) return uf;
+    if( this==uf ) { _uf_trial=null; return this; }
+    return (_uf_trial = uf);
+  }
+
   // -------------------------------------------------------------
   // Classic Hindley-Milner structural unification.
   // Returns false if no-change, true for change.
@@ -310,6 +357,8 @@ abstract public class TV3 implements Cloneable {
 
   boolean _fresh_unify( TV3 that, boolean test ) {
     assert !unified() && !that.unified();
+    // If we ever need to resolve, always a hard yes here
+    union_trial(that);
 
     // Check for cycles
     TV3 prior = VARS.get(this);
@@ -432,6 +481,10 @@ abstract public class TV3 implements Cloneable {
     TV3 t = copy();
     add_delay_fresh();          // Related via fresh, so track updates
     vput(t,true);   ;           // Stop cyclic structure looping
+    // If we ever need to resolve, always a hard yes here
+    t._uf_trial = null;
+    union_trial(t);
+
     if( _args!=null )
       for( int i=0; i<t.len(); i++ )
         if( _args[i]!=null )
@@ -487,11 +540,12 @@ abstract public class TV3 implements Cloneable {
     long duid = dbl_uid(that._uid);
     if( TDUPS.putIfAbsent(duid,this)!=null )
       return 1;                 // Visit only once, and assume will resolve
+    // Once trial-unified as a YES, always a YES
+    if( find_trial()==that.find_trial() )
+      return 1;
+    // Leafs never fail
     if( this instanceof TVLeaf leaf && !(that instanceof TVErr) ) return Resolvable.add_pat_dep(leaf); // No error
     if( that instanceof TVLeaf leaf && !(this instanceof TVErr) ) return Resolvable.add_pat_dep(leaf); // No error
-    //// Nil can unify with ints,flts,ptrs, which are a different class.
-    //if( this instanceof TVNil ) return this._trial_unify_ok_impl(that);
-    //if( that instanceof TVNil ) return that._trial_unify_ok_impl(this);
     // Different classes always fail
     if( getClass() != that.getClass() ) return -1;
     // Subclasses check sub-parts
@@ -546,7 +600,7 @@ abstract public class TV3 implements Cloneable {
       int len = ts.len();
       TypeFld fclz = ts.get(".");
       if( fclz==null ) len++;
-      
+
       String[] ss = new String[len];
       TV3[] tvs = new TV3[len];
       ss [0] = ".";

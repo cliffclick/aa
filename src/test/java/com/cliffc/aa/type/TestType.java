@@ -13,10 +13,10 @@ public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
     Ary<Type> ts = Type.ALL_TYPES();
-    
-    TypeFunPtr tfp0 = TypeFunPtr.NO_DSP_FUNPTR;
-    TypeFunPtr tfp1 = tfp0.make_from(null,TypeNil.SCALAR);
-    Type mt = tfp0.meet(tfp1);
+
+    TypeInt ti = TypeInt.INT64;
+    TypeFlt tf = TypeFlt.FLT64;
+    Type mt = ti.meet(tf);
     //assertSame(mt,f);
   }
 
@@ -71,7 +71,7 @@ public class TestType {
       Type t1 = Type.valueOf(s0);
       assertEquals(t0, t1);
     }
-    
+
   }
 
   @Test public void testTFPChain() {

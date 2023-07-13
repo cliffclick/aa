@@ -57,11 +57,17 @@ public class FieldNode extends Node implements Resolvable {
     if( t==Type.ANY || t==Type.ALL ) return t;
     // Here down, always return +/- SCALAR not ANY/ALL
     if( is_resolving() ) {
-      // Pre-HMT, dunno which one, use meet.
-      // Still resolving, use the join of all fields.
-      boolean lo = _tvar==null || Combo.HM_AMBI;
-      if( t instanceof TypeStruct ts )
-        return lo ? meet(ts) : join(ts);
+      // Pre-HMT, dunno which one, use meet of all fields
+      if( t instanceof TypeStruct ts ) {
+        if( ts.above_center() ) return ts._def;
+        if( _tvar==null || Combo.HM_AMBI ) {
+          Type t2 = ts._def;
+          for( TypeFld t3 : ts )  t2 = t2.meet(t3._t);
+          return t2;
+        }
+        // Join over all fields
+        return ts._def.dual();
+      }
       return TypeNil.EXTERNAL;
     }
 
@@ -73,7 +79,7 @@ public class FieldNode extends Node implements Resolvable {
     }
     // Hit on a field
     if( tstr instanceof TypeStruct ts ) {
-      if( ts.find(_fld)!= -1 ) return ts.at(_fld);
+      if( ts.find(_fld)!= -1 ) return ts.at(_fld).meet(ts._def.dual());
       // Miss on closed structs looks at superclass.
       // Miss on open structs dunno if the field will yet appear
       if( ts.len()>=1 && Util.eq(ts.fld(0)._fld,TypeFld.CLZ) )
@@ -81,18 +87,6 @@ public class FieldNode extends Node implements Resolvable {
       return ts._def;
     }
     return tstr.oob(Type.ALL);
-  }
-
-  private static Type meet(TypeStruct ts) {
-    if( ts.len()==0 ) return ts._def;
-    Type t = Type.ANY; for( TypeFld t2 : ts )  t = t.meet(t2._t); return t;
-  }
-  private static Type join(TypeStruct ts) {
-    if( ts.len()==0 ) return ts._def;
-    Type t = Type.ALL;
-    for( TypeFld t2 : ts )
-      t = t.join( t2._t instanceof TypeFunPtr tfp2  ? tfp2.make_from(tfp2.fidxs().dual()) : t2._t );
-    return t;
   }
 
   // If the field is resolving, we do not know which field to demand, so demand

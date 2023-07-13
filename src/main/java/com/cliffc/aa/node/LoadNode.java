@@ -54,8 +54,8 @@ public class LoadNode extends Node {
     // against an inlined object.  In this case the Load is a no-op.
     if( (tadr instanceof TypeStruct ts) )
       return ts;                // Happens if user directly calls an oper
-    if( !(tadr instanceof TypeNil ta) )
-      return tadr.oob(TypeStruct.ISUSED); // Not a address
+    if( !(tadr instanceof TypeNil ta) || (tadr instanceof TypeFunPtr) )
+      return tadr.oob(TypeStruct.ISUSED); // Not an address
     if( !(tmem instanceof TypeMem tm) )
       return tmem.oob(TypeStruct.ISUSED); // Not a memory
     if( ta==TypeNil.NIL || ta==TypeNil.XNIL )
@@ -82,7 +82,7 @@ public class LoadNode extends Node {
     if( !(adr instanceof TypeNil ptr) )
       return adr.oob(RootNode.def_mem(def));
 
-    if( ptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
+    if( ptr.above_center() || ptr._aliases.is_empty() ) return TypeMem.ANYMEM; // Loaded from nothing
     // Loading from a struct does not require memory
     if( ptr instanceof TypeStruct ) return TypeMem.ANYMEM;
 
@@ -280,9 +280,23 @@ public class LoadNode extends Node {
   // All field loads against a pointer.
   @Override public boolean unify( boolean test ) {
     TV3 ptr = adr().tvar();
+    Type ta = adr()._val;
     // No-Op load against an inlined struct
-    if( adr()._val instanceof TypeStruct ts )
+    
+    // TODO: Still this is a problem! In my (fact(2),fact(2.2)) case fact is
+    // not inlined, and not specialized.  The incoming argument becomes
+    // %[4,5][] - a mix of int/flt - and NOT a ptr.  The standard load against
+    // it mixes int/flt struct result.
+
+    // Since the parm is %[INT + FLT][], the N460 Load believes its the NO-OP
+    // but really it is a normal load.  Since NO-OP, does not push H-M types
+    // uphill to call arg, and so not uphill to caller.
+    
+    if( ta instanceof TypeStruct || ptr instanceof TVStruct )
       return tvar().unify(ptr,test);
+    // Exactly a NIL is an Int
+    if( ta == TypeNil.NIL || ta == TypeNil.XNIL )
+      return tvar().unify(PrimNode.ZINT.tvar(),test);
     if( ptr instanceof TVPtr tptr )
       return tvar().unify(tptr.load(),test);
     // Stall

@@ -48,9 +48,11 @@ public class TVPtr extends TV3 {
     TVPtr ptr = (TVPtr)that;    // Invariant when called
     _aliases = _aliases.meet(ptr._aliases);
     if( _t != null ) {
+      _aliases = _aliases.clear(0);
       if( ptr._t==null ) ptr._t=_t;
       else ptr._t = (TypeNil)ptr._t.meet(_t);
     }
+    if( ptr._may_nil ) ptr._t = (TypeNil)ptr._t.meet(TypeNil.NIL);
   }
 
   @Override boolean _unify_impl(TV3 that ) {
@@ -62,14 +64,19 @@ public class TVPtr extends TV3 {
   @Override boolean _fresh_unify_impl(TV3 that, boolean test) {
     boolean progress = false;
     TVPtr ptr = (TVPtr)that.find();    // Invariant when called
-    // Update aliases
     BitsAlias aliases = _aliases.meet( ptr._aliases );
+    TypeNil t = _t==null ? ptr._t : (ptr._t==null ? _t : (TypeNil)_t.meet(ptr._t));
+    if( t!=null ) {
+      aliases = aliases.clear(0);
+      if( ptr._may_nil ) t = (TypeNil)t.meet(TypeNil.NIL);
+    }
+    
+    // Update aliases
     if( aliases != ptr._aliases ) {
       ptr._aliases = aliases;
       progress = ptrue();
     }
     // Update Type
-    TypeNil t = _t==null ? ptr._t : (ptr._t==null ? _t : (TypeNil)_t.meet(ptr._t));
     if( t != ptr._t ) {
       ptr._t = t;
       progress = ptrue();

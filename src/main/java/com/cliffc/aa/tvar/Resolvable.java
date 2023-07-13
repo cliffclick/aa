@@ -21,25 +21,25 @@ public interface Resolvable {
   TV3 tvar();
   // Match type tvar (as opposed to pattern)
   TV3 match_tvar();
-  
+
   // Attempt to resolve an unresolved field.  No change if test, but reports progress.
   // ( @{name:str, ... } @{ age=A } ) -vs- @{ age=B } // Ambiguous, first struct could pick up age, 2nd struct A & B could fail later
   // ( @{name:str      } @{ age=A } ) -vs- @{ age=B } // Ambiguous, first struct is a clear miss  , 2nd struct A & B could fail later
   // ( @{name:str      } @{ age=A } ) -vs- @{ age=A } // OK, A & A cannot miss
   // ( @{name:str, ... } @{ age=A } ) -vs- @{ age=A } // Ambiguous, first struct could pick up age=A
-  // 
+  //
   // So each match has the following 3 choices
   // - hard no , something structural is wrong
   // - hard yes, all parts match, even leaf-for-leaf.  No open struct in pattern.
   // - maybe   , all parts match, except leafs.  Leafs might expand later and fail.
-  
+
   // "Pattern leafs" are just any TV3 that, if it changes might effect the match outcome.
   Ary<TVExpanding> PAT_LEAFS = new Ary<>(new TVExpanding[1],0);
 
-  // A cache for hard-no answers.  Once a no, always a no.  Faster to lookup
-  // than to fail the trial again.
-  NonBlockingHashMapLong<TV3> HARD_NO = new NonBlockingHashMapLong<>();
-  
+  // A cache for hard-no and hard-yes answers.  Once a no, always a no.  Once a
+  // yes, always a yes.  Faster to lookup than to run the trial again.
+  NonBlockingHashMapLong<TV3> HARD_NO  = new NonBlockingHashMapLong<>();
+
   default boolean trial_resolve( boolean outie, TV3 pattern, TVStruct rhs, boolean test ) {
     assert !rhs.is_open() && is_resolving();
 
@@ -57,6 +57,11 @@ public interface Resolvable {
       if( fail != null ) {
         assert fail==rhsx;
         assert pattern.trial_unify_ok(rhsx)== -1;
+        continue;
+      }
+      if( pattern.find_trial() == rhsx.find_trial() ) {
+        assert pattern.trial_unify_ok(rhsx)>=  0;
+        yes++; lab=id;
         continue;
       }
       // Count YES, NO, and MAYBEs
@@ -94,8 +99,8 @@ public interface Resolvable {
       PAT_LEAFS.pop().add_delay_resolve(rhs);
     return false;
   }
-  
-  // Field can be resolved to label    
+
+  // Field can be resolved to label
   default boolean resolve_it(boolean outie, TV3 pattern, TVStruct rhs, String lab ) {
     String old_fld = resolve(lab);      // Change field label
     boolean old = rhs.del_fld(old_fld); // Remove old label from rhs, if any
@@ -110,7 +115,7 @@ public interface Resolvable {
     }
     return true;              // Progress
   }
-  
+
   // Track expanding terms; this need to recheck the match if they expand.
   // Already return 0 for a "maybe".
   static int add_pat_dep(TVExpanding leaf) {
@@ -118,7 +123,7 @@ public interface Resolvable {
       PAT_LEAFS.add(leaf);
     return 0;                   // Always reports a "maybe"
   }
-    
+
   // Resolve failed; if ambiguous report that; if nothing present report that;
   // otherwise force unification on all choices which will trigger an error on
   // each choice.
@@ -127,7 +132,7 @@ public interface Resolvable {
     Env.GVN.add_flow(fld);
     fld.deps_work_clear();
   }
-  
+
   public static void reset_to_init0() {
     HARD_NO.clear();
   }

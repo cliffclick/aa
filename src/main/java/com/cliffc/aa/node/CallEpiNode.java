@@ -47,13 +47,13 @@ public final class CallEpiNode extends Node {
     CallNode call = call();
     Type tc = call._val;
     if( !(tc instanceof TypeTuple tcall) ) return null;
-    
+
     // Wait until broken things clear out before wiring or inlining
     int len = _defs._len - (_defs.last() instanceof RootNode ? 1 : 0);
     for( int i=1; i<len; i++ )
       if( ((RetNode)in(i)).is_copy() )
         return null;
-    
+
     // Add or remove Call Graph edges according to fidxs
     if( CG_wire() ) return this;
 
@@ -230,7 +230,7 @@ public final class CallEpiNode extends Node {
     // - fidxs are conservative, may get removed, and will not be NALL (checked above).
     // - If we get here, its conservative correct to meet across returns &
     //   mixing in the pre-call is required for root or pure calls
-    
+
     // Compute meet over wired called function returns.
     Type tmem = TypeMem.ANYMEM, rmem;
     Type trez = fidxs.above_center() || nwired()==0 ? tfptr._ret : Type.ANY, rrez;
@@ -324,19 +324,18 @@ public final class CallEpiNode extends Node {
   // - If FDX includes BitsFun.EXTX, an edge to Root is added in the last position.
   // - If any CG edge is explicit, all are.
   //
-  
+
   public int nwired() { return _defs._len-1; }
   public Node wired(int x) { return _defs.at(x+1); }
 
   // True if this CallEpi has virtual CG edges to other unknown callees.
   // If any function is wired, all are.
   boolean unknown_callers() { return len()==1; }
-  
+
   // Checks for sane Call Graph, similar to RetNode.is_CG
   public boolean is_CG(boolean precise) {
     CallNode call = call();
     BitsFun fidxs = call.tfp()._fidxs;
-    if( fidxs==BitsFun.NALL ) return true; // Some kind of error condition
     // Check back edges from CEPI to CALL
     for( int i=1; i<len(); i++ ) {
       int fidx;
@@ -348,7 +347,7 @@ public final class CallEpiNode extends Node {
         if( !(n instanceof RootNode) || i!=len()-1) return false;
         fidx = BitsFun.EXTX;
       }
-      if( (!LIFTING || precise) && // During Combo or after correcting during Iter, 
+      if( (!LIFTING || precise) && // During Combo or after correcting during Iter,
           !fidxs.test(fidx) ) return false; // wired without matching fidx is an error
       if( n._defs.find(call) == -1 ) return false; // Wired below but not above
     }
@@ -358,6 +357,7 @@ public final class CallEpiNode extends Node {
       if( use instanceof FunNode fun ) use = fun.ret();
       if( _defs.find(use) == -1 ) return false; // Wired above but not below
     }
+    if( fidxs==BitsFun.NALL ) return !precise; // Some kind of error condition
     // If precise, check that every fidx is wired.  If not precise we might
     // have fidxs not yet wired.
     if( precise && !fidxs.above_center() ) {
@@ -371,7 +371,7 @@ public final class CallEpiNode extends Node {
         }
       }
     }
-    
+
     return true;                // Everything is OK
   }
 
@@ -380,7 +380,7 @@ public final class CallEpiNode extends Node {
   public boolean CG_wire() {
     assert !_is_copy && is_CG(false);        // Might be imprecise, but conservatively correct
     boolean progress = false;
-    
+
     CallNode call = call();
     TypeFunPtr tfp = call.tfp();
     BitsFun fidxs = tfp._fidxs;
@@ -450,7 +450,7 @@ public final class CallEpiNode extends Node {
     }
     if( progress ) call.add_flow().add_flow_defs(); // Call, args may change liveness
     assert is_CG(true );        // Precise
-    return progress;            // 
+    return progress;            //
   }
 
 
@@ -498,7 +498,7 @@ public final class CallEpiNode extends Node {
     while( nwired()>0 ) {
       Node w = del(1), fun=w;
       if( w instanceof RetNode ret ) fun = ret.fun();
-      fun.remove(fun._defs.find(call()));      
+      fun.remove(fun._defs.find(call()));
     }
     assert is_CG(false);
     return new TVLeaf();
@@ -511,7 +511,7 @@ public final class CallEpiNode extends Node {
     CallNode call = call();     // Call header for Apply
     Node fdx = call.fdx();      // node {dsp args -> ret}
     TV3 tv3 = fdx.tvar();       // type {dsp args -> ret}
-    
+
     // Peek thru any error
     if( tv3 instanceof TVErr err ) tv3 = err.as_lambda();
 
@@ -524,7 +524,7 @@ public final class CallEpiNode extends Node {
                                   tvar());     // Result
       return fdx.tvar().unify(lam,false);
     }
-    
+
     // Check for progress amongst args
     int tnargs = tfun.nargs();
     int cnargs = call.nargs();
@@ -548,7 +548,7 @@ public final class CallEpiNode extends Node {
 
     // Check for progress on the return & memory
     progress |= tvar().unify(tfun.ret(),test);
-    
+
     if( tnargs > nargs )  // Missing arguments
       progress |= tvar().unify_err("Passing "+cnargs+" arguments to a function taking "+tnargs+" arguments",tfun,call._badargs[cnargs-ARG_IDX],test);
     if( cnargs > nargs ) throw unimpl(); // Too many arguments
@@ -558,9 +558,9 @@ public final class CallEpiNode extends Node {
 
   // Unify trailing result ProjNode with the CallEpi directly.
   @Override public boolean unify_proj( ProjNode proj, boolean test ) {
-    if( proj._idx==REZ_IDX ) 
+    if( proj._idx==REZ_IDX )
       return tvar().unify(proj.tvar(),test);
     throw unimpl(); // memory unify
   }
-  
+
 }

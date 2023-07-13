@@ -18,7 +18,7 @@ public class TypeFlt extends TypeNil<TypeFlt> {
     _con = con;
     return this;
   }
-  
+
   @Override TypeFlt chk() {
     assert _z!=0 || !_any; // Constants are centerline, ignore "any", so "all" is canonical
     assert _aliases.test_recur(BitsAlias.FLTX);
@@ -29,8 +29,7 @@ public class TypeFlt extends TypeNil<TypeFlt> {
   static BitsAlias bits(boolean any) {
     return any ? BitsAlias.FLT.dual() : BitsAlias.FLT;
   }
-  @Override boolean has_alias(BitsAlias aliases) { return aliases.test_recur(BitsAlias.FLTX); }
-  
+
   @Override protected TypeFlt copy() {
     TypeFlt tf = super.copy();
     tf._z = _z;
@@ -75,7 +74,6 @@ public class TypeFlt extends TypeNil<TypeFlt> {
     }
     return this;
   }
-  
 
   public static TypeFlt con(double con) { return make(false,false,true,0,con); }
 
@@ -85,6 +83,7 @@ public class TypeFlt extends TypeNil<TypeFlt> {
   public static final TypeFlt NFLT32= make(false,false,true ,32,0);
   public static final TypeFlt PI    = con(Math.PI);
   public static final TypeFlt HALF  = con(0.5);
+  public static final TypeFlt ZERO  = con(0.0);
   public static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,PI,FLT32,NFLT32,HALF};
   static void init1( HashMap<String,TypeNil> types ) {
     types.put("flt32",FLT32);
@@ -119,13 +118,22 @@ public class TypeFlt extends TypeNil<TypeFlt> {
   }
   static int log( double con ) { return ((double)(float)con)==con ? 32 : 64; }
 
+  // Mixing TypeFlt subclasses.
+  @Override TypeNil nmeet(TypeNil tsub) {
+    assert _type==TFLT && tsub._type>TFLT;
+    return (TypeNil)tsub.widen_sub().meet(widen_sub());
+  }
+  @Override boolean chk(BitsAlias aliases) { return aliases.test_recur(BitsAlias.FLTX); }
+  @Override TypeFlt nil_meet() { return xmeet(make(true,false,false,64,0)); }
+
+
   @Override public TypeFlt widen() {
     if( !_nil && _sub ) return NFLT64;
     return FLT64;
   }
   @Override TypeNil widen_sub() {
-    BitsAlias aliases = _aliases.above_center() ? _aliases.dual() : _aliases;
-    return make(false,_nil,_sub,aliases,_fidxs);
+    if( !_fidxs.is_empty() ) throw com.cliffc.aa.AA.unimpl();
+    return TypeMemPtr.FLTPTR;
   }
   @Override public boolean is_con() { return _z==0; }
 }

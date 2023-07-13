@@ -46,10 +46,10 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     return tfp;
   }
 
-  @Override public TypeMemPtr walk( TypeStrMap map, BinaryOperator<TypeMemPtr> reduce ) { return reduce.apply(_dsp==null ? null : map.map(_dsp,"dsp"), map.map(_ret,"ret")); }
-  @Override public long lwalk( LongStringFunc map, LongOp reduce ) { return reduce.run(_dsp==null ? 0 : map.run(_dsp,"dsp"), map.run(_ret,"ret")); }
-  @Override public void walk( TypeStrRun map ) { if( _dsp!=null ) map.run(_dsp,"dsp"); map.run(_ret,"ret"); }
-  @Override public void walk_update( TypeMap map ) { if( _dsp!=null ) _dsp = map.map(_dsp); _ret = map.map(_ret); }
+  @Override public TypeMemPtr walk( TypeStrMap map, BinaryOperator<TypeMemPtr> reduce ) { return reduce.apply(map.map(_dsp,"dsp"), map.map(_ret,"ret")); }
+  @Override public long lwalk( LongStringFunc map, LongOp reduce ) { return reduce.run(map.run(_dsp,"dsp"), map.run(_ret,"ret")); }
+  @Override public void walk( TypeStrRun map ) { map.run(_dsp,"dsp"); map.run(_ret,"ret"); }
+  @Override public void walk_update( TypeMap map ) { _dsp = map.map(_dsp); _ret = map.map(_ret); }
   @Override public Cyclic.Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links) {
     TypeFunPtr tfp = (TypeFunPtr)t;
     Cyclic.Link dsplk = Cyclic._path_diff(_dsp,tfp._dsp,links);
@@ -57,20 +57,20 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     return Cyclic.Link.min(dsplk,retlk);
   }
 
-  public static boolean has_dsp(Type dsp) { return dsp!=null; }
+  public static boolean has_dsp(Type dsp) { return dsp!=Type.ALL; }
   public boolean has_dsp() { return has_dsp(_dsp); }
   public Type dsp() { return _dsp; }
 
   // Static properties hashcode, no edge hashes
   @Override long static_hash() {
-    return Util.mix_hash(super.static_hash(),_fidxs._hash,_nargs^(_dsp==null ? 0 : _dsp._type)^_ret._type);
+    return Util.mix_hash(super.static_hash(),_fidxs._hash,_nargs^_dsp._type^_ret._type);
   }
 
   // Static properties equals, no edges.  Already known to be the same class
   // and not-equals.
   @Override boolean static_eq(TypeFunPtr t) {
     return super.static_eq(t) && _nargs == t._nargs &&
-      (_dsp==t._dsp || (_dsp!=null && t._dsp!=null && _dsp._type == t._dsp._type)) &&
+      _dsp._type == t._dsp._type &&
       _ret._type == t._ret._type && _fidxs==t._fidxs;
   }
 
@@ -92,9 +92,8 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     if( !(o instanceof TypeFunPtr tf) ) return false;
     if( !super.equals(tf) ) return false;
     if( _fidxs!=tf._fidxs || _nargs != tf._nargs ) return false;
-    if( _dsp!=tf._dsp &&
-        (_dsp==null || tf._dsp==null || !_dsp.cycle_equals(tf._dsp)) )
-        return false;
+    if( _dsp!=tf._dsp && !_dsp.cycle_equals(tf._dsp) )
+      return false;
     if( _ret==tf._ret ) return true;
     if( _ret==null ) return false; // One if partially built, the other is fully built
     Type t2 =    find_other();
@@ -116,7 +115,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
         dups.put(_uid,"X"+(char)('A'+ucnt._tfp++));
       return;
     }
-    if( _dsp!=null ) _dsp._str_dups(visit,dups,ucnt);
+    _dsp._str_dups(visit,dups,ucnt);
     _ret._str_dups(visit,dups,ucnt);
   }
 
@@ -126,8 +125,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     _fidxs.str(sb);
     sb.p('{');                  // Arg list start
     if( debug )
-      if( _dsp==null ) sb.p("---,");
-      else _dsp._str(visit,dups, sb, true, indent).p(",");
+      _dsp._str(visit,dups, sb, true, indent).p(",");
     sb.p(_nargs).p(" ->");
     boolean ind = indent && _ret._str_complex(visit,dups);
     if( ind ) sb.nl().ii(1).i();
@@ -147,7 +145,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     P.require('{');
     TypeFunPtr tfp = malloc(any,fidxs,0,null,null);
     if( cid!=null ) P._dups.put(cid,tfp);
-    tfp._dsp = P.peek("---") ? null : P.type();
+    tfp._dsp = P.type();
     P.require(',');
     tfp._nargs = (int)P._num();
     P.require('-');  P.require('>');
@@ -330,12 +328,11 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   public  static final TypeFunPtr ARG2   =         make(false,BitsFun.NALL,2,Type.ALL,Type.ALL);
   public  static final TypeFunPtr THUNK  =         make(false,false,true,BitsFun.NALL ,3,TypeNil.ALL,Type.ALL); // zero-arg function (plus ctrl, mem, display)
   public  static final TypeFunPtr EMPTY  =         make(false,BitsFun.EMPTY,1,Type.ANY,Type.ANY);
-  public  static final TypeFunPtr NO_DSP_FUNPTR  = make(false,BitsFun.NALL,1,null,Type.ALL);
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,ARG2,THUNK};
 
   @Override protected TypeFunPtr xdual() {
     boolean xor = _nil == _sub;
-    return malloc(!_any,_nil^xor,_sub^xor,_fidxs.dual(),-_nargs,_dsp==null ? null : _dsp.dual(),_ret.dual());
+    return malloc(!_any,_nil^xor,_sub^xor,_fidxs.dual(),-_nargs,_dsp.dual(),_ret.dual());
   }
   @Override void rdual() { _dual._dsp = _dsp._dual;  _dual._ret = _ret._dual; }
 
@@ -348,8 +345,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     // Meet of non-return parts
     BitsFun fidxs = _fidxs.meet(tf._fidxs);
     int nargs = (_nargs ^ tf._nargs) > 0 ? Math.min(_nargs,tf._nargs) : Math.max(_nargs,tf._nargs);
-    if( (_dsp==null) != (tf._dsp==null) ) throw typerr(tf);
-    Type dsp = _dsp==null ? null : _dsp.meet(tf._dsp);
+    Type dsp = _dsp.meet(tf._dsp);
 
     // If both are short cycles, the result is a short cycle
     if( _ret==this && tf._ret==tf )
@@ -364,7 +360,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   // All fidxs, whether meet or join
   public BitsFun fidxs() { return _fidxs; }
   public int fidx() { return _fidxs.getbit(); } // Asserts internally single-bit
-  public boolean is_fidx() { return _fidxs.abit()>-1; } // Single-bit TFP
+  public boolean is_fidx() { return _fidxs.abit()>1; } // Single-bit TFP
   public boolean test(int fidx) { return _fidxs.test_recur(fidx); }
   public boolean is_empty() { return _fidxs.is_empty(); }
   public boolean is_full() { return _fidxs==BitsFun.NALL; }
@@ -378,7 +374,15 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     return make_from(ds,rs);
   }
 
-
+  // Mixing TypeNil subclasses.  TypeFunPtr does not play well with others, so
+  // the result is TypeNil.
+  @Override TypeNil nmeet(TypeNil tsub) {
+    assert _type==TFUNPTR && tsub._type>TFUNPTR;
+    boolean sub = _sub & tsub._sub;
+    boolean nil = _nil & tsub._nil & sub; // Disallow the xnil->nil edge
+    return TypeNil.make(false,nil,sub,_aliases.meet(tsub._aliases),_fidxs.meet(tsub._fidxs));
+  }
+  
   // [30]{-> XA:[29,31]{ -> XA} } meet [29]{-> ~Scalar} meet *[4]
 
   // Since meeting [30] and [29] will force a roll-up of the TFPs to XA:[29,30,31]{->XA}
@@ -411,7 +415,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     throw unimpl();
   }
 
-  @Override public TypeFunPtr sharptr2( TypeMem mem ) { return make_from(_dsp==null ? null : _dsp.sharptr2(mem),_ret.sharptr2(mem)); }
+  @Override public TypeFunPtr sharptr2( TypeMem mem ) { return make_from(_dsp.sharptr2(mem),_ret.sharptr2(mem)); }
 
   // All reaching fidxs, including any function returns
   @Override BitsFun _all_reaching_fidxs( TypeMem tmem) {
