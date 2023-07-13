@@ -82,7 +82,7 @@ public class TestLattice {
     static Ary<N> NS=new Ary<>(new N[1],0);
     static void reset() { NS.clear(); ID=0; }
     final int _id;
-    final String _t;
+    String _t;
     final Ary<N> _subs;
     final Ary<N> _sups;
     final BitSet _reaches; // Who reaches this node, including self
