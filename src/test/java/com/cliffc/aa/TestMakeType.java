@@ -18,6 +18,12 @@ public class TestMakeType {
     TCon I2 = new TCon("2");
     TCon I3 = new TCon("3");
     TOR INT64 = new TOR("~int64","int64",I2,I3);
+
+    // TODO:
+    // Add TFP
+    // Add Struct
+    // Add TMP
+    // Add TMEM
     
     TestMakeType SCALAR = new TOR("XSCALAR","SCALAR",FLT,INT64);
     TNilWrap NIL_SCALARS = new TNilWrap(SCALAR);
