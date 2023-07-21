@@ -72,15 +72,6 @@ public class TypeRPC extends TypeNil<TypeRPC> {
     rez._rpcs = _rpcs.meet( rpc._rpcs );
     return rez.chk().hashcons_free();
   }
-
-  // Mixing TypeNil subclasses.  TypeRPC does not play well with others, so
-  // the result is TypeNil.
-  @Override TypeNil nmeet(TypeNil tsub) {
-    assert _type==TRPC && tsub._type>TRPC;
-    boolean sub = _sub & tsub._sub;
-    boolean nil = _nil & tsub._nil & sub; // Disallow the xnil->nil edge
-    return TypeNil.make(false,nil,sub,_aliases.meet(tsub._aliases),_fidxs.meet(tsub._fidxs));
-  }
   @Override TypeRPC canonicalize() {
     if( _any != _rpcs.above_center() && !_rpcs.is_empty())
       _rpcs = _rpcs.dual();

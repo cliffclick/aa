@@ -533,8 +533,13 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     if(   is_simple() ) return this.xmeet(t   );
     if( t.is_simple() ) return t   .xmeet(this);
     // Triangulate on is_nil without being the same class
-    if( this instanceof TypeNil t0 && t instanceof TypeNil t1 )
-      return t0._type < t1._type ? t0.nmeet(t1) : t1.nmeet(t0);
+    if( this instanceof TypeNil t0 && t instanceof TypeNil t1 ) {
+      // LHS is TypeNil directly
+      if( t0._type==TNIL ) return t0.nmeet(t1);
+      if( t1._type==TNIL ) return t1.nmeet(t0);
+      // Mis-matched TypeNil subclasses
+      return t0.widen_sub().meet(t1.widen_sub());
+    }
     return Type.ALL;        // Mixing 2 unrelated types not subclassing TypeNil
   }
 
@@ -564,7 +569,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     Type mt2 = t.meet(this);   // Reverse args and try again
 
     if( mt==mt2 ) return true;
-    System.out.println("Meet not commutative: "+this+".meet("+t+")="+mt+",\n but "+t+".meet("+this+")="+mt2);
+    System.err.println("Meet not commutative: "+this+".meet("+t+")="+mt+",\n but "+t+".meet("+this+")="+mt2);
     return false;
   }
   // A & B = MT

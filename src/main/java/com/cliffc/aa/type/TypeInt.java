@@ -138,22 +138,12 @@ public class TypeInt extends TypeNil<TypeInt> {
     return 64;
   }
 
-  // Mixing TypeInt subclasses.
-  @Override TypeNil nmeet(TypeNil tsub) {
-    assert _type==TINT && tsub._type>TINT;
-    if( tsub._type==TFLT ) {
-      // Could imagine small ints inject into large floats
-      return (TypeMemPtr)TypeMemPtr.INTPTR.meet(TypeMemPtr.FLTPTR);
-    }
-    return (TypeNil)tsub.widen_sub().meet(widen_sub());
-  }
   @Override boolean chk(BitsAlias aliases) { return aliases.test_recur(BitsAlias.INTX); }
-  @Override TypeInt nil_meet() { return xmeet(make(true,false,false,64,0)); }
 
   @Override public TypeInt widen() { return INT64; }
   @Override TypeNil widen_sub() {
-    if( !_fidxs.is_empty() ) throw com.cliffc.aa.AA.unimpl();
-    return TypeMemPtr.INTPTR;
+    BitsAlias aliases = _aliases.above_center() ? _aliases.dual() : _aliases;
+    return make(false,_nil,_sub,aliases,_fidxs);
   }
 
   @Override public boolean is_con()  { return _z==0; }

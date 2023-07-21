@@ -117,14 +117,7 @@ public class TypeFlt extends TypeNil<TypeFlt> {
     return rez.chk().hashcons_free();
   }
   static int log( double con ) { return ((double)(float)con)==con ? 32 : 64; }
-
-  // Mixing TypeFlt subclasses.
-  @Override TypeNil nmeet(TypeNil tsub) {
-    assert _type==TFLT && tsub._type>TFLT;
-    return (TypeNil)tsub.widen_sub().meet(widen_sub());
-  }
   @Override boolean chk(BitsAlias aliases) { return aliases.test_recur(BitsAlias.FLTX); }
-  @Override TypeFlt nil_meet() { return xmeet(make(true,false,false,64,0)); }
 
 
   @Override public TypeFlt widen() {
@@ -132,8 +125,8 @@ public class TypeFlt extends TypeNil<TypeFlt> {
     return FLT64;
   }
   @Override TypeNil widen_sub() {
-    if( !_fidxs.is_empty() ) throw com.cliffc.aa.AA.unimpl();
-    return TypeMemPtr.FLTPTR;
+    BitsAlias aliases = _aliases.above_center() ? _aliases.dual() : _aliases;
+    return make(false,_nil,_sub,aliases,_fidxs);
   }
   @Override public boolean is_con() { return _z==0; }
 }

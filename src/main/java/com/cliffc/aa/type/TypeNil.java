@@ -6,8 +6,6 @@ import com.cliffc.aa.util.VBitSet;
 
 import java.util.HashMap;
 
-import static com.cliffc.aa.AA.unimpl;
-
 public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   public boolean _any;  // any vs all
   // OR  =   nil &  sub // NIL choice and subclass choice
@@ -223,51 +221,18 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     return rez;
   }
 
-  // LHS is TypeNil directly; RHS is a TypeNil subclass.
-  //              ~Scalar[nANY][nANY]
-  // ~TFP[][nANY]               ~TMP[nANY][]
-  //                   ~int[4]  ~flt[5]  [nANY][]UNUSED
-  //                  nil
-  // [55]{->}            17       3.14   [2][]@{some}
-  //                 xnil
-  //                    int[4]   flt[5]  [nALL][]ISUSED
-  //  TFP[][nALL]               ~TMP[nALL][]ISUSED
-  //               Scalar[nALL][nALL]
-  //
-  TypeNil nmeet(TypeNil tsub) {
+  final TypeNil nmeet(TypeNil tsub) {
     assert _type==TNIL && tsub._type!=TNIL;
-    if( this== NIL ) return tsub.nil_meet();
-    if( this==XNIL )
-      return tsub.or_ish() ? XNIL : SCALAR;
-
-    if( _any && tsub.chk(_aliases) ) {
-      // Keep subclass structure.
-      TypeNil rez = tsub.ymeet(this);
-      rez._nil &= rez._sub; // Disallow the xnil->nil edge
-      return (TypeNil)rez.canonicalize().chk().hashcons_free();
-    } else {
+    if( !_any || !tsub.chk(_aliases) ) {
       TypeNil tn = tsub.widen_sub();
-      return tn._type==TNIL ? xmeet(tn) : nmeet(tn);
+      return tn==this ? this : xmeet(tn);
     }
+    // Keep subclass structure.  
+    TypeNil rez = tsub.ymeet(this);
+    rez._nil &= _sub & tsub._sub; // Disallow the xnil->nil edge
+    return (TypeNil)rez.canonicalize().chk().hashcons_free();
   }
   
-  // Overridden in subclasses.
-  // Nil Sub
-  //  T   T   OR , oddly, falls to AND
-  //  T   F   YES, CANT HAPPEN
-  //  F   T   NO , nil  , falls to AND
-  //  F   F   AND, nil  , stay  
-  TypeNil nil_meet() {
-    assert !yes_ish();                // YES can't happen
-    if( !_nil && !_sub ) return this; // Already AND
-    // Keep substructure but fall to AND
-    //TypeNil tn = (_any ? dual() : this).copy();
-    TypeNil tn = copy();
-    tn._nil = tn._sub = false;
-    return (TypeNil)tn.canonicalize().chk().hashcons_free();
-  }
-
-
   // is allowed to be int or flt
   boolean chk(BitsAlias aliases) { return true; }
 

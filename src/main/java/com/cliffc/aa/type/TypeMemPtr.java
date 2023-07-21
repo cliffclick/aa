@@ -180,21 +180,6 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     return malloc(any,nil,sub,aliases, to).hashcons_free();
   }
 
-  // Mixing TypeNil subclasses.  TypeMemPtr surrounds TypeInt and TypeFlt.
-  @Override TypeNil nmeet(TypeNil tsub) {
-    assert _type==TMEMPTR && tsub._type>TMEMPTR;
-    // Keep the subtype for Int, Flt.
-    // Fall for e.g. Struct, RPC
-    if( _any && ((tsub._type==TINT || tsub._type==TFLT) && tsub.chk(_aliases)) ) {
-      TypeNil ty = tsub.ymeet(this);
-      ty._nil = tsub._nil;      // Keep original nil-ness, not from the aliases
-      return (TypeNil)ty.canonicalize().chk().hashcons_free();
-    }
-    // Fall
-    return (TypeNil)meet(tsub.widen_sub());
-  }
-
-
   // Widens, not lowers.
   @Override public TypeMemPtr simple_ptr() {
     if( _obj.len()==0 ) return this;

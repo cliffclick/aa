@@ -373,15 +373,6 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     if( _dsp==ds && _ret==rs ) return this;
     return make_from(ds,rs);
   }
-
-  // Mixing TypeNil subclasses.  TypeFunPtr does not play well with others, so
-  // the result is TypeNil.
-  @Override TypeNil nmeet(TypeNil tsub) {
-    assert _type==TFUNPTR && tsub._type>TFUNPTR;
-    boolean sub = _sub & tsub._sub;
-    boolean nil = _nil & tsub._nil & sub; // Disallow the xnil->nil edge
-    return TypeNil.make(false,nil,sub,_aliases.meet(tsub._aliases),_fidxs.meet(tsub._fidxs));
-  }
   
   // [30]{-> XA:[29,31]{ -> XA} } meet [29]{-> ~Scalar} meet *[4]
 
