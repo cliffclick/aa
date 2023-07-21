@@ -514,7 +514,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     if( t == this ) return this;
     // Short-cut for seeing this meet before
     Type mt = Key.get(this,t);
-    //if( mt != null ) return mt;
+    if( mt != null ) return mt;
     // Compute meet without filtering
     mt = ymeet(t);
     // Record this meet, to short-cut next time

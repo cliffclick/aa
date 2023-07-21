@@ -68,15 +68,14 @@ public class FieldNode extends Node implements Resolvable {
         // Join over all fields
         return ts._def.dual();
       }
-      return TypeNil.EXTERNAL;
+      return t.oob(); //TypeNil.EXTERNAL;
     }
 
     // Field from Base looks in the base CLZ.
     // One of TypeInt, TypeFlt, NIL or XNIL
     Type tstr = t;
-    if( t instanceof TypeNil && !(t instanceof TypeStruct) ) {
-      throw unimpl();
-    }
+    if( t instanceof TypeNil && !(t instanceof TypeStruct) )
+      return t.oob();
     // Hit on a field
     if( tstr instanceof TypeStruct ts ) {
       if( ts.find(_fld)!= -1 ) return ts.at(_fld).meet(ts._def.dual());

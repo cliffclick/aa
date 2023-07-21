@@ -30,8 +30,8 @@ public class TestParse {
 
     DO_GCP=true;
     DO_HMT=false;
-    RSEED=1;
-    //test("1+2*3", "7", "7");
+    RSEED=0;
+    test("{ x -> ( 3, x )}", "[%f0]{all,4 -> *[%a2](3, %[2,%a2][2,%f0]?) }", "{ A B -> *[%a2](3, B) }", null, null, "[%a2]", "[%f0]");
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(2),fact(2.2))","*[14](nil,1,2)","*[14](int64,int64,int64)", null, null, "[14]", null);
   }
 
@@ -62,9 +62,9 @@ public class TestParse {
     // Simple no-arg anonymous function, being called
     test("{5}()", "5", "5");
     // TestHM.a_basic_01
-    test("{ x -> ( 3, x )}", "[%f0]{---,4 -> *[%a2](3, %[2,%a2][2,%f0]?) }", "{ A B -> *[%a2](3, B) }", null, null, "[%a2]", "[%f0]");
+    test("{ x -> ( 3, x )}", "[%f0]{all,4 -> *[%a2](3, %[2,%a2][2,%f0]?) }", "{ A B -> *[%a2](3, B) }", null, null, "[%a2]", "[%f0]");
     // TestHM.a_basic_02
-    test("{ z -> ((z 0), (z \"abc\")) }", "[%f0]{---,4 -> *[%a3](%[2,%a2,%a3][2,%f0]?, %[2,%a2,%a3][2,%f0]?) }",
+    test("{ z -> ((z 0), (z \"abc\")) }", "[%f0]{all,4 -> *[%a3](%[2,%a2,%a3][2,%f0]?, %[2,%a2,%a3][2,%f0]?) }",
          "{A {B *[%a2]str:(97)? -> C } -> *[%a3](C,C) }",
          null, null,
          "[%a2,%a3]", "[%f0]" );
