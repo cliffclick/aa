@@ -129,4 +129,8 @@ public class TypeFlt extends TypeNil<TypeFlt> {
     return make(false,_nil,_sub,aliases,_fidxs);
   }
   @Override public boolean is_con() { return _z==0; }
+  
+  public TypeNil wrap() {
+    return TypeStruct.make_prim(TypeFld.make_clz(TypeMemPtr.FLTPTR),TypeFld.make_prim(this)); // Wrapped primitive
+  }
 }

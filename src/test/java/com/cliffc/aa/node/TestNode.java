@@ -201,7 +201,7 @@ public class TestNode {
     mem._val = TypeMem.ALLMEM;
     FunNode fun_forward_ref = new FunNode("some_fcn");
 
-    Node unr = Env.TOP.lookup("+"); // All the "+" functions
+    Node unr = Env.PRIM.lookup("+"); // All the "+" functions
     FunNode fun_plus = ((FunPtrNode)unr.in(1)).fun();
     RetNode ret = fun_plus.ret();
     CallNode call = new CallNode(false,null,_ins[0],unr,mem);

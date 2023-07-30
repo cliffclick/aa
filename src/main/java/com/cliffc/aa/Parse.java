@@ -1603,7 +1603,7 @@ public class Parse implements Comparable<Parse> {
   private Node mem() { return scope().mem(); }
   private void set_mem( Node n) { scope().set_mem(n); }
 
-  private Node con( TypeNil t ) { return Node.con(t); }
+  private Node con( TypeNil t ) { return Node.con(PrimNode.wrap(t)); }
 
   // Lookup & extend scopes
   public  Node lookup( String tok ) { return _e.lookup(tok); }

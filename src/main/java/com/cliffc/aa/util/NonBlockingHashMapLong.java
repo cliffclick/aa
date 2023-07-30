@@ -1,16 +1,3 @@
-/*
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package com.cliffc.aa.util;
 
 import java.io.IOException;
@@ -23,6 +10,10 @@ import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import static com.cliffc.aa.util.UtilUnsafe.UNSAFE;
 import static com.cliffc.aa.util.UtilUnsafe.fieldOffset;
 
+/*
+ * Written by Cliff Click and released to the public domain, as explained at
+ * http://creativecommons.org/licenses/publicdomain
+ */
 
 /**
  * A lock-free alternate implementation of {@link java.util.concurrent.ConcurrentHashMap}

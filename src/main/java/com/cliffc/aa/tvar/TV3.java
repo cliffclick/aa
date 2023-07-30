@@ -564,8 +564,8 @@ abstract public class TV3 implements Cloneable {
   private static final VBitSet DEPS_VISIT = new VBitSet();
   public boolean deps_add_deep(Node n ) { DEPS_VISIT.clear(); _deps_add_deep(n); return false; }
   public void _deps_add_deep(Node n ) {
-    // no progress during bulk testing*
-    if( !Node.FLOW_VISIT.isEmpty() ) return;
+    // no progress during bulk testing
+    if( Node.mid_work_assert() ) return;
     if( DEPS_VISIT.tset(_uid) ) return;
     if( _deps==null ) _deps = UQNodes.make(n);
     _deps = _deps.add(n);
@@ -576,7 +576,7 @@ abstract public class TV3 implements Cloneable {
   }
   public void deps_add(Node n ) {
     // no progress during bulk testing*
-    if( !Node.FLOW_VISIT.isEmpty() ) return;
+    if( Node.mid_work_assert() ) return;
     if( _deps==null ) _deps = UQNodes.make(n);
     _deps = _deps.add(n);
   }
@@ -590,41 +590,31 @@ abstract public class TV3 implements Cloneable {
   }
 
   // -----------------
-  public static TV3 from_flow(Type t) {
+  public static TV3 from_flow(Type t) { return from_flow(t,0); }
+  private static TV3 from_flow(Type t, int d) {
+    assert d<1000;  d++;        // Stack overflow?
     return switch( t ) {
     case TypeFunPtr tfp ->  tfp.is_full() ? new TVLeaf() // Generic Function Ptr
-      : new TVLambda(tfp.nargs(),from_flow(tfp.dsp()),from_flow(tfp._ret));
-    case TypeMemPtr tmp -> new TVPtr(tmp._aliases,(TVStruct)from_flow(tmp._obj));
+      : new TVLambda(tfp.nargs(),from_flow(tfp.dsp(),d),from_flow(tfp._ret,d));
+    case TypeMemPtr tmp -> {
+      TVStruct ts = (TVStruct)from_flow(tmp._obj,d);
+      StoreNode.unify(tmp._aliases,ts,false);
+      yield new TVPtr(tmp._aliases,ts);
+    }
     case TypeStruct ts -> {
-      // need to handle CLZ in slot 0
       int len = ts.len();
-      TypeFld fclz = ts.get(".");
-      if( fclz==null ) len++;
-
       String[] ss = new String[len];
       TV3[] tvs = new TV3[len];
-      ss [0] = ".";
-      tvs[0] = fclz==null ? new TVLeaf() : from_flow(fclz._t);
-      for( int i=0,j=1; i<ts.len(); i++ ) {
-        TypeFld fld = ts.fld(i);
-        if( !Util.eq(fld._fld,".") ) {
-          ss [j  ] = fld._fld;
-          tvs[j++] = from_flow(fld._t);
-        }
+      for( int i=0; i<ts.len(); i++ ) {
+        ss [i] = ts.fld(i)._fld;
+        tvs[i] = from_flow(ts.fld(i)._t,d);
       }
       yield new TVStruct(ss,tvs,ts._def==Type.ANY);
     }
-    case TypeInt ti -> ((TVPtr)PrimNode.PINT.tvar()).make_from(ti);
-    case TypeFlt tf -> ((TVPtr)PrimNode.PFLT.tvar()).make_from(tf);
-    // TODO
-    //case TypeInt ti -> {
-    //  TVPtr ptr = (TVPtr)PrimNode.PINT.tvar();
-    //  yield ptr._t==ti ? ptr : ptr.make_from(ti);
-    //}
+    case TypeInt ti -> TVBase.make(ti);
+    case TypeFlt tf -> TVBase.make(tf);
 
-    case TypeNil tn -> tn == TypeNil.NIL
-      ? new TVPtr( BitsAlias.make0(0), new TVStruct(true) )
-      : ((TVPtr)PrimNode.PINT.tvar()).make_from(tn);
+    case TypeNil tn -> new TVPtr( BitsAlias.make0(0), new TVStruct(true) );
     case Type tt -> {
       if( tt == Type.ANY || tt == Type.ALL ) yield new TVLeaf();
       throw unimpl();
@@ -735,7 +725,7 @@ abstract public class TV3 implements Cloneable {
       return unified() ? _uf._str(sb.p(">>"), visit, dups, debug, prims) : sb;
     }
     // Dup printing for all but bases (which are short, just repeat them)
-    boolean is_base = this instanceof TVPtr ptr && ptr._t!=null;
+    boolean is_base = this instanceof TVBase;
     if( dup && (debug || !is_base) ) {
       vname(sb,debug,false);           // Leading V123
       if( visit.tset(_uid) && !is_base ) return sb; // V123 and nothing else

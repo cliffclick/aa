@@ -67,9 +67,9 @@ public class TVStruct extends TVExpanding {
   }
 
   // Clazz for this struct, or null for ClazzClazz
-  public TVStruct clz() {
-    if( _max==0 || !Util.eq(_flds[0],".") ) return null;
-    return (TVStruct)arg(0);
+  public TVPtr pclz() {
+    if( _max==0 || !Util.eq(_flds[0],TypeFld.CLZ) ) return null;
+    return (TVPtr)arg(0);
   }
   
   @Override boolean can_progress() { throw unimpl(); }
@@ -104,7 +104,7 @@ public class TVStruct extends TVExpanding {
     String  fld = _flds[idx];
     TV3     tv3 = _args[idx];
     boolean pin = _pins[idx];
-    assert !Util.eq(fld,"."); // Never remove clazz
+    assert !Util.eq(fld,TypeFld.CLZ); // Never remove clazz
     _args[idx] = _args[_max-1];
     _flds[idx] = _flds[_max-1];
     _pins[idx] = _pins[_max-1];
@@ -380,7 +380,7 @@ public class TVStruct extends TVExpanding {
   boolean is_top_clz() { return idx("math") >= 0; }
 
   @Override public VBitSet _get_dups_impl(VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
-    TV3 clz = debug_arg(".");
+    TV3 clz = debug_arg(TypeFld.CLZ);
     if( !prims && is_int_clz() ) return dups;
     if( !prims && is_flt_clz() ) return dups;
     if( !prims && is_str_clz() ) return dups;
@@ -393,7 +393,6 @@ public class TVStruct extends TVExpanding {
         return _args[1]._get_dups(visit,dups,debug,prims);
     }
     for( int i=0; i<len(); i++ ) {
-      if( !debug && Util.eq("^",_flds[i]) ) continue; // Display is private, not shown
       if( !debug && Resolvable.is_resolving(_flds[i]) ) continue;
       _args[i]._get_dups(visit,dups,debug,prims);
     }
@@ -410,11 +409,13 @@ public class TVStruct extends TVExpanding {
     if( !prims && is_top_clz() ) return sb.p("TOP");
 
     // Special hack to print "int:(2)" as "2"
-    TV3 clz = debug_arg(".");
-    if( !debug && clz instanceof TVPtr zptr && _flds.length==2 && Util.eq(_flds[1],"0") ) {
+    TV3 clz = debug_arg(TypeFld.CLZ);
+    if(clz instanceof TVPtr zptr && _flds.length==2 && Util.eq(_flds[1],TypeFld.PRIM) ) {
       TVStruct zts = zptr.load();
-      if( zts.is_int_clz() || zts.is_flt_clz() || zts.is_str_clz() )
-        return _args[1]._str(sb,visit,dups,debug,prims);
+      if( zts.is_int_clz() || zts.is_flt_clz() || zts.is_str_clz() ) {
+        zts._str(sb,visit,dups,debug,prims);
+        return _args[1]._str(sb.p(":"),visit,dups,debug,prims);
+      }
     }
     // Print clazz field up front.
     if( clz!=null ) clz._str(sb,visit,dups,debug,prims).p(":");    
@@ -423,7 +424,7 @@ public class TVStruct extends TVExpanding {
     for( int idx : sorted_flds() ) {
       if( !debug && Util.eq("^",_flds[idx]) ) continue; // Displays are private by default
       if( !debug && Resolvable.is_resolving(_flds[idx]) ) continue;
-      if( Util.eq(".",_flds[idx]) ) continue; // CLZ already printed up front
+      if( Util.eq(TypeFld.CLZ,_flds[idx]) ) continue; // CLZ already printed up front
       if( !is_tup ) {                         // Skip tuple field names
         sb.p(_flds[idx]);
         sb.p("= ");

@@ -5,7 +5,6 @@ import com.cliffc.aa.tvar.Resolvable;
 import com.cliffc.aa.tvar.TVField;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.NonBlockingHashMapLong;
-import com.cliffc.aa.util.VBitSet;
 
 /** Combined Global Constant Propagation and Hindly-Milner with extensions.
 
@@ -136,20 +135,22 @@ public abstract class Combo {
 
   public static void opto() {
     assert Env.GVN.work_is_clear();
+    // This pass LIFTS not FALLs
+    AA.LIFTING = false;
 
     // Set all values to ANY and lives to DEAD, their most optimistic types.
     // Set all type-vars to Leafs.
-    PrimNode.ZINT.init_tvar();
-    PrimNode.ZFLT.init_tvar();
-    PrimNode.PINT.set_tvar();
-    PrimNode.PFLT.set_tvar();
-    PrimNode.ZINT._set_tvar();
-    PrimNode.ZFLT._set_tvar();
-    PrimNode.PSTR.set_tvar();
-    PrimNode.ZSTR.set_tvar();
     RootNode.combo_def_mem();
-    Env.ROOT.walk_initype(new VBitSet());
-    assert Env.ROOT.more_work(false)==0; // Initial conditions are correct
+    Env.KEEP_ALIVE.walk( (n,ignore) -> {
+        if( n.is_prim() ) return 0;
+        n._val = n._live = Type.ANY;  // Highest value
+        if( n.has_tvar() ) n.set_tvar();
+        n.add_flow();
+        if( n instanceof FunNode fun && !n.always_prim() )
+          fun.set_unknown_callers();
+        return 0;
+      });
+    assert Env.KEEP_ALIVE.more_work()==0; // Initial conditions are correct
 
     // Init
     HM_NEW_LEAF = false;
@@ -162,24 +163,27 @@ public abstract class Combo {
 
     // Pass 2: Potential new Leafs quit lifting GCP in Apply
     add_new_leaf_work();
-    assert Env.ROOT.more_work(false)==0;
+    assert Env.KEEP_ALIVE.more_work()==0;
     work_cnt += main_work_loop(2);
 
     // Pass 3: Unresolved Fields are ambiguous; propagate errors
     HM_AMBI = true;
     add_ambi_work();
-    assert Env.ROOT.more_work(false)==0;
+    assert Env.KEEP_ALIVE.more_work()==0;
     work_cnt += main_work_loop(3);
 
     // Pass 4: H-M types freeze, escaping function args are assumed called with lowest H-M compatible
     // GCP types continue to run downhill.
     HM_FREEZE = true;
     add_freeze_work();
-    assert Env.ROOT.more_work(false)==0;
+    assert Env.KEEP_ALIVE.more_work()==0;
     work_cnt += main_work_loop(4);
 
     // Take advantage of results
-    Env.ROOT.walk_opt(new VBitSet());
+    Env.KEEP_ALIVE.walk( (n,ignore) -> {
+        Env.GVN.add_work_new(n);
+        return 0;
+      });
   }
 
   static int main_work_loop( int pass ) {
@@ -210,7 +214,7 @@ public abstract class Combo {
       }
 
       // Very expensive assert: everything that can make progress is on worklist
-      //assert Env.ROOT.more_work(false)==0;
+      //assert Env.KEEP_ALIVE.more_work()==0;
     }
     return cnt;
   }

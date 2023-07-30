@@ -28,21 +28,21 @@ public class NewNode extends Node {
   // Just TMP.make(_alias,ISUSED)
   public TypeMemPtr _tptr;
 
-  public NewNode( int alias ) {
+  public NewNode( int alias, boolean is_con ) {
     super(OP_NEW);
     _reset0_alias = alias;       // Allow a reset, if this alias splits and then we want to run a new test
-    set_alias(alias);
+    set_alias(alias,is_con);
     NEWS.setX(alias,this);
   }
-  public NewNode( ) { this(BitsAlias.new_alias()); }
+  public NewNode( ) { this(BitsAlias.new_alias(),false); }
 
-  private void set_alias(int alias) {
+  private void set_alias(int alias, boolean is_con) {
     if( _elock ) unelock();    // Unlock before changing hash
     _alias = alias;
-    _tptr = TypeMemPtr.make(alias,TypeStruct.ISUSED);
+    _tptr = TypeMemPtr.make_con(BitsAlias.make0(alias),is_con,TypeStruct.ISUSED);
   }
   @Override public String xstr() { return "New"+"*"+_alias; } // Self short name
-  @Override void walk_reset0() { set_alias(_reset0_alias); super.walk_reset0(); }
+  @Override void walk_reset0() { set_alias(_reset0_alias,_tptr.is_con()); super.walk_reset0(); }
 
   @Override public Type value() { return _killed ? _tptr.dual() : _tptr; }
   
@@ -88,21 +88,16 @@ public class NewNode extends Node {
   @Override public boolean has_tvar() { /*assert used(); */ return true; }
 
   @Override public TV3 _set_tvar() {
-    // Used to close the cycle between the ints and flts
-    TypeNil t=null;
-    TVStruct ts=null;
-    if( this==PrimNode.PINT ) { t = TypeInt.INT64; ts = PrimNode.ZINT._tvar.as_struct(); }
-    if( this==PrimNode.PFLT ) { t = TypeFlt.FLT64; ts = PrimNode.ZFLT._tvar.as_struct(); }
-    if( ts==null ) ts = new TVStruct(true);
-    return new TVPtr(BitsAlias.make0(_alias), ts, t );
+    return new TVPtr(BitsAlias.make0(_alias), new TVStruct(true) );
   }
 
   // clones during inlining all become unique new sites
   @Override public @NotNull NewNode copy(boolean copy_edges) {
     // Split the original '_alias' class into 2 sub-aliases
+    assert !_tptr.is_con();
     NewNode nnn = (NewNode)super.copy(copy_edges);
-    nnn.set_alias(BitsAlias.new_alias(_alias)); // Children alias classes, split from parent
-        set_alias(BitsAlias.new_alias(_alias)); // The original NewNode also splits from the parent alias
+    nnn .set_alias(BitsAlias.new_alias(_alias),false); // Children alias classes, split from parent
+    this.set_alias(BitsAlias.new_alias(_alias),false); // The original NewNode also splits from the parent alias
     Env.GVN.add_flow(this);     // Alias changes flow
     return nnn;
   }

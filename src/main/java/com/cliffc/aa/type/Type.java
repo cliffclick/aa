@@ -842,11 +842,11 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
           // Shortcut for ints/flts.  Check for "int:int_type" or "flt:flt_type"
           if( Util.eq(id,"int") ) {
             TypeInt tint = TypeInt.valueOfInt(id_num());
-            yield maybe_dup(dup,tint==null ? TypeInt.con((long)back_num(oldx2)) : tint);
+            yield maybe_dup(dup,(tint==null ? TypeInt.con((long)back_num(oldx2)) : tint).wrap());
           }
           if( Util.eq(id,"flt") ) {
             TypeFlt tflt = TypeFlt.valueOfFlt(id_num());
-            yield maybe_dup(dup,tflt==null ? TypeFlt.con(      back_num(oldx2)) : tflt);
+            yield maybe_dup(dup,(tflt==null ? TypeFlt.con(      back_num(oldx2)) : tflt).wrap());
           }
 
           // Ok, really start a recursive type

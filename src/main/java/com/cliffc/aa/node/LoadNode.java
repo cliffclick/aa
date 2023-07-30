@@ -7,6 +7,8 @@ import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.*;
 
+// TODO: FOLD BACK INTO FIELD
+
 // Load a struct from memory.  Does its own nil-check testing.
 //
 // Load is used on primitives as well as normal struct loads.  Display/Frames

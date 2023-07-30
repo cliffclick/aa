@@ -29,6 +29,7 @@ public class GVNGCM {
 
   static public <N extends Node> N add_work( WorkNode work, N n ) {
     if( n==null || n.is_dead() ) return n;
+    if( n.is_prim() && PrimNode.post_init() ) return n; // No prims after prim init
     work.add(n);
     return n;
   }
@@ -88,6 +89,11 @@ public class GVNGCM {
     ITER_CNT = ITER_CNT_NOOP = 0;
   }
   boolean work_is_clear() { return _work_flow.isEmpty() && _work_dead.isEmpty() && _work_reduce.isEmpty(); }
+  public void work_clear() {
+    _work_flow.clear();
+    _work_dead.clear();
+    _work_reduce.clear();
+  }
 
   // Keep a Node reference alive for later.  Strongly asserted as a stack
   public static int push( Node n ) { KEEP_ALIVE.add_def(n); return KEEP_ALIVE._defs._len; }
@@ -131,10 +137,10 @@ public class GVNGCM {
   // aggressively checks no-more-progress.
   public void iter() {
     int cnt = ITER_CNT;
-    assert AA.once_per() || Env.ROOT.more_work(true) == 0; // Initial conditions are correct
+    assert AA.once_per() || Env.KEEP_ALIVE.more_work() == 0; // Initial conditions are correct
     //assert Env.ROOT.no_more_ideal(); // Has side-effects of putting things on worklist
     while( true ) {
-      cnt++; assert cnt < 20000; // Catch infinite ideal-loops
+      cnt++; assert cnt < 10000; // Catch infinite ideal-loops
       Node n, m;
       if( false ) ;
       else if( (n=_work_dead  .pop())!=null ) m = n._uses._len == 0 ? n.kill() : null;
@@ -146,11 +152,11 @@ public class GVNGCM {
       else break;
       if( m == null ) ITER_CNT_NOOP++;     // No progress profiling
       else n.deps_work_clear();            // Progress; deps on worklist
-      //assert Env.ROOT.more_work(true) == 0;
+      //assert Env.KEEP_ALIVE.more_work() == 0;
       //assert Env.ROOT.no_more_ideal();
     }
-    assert AA.once_per() || Env.ROOT.more_work(true)==0;
-    //assert Env.ROOT == null || Env.ROOT.no_more_ideal(); // Has side effects of putting things on worklist
+    assert AA.once_per() || Env.ROOT.more_work()==0;
+    //assert Env.ROOT == null || Env.ROOT.no_more_ideal();
     ITER_CNT=cnt;
   }
 

@@ -11,7 +11,7 @@ import java.util.function.Predicate;
 // constants, except for XNIL.  XNIL allows for a TV3 typevar Nilable-Leaf with
 // each Leaf unifying on its own.
 public class ConNode<T extends Type> extends Node {
-  T _t;                         // Not final for testing
+  public T _t;                  // Not final for testing
   public ConNode( T t ) {
     super(OP_CON,Env.ROOT);
     _t=t;
@@ -29,14 +29,13 @@ public class ConNode<T extends Type> extends Node {
   @Override public boolean has_tvar() {
     if( _t==Type.ALL || _t==Type.ANY ) return true;  // Specifically allowed for various unused-displays on primitives
     if( _t instanceof TypeNil ) return true; // Yes on NIL, INT, FLT, MEMPTR, FUNPTR, STRUCT
-    if( _t instanceof TypeMem ) return false;
     // No for TFLD, RPC
     return false;
   }
 
   @Override public TV3 _set_tvar() {
     unelock();                  // Hash now depends on TVars
-    TV3 tv = PrimNode.wrap_base(_t);
+    TV3 tv = TV3.from_flow(_t);
     tv.deps_add_deep(this);     // Constant hash depends on tvar      
     return tv;
   }

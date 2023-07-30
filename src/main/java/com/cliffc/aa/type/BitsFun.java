@@ -41,14 +41,14 @@ public class BitsFun extends Bits<BitsFun> {
 
   public static final BitsFun EXT = make0(EXTX);
   public static final BitsFun INT = make0(INTX);
-  
+
   public static final BitsFun EMPTY = make0();
   @Override public BitsFun ALL() { return ALL; }
   @Override public BitsFun ANY() { return ANY; }
   @Override public BitsFun EMPTY() { return EMPTY; }
 
   // Make a NEW fidx, with the given parent, and return the Bits with just it
-  static BitsFun make_new_fidx( int parent_fidx ) { return make0(new_fidx(parent_fidx)); }
+  public static BitsFun make_new_fidx( int parent_fidx ) { return make0(new_fidx(parent_fidx)); }
   public static void free(int fidx) { TREE.free(fidx); }
   public static BitsFun make0( int bit ) { return NALL.make(bit); }
   public static BitsFun make0( int... bits ) { return NALL.make(bits); }

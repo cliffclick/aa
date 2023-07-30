@@ -1,7 +1,6 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.*;
-import com.cliffc.aa.node.PrimNode;
 
 import java.util.Arrays;
 import java.util.BitSet;
@@ -54,7 +53,7 @@ import static com.cliffc.aa.type.TypeFld.Access;
 */
 public class TypeMem extends Type<TypeMem> {
   private boolean _any;
-  
+
   // Mapping from alias#s to the current known alias state.  TypeMem is never a
   // nil.  Slot#0 is always nil.  Slot#1 is the Parent-Of-All aliases and is
   // the default value.  Default values are replaced with null during
@@ -119,11 +118,9 @@ public class TypeMem extends Type<TypeMem> {
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
 
   @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
-    for( int i = 1; i< _objs.length; i++ ) {
-      TypeStruct ts = _objs[i];
-      if( ts!=null && i>BitsAlias.STRX && i<PrimNode.MAX_PRIM_ALIAS && !ts.is_prim_clz() )
-        ts._str_dups(visit,dups,ucnt);
-    }
+    for( int i = 1; i< _objs.length; i++ )
+      if( _objs[i]!=null )
+        _objs[i]._str_dups(visit,dups,ucnt);
   }
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
@@ -135,8 +132,6 @@ public class TypeMem extends Type<TypeMem> {
     if( indent ) sb.ii(1).nl(); // Indent memory
     for( int i = 1; i< _objs.length; i++ )
       if( _objs[i] != null ) {
-        if( i>BitsAlias.STRX && i<PrimNode.MAX_PRIM_ALIAS && !_objs[i].is_prim_clz() )
-          continue;             // Skip all the redundant prims
         if( indent ) sb.i();
         _objs[i]._str(visit,dups, sb.p(i).p(':'), debug, indent).p(",");
         if( indent ) sb.nl();
@@ -149,7 +144,7 @@ public class TypeMem extends Type<TypeMem> {
 
   static TypeMem valueOf(Parse P, String cid, boolean any ) {
     if( P.peek("_all_]]") ) return ALLMEM;
-    if( P.peek("_any_]]") ) return ANYMEM;    
+    if( P.peek("_any_]]") ) return ANYMEM;
     Ary<TypeStruct> objs  = new Ary<>( new TypeStruct[1],0);
     objs.push(null);
     while( true ) {
@@ -161,7 +156,7 @@ public class TypeMem extends Type<TypeMem> {
     }
     return make0(any,objs.asAry());
   }
-  
+
   // Alias-at.  Out of bounds or null uses the parent value.
   public TypeStruct at(int alias) { return at( _objs,alias); }
   static TypeStruct at(TypeStruct[] tos, int alias) { return tos[at_idx(tos,alias)]; }
@@ -232,11 +227,10 @@ public class TypeMem extends Type<TypeMem> {
       as[par] = TypeStruct.UNUSED;
     return make0(_any,as);
   }
-
-
-  public static TypeMem make_live(TypeStruct live) {
-    throw unimpl();
-    //return make0(new TypeStruct[]{live});
+  public TypeMem make_from(int alias, TypeStruct oop) {
+    TypeStruct[] as = Arrays.copyOf( _objs,Math.max( _objs.length,alias+1));
+    as[alias] = oop;
+    return make0(_any,as);    
   }
 
   public static final TypeMem ANYMEM,ALLMEM,EXTMEM; // Every alias is unused (so above XOBJ or below OBJ)
@@ -289,6 +283,8 @@ public class TypeMem extends Type<TypeMem> {
       return TypeStruct.UNUSED;
       //return ptr._obj.oob(TypeStruct.ISUSED);
     }
+    if( ptr._aliases == BitsAlias.NALL )
+      return TypeStruct.ISUSED;
     if( this==ALLMEM ) return TypeStruct.ISUSED;
     if( this==ANYMEM ) return TypeStruct.UNUSED;
     return ld( _objs,ptr._aliases);
@@ -314,7 +310,7 @@ public class TypeMem extends Type<TypeMem> {
     AryInt work = new AryInt();
     VBitSet visit = new VBitSet();
     _add_all(aliases,visit,work,aliases);
-  
+
     while( !work.isEmpty() ) {
       if( aliases==BitsAlias.NALL ) return aliases; // Already full
       TypeStruct ts = at(work.pop());
@@ -345,8 +341,8 @@ public class TypeMem extends Type<TypeMem> {
     work.push(alias);
     return aliases.set(alias);
   }
-  
-    
+
+
   // Slice memory by aliases; unnamed aliases are replaced with ~use.
   public TypeMem slice_reaching_aliases(BitsAlias aliases) {
     if( aliases==BitsAlias.NALL ) return this;
@@ -489,7 +485,7 @@ public class TypeMem extends Type<TypeMem> {
         return false;           // Need to clean up
     return true;
   }
-  
+
 
   // Struct store into a conservative set of aliases.
   // 'precise' is replace, imprecise is MEET.
@@ -529,7 +525,7 @@ public class TypeMem extends Type<TypeMem> {
       if( at(alias)!=TypeStruct.UNUSED )
         { found=true; break; }
     if( !found ) return this;
-      
+
     TypeStruct[] tos = _objs.clone();
     tos[0] = null;
     for( int alias : escs )
@@ -552,7 +548,7 @@ public class TypeMem extends Type<TypeMem> {
     }
     return true;                // Not modified in any alias
   }
-  
+
   // Everything NOT in the 'escs' is flattened to UNUSED.
   // Everything YES in the 'escs' is flattened for live.
   public TypeMem remove_no_escapes( BitsAlias escs ) {

@@ -9,6 +9,8 @@ import org.jetbrains.annotations.NotNull;
 
 import static com.cliffc.aa.AA.unimpl;
 
+// TODO: FOLD BACK INTO LOAD
+
 // Takes a static field name, a TypeStruct and returns the field value.
 // Basically a ProjNode except it does lookups by field name in TypeStruct
 // instead of by index in TypeTuple.
@@ -60,34 +62,46 @@ public class FieldNode extends Node implements Resolvable {
       // Pre-HMT, dunno which one, use meet of all fields
       if( t instanceof TypeStruct ts ) {
         if( ts.above_center() ) return ts._def;
+        Type t2 = ts._def;
         if( _tvar==null || Combo.HM_AMBI ) {
-          Type t2 = ts._def;
+          // If ts._def is ALL, not adding more fields
           for( TypeFld t3 : ts )  t2 = t2.meet(t3._t);
-          return t2;
+        } else {
+          // Join over all fields
+          for( TypeFld t3 : ts )  t2 = t2.join(t3._t);
         }
-        // Join over all fields
-        return ts._def.dual();
+        return t2;
       }
       return t.oob(); //TypeNil.EXTERNAL;
     }
 
-    // Field from Base looks in the base CLZ.
-    // One of TypeInt, TypeFlt, NIL or XNIL
-    Type tstr = t;
+    // Field lookup
+    LoadNode ld = (LoadNode)in(0);
+    Type lmem = ld.mem()._val;
+    ld.mem().deps_add( this );
+    return lmem instanceof TypeMem mem ? lookup(t,mem) : lmem.oob();
+  }
+
+  // Field lookup, might check superclass
+  private Type lookup( Type t, TypeMem mem ) {
     if( t instanceof TypeNil && !(t instanceof TypeStruct) )
       return t.oob();
     // Hit on a field
-    if( tstr instanceof TypeStruct ts ) {
+    if( t instanceof TypeStruct ts ) {
       if( ts.find(_fld)!= -1 ) return ts.at(_fld).meet(ts._def.dual());
-      // Miss on closed structs looks at superclass.
       // Miss on open structs dunno if the field will yet appear
-      if( ts.len()>=1 && Util.eq(ts.fld(0)._fld,TypeFld.CLZ) )
-        throw unimpl();
+      if( ts._def==Type.ANY ) return Type.ANY;
+      // Miss on closed structs looks at superclass.
+      if( ts.len()>=1 && Util.eq(ts.fld(0)._fld,TypeFld.CLZ) ) {
+        TypeMemPtr ptr = (TypeMemPtr)ts.fld(0)._t;
+        TypeStruct obj = mem.ld(ptr);
+        return lookup(obj,mem);
+      }
       return ts._def;
     }
-    return tstr.oob(Type.ALL);
+    return t.oob(Type.ALL);
   }
-
+  
   // If the field is resolving, we do not know which field to demand, so demand
   // them all when lifting and none when lowering.
   @Override public Type live_use( int i ) {
@@ -185,7 +199,7 @@ public class FieldNode extends Node implements Resolvable {
     if( is_resolving() )
       return try_resolve(tstr,test);
     // Search up the super-clazz chain
-    for( ; tstr!=null; tstr = tstr.clz() ) {
+    for( ; tstr!=null; tstr = tstr.pclz().load() ) {
       // If the field is in the struct, unify and done
       if( (fld=tstr.arg(_fld))!=null ) return do_fld(fld,test);
       // If the struct is open, add field here and done.

@@ -228,6 +228,9 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   public static TypeStruct malloc_test( TypeStruct clz, TypeFld fld0, TypeFld fld1 ) {
     return malloc(false,ALL,TypeFlds.make(TypeFld.make_clz(clz),fld0,fld1));
   }
+  public static TypeStruct malloc_prim( Type clz, Type fld ) {
+    return malloc(false,ALL,TypeFlds.ts(TypeFld.malloc_clz(clz),TypeFld.make("_",fld)));
+  }
   public TypeStruct hashcons_free() {
     // All subparts already interned
     if( RECURSIVE_MEET ==0 ) {
@@ -260,8 +263,8 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
 
   // Used to make a few testing constants
   public static TypeStruct make_test( String fld_name, Type t, Access a ) { return make(TypeFld.make(fld_name,t,a)); }
-  public static TypeStruct make_test(           TypeFld fld0, TypeFld fld1 ) { return make(TypeFlds.make(fld0,fld1)); }
-  public static TypeStruct make_test( Type def, TypeFld fld0, TypeFld fld1 ) { return make(false,def,TypeFlds.make(fld0,fld1)); }
+  public static TypeStruct make_test( TypeFld fld0, TypeFld fld1 ) { return make(TypeFlds.make(fld0,fld1)); }
+  public static TypeStruct make_prim( TypeFld fld0, TypeFld fld1 ) { return make(false,TypeNil.NIL,TypeFlds.make(fld0,fld1)); }
   public static TypeStruct make_test( Type def, TypeStruct clz, TypeFld fld0, TypeFld fld1 ) {
     return make(false,def,TypeFlds.make(TypeFld.make_clz(clz),fld0,fld1));
   }
@@ -625,17 +628,21 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     if( is_math_clz()) return sb.p("@{MATH}");
     if( is_str() ) return sb.p("str:("+_flds[1]._t+")");
 
+    if( _flds.length>1 && Util.eq(_flds[0]._fld,TypeFld.CLZ) && _flds[0]._t instanceof TypeMemPtr pclz && pclz._is_con ) {
+      if( pclz._aliases==BitsAlias.INT ) return _flds[1]._t._str(visit,dups,sb.p("int:"),debug,indent);
+      if( pclz._aliases==BitsAlias.FLT ) return _flds[1]._t._str(visit,dups,sb.p("flt:"),debug,indent);
+    }
+
     boolean is_tup = is_tup();
     sb.p(is_tup ? "(" : "@{");
     // Set the indent flag once for the entire struct.  Indent if any field is complex.
     boolean ind = false;
-    for( TypeFld fld : this )
+    for( TypeFld fld : _flds )
       if( (debug || !Util.eq(fld._fld,TypeFld.CLZ)) && (fld._t!=null && fld._t._str_complex(visit,dups)) )
         ind=indent;           // Field is complex, indent if asked to do so
     if( ind ) sb.ii(1);
     boolean sep=false;
     for( TypeFld fld : _flds ) {
-      if( !debug && Util.eq(fld._fld,TypeFld.CLZ) ) continue;
       if( fld==TypeFld.ANY_CLZ ) sb.p('_'); // Short-cut the ever-present display
       else {
         if( ind ) sb.nl().i();

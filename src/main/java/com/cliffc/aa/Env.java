@@ -13,9 +13,9 @@ import static com.cliffc.aa.AA.*;
 // An "environment", a lexical Scope tracking mechanism that runs 1-for-1 in
 // parallel with a ScopeNode.
 //
-// TOP: The top-most environment, which includes the primitives (e.g. "+") and top-level types (e.g. "int64")
-// TOP._scope: Node placeholder pointing to all the primitives and types, keeping them alive.
-// The TOP env is closed when the 'aa' process no longer accepts more code.
+// PRIM: The top-most environment, which includes the primitives (e.g. "+") and top-level types (e.g. "int64")
+// PRIM._scope: Node placeholder pointing to all the primitives and types, keeping them alive.
+// The PRIM env is closed when the 'aa' process no longer accepts more code.
 
 // FILE: The next env down; the results of a single complete normal parse and typing.
 // FILE._scope: Result of said parse.
@@ -24,26 +24,26 @@ import static com.cliffc.aa.AA.*;
 // single test (but not a collection of tests in the same test function), or a
 // single REPL session (but not a single REPL line).
 
-// Testing generally starts with TOP, then parses whole complete (short)
-// programs at a FILE env and checks their typing - within the same TOP scope.
-// A single testParseXX() function will have many tests but only one TOP.
+// Testing generally starts with PRIM, then parses whole complete (short)
+// programs at a FILE env and checks their typing - within the same PRIM scope.
+// A single testParseXX() function will have many tests but only one PRIM.
 
-// The REPL starts with a TOP, then opens a FILE level env - then opens a
+// The REPL starts with a PRIM, then opens a FILE level env - then opens a
 // single-line Env, parses and types it, then exports it to the FILE env.
 
 public class Env implements AutoCloseable {
-  public static Env TOP,FILE;
+  public static Env PRIM,FILE;
   public static final GVNGCM GVN = new GVNGCM(); // Initial GVN
+
+  // The Root Node.  Program start and exit; the Universe betwixt the end and the beginning
+  public static RootNode ROOT;
+  // Program start control and memory.  NOT module-start, this presumes NO prior state.
+  public static CProjNode CTL_0; // Program start value control
+  public static MProjNode MEM_0; // Program start value memory
 
   // KeepNode represents future un-parsed users of a Node.  Removed after parsing.
   // Semantically, it represents a conservative approximation of ALL uses.
-  public static final KeepNode KEEP_ALIVE = new KeepNode();
-
-  // The Root Node.  Program start and exit; the Universe betwixt the end and the beginning
-  public static final   RootNode ROOT;
-  // Program start control and memory.  NOT module-start, this presumes NO prior state.
-  public static final  CProjNode CTL_0; // Program start value control
-  public static final  MProjNode MEM_0; // Program start value memory
+  public static final KeepNode KEEP_ALIVE;
 
   // Short-cuts for common constants Nodes.
   public static final ConNode ANY;   // Common ANY / used for dead
@@ -54,13 +54,9 @@ public class Env implements AutoCloseable {
   public static final ConNode XSCALAR;// Default scalar
   public static final ConNode THUNK; // Default thunk parameter
   public static final ConNode UNUSED;// Dead alias
-  public static final ConNode ALLMEM;//   Used whole memory
-  public static final ConNode   XMEM;// Unused whole memory
-
-  // All possible return addresses (RPCs).
-  public static final ProjNode ALL_CALL;
-  // All possible escaped *internal* aliases and fidxs
-  public static final ProjNode ALL_ESC;
+  public static final ConNode ALLMEM;// Used whole memory
+  public static final ConNode ANYMEM;// No memory
+  public static final ConNode   XMEM;// External whole memory
 
   // Initial program state.  Includes definitions for int: and flt: clazzes,
   // which includes most common primitives.
@@ -82,9 +78,10 @@ public class Env implements AutoCloseable {
   }
 
   static {
+    // The Keep-Alive
+    KEEP_ALIVE = new KeepNode();
+    
     // Top-level or common default values
-
-    // Common constants
     ANY   = keep(new ConNode<>(Type.ANY   ));
     ALL   = keep(new ConNode<>(Type.ALL   ));
     XCTRL = keep(new ConNode<>(Type.XCTRL ));
@@ -94,25 +91,14 @@ public class Env implements AutoCloseable {
     THUNK = keep(new ConNode<>(TypeFunPtr.THUNK));
     UNUSED= keep(new ConNode<>(TypeStruct.UNUSED));
     ALLMEM= keep(new ConNode<>(TypeMem.ALLMEM));
+    ANYMEM= keep(new ConNode<>(TypeMem.ANYMEM));
     XMEM  = keep(new ConNode<>(TypeMem.EXTMEM));
 
-    // The Universe outside the parse program
-    ROOT  = keep(new RootNode());
-    // Initial control & memory
-    CTL_0 = keep(new CProjNode(ROOT,0));
-    MEM_0 = keep(new MProjNode(ROOT,MEM_IDX));
-
-    // All the Calls in the Universe, which might call somebody.
-    ALL_CALL=keep(new ProjNode(ROOT,2));
-
-    // All the escaped fidxs and aliases, which might called or modified
-    ALL_ESC = keep(new ProjNode(ROOT,3));
-    
     PROTOS = new NonBlockingHashMap<>();
 
     // The Top-Level environment; holds the primitives.
-    TOP = new Env();
-    SCP_0 = TOP._scope;
+    PRIM = new Env();
+    SCP_0 = PRIM._scope;
     STK_0 = SCP_0.stk();
     PrimNode.PRIMS();           // Initialize
     Type.init0(SCP_0._types);
@@ -130,7 +116,7 @@ public class Env implements AutoCloseable {
     _fun = fun;
     StructNode dsp = fref==null ? new StructNode(nargs,false,null, Type.ALL).init() : fref;
     dsp.add_fld("^",TypeFld.Access.Final,dsp_ptr,null);
-    NewNode ptr = new NewNode();  GVN.add_flow(ptr);
+    NewNode ptr = new NewNode().init();  GVN.add_flow(ptr);
     mem = new StoreNode(mem,ptr,dsp,null).init();
     mem.in(1).xliv();
     // Install a top-level prototype mapping
@@ -147,7 +133,7 @@ public class Env implements AutoCloseable {
 
   // Top-level Env.  Contains, e.g. the primitives.
   // Above any file-scope level Env.
-  private Env( ) { this(null,null,0,CTL_0,MEM_0,NIL,null); }
+  private Env( ) { this(null,null,0,ALL,ANYMEM,NIL,null); }
 
   // Gather and report errors and typing
   TypeEnv gather_errors(ErrMsg err) {
@@ -215,23 +201,23 @@ public class Env implements AutoCloseable {
   // Reset all global statics for the next parse.  Useful during testing when
   // many top-level parses happen in a row.
   public static void top_reset() {
-    ROOT.reset();
+    if( Env.ROOT!=null ) {
+      while( Env.ROOT.len()>0 ) Env.ROOT.pop();
+      Env.ROOT=null;
+    }
     TV3.reset_to_init0();
     Node.VALS.clear();          // Clean out hashtable
     GVN.reset_to_init0();
-    VBitSet visit = new VBitSet();
-    ROOT.walk_reset(visit);          // Clean out any wired prim calls
-    KEEP_ALIVE.walk_reset(visit);    // Clean out any wired prim calls
-    GVNGCM.KEEP_ALIVE.walk_reset(visit);
+    KEEP_ALIVE.walk(Node::walk_reset); // Clean out any wired prim calls
+    GVNGCM.KEEP_ALIVE.walk(Node::walk_reset);
     Combo.reset();
-    GVN.iter();                 // Clean out any dead; reset prim types
-    for( Node n : Node.VALS.keySet() ) // Assert no leftover bits from the prior compilation
-      assert n._uid < Node._INIT0_CNT; //
+    assert KEEP_ALIVE.more_work() == 0; // Initial conditions are correct
     AA.reset();
     Node      .reset_to_init0();
     GVN       .reset_to_init0();
     FunNode   .reset_to_init0();
     NewNode   .reset_to_init0();
+    RootNode  .reset_to_init0();
     BitsAlias .reset_to_init0();
     BitsFun   .reset_to_init0();
     BitsRPC   .reset_to_init0();

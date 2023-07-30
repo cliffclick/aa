@@ -23,7 +23,7 @@ public class TestType {
   // Test for a collection of Types, that toString and valueOf are a bijection
   @Test public void testToString() {
     Ary<Type> ts = Type.ALL_TYPES();
-    Object dummy = Env.TOP;
+    Object dummy = Env.PRIM;
     String[] ss = new String[ts.len()];
     for( int i=0; i<ts.len(); i++ )
       ss[i] = ts.at(i).str(new SB(), true, false).toString();
@@ -48,6 +48,7 @@ public class TestType {
       "3",                      // Simple primitive int
       "int64",                  // Simple primitive range
       "123",                    // Class integer
+      "int:123",                // Wrapped integer
       "nint8",                  // Class integer range
       "3.14",                   // Simple primitive flt
       "flt32",                  // Simple primitive range

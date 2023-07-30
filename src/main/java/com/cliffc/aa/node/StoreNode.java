@@ -227,20 +227,40 @@ public class StoreNode extends Node {
   //    ptr.load().unify(rez)
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
-    if( rez()==null ) return null; // Did not clear out during iter
-    TV3 adr = adr().set_tvar();
-    TV3 rez = rez().set_tvar();
-    TVStruct stz;
-    if( rez instanceof TVStruct stz0 ) stz = stz0;
-    else  // Open empty struct
-      rez.unify(stz = new TVStruct(true),false);
+    assert rez()!=null; // Did not clear out during iter; return mem().tvar()
 
-    if( adr instanceof TVPtr ptr ) ptr.load().unify(stz,false);
-    else adr.unify(new TVPtr(BitsAlias.NALL,stz),false);
+    //TV3 tmem = mem().set_tvar();   TVMem mem;
+    //if( tmem instanceof TVMem mem0 ) mem = mem0;
+    //else tmem.unify(mem = new TVMem(),false);
+
+    TV3 rez = rez().set_tvar();    TVStruct stz;
+    if( rez instanceof TVStruct stz0 ) stz = stz0;
+    else rez.unify(stz = new TVStruct(true),false);
+    
+    TV3 adr = adr().set_tvar();    TVPtr ptr;
+    if( adr instanceof TVPtr ptr0 ) (ptr=ptr0).load().unify(stz,false);
+    else adr.unify(ptr=new TVPtr(BitsAlias.EMPTY,stz),false);
+    assert ptr.aliases()!=BitsAlias.NALL;
+    
+    //return mem;
     return null;
   }
 
-  @Override public boolean unify( boolean test ) { return false; }
+  @Override public boolean unify( boolean test ) {
+    TVPtr ptr = (TVPtr)adr().tvar();
+    return unify(ptr.aliases(),rez().tvar(),test);
+  }
+  static public boolean unify( BitsAlias aliases, TV3 tv, boolean test ) {
+    assert aliases!=BitsAlias.NALL;
+    boolean progress = false;
+    for( int alias : aliases ) {
+      // Called from set_tvar and tvar, so has to init-check
+      NewNode nn = NewNode.get(alias);
+      if( nn._tvar==null ) nn.set_tvar();
+      progress |= ((TVPtr)nn.tvar()).load().unify(tv,test);
+    }
+    return progress;
+  }
 
   @Override public ErrMsg err( boolean fast ) {
     Type tadr = adr()._val;

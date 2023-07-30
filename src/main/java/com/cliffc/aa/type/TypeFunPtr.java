@@ -289,7 +289,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     TypeFunPtr t1 = POOLS[TFUNPTR].malloc();
     return t1.init(any,nil,sub,fidxs,nargs,dsp,ret);
   }
-  private static TypeFunPtr malloc(boolean any, BitsFun fidxs, int nargs, Type dsp, Type ret ) {
+  public static TypeFunPtr malloc(boolean any, BitsFun fidxs, int nargs, Type dsp, Type ret ) {
     TypeFunPtr t1 = POOLS[TFUNPTR].malloc();
     return t1.init(any, any & fidxs.test(0), any | !fidxs.test(0), fidxs.clear(0), nargs, dsp, ret);
   }
@@ -373,7 +373,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     if( _dsp==ds && _ret==rs ) return this;
     return make_from(ds,rs);
   }
-  
+
   // [30]{-> XA:[29,31]{ -> XA} } meet [29]{-> ~Scalar} meet *[4]
 
   // Since meeting [30] and [29] will force a roll-up of the TFPs to XA:[29,30,31]{->XA}

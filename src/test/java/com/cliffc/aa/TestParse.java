@@ -31,7 +31,8 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    test("{ x -> ( 3, x )}", "[%f0]{all,4 -> *[%a2](3, %[2,%a2][2,%f0]?) }", "{ A B -> *[%a2](3, B) }", null, null, "[%a2]", "[%f0]");
+    //test("1+2*3", "int:7", "int:7");
+    test("sq = { x -> x*x }; (sq(2),sq(2.2))","*[14](4,4.64)","*[14](int64,flt64)", null, null, "[14]", null);
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(2),fact(2.2))","*[14](nil,1,2)","*[14](int64,int64,int64)", null, null, "[14]", null);
   }
 
@@ -974,7 +975,7 @@ HashTable = {@{
   // If both are null and err is set, test against err.
   // if both are set, also check esc_ptrs and esc_funs.
   static private void _test0( String program, String gcp, String hmt, String esc_ptrs, String esc_funs, String err, int cur_off, int rseed ) {
-    TypeEnv te = Exec.file("test",program,rseed,gcp!=null,hmt!=null);
+    TypeEnv te = Exec.test("test",program,rseed,gcp!=null,hmt!=null);
     // Check GCP result
     if( gcp != null && (err==null || cur_off<0) ) {
       assertNull(te._errs);

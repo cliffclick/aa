@@ -130,6 +130,7 @@ public class FunNode extends Node {
   // One-shot transition from having unknown callers to not having.
   // At Combo, all callers are known and stay known: even Root is a known caller.
   public boolean unknown_callers( Node dep ) {
+    if( always_prim() ) return true; // Too early
     if( _unknown_callers && dep!=null ) deps_add(dep);
     return _unknown_callers;
   }
@@ -137,6 +138,7 @@ public class FunNode extends Node {
   // unknown-callers to all-callers-known.
   public boolean set_unknown_callers() {
     if( !_unknown_callers || _unknown_callers() ) return false;
+    assert !always_prim();
     _unknown_callers=false;   // One-shot transition
     deps_work_clear();        // Folks who depend on it get touched
     return true;              // Progress
@@ -250,7 +252,7 @@ public class FunNode extends Node {
     FunNode fun = make_new_fun(ret, path);
     split_callers(ret,fun,body,path);
     boolean x = fun.set_unknown_callers(); assert x; // Will be false now, so makes progress
-    assert Env.ROOT.more_work(true)==0; // Initial conditions are correct
+    assert Env.ROOT.more_work()==0; // Initial conditions are correct
     return this;
   }
 

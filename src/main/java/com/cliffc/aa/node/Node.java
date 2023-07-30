@@ -55,27 +55,27 @@ public abstract class Node implements Cloneable, IntSupplier {
   static { assert STRS.length==OP_MAX; }
 
   // Unique dense node-numbering
-  public  static int _INIT0_CNT;
   private static int CNT=1; // Do not hand out UID 0
   int newuid() {
     assert CNT < 100000 : "infinite node create loop";
     if( CNT==AA.UID )
-      System.out.print("");
+      System.out.print("");     // Handy break-at-UID
     return CNT++;
   }
   @Override public int getAsInt() { return _uid; }
 
+
+  public static int _INIT0_CNT = 99999;
   // Initial state after loading e.g. primitives.
-  public static void init0() {
-    _INIT0_CNT=CNT;
-  }
+  public static void init0() { _INIT0_CNT=CNT; }
   // Reset is called after a top-level exec exits (e.g. junits) with no parse
   // state left alive.  NOT called after a line in the REPL or a user-call to
   // "eval" as user state carries on.
-  public static void reset_to_init0() {
-    CNT = _INIT0_CNT;
-  }
+  public static void reset_to_init0() { CNT = _INIT0_CNT; }
 
+  // Is a primitive
+  public boolean always_prim() { return _uid<_INIT0_CNT; }
+  public boolean is_prim() { return _uid<_INIT0_CNT && PrimNode.post_init(); }
 
   public int _uid;      // Unique ID, will have gaps, used to give a dense numbering to nodes
   public final byte _op;// Opcode (besides the object class), used to avoid v-calls in some places
@@ -252,7 +252,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Add a dep
   void deps_add(Node dep) {
     if( _deps==null ) _deps = new Ary<>(new Node[1],0);
-    if( _deps.find(dep)==-1 && FLOW_VISIT.isEmpty() /*no progress during bulk testing*/) {
+    if( _deps.find(dep)==-1 && VISIT.isEmpty() /*no progress during bulk testing*/) {
       assert dep!=null;
       _deps.push(dep);
     }
@@ -279,9 +279,6 @@ public abstract class Node implements Cloneable, IntSupplier {
     _val  = _live = Type.ALL;
     _tvar = null;
   }
-
-  // Is a primitive
-  public boolean is_prim() { return _INIT0_CNT==0 || _uid<_INIT0_CNT; }
 
   // Make a copy of the base node, with no defs nor uses and a new UID.
   // Some variations will use the CallEpi for e.g. better error messages.
@@ -504,6 +501,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( nval!=oval ) {
       _val = nval;
       add_flow_uses(); // Put uses on worklist... values flows downhill
+      deps_work_clear();
     }
     return nval;
   }
@@ -541,7 +539,8 @@ public abstract class Node implements Cloneable, IntSupplier {
     Type nliv = live(); // Get new live
     if( nliv!=oliv ) {
       _live = nliv;
-      add_flow_uses();  // Put uses on worklist... values flows downhill
+      add_flow_defs();  // Put uses on worklist... live flows uphill
+      deps_work_clear();
     }
   }
   // Compute local contribution of use liveness to this def.
@@ -724,6 +723,7 @@ public abstract class Node implements Cloneable, IntSupplier {
         this instanceof ErrNode    || // Never touch an ErrNode
         this instanceof AssertNode || // Never touch an AssertNode
         this instanceof FreshNode  || // These modify the TVars but not the constant flows
+        this instanceof LoadNode || // TODO: YANK THIS AFTER FOLDING INTO FIELD
         (this instanceof StructNode st && !st.is_closed()) || // Struct is in-progress
         is_mem() ||
         is_prim() )                 // Never touch a Primitive
@@ -758,26 +758,9 @@ public abstract class Node implements Cloneable, IntSupplier {
     return Env.GVN.add_flow(con); // Updated live flows
   }
 
-  // Forward reachable walk, setting types to ANY and making all dead.
-  public final void walk_initype( VBitSet visit ) {
-    if( visit.tset(_uid) ) return; // Been there, done that
-    Env.GVN.add_flow(this);        // On worklist and mark visited
-    if( has_tvar() ) set_tvar();
-    if( this instanceof FunNode fun )
-      fun.set_unknown_callers();
-    _val = _live = Type.ANY;  // Highest value
-    // Walk reachable graph
-    for( Node def : _defs ) if( def != null ) def.walk_initype(visit);
-    for( Node use : _uses )                   use.walk_initype(visit);
-  }
-
-  // Reset
-  public final void walk_reset( VBitSet visit ) {
-    assert is_prim();
-    if( visit.tset(_uid) ) return; // Been there, done that
-    Env.GVN.add_flow(Env.GVN.add_reduce(this));
-    _val = _live = Type.ALL;    // Lowest value
-    _tvar = null;               // Clear TV3 for next go
+  // Reset primitives.  Mostly unwire called and wired primitives.
+  public final int walk_reset( int ignore ) {
+    assert is_prim();           // Primitives
     _elock = false;             // Clear elock if reset_to_init0
     _deps = null;               // No deps
     walk_reset0();              // Special reset
@@ -785,7 +768,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     // Remove non-prim inputs to a prim.  Skips all asserts and worklists.
     Node c;
     while( _defs._len>0 && (c=_defs.last())!=null && !c.is_prim() )
-      _defs.pop()._uses.del(this); // Remove backedge?
+      _defs.pop()._uses.del(this);
     // Remove non-prim uses of a prim.
     for( int i=0; i<_uses._len; i++ )
       if( !(c = _uses.at(i)).is_prim() ) {
@@ -795,9 +778,7 @@ public abstract class Node implements Cloneable, IntSupplier {
         }
         i--;
       }
-    // Walk reachable graph
-    for( Node use : _uses )                   use.walk_reset(visit);
-    for( Node def : _defs ) if( def != null ) def.walk_reset(visit);
+    return 0;
   }
   // Non-recursive specialized version
   void walk_reset0( ) {}
@@ -820,6 +801,49 @@ public abstract class Node implements Cloneable, IntSupplier {
     _val = _live = Type.ANY;    // Super optimistic types
     if( has_tvar() ) set_tvar();
     return Env.GVN.add_flow(this);
+  }
+
+  // --------------------------------------------------------------------------
+  // Assert all value and liveness calls only go forwards, and if they can
+  // progress they are on the worklist.
+  private static boolean MORE_WORK_ASSERT;
+  public final int more_work( ) {
+    MORE_WORK_ASSERT = true;
+    int rez = walk( Node::more_work );
+    MORE_WORK_ASSERT = false;
+    return rez;
+  }
+  public static boolean mid_work_assert() { return MORE_WORK_ASSERT; }
+  private int more_work( int errs ) {
+    if( Env.GVN.on_dead(this) ) return -1; // Do not check dying nodes or reachable from dying
+    if( is_prim() ) return errs;           // Do not check primitives
+    // Check for GCP progress
+    Type oval= _val, nval = value(); // Forwards flow
+    Type oliv=_live, nliv = live (); // Backwards flow
+    if( oval!=nval || oliv!=nliv ) {
+      if( !(AA.LIFTING
+            ? nval.isa(oval) && nliv.isa(oliv)
+            : oval.isa(nval) && oliv.isa(nliv)) )
+        errs += _report_bug("Monotonicity bug");
+      if( !Env.GVN.on_flow(this) && (AA.LIFTING || AA.DO_GCP) )
+        errs += _report_bug("Progress bug");
+    }
+    // Check for HMT progress
+    if( !AA.LIFTING &&                      // Falling, in Combo, so HM is running
+        oliv!=Type.ANY && oval!=Type.ANY && // Alive in any way
+        has_tvar() &&                       // Doing TVar things
+        (!Env.GVN.on_flow(this) || Combo.HM_FREEZE) ) { // Not already on worklist, or past freezing
+      if( unify(true) )
+        errs += _report_bug(Combo.HM_FREEZE ? "Progress after freezing" : "Progress bug");
+    }
+    return errs;
+  }
+  private int _report_bug(String msg) {
+    VISIT.clear(_uid); // Pop-frame & re-run in debugger
+    System.err.println(msg);
+    System.err.println(dump(0,new SB(),null,null,null,null,true,false)); // Rolling backwards not allowed
+    VISIT.set(_uid); // Reset if progressing past breakpoint
+    return 1;
   }
 
   // Assert all ideal, value and liveness calls are done
@@ -845,44 +869,8 @@ public abstract class Node implements Cloneable, IntSupplier {
     return false;
   }
 
-  // Assert all value and liveness calls only go forwards.  Returns >0 for failures.
-  public static final VBitSet FLOW_VISIT = new VBitSet();
-  public  final int more_work( boolean lifting ) { FLOW_VISIT.clear();  int errs = more_work(lifting,0);  FLOW_VISIT.clear(); return errs; }
-  private int more_work( boolean lifting, int errs ) {
-    if( FLOW_VISIT.tset(_uid) ) return errs; // Been there, done that
-    if( Env.GVN.on_dead(this) ) return errs; // Do not check dying nodes
-    // Check for GCP progress
-    Type oval= _val, nval = value(); // Forwards flow
-    Type oliv=_live, nliv = live (); // Backwards flow
-    if( oval!=nval || oliv!=nliv ) {
-      if( !(lifting
-            ? nval.isa(oval) && nliv.isa(oliv)
-            : oval.isa(nval) && oliv.isa(nliv)) )
-        errs += _report_bug("Monotonicity bug");
-      if( !Env.GVN.on_flow(this) && (lifting || AA.DO_GCP) )
-        errs += _report_bug("Progress bug");
-    }
-    // Check for HMT progress
-    if( !lifting &&                         // Falling, in Combo, so HM is running
-        oliv!=Type.ANY && oval!=Type.ANY && // Alive in any way
-        has_tvar() &&                       // Doing TVar things
-        (!Env.GVN.on_flow(this) || Combo.HM_FREEZE) ) { // Not already on worklist, or past freezing
-      if( unify(true) )
-        errs += _report_bug(Combo.HM_FREEZE ? "Progress after freezing" : "Progress bug");
-    }
-    for( Node def : _defs ) if( def != null ) errs = def.more_work(lifting,errs);
-    for( Node use : _uses ) if( use != null ) errs = use.more_work(lifting,errs);
-    return errs;
-  }
-  private int _report_bug(String msg) {
-    FLOW_VISIT.clear(_uid); // Pop-frame & re-run in debugger
-    System.err.println(msg);
-    System.err.println(dump(0,new SB(),null,null,null,null,true,false)); // Rolling backwards not allowed
-    FLOW_VISIT.set(_uid); // Reset if progressing past breakpoint
-    return 1;
-  }
 
-
+  // --------------------------------------------------------------------------
   // Gather errors, walking from Scope to START.
   public void walkerr_def( HashSet<ErrMsg> errs, VBitSet bs ) {
     if( bs.tset(_uid) ) return; // Been there, done that
@@ -908,18 +896,29 @@ public abstract class Node implements Cloneable, IntSupplier {
     errs.add(msg);
   }
 
-  // GCP optimizations on the live subgraph
-  public void walk_opt( VBitSet visit ) {
-    assert !is_dead();
-    if( visit.tset(_uid) ) return; // Been there, done that
-    // Walk reachable graph
-    if( is_dead() ) return;
-    if( is_prim() ) _elock();   // Prims back into VALS
-    Env.GVN.add_work_new(this);
-    for( Node def : _defs )  if( def != null )  def.walk_opt(visit);
-    for( Node use : _uses )                     use.walk_opt(visit);
+  // --------------------------------------------------------------------------
+  // Generic Visitor Pattern
+  static private final VBitSet VISIT = new VBitSet();
+  // Map takes and updates/reduces int x.
+  // If map returns -1, the walk is stopped and x is not updated.
+  public interface NodeMap { int map(Node n, int x); }
+  final public int walk( NodeMap map ) {
+    assert VISIT.isEmpty();
+    int rez = _walk(map,0);
+    VISIT.clear();
+    return rez;
   }
 
+  private int _walk( NodeMap map, int x ) {
+    if( VISIT.tset(_uid) ) return x; // Been there, done that
+    int x2 = map.map(this,x);
+    if( x2 == -1 ) return x;
+    for( Node def : _defs )  if( def != null )  x2 = def._walk(map,x2);
+    for( Node use : _uses )                     x2 = use._walk(map,x2);
+    return x2;
+  }
+
+  // --------------------------------------------------------------------------
   // Overridden in subclasses that return TypeTuple value types.  Such nodes
   // are always followed by ProjNodes to break out the tuple slices.  If the
   // node optimizes, each ProjNode becomes a copy of some other value... based

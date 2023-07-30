@@ -41,28 +41,22 @@ public class ParmNode extends Node {
     boolean wired_root = fun._defs.last() instanceof RootNode;
     if( wired_root || fun.unknown_callers(this) ) {
       if( wired_root ) len--;
-      else Env.ROOT.deps_add(this);
       // During/after Combo, use the HM type for the GCP type instead of the given default
       if( _idx==MEM_IDX ) {
         t = Combo.pre() ? RootNode.def_mem(this) : Env.ROOT.rmem();
-        Env.ROOT.deps_add(this); // Depends on Root
-      } else if( _tvar==null ) {
+      } else if( Combo.pre() ) {
         t = _t==TypeNil.SCALAR ? Env.ROOT.ext_scalar(this) : _t;
       } else {
-        Env.ROOT.deps_add(this); // Depends on Root
         t = tvar().as_flow(this);
-        // TODO: Very expensive and rarely needed
-        //_tvar.deps_add(this);
-        //_tvar.deps_add_deep(this); // Updates to tvar recompute flow
       }
     }
-  
+
     // Merge all live paths
     for( int i=1; i<len; i++ ) {
       if( fun.in(i) instanceof CallNode call ) {
         call.deps_add(this);
         Type tcall = call._val, t2;
-        // Parm RPC grabs the RPC from the Call directly, not any Call value 
+        // Parm RPC grabs the RPC from the Call directly, not any Call value
         if( _idx==0 ) t2 = TypeRPC.make(call._rpc);
         else if( !(tcall instanceof TypeTuple tt) ) t2 = tcall;
         else if( call._is_copy || _idx < call.nargs() ) t2 = tt.at(_idx);
@@ -76,7 +70,7 @@ public class ParmNode extends Node {
   }
 
   @Override public Type live_use( int i ) { return Type.ALL; }
-  
+
   @Override public Node ideal_reduce() {
     if( !(in(0) instanceof FunNode) )
       return in(0).is_copy(_idx); // Dying, or thunks
@@ -96,7 +90,7 @@ public class ParmNode extends Node {
   }
 
   @Override public boolean has_tvar() { return !(_t instanceof TypeRPC) && !is_mem(); }
-  
+
   @Override public TV3 _set_tvar() {
     if( is_prim() && _t==TypeInt.INT64 ) return PrimNode.PINT.tvar();
     if( is_prim() && _t==TypeFlt.FLT64 ) return PrimNode.PFLT.tvar();
@@ -109,7 +103,7 @@ public class ParmNode extends Node {
   // Parms are already treated by the H-M algo, and (via fresh_unify) get
   // "fresh" TVars for every input path.
   @Override public boolean unify( boolean test ) { return false; }
-  
+
   @Override public int hashCode() { return super.hashCode()+(int)_t._hash+_idx; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

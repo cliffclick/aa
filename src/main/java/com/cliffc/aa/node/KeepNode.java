@@ -10,7 +10,7 @@ public class KeepNode extends Node {
   @Override public Type live () { return RootNode.def_mem(this); }
   @Override public Type live_use( int i ) {
     Node def = in(i);
-    if( def.is_mem() ) return _live;
+    if( def.is_mem() ) return RootNode.def_mem(this);
     if( def instanceof   StructNode ) return TypeStruct.ISUSED;
     if( def instanceof SetFieldNode ) return TypeStruct.ISUSED;
     if( def instanceof     LoadNode ) return TypeStruct.ISUSED;
@@ -26,4 +26,3 @@ public class KeepNode extends Node {
   @Override public boolean equals(Object o) { return this==o; }
   @Override public boolean has_tvar() { return false; }
 }
-

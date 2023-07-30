@@ -14,10 +14,20 @@ import static com.cliffc.aa.AA.*;
 
 
 // Program execution start
+
+// RootNode inputs are:
+// [program exit control,
+//  program exit memory,
+//  program exit value,
+//  primitive memory
+//    TODO: primitive NewNode aliases, eg PrimNode.PINT
+// Any number in any order:
+//  escaping RetNodes - functions callable from Universe
+//  global CallNodes - Calls to unknown functions from Universe
+// ]
+
 public class RootNode extends Node {
-  // Inputs are:
-  // [program exit control, program exit memory, program exit value, escaping RetNodes and global CallNodes... ]
-  public RootNode() { super(OP_ROOT, null, null, null); }
+  public RootNode(Node... defs) { super(OP_ROOT, defs); }
 
   @Override boolean is_CFG() { return true; }
   @Override public boolean is_mem() { return true; }
@@ -55,17 +65,20 @@ public class RootNode extends Node {
 
   // Output value is:
   // [Ctrl, All_Mem_Minus_Dead, Rezult, global_escaped_[fidxs, aliases]]
-  @Override public TypeTuple value() {
-    Node rez = in(REZ_IDX);
+  @Override public TypeTuple value() {    
+    //TypeMem tmem = mem._val instanceof TypeMem tmem0 ? tmem0 : mem._val.oob(TypeMem.ALLMEM);
+    //// Primitive memory
+    ////tmem = PrimNode.primitive_memory(this,tmem);
+    //tmem = (TypeMem)tmem.meet(val(ARG_IDX));
+    TypeMem tmem = (TypeMem)val(ARG_IDX);
     // Conservative final result.  Until Combo external calls can still wire, and escape arguments
-    if( rez==null || Combo.pre() )
-      return TypeTuple.make(Type.CTRL,def_mem(this),TypeNil.SCALAR,TypeNil.SCALAR);
+    if( Combo.pre() )
+      return TypeTuple.make(Type.CTRL,tmem.make_from(BitsAlias.EXTX,TypeStruct.ISUSED),TypeNil.SCALAR,TypeNil.SCALAR);
+    
+    Node rez = in(REZ_IDX);
     Type trez = rez._val;
     // Conservative final memory
     Node mem = in(MEM_IDX);
-    TypeMem tmem = mem._val instanceof TypeMem tmem0 ? tmem0 : mem._val.oob(TypeMem.ALLMEM);
-    // All primitive aliases have sharper types
-    tmem = PrimNode.primitive_memory(this,tmem);
 
     // Walk the 'rez', all Call args (since they call Root, their args escape)
     // and function rets (since called from Root, their return escapes).
@@ -73,7 +86,7 @@ public class RootNode extends Node {
     AryInt fwork = new AryInt();
     TypeNil escs = TypeNil.EXTERNAL;
     escs = _add_all(escs,awork,fwork,trez);
-    for( int i=ARG_IDX; i<len(); i++ ) {
+    for( int i=ARG_IDX+1; i<len(); i++ ) {
       if( escs==TypeNil.SCALAR ) break; // Already maxed out
       if( in(i) instanceof CallNode call ) {
         // If Call is calling an externally defined function then all args escape
@@ -96,7 +109,7 @@ public class RootNode extends Node {
     // Kill the killed
     for( int alias : KILL_ALIASES )
       tmem = tmem.set(alias,TypeStruct.UNUSED);
-    
+
     // Keep a visit bit for aliases & fidxs.  No need to visit twice.  If a bit
     // alias/fidx is set in the answer, then it must be on the to-do list.
     // Visited aliases use the TMEM memory struct, and recursively visit.
@@ -124,7 +137,7 @@ public class RootNode extends Node {
     // Kill the killed
     escs = TypeNil.make(false,false,false,escs._aliases.subtract(KILL_ALIASES),escs._fidxs);
 
-    
+
     // RootNode value is a 4-pack
     return TypeTuple.make(Type.CTRL, tmem, trez, escs);
   }
@@ -209,13 +222,14 @@ public class RootNode extends Node {
 
   @Override public Type live() {
     // Pre-combo, all memory is alive, except kills
-    if( Combo.pre() ) return Env.KEEP_ALIVE._live;
     // During/post combo, check external Call users
-    Type live = super.live(false);
+    Type live = Combo.pre() ? TypeMem.ALLMEM : super.live(false);
     if( live==Type.ANY ) return live;
     TypeMem mem = (TypeMem)live;
+    // Kill the killables
     for( int kill : KILL_ALIASES )
       mem = mem.set(kill,TypeStruct.UNUSED);
+    if( Combo.pre() ) return mem;
     // Liveness for return value: All reaching aliases plus their escapes are alive.
     BitsAlias ralias = ralias();
     if( ralias==BitsAlias.EMPTY ) return mem;
@@ -250,7 +264,7 @@ public class RootNode extends Node {
     BitsFun fidxs = rfidxs();
     int non_prim_rets=0;
     // All currently wired Calls and Rets are sensible
-    for( int i=ARG_IDX; i<len(); i++ ) {
+    for( int i=ARG_IDX+1; i<len(); i++ ) {
       if( in(i) instanceof RetNode ret ) {
         if( !ret.is_prim() ) non_prim_rets++;
         FunNode fun = ret.fun();
@@ -266,7 +280,7 @@ public class RootNode extends Node {
     // hard (generally an error condition), and we might have physical edges
     // which can lazily be made virtual.
     if( fidxs.above_center() || fidxs==BitsFun.NALL )
-      return non_prim_rets==0 || !Combo.pre(); 
+      return non_prim_rets==0 || !Combo.pre();
     // All fidxs are wired if precise.  Imprecise allows some new fidxs not yet wired.
     if( precise )
       for( int fidx : fidxs )
@@ -310,10 +324,10 @@ public class RootNode extends Node {
         del(i--);
         if( ret._uses._len==0 ) ret.kill();
       }
-    
+
     // Turned off, since int/flt constant returns actually have a TVClz with a
     // TVPtr in memory which is used for the HM return.
-    
+
     //// See if the result can ever refer to local memory.
     //Node rez = in(REZ_IDX);
     //if( in(MEM_IDX) != Env.XMEM &&
@@ -323,7 +337,7 @@ public class RootNode extends Node {
     //  Env.XMEM.xliv();          // Added a new use
     //  return this;
     //}
-    
+
     if( CG_wire() ) return this;
 
     return null;
@@ -346,7 +360,7 @@ public class RootNode extends Node {
   }
 
   @Override public boolean unify( boolean test ) { return false; }
-  
+
   // Unify trailing result ProjNode with RootNode results; but no unification
   // with anything from Root, all results are independent.
   @Override public boolean unify_proj( ProjNode proj, boolean test ) { return false; }
@@ -355,20 +369,7 @@ public class RootNode extends Node {
   @Override public boolean equals(Object o) { return this==o; }
 
   // Reset for next test
-  public void reset() {
-    set_def(CTL_IDX,null);
-    set_def(MEM_IDX,null);
-    set_def(REZ_IDX,null);
-    while( len() > REZ_IDX+1 ) {
-      Node n = _defs.last();
-      if( n instanceof CallNode call ) {
-        call.cepi().unwire(call,this,this);
-      } else if( n instanceof RetNode ret ) {
-        ret.fun().pop();
-        pop();
-      }
-      else throw unimpl();
-    }
+  public static void reset_to_init0() {
     KILL_ALIASES = BitsAlias.EMPTY;
     CACHE_DEF_MEM = TypeMem.ALLMEM;
     PROGRESS.clear();

@@ -34,7 +34,7 @@ public abstract class AA {
     System.out.println(ABV.toString());
     // Command line program
     if( args.length > 0 ) {
-      TypeEnv te = Exec.go(Env.TOP,"args",String.join(" ",args));
+      TypeEnv te = Exec.go_one("args",String.join(" ",args));
       if( te._errs!=null ) System.out.println(te._errs);
       else {
         System.out.println(te._hmt.toString());
@@ -52,9 +52,9 @@ public abstract class AA {
     System.err.println(s);
     return x;
   }
-  public static String p    () { return Env.ROOT.dumprpo(false,false,false); }  // Debugging hook
-  public static String plive() { return Env.ROOT.dumprpo(false,true ,false); }  // Debugging hook
-  public static Node f(int uid) { return Env.ROOT.find(uid); }        // Debugging hook
+  public static String p    () { return Env.KEEP_ALIVE.dumprpo(false,false,false); }  // Debugging hook
+  public static String plive() { return Env.KEEP_ALIVE.dumprpo(false,true ,false); }  // Debugging hook
+  public static Node f(int uid) { return Env.KEEP_ALIVE.find(uid); }        // Debugging hook
   public static int UID=-1;     // Used to breakpoint on a named Node creation
 
   // assert AA.once_per() || ...expensive;

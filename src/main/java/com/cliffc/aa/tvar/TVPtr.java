@@ -2,7 +2,6 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.node.Node;
-import com.cliffc.aa.node.PrimNode;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
@@ -15,16 +14,10 @@ public class TVPtr extends TV3 {
   // The actual pointed-at type is tracked in memory.
   BitsAlias _aliases;
 
-  // Ground term
-  TypeNil _t;
-
-  public TVPtr( BitsAlias aliases, TVStruct str ) { this(aliases,str,null); }
-  public TVPtr( BitsAlias aliases, TVStruct str, TypeNil tn ) {
+  public TVPtr( BitsAlias aliases, TVStruct str ) {
     super(aliases.test(0),str);
     _aliases = aliases;
-    _t = tn;
   }
-  public TVPtr make_from(TypeNil t) { return t==_t ? this : new TVPtr(_aliases,load(),t); }
 
   @Override public TVPtr as_ptr() { return this; }
 
@@ -32,27 +25,14 @@ public class TVPtr extends TV3 {
 
   @Override int eidx() { return TVErr.XPTR; }
 
-  //// Make the leader a nilable version of 'this' child
-  //@Override TV3 find_nil() {
-  //  TVPtr ptr = (TVPtr)copy();
-  //  if( ptr._t!=null )
-  //    ptr._t = (TypeNil)ptr._t.meet(TypeNil.NIL);
-  //  ptr.add_may_nil(false);
-  //  return ptr;
-  //}
-
+  public BitsAlias aliases() { return _aliases; }
+  
   // -------------------------------------------------------------
   // Union aliases
   @Override public void _union_impl(TV3 that) {
     assert !unified();
     TVPtr ptr = (TVPtr)that;    // Invariant when called
     _aliases = _aliases.meet(ptr._aliases);
-    if( _t != null ) {
-      _aliases = _aliases.clear(0);
-      if( ptr._t==null ) ptr._t=_t;
-      else ptr._t = (TypeNil)ptr._t.meet(_t);
-    }
-    if( ptr._may_nil ) ptr._t = (TypeNil)ptr._t.meet(TypeNil.NIL);
   }
 
   @Override boolean _unify_impl(TV3 that ) {
@@ -65,20 +45,10 @@ public class TVPtr extends TV3 {
     boolean progress = false;
     TVPtr ptr = (TVPtr)that.find();    // Invariant when called
     BitsAlias aliases = _aliases.meet( ptr._aliases );
-    TypeNil t = _t==null ? ptr._t : (ptr._t==null ? _t : (TypeNil)_t.meet(ptr._t));
-    if( t!=null ) {
-      aliases = aliases.clear(0);
-      if( ptr._may_nil ) t = (TypeNil)t.meet(TypeNil.NIL);
-    }
     
     // Update aliases
     if( aliases != ptr._aliases ) {
       ptr._aliases = aliases;
-      progress = ptrue();
-    }
-    // Update Type
-    if( t != ptr._t ) {
-      ptr._t = t;
       progress = ptrue();
     }
     if( test && progress ) return progress;
@@ -89,14 +59,6 @@ public class TVPtr extends TV3 {
   // -------------------------------------------------------------
   @Override int _trial_unify_ok_impl( TV3 tv3 ) {
     TVPtr that = (TVPtr)tv3; // Invariant when called
-    if( _t!=null && that._t!=null ) {
-      if( _t.getClass() != that._t.getClass() ) {
-        // Mixed int/float is bad, but always can mix in a nil
-        if( _t!=TypeNil. NIL && that._t!=TypeNil. NIL &&
-            _t!=TypeNil.XNIL && that._t!=TypeNil.XNIL )
-          return -1;            // Wrong kind of bases
-      }
-    }
     return load()._trial_unify_ok(that.load());
   }
 
@@ -104,29 +66,15 @@ public class TVPtr extends TV3 {
 
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) {
-    if( _t instanceof TypeInt ti ) return ti;
-    if( _t instanceof TypeFlt tf ) return tf;
     deps_add(dep);
     // Compatible escaped aliases
     BitsAlias aliases = Env.ROOT.matching_escaped_aliases(this, dep);
     return TypeMemPtr.make(false,_may_nil,aliases,TypeStruct.ISUSED);
   }
-  @Override void _widen( byte widen ) {
-    if( widen < 2 ) return;
-    if( _t==null ) return;
-    TypeNil tw = (TypeNil)_t.widen();
-    if( tw == _t ) return;
-    _t = tw;
-    _deps_work_clear();
-  }
 
-  @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
-    if( !prims ) {
-      if( _aliases == PrimNode.PINT ._tptr._aliases ) return sb.p(_t);
-      if( _aliases == PrimNode.PFLT ._tptr._aliases ) return sb.p(_t);
-      if( _aliases == PrimNode.PSTR ._tptr._aliases ) return sb.p("*STRZ" );
-      if( _aliases == PrimNode.PMATH._tptr._aliases ) return sb.p("*MATH" );
-    }
+  @Override void _widen( byte widen ) { }
+  
+ @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     sb.p("*");
     _aliases.str(sb);
     if( _args.length>0 && _args[0]!=null ) arg(0)._str(sb,visit,dups,debug,prims);
