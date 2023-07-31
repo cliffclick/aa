@@ -116,8 +116,8 @@ public class Env implements AutoCloseable {
     _fun = fun;
     StructNode dsp = fref==null ? new StructNode(nargs,false,null, Type.ALL).init() : fref;
     dsp.add_fld("^",TypeFld.Access.Final,dsp_ptr,null);
-    NewNode ptr = new NewNode().init();  GVN.add_flow(ptr);
-    mem = new StoreNode(mem,ptr,dsp,null).init();
+    NewNode ptr = new NewNode(BitsAlias.new_alias(),par==null).init();  GVN.add_flow(ptr);
+    mem = new StoreXNode(mem,ptr,dsp,null).init();
     mem.in(1).xliv();
     // Install a top-level prototype mapping
     if( fref!=null ) {          // Forward ref?

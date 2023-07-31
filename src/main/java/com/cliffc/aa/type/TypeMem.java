@@ -486,34 +486,42 @@ public class TypeMem extends Type<TypeMem> {
     return true;
   }
 
-
+  
   // Struct store into a conservative set of aliases.
   // 'precise' is replace, imprecise is MEET.
-  public TypeMem update( BitsAlias aliases, TypeStruct tvs, boolean precise ) {
-    assert !precise || aliases.abit()!=-1;
-    assert !precise || aliases.getbit() > 0; // No precise high memory
+  public TypeMem update( TypeMemPtr tmp, TypeStruct tvs ) {
     // If precise, just replace whole struct
-    if( precise ) return set(aliases.getbit(),tvs);
-    // Must do struct-by-struct updates
+    if( tmp.is_con() )
+      return set(tmp._aliases.getbit(),tvs);
+    
+    // Must do struct-by-struct updates, doing inprecise meets
     Ary<TypeStruct> ss = new Ary<>( _objs.clone());
-    for( int alias : aliases )
+    for( int alias : tmp._aliases )
       if( alias != 0 )
         for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
-          ss.setX(kid,at(kid).update(tvs,precise));
+          ss.setX(kid,(TypeStruct)at(kid).meet(tvs));
     return make0(_any,ss.asAry());
   }
 
-
-  // Array store into a conservative set of aliases.
-  public TypeMem update( BitsAlias aliases, TypeInt idx, Type val ) {
-    Ary<TypeStruct> objs  = new Ary<>( _objs.clone());
-    for( int alias : aliases )
+  // Field store into a conservative set of aliases.
+  // 'precise' is replace, imprecise is MEET.
+  public TypeMem update( TypeMemPtr tmp, TypeFld fld ) {
+    if( tmp.is_con() ) {
+      int alias = tmp._aliases.getbit();
+      //return set(alias,at(alias).update());
+      throw unimpl();
+    }
+    
+    // Must do struct-by-struct updates
+    Ary<TypeStruct> ss = new Ary<>( _objs.clone());
+    for( int alias : tmp._aliases )
       if( alias != 0 )
         for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
-          //objs.setX(kid,at(_objs,kid).update(idx,val)); // imprecise
-          throw unimpl();
-    return make0(_any,objs.asAry());
+          ss.setX(kid,at(kid).update(fld,tmp.is_con()));
+    return make0(_any,ss.asAry());
   }
+
+  
 
   // Everything in the 'escs' set is flattened to UNUSED.
   public TypeMem remove(BitsAlias escs) {

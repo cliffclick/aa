@@ -2,7 +2,7 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
-import com.cliffc.aa.node.FieldNode;
+import com.cliffc.aa.node.Node;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.NonBlockingHashMapLong;
 
@@ -74,10 +74,11 @@ public interface Resolvable {
 
     switch( yes ) {
     case 0:
-      // No YESes, no MAYBES, this is an error
-      if( maybe==0 ) return ((FieldNode)this).resolve_failed_no_match();
-      // no YESes, but more maybes: wait.
-      else return stall(rhs);
+      //// No YESes, no MAYBES, this is an error
+      //if( maybe==0 ) return ((FieldNode)this).resolve_failed_no_match();
+      //// no YESes, but more maybes: wait.
+      //else return stall(rhs);
+      throw unimpl();
     case 1:
       // Exactly one yes and no maybes: we can resolve this now
       if( maybe==0 ) return test || resolve_it(outie,pattern,rhs,lab);
@@ -93,7 +94,8 @@ public interface Resolvable {
   // After HM_AMBI, it is too late, and we will never resolve.
   default boolean stall(TVStruct rhs) {
     if( Combo.HM_AMBI )
-      return ((FieldNode)this).resolve_ambiguous_msg();
+      //return ((FieldNode)this).resolve_ambiguous_msg();
+      throw unimpl();
     // Not resolvable (yet).  Delay until it can resolve.
     while( PAT_LEAFS._len>0 )
       PAT_LEAFS.pop().add_delay_resolve(rhs);
@@ -128,7 +130,7 @@ public interface Resolvable {
   // otherwise force unification on all choices which will trigger an error on
   // each choice.
   default void resolve_failed() {
-    FieldNode fld = (FieldNode)this;
+    Node fld = (Node)this;
     Env.GVN.add_flow(fld);
     fld.deps_work_clear();
   }

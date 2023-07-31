@@ -255,7 +255,7 @@
       }
       clz.close();
       Env.PROTOS.put(clzname,clz); // global mapping
-      StoreNode mem = new StoreNode(Env.SCP_0.mem(),ptr.add_flow(),clz,null).init();
+      StoreXNode mem = new StoreXNode(Env.SCP_0.mem(),ptr.add_flow(),clz,null).init();
       mem._live = TypeMem.ALLMEM;
       Env.SCP_0.set_mem(mem);
     }
@@ -267,7 +267,7 @@
       ZMATH.add_fld(rand._name,Access.Final,rand.as_fun(),null);
       ZMATH.close().init();
       Env.GVN.add_flow(PMATH); // Type depends on uses
-      StoreNode mem = new StoreNode(Env.SCP_0.mem(),PMATH,ZMATH,null).init();
+      StoreXNode mem = new StoreXNode(Env.SCP_0.mem(),PMATH,ZMATH,null).init();
       mem._live = TypeMem.ALLMEM;
       Env.SCP_0.set_mem(mem);
       return PMATH;

@@ -22,11 +22,13 @@ public class SetFieldNode extends Node {
   final Parse _badf;            // Bad field
 
   public SetFieldNode(String fld, Access fin, Node struct, Node val, Parse badf) {
-    super(OP_SETFLD,struct,val);
-    _fin = fin;
-    _fld = fld;
-    _badf= badf;
-    _live = TypeStruct.ISUSED;
+    super(OP_MAX);
+    //super(OP_SETFLD,struct,val);
+    //_fin = fin;
+    //_fld = fld;
+    //_badf= badf;
+    //_live = TypeStruct.ISUSED;
+    throw com.cliffc.aa.AA.unimpl();
   }
   @Override public String xstr() { return "."+_fld+"="; } // Self short name
   String  str() { return xstr(); }   // Inline short name
@@ -35,7 +37,8 @@ public class SetFieldNode extends Node {
   @Override public Type value() {
     Type t = val(0);
     if( !(t instanceof TypeStruct ts) ) return t.oob();
-    return ts.update(_fin,_fld,val(1));
+    //return ts.update(_fin,_fld,val(1));
+    throw com.cliffc.aa.AA.unimpl();
   }
 
   @Override public Type live_use( int i ) {
@@ -53,7 +56,8 @@ public class SetFieldNode extends Node {
     if( fld==null && !ts.above_center()     ) return ts;
     if( fld!=null && fld._access!=Access.RW ) return ts;
     // SetField resolved the demand for this field, so remove from live-use
-    return ts.replace_fld(TypeFld.make(_fld,Type.ANY));
+    //return ts.replace_fld(TypeFld.make(_fld,Type.ANY));
+    throw com.cliffc.aa.AA.unimpl();
   }
   @Override boolean assert_live(Type live) { return live instanceof TypeStruct; }
 

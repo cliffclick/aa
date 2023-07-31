@@ -297,7 +297,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     return fs;
   }
   public void remove_dups() { _flds = remove_dups(_def,_flds); }
-  public void remove_dups_hashcons() { _flds = TypeFlds.hash_cons(remove_dups(_def,_flds)); }
+  public TypeStruct remove_dups_hashcons() { _flds = TypeFlds.hash_cons(remove_dups(_def,_flds)); return this; }
   // Replace _flds; flds is not interned
   public TypeStruct make_from(TypeFld[] flds) { return make(_any,_def,TypeFlds.hash_cons(remove_dups(_def,flds))); }
 
@@ -713,32 +713,25 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
 
   // Extend the current struct with a new named field, making a new struct
   public TypeStruct add_fldx( TypeFld fld ) { return make_from(TypeFlds.add_sort(_flds,fld)); }
-  // Replace an existing field in the current struct.
-  public TypeStruct replace_fld( TypeFld fld ) {
+
+  // If the field does not exist, use a Final _def.
+  // If the prior field is final, do no updates. (error situation)
+  // If the update is precise, replace the field else meet the field.
+  TypeStruct update( TypeFld fld, boolean precise ) {
     int idx = find(fld._fld);
-    if( idx==-1 ) return add_fldx(fld);
-    if( get(idx)==fld ) return this;
-    return make_from(TypeFlds.make_from(_flds,idx,fld));
+    if( idx == -1 ) {
+      if( _def==Type.ALL ) return this; // No update if Final
+      return add_fldx(fld);
+    }
+    TypeFld prior = _flds[idx];
+    if( prior._access != Access.RW ) return this; // No update if RO or Final
+    TypeFld nfld = precise ? fld : (TypeFld)fld.meet(prior);
+    if( nfld == prior ) return this; // No update anyways
+    TypeStruct ts = copy2();
+    ts._flds[idx] = nfld;
+    return ts.remove_dups_hashcons().hashcons_free();
   }
-
-  // Update (approximately) the current TypeStruct.  Updates the named field.
-  public TypeStruct update(Access fin, String name, Type val) {
-    TypeFld fld = get(name);
-    if( fld == null ) return this; // Unknown field, assume changes no fields
-    // TODO: Turn off double-final-stores
-    //// Double-final-stores, result is an error
-    //if( fld._access==Access.Final || fld._access==Access.ReadOnly )
-    //  val = ALL;
-    if( fld._t==ALL ) return this; // No changes if field is already in-error
-    return replace_fld(fld.make_from(val,fin));
-  }
-
-  // Update (approximately) the whole current TypeStruct.
-  // 'precise' is replace, imprecise is MEET.
-  public TypeStruct update(TypeStruct ts, boolean precise) {
-    return (TypeStruct)(precise ? ts : meet(ts));
-  }
-
+  
   // Flatten fields for LIVE: only need a per-field any/all indication
   public TypeStruct flatten_live_fields() {
     boolean change=false;

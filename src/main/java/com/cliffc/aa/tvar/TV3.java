@@ -598,7 +598,7 @@ abstract public class TV3 implements Cloneable {
       : new TVLambda(tfp.nargs(),from_flow(tfp.dsp(),d),from_flow(tfp._ret,d));
     case TypeMemPtr tmp -> {
       TVStruct ts = (TVStruct)from_flow(tmp._obj,d);
-      StoreNode.unify(tmp._aliases,ts,false);
+      StoreAbs.unify(tmp._aliases,ts,false);
       yield new TVPtr(tmp._aliases,ts);
     }
     case TypeStruct ts -> {

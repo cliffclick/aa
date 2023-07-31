@@ -232,7 +232,7 @@ public class TestNode {
     //test1monotonic_intrinsic(new NewStrNode.ConvertI64Str());
     //test1monotonic_intrinsic(new NewStrNode.ConvertF64Str());
     //test1monotonic_intrinsic(new NewStrNode.AddStrStr());
-    test1monotonic(new   LoadNode(_ins[1],_ins[2],null));
+    test1monotonic(new   LoadNode(_ins[1],_ins[2],"_",null));
     StructNode nnn1 = new StructNode(0,false,null,Type.ALL);
     set_type(1,TypeNil.SCALAR);  nnn1.add_fld("x",Access.Final,_ins[1],null);
     set_type(2,TypeNil.SCALAR);  nnn1.add_fld("y",Access.Final,_ins[2],null);
@@ -245,7 +245,7 @@ public class TestNode {
     test1monotonic(new   ProjNode(1, _ins[0]));
     test1monotonic(new RegionNode(null,_ins[1],_ins[2]));
     test1monotonic(new    RetNode(_ins[0],mem,_ins[1],_ins[2],fun_plus)); // ctl,mem,val,rpc,fun
-    test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],null));
+    test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],"_",Access.Final,null));
     //                  ScopeNode has no inputs, and value() call is monotonic
     test1monotonic(new AssertNode(_ins[1],_ins[2],TypeNil.XNIL   ,null));
     test1monotonic(new AssertNode(_ins[1],_ins[2],TypeFlt.FLT64  ,null));

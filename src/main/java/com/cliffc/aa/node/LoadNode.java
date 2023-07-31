@@ -1,13 +1,13 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
-
-// TODO: FOLD BACK INTO FIELD
 
 // Load a struct from memory.  Does its own nil-check testing.
 //
@@ -15,35 +15,57 @@ import static com.cliffc.aa.AA.*;
 // are normal structs, so local vars are ALSO normal struct loads.
 
 //"x.y"
-// Op   Adr   Value
-// Load ptr   TypeStruct
-// Field y    field
-// Bind ptr   bound lambda, or original field
+// Op     Adr   Value
+// Load.y ptr   field
+// Bind   ptr   bound lambda, or original field
 //
 //"1._+_._"
-// Op   Adr   Value
-// Load  1    @{ INT CLAZZ }
-// Field _+_  (unbound function choices)
-// Bind  1    (  bound function choices)
-// Load  ts   (  bound function choices) --since ptr is TypeStruct, no-op
-// Field _       bound function
-// Bind  ts      bound function          --since ptr is TypeStruct, no-op
+// Op       Adr   Value
+// Load._+.  1    (unbound function choices from INT CLZ)
+// Bind      1    (  bound function choices)
+// Load._   ts       bound function
+// Bind     ts       bound function --since ptr is TypeStruct, no-op
 
 //"1+2"
-// Load  1    @{ INT CLAZZ }
-// Field y    (unbound function choices)
-// Field _     unbound function
-// Bind  1       bound function
+// Load._+_  1    (unbound function choices)
+// Bind      1       bound function
 
-public class LoadNode extends Node {
+public class LoadNode extends Node implements Resolvable {
+  // Field being loaded from a TypeStruct.  If "_", the field name is inferred
+  // from amongst the field choices.  If not present, then error.
+  public       String _fld;
+  // Where to report errors
   private final Parse _bad;
+  // Prevent recursive expansion during ideal_grow
   private boolean _mid_grow;
 
-  public LoadNode( Node mem, Node adr, Parse bad ) {
+  // A struct using just the field; just a cache for faster live-use
+  private final TypeStruct _live_use;
+  
+  public LoadNode( Node mem, Node adr, String fld, Parse bad ) {
     super(OP_LOAD,null,mem,adr);
+    _fld = resolve_fld_name(fld);
     _bad = bad;
-    _live=TypeStruct.ISUSED;
+    _live_use = TypeStruct.UNUSED.add_fldx(TypeFld.make(_fld));
   }
+  // A plain "_" field is a resolving field
+  private String resolve_fld_name(String fld) { return Util.eq(fld,"_") ? ("&"+_uid).intern() : fld; }
+  @Override public String xstr() { return "."+(is_resolving() ? "_" : _fld); }   // Self short name
+  String  str() { return xstr(); } // Inline short name
+  @Override public boolean is_resolving() { return Resolvable.is_resolving(_fld); }
+  @Override public String fld() { assert !is_resolving(); return _fld; }
+  // Set the resolved field label
+  @Override public String resolve(String label) {
+    assert !Combo.HM_AMBI;  // Must resolve before ambiguous field pass
+    unelock();                  // Hash changes since label changes
+    String old = _fld;
+    _fld = label;
+    add_flow();
+    in(1).add_flow(); // Liveness sharpens to specific field
+    return old;
+  }
+
+  
   Node mem() { return in(MEM_IDX); }
   Node adr() { return in(DSP_IDX); }
   private Node set_mem(Node a) { return set_def(MEM_IDX,a); }
@@ -52,81 +74,95 @@ public class LoadNode extends Node {
     Type tadr = adr()._val;
     Type tmem = mem()._val;
 
-    // Loads can be issued directly against a TypeStruct, if we are loading
-    // against an inlined object.  In this case the Load is a no-op.
-    if( (tadr instanceof TypeStruct ts) )
-      return ts;                // Happens if user directly calls an oper
     if( !(tadr instanceof TypeNil ta) || (tadr instanceof TypeFunPtr) )
-      return tadr.oob(TypeStruct.ISUSED); // Not an address
+      return tadr.oob(TypeNil.SCALAR); // Not an address
     if( !(tmem instanceof TypeMem tm) )
-      return tmem.oob(TypeStruct.ISUSED); // Not a memory
+      return tmem.oob(TypeNil.SCALAR); // Not a memory
     if( ta==TypeNil.NIL || ta==TypeNil.XNIL )
       ta = (TypeNil)ta.meet(PrimNode.PINT._val);
 
-    return tm.ld(ta);
+    // Loads can be issued directly against a TypeStruct, if we are loading
+    // against an inlined object.  In this case the Load is a no-op.
+    TypeStruct ts = ta instanceof TypeStruct ts0 ? ts0 : tm.ld(ta);
+
+    // Still resolving, dunno which field yet
+    if( is_resolving() ) {
+      if( ts.above_center() ) return TypeNil.XSCALAR;
+      // TODO: include clz fields
+      Type t2 = ts._def;
+      if( Combo.pre() || Combo.HM_AMBI ) {
+        for( TypeFld t3 : ts )  t2 = t2.meet(t3._t);
+      } else {
+        for( TypeFld t3 : ts )  t2 = t2.join(t3._t);
+      }
+      return t2;
+    }
+
+    return lookup(ts,tm);
   }
 
+
+  // Field lookup, might check superclass
+  private Type lookup( TypeStruct ts, TypeMem mem ) {
+    // Check for direct field
+    int idx = ts.find(_fld);
+    if( idx != -1 ) return ts.at(idx);
+    // Miss on open structs dunno if the field will yet appear
+    if( ts._def==Type.ANY ) return Type.ANY;
+    // Miss on closed structs looks at superclass.
+    if( ts.len()>=1 && Util.eq(ts.fld(0)._fld,TypeFld.CLZ) ) {
+      TypeMemPtr ptr = (TypeMemPtr)ts.fld(0)._t;
+      TypeStruct obj = mem.ld(ptr);
+      return lookup(obj,mem);
+    }
+    return ts._def;
+  }
+
+  
   // The only memory required here is what is needed to support the Load.
   // If the Load is alive, so is the address.
-
-  // If the Load computes a constant, the address live-ness is determined how
-  // Combo deals with constants, and not here.
   @Override public Type live_use( int i ) {
-    assert _live instanceof TypeStruct ts && ts.flatten_live_fields()==ts;
+    assert _live==Type.ALL;
     Type adr = adr()._val;
-    if( i==DSP_IDX )
-      // If the input is a Struct and not a Pointer, this Load is a nop
-      return adr instanceof TypeStruct ? _live : adr.oob();
+    // Since the Load is alive, the address is alive
+    if( i!=MEM_IDX ) return Type.ALL;
     // Memory demands
-    Node def=in(i);
+    Node def=mem();
     adr().deps_add(def);
-    if( adr==Type.ANY ) return TypeMem.ANYMEM;
-    if( !(adr instanceof TypeNil ptr) )
-      return adr.oob(RootNode.def_mem(def));
+    if( adr.above_center() ) return Type.ANY; // Nothing is demanded
+    if( !(adr instanceof TypeNil ptr) )  // Demand everything not killed at this field
+      // TODO: use kills and _live_use
+      return TypeMem.ALLMEM;
+  
+    if( ptr._aliases.is_empty() )  return Type.ANY; // Nothing is demanded still
+    // Loading from a struct does not require memory, but still needs the field
+    if( ptr instanceof TypeStruct ) throw unimpl();
 
-    if( ptr.above_center() || ptr._aliases.is_empty() ) return TypeMem.ANYMEM; // Loaded from nothing
-    // Loading from a struct does not require memory
-    if( ptr instanceof TypeStruct ) return TypeMem.ANYMEM;
-
-    // Demand memory produce the desired structs
-    if( ptr._aliases==BitsAlias.NALL ) return RootNode.def_mem(def);
-    return TypeMem.make(ptr._aliases,(TypeStruct)_live);
+    // Demand memory produce the desired field from a struct
+    if( ptr._aliases==BitsAlias.NALL )
+      return TypeMem.ALLMEM; // return RootNode.def_mem(def);
+    // Demand field "_fld" be "ALL", which is the default
+    return TypeMem.make(ptr._aliases,_live_use);
   }
-  // Only structs are demanded from a Load
-  @Override boolean assert_live(Type live) { return live instanceof TypeStruct; }
-
+  
   // Strictly reducing optimizations
   @Override public Node ideal_reduce() {
     Node adr = adr();
     Type tadr = adr._val;
-    // We allow Loads against structs to allow for inlined structs.
-    // The Load is a no-op
-    if( tadr instanceof TypeStruct ) return adr();
 
     // Dunno about other things than pointers
     if( !(tadr instanceof TypeNil tn) ) return null;
-    if( adr instanceof FreshNode frsh ) adr = frsh.id();
+    //if( adr instanceof FreshNode frsh ) adr = frsh.id();
     // If we can find an exact previous store, fold immediately to the value.
-    Node ps = find_previous_struct(this, mem(),adr,tn._aliases);
+    Node ps = find_previous_struct(this, mem(), adr, tn._aliases);
     if( ps instanceof StoreNode st ) {
-      Node rez = st.rez();
-      if( rez==null ) return null;
-      if( _live.isa(rez._live) ) return rez; // Stall until liveness matches
-      deps_add(this);                        // Self-add if live-ness updates
-      return null;
+    //  Node rez = st.rez();
+    //  if( rez==null ) return null;
+    //  if( _live.isa(rez._live) ) return rez; // Stall until liveness matches
+    //  deps_add(this);                        // Self-add if live-ness updates
+    //  return null;
+      throw unimpl();
     }
-
-    // Load can move past a Call if there's no escape.  Not really a reduce,
-    // but depends on the deps mechanism.
-    Node mem = mem();
-    if( mem instanceof MProjNode mprj ) {
-      if( mprj.in(0) instanceof CallEpiNode cepi && !cepi._is_copy ) {
-        if( adr instanceof NewNode nnn && !nnn.escaped(this) ) {
-          Env.GVN.add_reduce(this); // Re-run reduce
-          return set_mem(cepi.call().mem());
-        } else adr.deps_add(this);
-      }
-    } else mem.deps_add(this);
 
     return null;
   }
@@ -137,6 +173,18 @@ public class LoadNode extends Node {
     Node adr = adr();
     Type tadr = adr._val;
     BitsAlias aliases = tadr instanceof TypeMemPtr ? ((TypeMemPtr)tadr)._aliases : null;
+
+    // Load can move past a Call if there's no escape.  Not really a reduce,
+    // but depends on the deps mechanism.
+    if( mem instanceof MProjNode mprj ) {
+      if( mprj.in(0) instanceof CallEpiNode cepi && !cepi._is_copy ) {
+        if( adr instanceof NewNode nnn && !nnn.escaped(this) ) {
+    //      Env.GVN.add_reduce(this); // Re-run reduce
+    //      return set_mem(cepi.call().mem());
+          throw unimpl();
+        } else adr.deps_add(this);
+      }
+    } else mem.deps_add(this);
 
     // Load can move past a Join if all aliases align.
     if( mem instanceof MemJoinNode && aliases != null ) {
@@ -159,7 +207,7 @@ public class LoadNode extends Node {
       Node adr = adr();
       Node[] ns = new Node[mphi.len()];
       for( int i=1; i<mphi.len(); i++ ) {
-        ns[i] = Env.GVN.xform(new LoadNode(mphi.in(i),adr,_bad));
+        ns[i] = Env.GVN.xform(new LoadNode(mphi.in(i),adr,_fld,_bad));
         ns[i].push();
       }
       Node.pops(mphi.len()-1);
@@ -193,7 +241,7 @@ public class LoadNode extends Node {
     int cnt=0;
     while(true) {
       cnt++; assert cnt < 100; // Infinite loop?
-      if( mem instanceof StoreNode st ) {
+      if( mem instanceof StoreAbs st ) {
         if( st.adr()==adr ) return st.err(true)== null ? st : null; // Exact matching store
         st.adr().deps_add(ldst); // If store address changes
         if( mem == st.mem() ) return null; // Parallel unrelated stores
@@ -205,12 +253,6 @@ public class LoadNode extends Node {
           return null;        // Aliases not disjoint, might overlap but wrong address
         // Disjoint unrelated store.
         mem = st.mem(); // Advance past
-
-      //} else if( mem instanceof MemPrimNode.LValueWrite ) {
-      //  // Array stores and field loads never alias
-      //  mem = ((MemPrimNode)mem).mem();
-      } else if( mem instanceof SetFieldNode sfn ) {
-        throw unimpl();
 
       } else if( mem instanceof MProjNode ) {
         Node mem0 = mem.in(0);
@@ -273,38 +315,106 @@ public class LoadNode extends Node {
 
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
-    TV3 ptr = adr().set_tvar();
-    // This load could be a no-op, eventually, if it's loading from a struct
-    if( ptr instanceof TVPtr tptr ) return tptr.load();
+    if( is_resolving() )
+      TVField.FIELDS.put(_fld,this); // Track resolving field names
+    // Unsure if input is a ptr or a struct
     return new TVLeaf();
   }
 
   // All field loads against a pointer.
   @Override public boolean unify( boolean test ) {
-    TV3 ptr = adr().tvar();
+    boolean progress = false;
+    TV3 ptr0 = adr().tvar();
     Type ta = adr()._val;
-    // No-Op load against an inlined struct
-    
-    // TODO: Still this is a problem! In my (fact(2),fact(2.2)) case fact is
-    // not inlined, and not specialized.  The incoming argument becomes
-    // %[4,5][] - a mix of int/flt - and NOT a ptr.  The standard load against
-    // it mixes int/flt struct result.
 
-    // Since the parm is %[INT + FLT][], the N460 Load believes its the NO-OP
-    // but really it is a normal load.  Since NO-OP, does not push H-M types
-    // uphill to call arg, and so not uphill to caller.
-    
-    if( ta instanceof TypeStruct || ptr instanceof TVStruct )
-      return tvar().unify(ptr,test);
-    // Exactly a NIL is an Int
-    if( ta == TypeNil.NIL || ta == TypeNil.XNIL )
-      return tvar().unify(PrimNode.ZINT.tvar(),test);
-    if( ptr instanceof TVPtr tptr )
-      return tvar().unify(tptr.load(),test);
-    // Stall
-    assert ptr instanceof TVLeaf || ptr instanceof TVErr;
-    ptr.deps_add(this);
+    // See if we force the input to choose between ptr and struct.
+    // Get a struct in the end
+    if( ptr0 instanceof TVErr ) throw unimpl();
+    TV3 ptr1 = ptr0;            // TODO: error might already be a Ptr or Struct
+    TVStruct tstr=null;
+    if( ptr1 instanceof TVLeaf ) {
+      if( ta instanceof TypeStruct ) {
+        //TV3 tstr = TV3.from_flow(ta);
+        progress = ptr1.unify(tstr=new TVStruct(true),test);
+      } else if( ta instanceof TypeMemPtr ) {
+        throw unimpl();         // Force ptr
+      } if( ta == TypeNil.NIL || ta == TypeNil.XNIL ) {
+        throw unimpl();
+      }
+      // No progress, just stall until adr falls to ptr or struct
+      if( !progress ) {
+        adr().deps_add(this);
+        return false;
+      }
+      // Progress!
+      if( test ) return true;
+    } else if( ptr1 instanceof TVPtr ptr ) tstr = ptr.load();
+    else if( ptr1 instanceof TVStruct ts1 ) tstr = ts1;
+    else throw unimpl();
+
+    //// TODO: Still this is a problem! In my (fact(2),fact(2.2)) case fact is
+    //// not inlined, and not specialized.  The incoming argument becomes
+    //// %[4,5][] - a mix of int/flt - and NOT a ptr.  The standard load against
+    //// it mixes int/flt struct result.
+    //
+    //// Since the parm is %[INT + FLT][], the N460 Load believes its the NO-OP
+    //// but really it is a normal load.  Since NO-OP, does not push H-M types
+    //// uphill to call arg, and so not uphill to caller.
+
+    // Attempt resolve
+    if( is_resolving() )
+      return try_resolve(tstr,test) | progress;
+
+    // Search up the super-clazz chain
+    for( ; tstr!=null; tstr = tstr.pclz().load() ) {
+      // If the field is in the struct, unify and done
+      TV3 fld = tstr.arg(_fld);
+      if( fld!=null ) return do_fld(fld,test);
+      // If the struct is open, add field here and done.
+      // Field is not pinned, because it might belong in a superclazz
+      if( tstr.is_open() ) return tstr.add_fld(_fld,tvar(),false);
+    }
+
+    // struct is end-of-super-chain, miss_field
+    //return tvar().unify_err(resolve_failed_msg(),tvar(0),null,test);
+    throw unimpl();
+  }
+
+  private boolean do_fld( TV3 fld, boolean test ) {
+    if( tvar() instanceof TVLeaf leaf ) leaf.set_no_progress();
+    return tvar().unify(fld,test);
+  }
+
+  private boolean try_resolve( TVStruct str, boolean test ) {
+    // If struct is open, more fields might appear and cannot do a resolve.
+    if( str.is_open() ) {
+      str.deps_add(this);
+      return false;
+    }
+    if( trial_resolve(true, tvar(), str, test) )
+      return true;              // Resolve succeeded!
+    // No progress, try again if self changes
+    if( !test ) tvar().deps_add_deep(this);
     return false;
+  }
+
+
+  @Override public TV3 match_tvar() { return tvar(0); }
+
+  // clones during inlining change resolvable field names
+  @Override public LoadNode copy(boolean copy_edges) {
+    LoadNode nnn = (LoadNode)super.copy(copy_edges);
+    if( nnn.is_resolving() ) nnn._fld = nnn.resolve_fld_name("_");
+    Env.GVN.add_flow(this);     // Alias changes flow
+    return nnn;
+  }
+
+  @Override public int hashCode() { return super.hashCode()+_fld.hashCode(); }
+  @Override public boolean equals(Object o) {
+    if( this==o ) return true;
+    if( !super.equals(o) ) return false;
+    if( !(o instanceof LoadNode fld) ) return false;
+    return Util.eq(_fld,fld._fld);
   }
 
 }

@@ -184,10 +184,11 @@ public class StructNode extends Node {
           if( !parent.is_prim() ) {
             parent.add_fld(fref._name,TypeFld.Access.RW,fref,_fld_starts.at(i)).xval();
             // Stomp field locally to load from parent
-            FieldNode fld = new FieldNode(parent,fref._name,_fld_starts.at(i));
-            fld._val = val(i);
-            set_def(i,fld);
-            Env.GVN.add_work_new(fld);
+            //FieldNode fld = new FieldNode(parent,fref._name,_fld_starts.at(i));
+            //fld._val = val(i);
+            //set_def(i,fld);
+            //Env.GVN.add_work_new(fld);
+            throw unimpl();
           }
         }
       }

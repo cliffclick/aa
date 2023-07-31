@@ -55,7 +55,7 @@ public class TestLive {
     obj.close().init();
 
     NewNode ptr = new NewNode().init();
-    Node mem = new StoreNode(mmm,ptr,obj,null).init();
+    Node mem = new StoreXNode(mmm,ptr,obj,null).init();
 
     // Use the object for scope exit
     RootNode root = Env.ROOT;

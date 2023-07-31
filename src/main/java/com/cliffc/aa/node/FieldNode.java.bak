@@ -30,10 +30,12 @@ public class FieldNode extends Node implements Resolvable {
   public final Parse _bad;
 
   public FieldNode(Node struct, String fld, Parse bad) {
-    super(OP_FIELD,struct);
-    // A plain "_" field is a resolving field
-    _fld = resolve_fld_name(fld);
-    _bad = bad;
+    super(OP_MAX);
+    //super(OP_FIELD,struct);
+    //// A plain "_" field is a resolving field
+    //_fld = resolve_fld_name(fld);
+    //_bad = bad;
+    throw unimpl();
   }
   // A plain "_" field is a resolving field
   private String resolve_fld_name(String fld) { return Util.eq(fld,"_") ? ("&"+_uid).intern() : fld; }
@@ -51,8 +53,6 @@ public class FieldNode extends Node implements Resolvable {
     in(0).add_flow(); // Liveness sharpens to specific field
     return old;
   }
-
-  @Override public TV3 match_tvar() { return tvar(0); }
 
   @Override public Type value() {
     Type t = val(0);
@@ -113,7 +113,7 @@ public class FieldNode extends Node implements Resolvable {
       return TypeStruct.UNUSED;
     }
     // Otherwise normal fields and clazz fields are field-alive.
-    return TypeStruct.UNUSED.replace_fld(TypeFld.make(_fld,Type.ALL));
+    return TypeStruct.UNUSED.add_fld(TypeFld.make(_fld,Type.ALL));
   }
 
   @Override public Node ideal_reduce() {
@@ -165,7 +165,8 @@ public class FieldNode extends Node implements Resolvable {
     if( in(0) instanceof PhiNode phi ) {
       int fcnt=0;
       for( int i=1; i<phi.len(); i++ )
-        if( phi.in(i)._op == OP_SETFLD || phi.in(i)._op == OP_BINDFP ) fcnt++;
+        //if( phi.in(i)._op == OP_SETFLD || phi.in(i)._op == OP_BINDFP ) fcnt++;
+        throw unimpl();
       if( fcnt>0 ) {
         Node lphi = new PhiNode(TypeNil.SCALAR,phi._badgc,phi.in(0));
         for( int i=1; i<phi.len(); i++ )
@@ -216,6 +217,8 @@ public class FieldNode extends Node implements Resolvable {
     return tvar().unify(fld,test);
   }
 
+
+  @Override public TV3 match_tvar() { return tvar(0); }
 
   public static String clz_str(Type t) {
     return switch( t ) {

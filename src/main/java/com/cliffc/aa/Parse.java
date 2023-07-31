@@ -448,7 +448,7 @@ public class Parse implements Comparable<Parse> {
     if( create ) {              // Token not already bound at any scope
       scope = scope();          // Create in the current scope
       StructNode stk = scope.stk();
-      stk.add_fld (tok,Access.RW, con(TypeNil.NIL),badf); // Create at top of scope as undefined
+      stk.add_fld (tok,Access.RW, Env.ANY,badf); // Create at top of scope as undefined
     }
     
     // Assert type if asked for
@@ -467,11 +467,8 @@ public class Parse implements Comparable<Parse> {
 
     // Load the display/stack-frame for the defining scope.
     Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
-    Node stk = gvn(new LoadNode(mem(),ptr,badf));
-    // Build a new display/stack-frame
-    Node stk2 = gvn(new SetFieldNode(tok,mutable,stk,Node.peek(iidx),badf));
     // Store into the defining scope (not necessarily local scope)
-    Node st = new StoreNode(mem(),ptr,stk2,badf);
+    Node st = new StoreNode(mem(),ptr,Node.peek(iidx),tok,mutable,badf);
     scope().replace_mem(st);
     if( mutable==Access.Final ) Oper.make(tok,false);
     return Node.pop(iidx);
@@ -541,67 +538,69 @@ public class Parse implements Comparable<Parse> {
       PhiNode phi_mem = new PhiNode(TypeMem.ALLMEM,bad,r,t_scope.mem (),f_scope.mem ());
       scope.set_def(MEM_IDX,null);
       Node x_mem = X.xform(phi_mem);
-      // Load the stack frame from above the trinary.
-      // We will promote common vars to it.
-      Node x_stk_now = X.xform(new LoadNode(x_mem,scope.ptr(),null));
-
-      // Phi-merge result of the whole trinary
-      Node rez = X.xform(new PhiNode(TypeNil.SCALAR,bad,r,t_scope.rez (),f_scope.rez ())) ; // Ifex result
-      rez_x = rez.push();
-      
-      // Load the stack frames from each T/F side
-      Node t_stk_now = X.xform(new LoadNode(t_scope.mem(),t_scope.ptr(),null));
-      Node f_stk_now = X.xform(new LoadNode(f_scope.mem(),f_scope.ptr(),null));
-
-      // Common variables are made Fresh on both sides, then Phi'd, then
-      // exported to the stack frame.
-      for( int i=1,j; i<t_stk.len(); i++ ) { // Walk true side, skip display
-        String fld = t_stk.fld(i);         // Field name
-        if( (j=f_stk.find(fld)) >= 0 ) {       // Variable is common to both
-          Node t_fsh = _fresh_field(X,t_stk_now,fld);
-          Node f_fsh = _fresh_field(X,f_stk_now,fld);
-          Access access = t_stk.access(i).meet(f_stk.access(j));
-          x_stk_now = _phi(X,r,t_fsh,f_fsh,fld,access,x_stk_now,bad);
-        }
-      }
-
-      // Vars in LHS not in RHS get an error
-      for( int i=1; i<t_stk.len(); i++ ) { // Walk true side, skip display
-        String fld = t_stk.fld(i);         // Field name
-        if( f_stk.find(fld) == -1 ) {      // Missing in false side
-          Node t_var = _fresh_field(X,t_stk_now,fld);
-          Node f_var = _err_not_def(X,f_scope,fld,false,bad);
-          x_stk_now = _phi(X,r,t_var,f_var,fld,Access.bot(),x_stk_now,bad);
-        }
-      }
-
-      // Vars in RHS not in LHS get an error
-      for( int i=1; i<f_stk.len(); i++ ) { // Walk false side, skip display
-        String fld = f_stk.fld(i);         // Field name
-        if( t_stk.find(fld) == -1 ) {      // Missing in true side
-          Node t_var = _err_not_def(X,t_scope,fld,true ,bad);
-          Node f_var = _fresh_field(X,f_stk_now,fld);
-          x_stk_now = _phi(X,r,t_var,f_var,fld,Access.bot(),x_stk_now,bad);
-        }
-      }
-      
-      StoreNode post_mem = new StoreNode(x_mem,scope.ptr(),x_stk_now,null);
-      scope.set_def(MEM_IDX,null);
-      scope.set_mem(X.xform(post_mem));
-      Env.GVN.revalive(x_mem,post_mem);
-      
-      Env.GVN.add_unuse(t_scope);
-      Env.GVN.add_unuse(f_scope);
-      Env.GVN.add_unuse(t_stk_now);
-      Env.GVN.add_unuse(f_stk_now);
+      //// Load the stack frame from above the trinary.
+      //// We will promote common vars to it.
+      //Node x_stk_now = X.xform(new LoadNode(x_mem,scope.ptr(),null));
+      //
+      //// Phi-merge result of the whole trinary
+      //Node rez = X.xform(new PhiNode(TypeNil.SCALAR,bad,r,t_scope.rez (),f_scope.rez ())) ; // Ifex result
+      //rez_x = rez.push();
+      //
+      //// Load the stack frames from each T/F side
+      //Node t_stk_now = X.xform(new LoadNode(t_scope.mem(),t_scope.ptr(),null));
+      //Node f_stk_now = X.xform(new LoadNode(f_scope.mem(),f_scope.ptr(),null));
+      //
+      //// Common variables are made Fresh on both sides, then Phi'd, then
+      //// exported to the stack frame.
+      //for( int i=1,j; i<t_stk.len(); i++ ) { // Walk true side, skip display
+      //  String fld = t_stk.fld(i);         // Field name
+      //  if( (j=f_stk.find(fld)) >= 0 ) {       // Variable is common to both
+      //    Node t_fsh = _fresh_field(X,t_stk_now,fld);
+      //    Node f_fsh = _fresh_field(X,f_stk_now,fld);
+      //    Access access = t_stk.access(i).meet(f_stk.access(j));
+      //    x_stk_now = _phi(X,r,t_fsh,f_fsh,fld,access,x_stk_now,bad);
+      //  }
+      //}
+      //
+      //// Vars in LHS not in RHS get an error
+      //for( int i=1; i<t_stk.len(); i++ ) { // Walk true side, skip display
+      //  String fld = t_stk.fld(i);         // Field name
+      //  if( f_stk.find(fld) == -1 ) {      // Missing in false side
+      //    Node t_var = _fresh_field(X,t_stk_now,fld);
+      //    Node f_var = _err_not_def(X,f_scope,fld,false,bad);
+      //    x_stk_now = _phi(X,r,t_var,f_var,fld,Access.bot(),x_stk_now,bad);
+      //  }
+      //}
+      //
+      //// Vars in RHS not in LHS get an error
+      //for( int i=1; i<f_stk.len(); i++ ) { // Walk false side, skip display
+      //  String fld = f_stk.fld(i);         // Field name
+      //  if( t_stk.find(fld) == -1 ) {      // Missing in true side
+      //    Node t_var = _err_not_def(X,t_scope,fld,true ,bad);
+      //    Node f_var = _fresh_field(X,f_stk_now,fld);
+      //    x_stk_now = _phi(X,r,t_var,f_var,fld,Access.bot(),x_stk_now,bad);
+      //  }
+      //}
+      //
+      //StoreNode post_mem = new StoreNode(x_mem,scope.ptr(),x_stk_now,null);
+      //scope.set_def(MEM_IDX,null);
+      //scope.set_mem(X.xform(post_mem));
+      //Env.GVN.revalive(x_mem,post_mem);
+      //
+      //Env.GVN.add_unuse(t_scope);
+      //Env.GVN.add_unuse(f_scope);
+      //Env.GVN.add_unuse(t_stk_now);
+      //Env.GVN.add_unuse(f_stk_now);
     }
-    Env.GVN.iter();
-    return Node.pop(rez_x);
+    //Env.GVN.iter();
+    //return Node.pop(rez_x);
+    throw unimpl();
   }
 
   private Node _fresh_field(GVNGCM.Build<Node> X, Node stk_now, String fld) {
-    Node val = X.xform(new FieldNode(stk_now,fld,null));  // Dunno clazz or not
-    return X.xform(new FreshNode(val,_e));
+    //Node val = X.xform(new FieldNode(stk_now,fld,null));  // Dunno clazz or not
+    //return X.xform(new FreshNode(val,_e));
+    throw unimpl();
   }
 
   private Node _err_not_def(GVNGCM.Build<Node> X, ScopeNode scope, String fld, boolean side, Parse bad) {
@@ -610,9 +609,10 @@ public class Parse implements Comparable<Parse> {
   }
   
   private Node _phi(GVNGCM.Build<Node> X, Node r, Node t_var, Node f_var, String fld, Access access, Node x_stk_now, Parse bad) {
-    Node phi = X.xform(new PhiNode(TypeNil.SCALAR,bad,r,t_var,f_var));
-    scope().stk().add_fld(fld,Access.RW,con(TypeNil.NIL),null);
-    return X.xform(new SetFieldNode(fld,access,x_stk_now,phi,bad));          
+    //Node phi = X.xform(new PhiNode(TypeNil.SCALAR,bad,r,t_var,f_var));
+    //scope().stk().add_fld(fld,Access.RW,con(TypeNil.NIL),null);
+    //return X.xform(new SetFieldNode(fld,access,x_stk_now,phi,bad));
+    throw unimpl();
   }
   
   
@@ -676,16 +676,12 @@ public class Parse implements Comparable<Parse> {
       int rhsx = _x;            // Invariant: WS already skipped
       int lhsidx = lhs.push();
       Parse err = errMsg(opx);
-      // Load against LHS pointer.  If this is a primitive, the Load produces
-      // the primitive clazz.  Otherwise, this loads the clazz from the
-      // reference for a clazz field lookup.
-      Node val = gvn(new LoadNode(mem(),lhs,err));
-      // Get the overloaded operator field, always late binding
-      Node over = gvn(new FieldNode(val,binop._name,err));
-      // Get the set of primitive choices
-      Node tuple = gvn(new LoadNode(mem(),over,err));
-      // Get the resolved operator from the overload
-      Node fun = gvn(new FieldNode(tuple,"_",err));
+      // Load against LHS pointer.  If this is a primitive, the Load loads
+      // against the primitive clazz.
+      Node over= gvn(new LoadNode(mem(),lhs,binop._name,err));
+      // Resolve the set of primitive choices
+      Node fun = gvn(new LoadNode(mem(),over,"_",err));
+      // Bind the LHS to the function
       Node bind= gvn(new BindFPNode(fun,Node.peek(lhsidx),false));
       int fidx = bind.push();
       // Parse the RHS operand
@@ -800,13 +796,9 @@ public class Parse implements Comparable<Parse> {
       Parse err = errMsg(oldx);
       // Load against e0 pointer.  If e0 is a primitive, the Load is a no-op;
       // otherwise this converts a reference to a value.
-      Node val = gvn(new LoadNode(mem(),e0,err));
-      // Load from the clazz value
-      Node over = gvn(new FieldNode(val,op._name,err));
-      // Load tuple of primitive choices
-      Node tuple = gvn(new LoadNode(mem(),over,err));
-      // Selects the correct function from the TypeStruct overload tuple.
-      Node fun = gvn(new FieldNode(tuple,"_",err));
+      Node over= gvn(new LoadNode(mem(),e0,op._name,err));
+      // Resolve the correct function from the overload choices
+      Node fun = gvn(new LoadNode(mem(),over,"_",err));
       // Call the operator
       n = do_call(errMsgs(oldx,oldx),args(Node.pop(e0idx),fun));
     } else {
@@ -843,19 +835,15 @@ public class Parse implements Comparable<Parse> {
             return err_ctrl2("Missing stmt after assigning field '."+tok+"'");
           Parse bad = errMsg(fld_start);
           int nidx = n.push();
-          int cidx = castnn.push();
-          Node ld = gvn(new LoadNode(mem(),castnn,null));
-          Node sf = gvn(new SetFieldNode(tok,fin,ld,n,bad));
-          scope().replace_mem( new StoreNode(mem(),Node.pop(cidx),sf,bad));
+          scope().replace_mem( new StoreNode(mem(),castnn,n,tok,fin,bad));
           return Node.pop(nidx);
         } else {
           boolean is_oper = Oper.is_oper(tok);
           Parse bad = errMsg(fld_start);
           int cidx = castnn.push();
-          Node ld = gvn(new LoadNode(mem(),castnn,bad));
           // Using a plain underscore for the field name is a Resolving field.
           // If an oper load, then load from the clazz and not local struct.
-          Node fd = gvn(new FieldNode(ld,tok/*,is_oper*/,bad)); // Dunno if not oper, should be clz or not
+          Node fd = gvn(new LoadNode(mem(),castnn,tok,bad));
           // Loading an explicit Oper-name field Binds late (now), and
           // binds on the loaded overload.
           castnn = Node.pop(cidx);
@@ -945,28 +933,22 @@ public class Parse implements Comparable<Parse> {
     // Now properly load from the display.
     Parse bad = errMsg();
     Node ptr = get_display_ptr(scope);
-    Node ld = gvn(new LoadNode(mem(),ptr,bad));
-    int ld_x = ld.push();
-    Node fd = gvn(new FieldNode(ld,tok,bad)); // Since field is mutating, not in clz
+    Node fd = gvn(new LoadNode(mem(),ptr,tok,bad));
     if( fd.is_forward_ref() )    // Prior is actually a forward-ref
       return err_ctrl1(ErrMsg.forward_ref(this,(FunPtrNode)fd));
     Node n = gvn(new FreshNode(fd,_e));
     int nidx = n.push();
     // Do a full lookup on "+", and execute the function
     // Get the overloaded operator field, always late binding
-    Node clz = gvn(new LoadNode(mem(),n,bad));
-    Node overplus = gvn(new FieldNode(clz,"_+_",bad)); // Plus operator overload
-    // Load tuple of primitive choices
-    Node tuple = gvn(new LoadNode(mem(),overplus,bad));
-    Node plus = gvn(new FieldNode(tuple,"_",bad)); // Resolve overload
+    Node overplus = gvn(new LoadNode(mem(),n,"_+_",bad));
+    // Resolve primitive choices
+    Node plus = gvn(new LoadNode(mem(),overplus,"_",bad));
     Node inc = con(TypeInt.con(d));
+    // Add
     Node sum = do_call0(true,errMsgs(_x-2,_x,_x), args(Node.peek(nidx),inc,plus));
-    Node stf = gvn(new SetFieldNode(tok,Access.RW,Node.peek(ld_x),sum,bad));
-    // Active memory for the chosen scope, after the call to plus
-    scope().replace_mem(new StoreNode(mem(),ptr,stf,bad));
-    n = Node.pop(nidx);
-    Node.pop(ld_x).add_flow();  // No longer need
-    return n;                   // Return pre-increment post-fresh value
+    // Store result back
+    scope().replace_mem(new StoreNode(mem(),ptr,sum,tok,Access.RW,bad));
+    return Node.pop(nidx);      // Return pre-increment post-fresh value
   }
 
 
@@ -1050,11 +1032,8 @@ public class Parse implements Comparable<Parse> {
     // Display/struct/scope containing the field
     Node dsp = get_display_ptr(scope);
     
-    // Load the display/scope structure
-    Node ld = gvn(new LoadNode(mem(),dsp,bad));
-
-    // Load the resolved field from the struct.
-    Node fd = gvn(new FieldNode(ld,tok,bad)); // Dunno clazz or not
+    // Load the resolve field from the display/scope structure
+    Node fd = gvn(new LoadNode(mem(),dsp,tok, bad));
 
     // If in the middle of a definition (e.g. a HM Let, or recursive assign)
     // then no Fresh per normal HM rules.  If loading from normal Lambda
@@ -1078,7 +1057,7 @@ public class Parse implements Comparable<Parse> {
     Node ptr = gvn(new NewNode());
     nn = (StructNode)init(Node.pop(sidx));
     int pidx = ptr.push();
-    set_mem(gvn(new StoreNode(mem(),ptr,nn,bad)));
+    set_mem(gvn(new StoreXNode(mem(),ptr,nn,bad)));
     return Node.pop(pidx);
   }
   private void _tuple(int oldx, Node s, Parse bad, StructNode nn) {
@@ -1346,10 +1325,10 @@ public class Parse implements Comparable<Parse> {
     StructNode scon = new StructNode(0,false,bad, Type.ALL);
     scon.add_fld(".",Access.Final,PrimNode.ZSTR,bad);
     scon.add_fld("0",Access.Final,con(TypeInt.con(str.charAt(0))),bad);
-    Node scon1 = gvn(scon.close());
+    StructNode scon1 = (StructNode)gvn(scon.close());
     Node ptr = new NewNode().init();
     int nidx = ptr.push();
-    set_mem( gvn(new StoreNode(mem(),ptr,scon1,bad)) );
+    set_mem( gvn(new StoreXNode(mem(),ptr,scon1,bad)) );
     return Node.pop(nidx);
   }
 
@@ -1622,10 +1601,7 @@ public class Parse implements Comparable<Parse> {
     Node mmem = mem();
     while( true ) {
       if( scope == e._scope ) return ptr;
-      Node dsp = gvn(new LoadNode(mmem,ptr,null)); // Gen linked-list walk code, walking display slot
-      while( dsp instanceof SetFieldNode ) // Bypass partial frame updates
-        dsp = dsp.in(0); // Never set the display, so bypass
-      ptr = gvn(new FieldNode(dsp,"^",null)); // Not clz, this is an instance field up-link
+      ptr = gvn(new LoadNode(mmem,ptr,"^",null)); // Gen linked-list walk code, walking display slot
       e = e._par;                                 // Walk linked-list in parser also
     }
   }

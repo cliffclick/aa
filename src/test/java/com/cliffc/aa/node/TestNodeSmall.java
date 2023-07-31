@@ -489,7 +489,7 @@ public class TestNodeSmall {
     ConNode dsp_prims = new ConNode<>(TypeMemPtr.DISP_SIMPLE).init();
     StructNode dsp_file = new StructNode(1,false,null,Type.ALL).add_fld("^",Access.Final,dsp_prims,null).init();
     NewNode dsp_file_ptr = new NewNode().init();
-    Node dsp_file_mem = new StoreNode(mem,dsp_file_ptr,dsp_file,null).init();
+    Node dsp_file_mem = new StoreXNode(mem,dsp_file_ptr,dsp_file,null).init();
     // Function header with nargs
     FunNode fun = new FunNode("fact",ARG_IDX).add_def(ctl).init();
     // Parms for the Fun.  Note that the default type is "weak" because the
