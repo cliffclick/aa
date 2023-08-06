@@ -119,10 +119,11 @@ public class CallNode extends Node {
   // Set arguments
   void set_xmem() { set_def(MEM_IDX, Env.ANY); }
   void set_xarg(int idx) { assert idx>=DSP_IDX && idx <nargs();  set_def(idx, Env.ANY); }
-  void set_fdx(Node fun) {
+  CallNode set_fdx(Node fun) {
     assert fun._val instanceof TypeFunPtr;
     set_def(nargs(), fun);
     xval();                     // Recompute value
+    return this;
   }
 
   // Add a bunch of utilities for breaking down a Call.value tuple:
@@ -214,6 +215,10 @@ public class CallNode extends Node {
       return set_def(0,Env.XCTRL);
     }
 
+    // Call can skip a direct BindFP to the source of the FP itself
+    if( fdx() instanceof BindFPNode bind && bind.fp()._val instanceof TypeFunPtr  )
+      return set_fdx(bind.fp());
+    
     // Have some sane function choices?
     TypeFunPtr tfp  = ttfp(tcall);
     BitsFun fidxs = tfp.fidxs();
@@ -327,12 +332,16 @@ public class CallNode extends Node {
     return TypeTuple.make(ts);
   }
 
+  @Override public Type live() {
+    return _is_copy ? _live : super.live();
+  }
+
   static final Type FP_LIVE = TypeStruct.UNUSED.add_fldx(TypeFld.make("fp",Type.ALL));
   @Override public Type live_use( int i ) {
     Node def = in(i);
     if( _is_copy ) return def._live;
     boolean is_keep = is_keep();
-    if( i==CTL_IDX ) return Type.ALL;
+    if( i==CTL_IDX ) return def.is_mem() ? TypeMem.ALLMEM : Type.ALL;
     if( i==MEM_IDX ) return is_keep || _live==Type.ALL ? RootNode.def_mem(def) : _live;
     if( i==nargs() ) return _unpacked ? FP_LIVE : Type.ALL;
     if( !_unpacked ) return TypeStruct.ISUSED;

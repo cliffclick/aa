@@ -50,13 +50,14 @@ public abstract class PrimNode extends Node {
     _badargs=null;
   }
 
-  public static final StructNode ZCLZ = new StructNode(0,false,null, Type.ALL);
 
   // Int/Float/String primitives.
+  public static final StructNode ZCLZ = new StructNode(0,false,null, Type.ALL);
   public static final StructNode ZINT = new StructNode(0,false,null, Type.ALL);
   public static final StructNode ZFLT = new StructNode(0,false,null, Type.ALL);
   public static final StructNode ZSTR = new StructNode(0,false,null, Type.ALL);
   public static final StructNode ZMATH= new StructNode(0,false,null, Type.ALL);
+  public static final NewNode PCLZ = new NewNode(BitsAlias.CLZX,true);
   public static final NewNode PINT = new NewNode(BitsAlias.INTX,true);
   public static final NewNode PFLT = new NewNode(BitsAlias.FLTX,true);
   public static final NewNode PSTR = new NewNode(BitsAlias.STRX,true); // String clazz, not strings
@@ -89,7 +90,7 @@ public abstract class PrimNode extends Node {
     PrimNode[][] FLTS = new PrimNode[][]{
       //{ new AddF64(), new AddFI64() },
       //{ new SubF64(), new SubFI64() },
-      //{ new MulF64(), new MulFI64() },
+      { new MulF64(), new MulFI64() },
       //{ new DivF64(), new DivFI64() },
       //{ new LT_F64(), new LT_FI64() },
       //{ new GE_F64(), new GE_FI64() },
@@ -129,6 +130,7 @@ public abstract class PrimNode extends Node {
 
     // ClazzClazz
     ZCLZ.close();
+    PCLZ.init();
 
     // Gather
     Ary<PrimNode> allprims = new Ary<>(others);
@@ -237,7 +239,7 @@ public abstract class PrimNode extends Node {
 
   // Make and install a primitive Clazz.
   private static void make_prim( StructNode clz, String clzname, NewNode ptr, PrimNode[][] primss ) {
-    clz.add_fld(TypeFld.CLZ,Access.Final,ZCLZ,null);
+    clz.add_fld(TypeFld.CLZ,Access.Final,PCLZ,null);
     for( PrimNode[] prims : primss ) {
       // Primitives are grouped into overload groups, where the 'this' or
       // display argument is always of the primitive type, and the other

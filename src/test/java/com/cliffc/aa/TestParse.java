@@ -32,7 +32,7 @@ public class TestParse {
     DO_HMT=false;
     RSEED=0;
     //test("1+2*3", "int:7", "int:7");
-    test("sq = { x -> x*x }; (sq(2),sq(2.2))","*[14](4,4.64)","*[14](int64,flt64)", null, null, "[14]", null);
+    test("sq = { x -> x*x }; (sq(2),sq(2.2))","*[15](int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(2),fact(2.2))","*[14](nil,1,2)","*[14](int64,int64,int64)", null, null, "[14]", null);
   }
 

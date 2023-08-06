@@ -190,6 +190,7 @@ public class Env implements AutoCloseable {
   // Record global static state for reset
   private static void record_for_reset() {
     Node.init0(); // Record end of primitives
+    TV3.init0();
     GVN.init0();
     FunNode.init0();
     NewNode.init0();

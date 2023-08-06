@@ -22,19 +22,27 @@ public class StoreXNode extends StoreAbs {
     return tm.update(tmp,tvs);
   }
 
-  @Override TypeMem _live_use( TypeMem live0, TypeMemPtr tmp ) {
+  @Override Type _live_use( TypeMem live0, TypeMemPtr tmp, int i ) {
+    TypeMem live1;
     if( tmp.above_center() ) {
       throw unimpl();
-    } else {
-      // Constant ptr, so precise update
-      if( tmp.is_con() ) {
-        TypeStruct ts = rez()._val instanceof TypeStruct ts0 ? ts0.flatten_live_fields() : rez()._val.oob(TypeStruct.ISUSED);
-        return live0.update(tmp,ts);
-      } else {
-        // Imprecise update; everything remains live
-        return live0;
-      }
-    }    
+    } else if( tmp.is_con() ) { // Constant ptr, so precise update
+      TypeStruct ts = rez()._val instanceof TypeStruct ts0 ? ts0.flatten_live_fields() : rez()._val.oob(TypeStruct.ISUSED);
+      live1 = live0.update(tmp,ts);
+    } else {                    // Imprecise update; everything remains live
+      live1 = live0;
+    }
+    // Asking for live-in, give it
+    if( i==1 ) return live1;
+    // Struct live passes through
+    TypeStruct luse = live0.ld(tmp);
+    if( i==3 ) return luse;
+    assert i==2;                // Address live
+    return luse.oob();          // Address is ANY/ALL
+  }
+
+  @Override TypeMem _live_kill(TypeMemPtr tmp) {
+    throw unimpl();
   }
 
   // Is this Store alive, based on given liveness?
@@ -44,22 +52,33 @@ public class StoreXNode extends StoreAbs {
   @Override public TV3 _set_tvar() {
     assert rez()!= Env.ANY; // Did not clear out during iter; return mem().tvar()
 
-    // Demands rez is a struct
-    TV3 rez = rez().set_tvar();    TVStruct stz;
-    if( rez instanceof TVStruct stz0 ) stz = stz0;
-    else rez.unify(stz = new TVStruct(true),false);
+    // Address is a ptr to a struct
+    TV3 adr = adr().set_tvar();
+    TVPtr ptr = adr instanceof TVPtr ptr0 ? ptr0 : new TVPtr(BitsAlias.EMPTY, new TVStruct(true));
+    adr.unify(ptr,false);
 
-    // Demands address is a ptr to above struct.
-    TV3 adr = adr().set_tvar();    TVPtr ptr;
-    if( adr instanceof TVPtr ptr0 ) (ptr=ptr0).load().unify(stz,false);
-    else adr.unify(ptr=new TVPtr(BitsAlias.EMPTY,stz),false);
-    assert ptr.aliases()!=BitsAlias.NALL;
+    // Result must be the struct
+    TVStruct stz = ptr.load();
+    rez().set_tvar().unify(stz,false);    
     
     return null;
   }
 
   @Override public boolean unify( boolean test ) {
-    TVPtr ptr = (TVPtr)adr().tvar();
-    return unify(ptr.aliases(),rez().tvar(),test);
+    TVPtr   ptr = (TVPtr   )adr().tvar();
+    TVStruct ts = (TVStruct)rez().tvar();
+    return unify(ptr.aliases(),ts,test);
   }
+  public static final boolean unify( BitsAlias aliases, TVStruct ts, boolean test ) {
+    assert aliases!=BitsAlias.NALL;
+    boolean progress = false;
+    for( int alias : aliases ) {
+      // Each alias unifies into the global field state
+      TVPtr nptr = (TVPtr)(NewNode.get(alias)).tvar();
+      progress |= nptr.load().unify(ts,test);
+      if( test && progress ) return true;
+    }
+    return progress;
+  }
+
 }

@@ -95,9 +95,12 @@ public class NewNode extends Node {
   @Override public @NotNull NewNode copy(boolean copy_edges) {
     // Split the original '_alias' class into 2 sub-aliases
     assert !_tptr.is_con();
+    NEWS.set(_alias,null);
     NewNode nnn = (NewNode)super.copy(copy_edges);
     nnn .set_alias(BitsAlias.new_alias(_alias),false); // Children alias classes, split from parent
     this.set_alias(BitsAlias.new_alias(_alias),false); // The original NewNode also splits from the parent alias
+    NEWS.setX(nnn ._alias,nnn );
+    NEWS.setX(this._alias,this);
     Env.GVN.add_flow(this);     // Alias changes flow
     return nnn;
   }

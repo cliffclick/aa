@@ -3,11 +3,10 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.TV3;
-import com.cliffc.aa.tvar.TVPtr;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.MEM_IDX;
 
 // Store a value into a named struct field.  Does it's own nil-check and value
 // testing; also checks final field updates.
@@ -51,25 +50,21 @@ public abstract class StoreAbs extends Node {
     // Pointer, which memory we might kill
     TypeMemPtr tmp = adr()._val instanceof TypeMemPtr tmp0 ? tmp0 : adr()._val.oob(TypeMemPtr.ISUSED);
     if( tmp.above_center() ) {
+      if( i!=MEM_IDX ) return Type.ANY;
       if( tmp._aliases==BitsAlias.NANY ) return TypeMem.ANYMEM; // High, killing all
       // Kill specific structs or fields
-      throw unimpl();
+      return _live_kill(tmp);
     }
+    adr().deps_add(in(i));
     
     // Liveness as a TypeMem.  If current liveness is the default ALL, go ahead
     // an upgrade to RootNodes global default - which globally excludes kills.
     TypeMem live0 = _live== Type.ALL ? RootNode.def_mem(this) : (TypeMem)_live;
-
-    // Compute live-in
-    TypeMem live1 = _live_use(live0,tmp);
-
-    // Asking for live-in, give it
-    if( i==1 ) return live1;
-    // For ptr or rez, if making a liveness change, they must be live
-    assert i==2 || i==3;
-    return live0==live1 ? Type.ANY : Type.ALL;
+    // Specific live-use varies from field-vs-struct
+    return _live_use(live0,tmp,i);
   }
-  abstract TypeMem _live_use( TypeMem live0, TypeMemPtr tmp );
+  abstract Type _live_use( TypeMem live0, TypeMemPtr tmp, int i );
+  abstract TypeMem _live_kill(TypeMemPtr tmp);
   
   @Override public Node ideal_reduce() {
     if( is_prim() ) return null;
@@ -94,11 +89,11 @@ public abstract class StoreAbs extends Node {
 
     // Store of a Store, same address
     if( mem instanceof StoreNode st ) {
-      throw unimpl();
-//      Node adr0 = st.adr();
+      Node adr0 = st.adr();
 //      if( adr  instanceof FreshNode f ) adr  = f.id();
 //      if( adr0 instanceof FreshNode f ) adr0 = f.id();
-//      if( adr == adr0 ) {
+      if( adr == adr0 ) {
+        throw unimpl();
 //        // Do not bypass a parallel writer
 //        if( st.check_solo_mem_writer(this) &&
 //            // And liveness aligns
@@ -113,9 +108,9 @@ public abstract class StoreAbs extends Node {
 //        } else {
 //          mem.deps_add(this);    // If become solo writer, check again
 //        }
-//      } else {
-//        st.adr().deps_add(this);      // If address changes, check again
-//      }
+      } else {
+        st.adr().deps_add(this);      // If address changes, check again
+      }
     }
 
     // Store of a Load
@@ -143,19 +138,7 @@ public abstract class StoreAbs extends Node {
   // Given a tptr, trez:
   //    ptr.load().unify(rez)
   @Override public boolean has_tvar() { return true; }
-
-  static public final boolean unify( BitsAlias aliases, TV3 tv, boolean test ) {
-    assert aliases!=BitsAlias.NALL;
-    boolean progress = false;
-    for( int alias : aliases ) {
-      // Called from set_tvar and tvar, so has to init-check
-      NewNode nn = NewNode.get(alias);
-      if( nn._tvar==null ) nn.set_tvar();
-      progress |= ((TVPtr)nn.tvar()).load().unify(tv,test);
-    }
-    return progress;
-  }
-
+ 
   @Override public ErrMsg err( boolean fast ) {
     Type tadr = adr()._val;
     Type tmem = mem()._val;

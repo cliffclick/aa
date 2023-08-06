@@ -418,13 +418,11 @@ public class TVStruct extends TVExpanding {
       }
     }
     // Print clazz field up front.
-    if( clz!=null ) clz._str(sb,visit,dups,debug,prims).p(":");    
     boolean is_tup = is_tup(debug), once=_open;
     sb.p(is_tup ? "(" : "@{");
     for( int idx : sorted_flds() ) {
       if( !debug && Util.eq("^",_flds[idx]) ) continue; // Displays are private by default
       if( !debug && Resolvable.is_resolving(_flds[idx]) ) continue;
-      if( Util.eq(TypeFld.CLZ,_flds[idx]) ) continue; // CLZ already printed up front
       if( !is_tup ) {                         // Skip tuple field names
         sb.p(_flds[idx]);
         sb.p("= ");

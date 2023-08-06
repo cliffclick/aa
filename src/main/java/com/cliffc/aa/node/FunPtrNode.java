@@ -115,6 +115,7 @@ public final class FunPtrNode extends Node {
     RetNode ret = ret();
     Node rez = ret.rez();
     if( rez==null ) return new TVLeaf(); // Happens for broken Lambdas
+    add_flow();
     Node dsp  = ret.fun().parm(DSP_IDX);
     TV3 tdsp  = dsp == null ? new TVLeaf() : dsp.set_tvar();
     return new TVLambda(nargs(),tdsp,rez.set_tvar());

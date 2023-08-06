@@ -1,7 +1,11 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
+import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.TVPtr;
+import com.cliffc.aa.tvar.TVStruct;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.unimpl;
@@ -17,74 +21,31 @@ public class StoreNode extends StoreAbs {
     _fld = fld;
     _fin = fin;
   }
+  @Override public String xstr() { return "."+_fld+"="; }   // Self short name
 
   
   @Override Type _value( TypeMem tm, TypeMemPtr tmp ) {
     return tm.update(tmp,TypeFld.make(_fld,rez()._val,_fin));
   }
 
-  @Override TypeMem _live_use( TypeMem live0, TypeMemPtr tmp ) {
+  @Override Type _live_use( TypeMem live0, TypeMemPtr tmp, int i ) {
     assert !tmp.above_center();
     // Not a precise store, so no kills
-    if( !tmp.is_con() ) return live0;
-
+    if( !tmp.is_con() ) {
+      // Asking for live-in, give it
+      if( i==1 ) return live0;
+      TypeStruct luse = live0.ld(tmp);
+      assert i==2 || i==3;        // Address & value live
+      return luse.oob();          // Address is ANY/ALL
+    }
     
     throw unimpl();
   }
+  
+  @Override TypeMem _live_kill(TypeMemPtr tmp) {
+    return ((TypeMem)_live).kill(tmp._aliases,_fld);
+  }
 
-//  // Compute the liveness local contribution to def's liveness.  Turns around
-//  // value into live: if values are ANY then nothing is demand-able.
-//  @Override public Type live_use( int i ) {
-//    Node def = in(i);
-//    // Liveness as a TypeMem
-//    TypeMem live = _live== Type.ALL ? RootNode.def_mem(def) : (TypeMem)_live;
-//    // Input memory as a TypeMem
-//    Type mem0 = mem()._val;
-//    TypeMem mem = mem0== Type.ANY ? TypeMem.ANYMEM
-//      : (mem0== Type.ALL ? TypeMem.ALLMEM
-//         : (TypeMem)mem0);
-//    TypeMemPtr tmp = adr()._val instanceof TypeMemPtr tmp0 ? tmp0 : adr()._val.oob(TypeMemPtr.ISUSED);
-//
-//    // Liveness for memory?
-//    if( i==MEM_IDX ) {
-//      adr().deps_add(def);
-//      // Assume all above center aliases kill everything (will optimistically
-//      // kill what we need) to make uses go away
-//      if( tmp._aliases.above_center() ) {
-//        for( int alias : tmp._aliases )
-//          live = live.set(alias,TypeStruct.UNUSED);
-//        return live;
-//      }
-//      mem().deps_add(def);
-//      // Precise update if it's a single alias, and no value at alias is
-//      // arriving here OR directly storing from the NewNode.
-//      Node adr = adr();
-//      if( adr instanceof FreshNode frsh ) adr = frsh.id();
-//      int alias = tmp._aliases.abit();
-//      if( adr instanceof NewNode nnn && (tmp._aliases.is_empty() || nnn._alias==alias) )
-//        return live.set(nnn._alias,TypeStruct.UNUSED); // Precise set, no longer demanded
-//
-//      // Since empty can fall to any single precise alias, we need to assume
-//      // all things are not demanded until one or more aliases show up.
-//      if( tmp._aliases.is_empty() ) {
-//        for( int ax=1; ax<mem.len(); ax++ )
-//          if( mem.at(ax).above_center() )
-//            live = live.set(ax,TypeStruct.UNUSED);
-//      } else {
-//        if( alias!=-1 && mem.at(alias).above_center() )
-//          return live.set(alias,TypeStruct.UNUSED); // Precise set, no longer demanded
-//      }
-//      // Imprecise update, cannot dataflow kill alias going backwards
-//      return live;
-//    }
-//    // Address changes liveness, the rez can be more live
-//    if( rez()!=null ) adr().deps_add(rez());
-//
-//    // Demanded struct; if ptr just any/all else demand struct
-//    TypeStruct ts = live.ld(tmp);
-//    return i==CTL_IDX ? ts.oob() : ts;
-//  }
-//
 
   // Is this Store alive, based on given liveness?
   // Depends on the field
@@ -185,47 +146,40 @@ public class StoreNode extends StoreAbs {
 //      return null;
 //    return st;
 //  }
-//
-//
-//  // Given a tptr, trez:
-//  //    ptr.load().unify(rez)
-//  @Override public boolean has_tvar() { return true; }
-//  @Override public TV3 _set_tvar() {
-//    assert rez()!=null; // Did not clear out during iter; return mem().tvar()
-//
-//    //TV3 tmem = mem().set_tvar();   TVMem mem;
-//    //if( tmem instanceof TVMem mem0 ) mem = mem0;
-//    //else tmem.unify(mem = new TVMem(),false);
-//
-//    TV3 rez = rez().set_tvar();    TVStruct stz;
-//    if( rez instanceof TVStruct stz0 ) stz = stz0;
-//    else rez.unify(stz = new TVStruct(true),false);
-//    
-//    TV3 adr = adr().set_tvar();    TVPtr ptr;
-//    if( adr instanceof TVPtr ptr0 ) (ptr=ptr0).load().unify(stz,false);
-//    else adr.unify(ptr=new TVPtr(BitsAlias.EMPTY,stz),false);
-//    assert ptr.aliases()!=BitsAlias.NALL;
-//    
-//    //return mem;
-//    return null;
-//  }
-//
-//  @Override public boolean unify( boolean test ) {
-//    TVPtr ptr = (TVPtr)adr().tvar();
-//    return unify(ptr.aliases(),rez().tvar(),test);
-//  }
-//  static public boolean unify( BitsAlias aliases, TV3 tv, boolean test ) {
-//    assert aliases!=BitsAlias.NALL;
-//    boolean progress = false;
-//    for( int alias : aliases ) {
-//      // Called from set_tvar and tvar, so has to init-check
-//      NewNode nn = NewNode.get(alias);
-//      if( nn._tvar==null ) nn.set_tvar();
-//      progress |= ((TVPtr)nn.tvar()).load().unify(tv,test);
-//    }
-//    return progress;
-//  }
-//
+
+  @Override public TV3 _set_tvar() {
+    assert rez()!= Env.ANY; // Did not clear out during iter; return mem().tvar()
+
+    // Address is a ptr to a struct
+    TV3 adr = adr().set_tvar();
+    TVPtr ptr = adr instanceof TVPtr ptr0 ? ptr0 : new TVPtr(BitsAlias.EMPTY, new TVStruct(true));
+    adr.unify(ptr,false);
+    // The struct
+    TVStruct ts = ptr.load();
+    // Add/unify field into struct
+    TV3 fld = rez().set_tvar();
+    TV3 xfld = ts.arg(_fld);
+    if( xfld==null ) ts.add_fld(_fld,fld,false);
+    else             fld.unify(xfld,false);
+    return null;
+  }
+
+  @Override public boolean unify( boolean test ) {
+    TVPtr ptr = (TVPtr)adr().tvar();
+    TV3 fld = rez().tvar();
+    BitsAlias aliases = ptr.aliases();
+    assert aliases!=BitsAlias.NALL;
+    boolean progress = false;
+    for( int alias : aliases ) {
+      // Each alias unifies into the global field state
+      TVPtr nptr = (TVPtr)NewNode.get(alias).tvar();
+      TV3 xfld = nptr.load().arg(_fld);
+      progress |= fld.unify(xfld,test);
+      if( test && progress ) return true;
+    }
+    return progress;
+  }
+
   @Override public ErrMsg err( boolean fast ) {
     ErrMsg err = super.err(fast);
     if( err!=null ) return err;

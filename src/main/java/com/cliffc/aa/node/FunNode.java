@@ -212,7 +212,7 @@ public class FunNode extends Node {
     pmem.deps_add(def);
     if( !(pmem._live instanceof TypeMem mem) ) return Type.ANY;
     // Pass through mem liveness
-    return mem.remove(RootNode.KILL_ALIASES);
+    return mem.kill(RootNode.KILL_ALIASES);
   }
 
   // ----
@@ -298,7 +298,15 @@ public class FunNode extends Node {
       // As a special case for H-M, always clone uses of nil constants.
       // These need private H-M variables to support polymorphic nil-typing.
       if( n instanceof ConNode && ((ConNode)n)._t==TypeNil.XNIL ) freached.tset(n._uid);
-      if( !freached.get (n._uid) ) continue; // Not reached from fcn top
+      if( !freached.get (n._uid) ) { // Not reached from fcn top
+        // Still clone in function body, if only used in function body
+        if( n._defs.len() > 0 ) continue;
+        boolean external_use=false;
+        for( Node use : n._uses )
+          if( !freached.get(use._uid) )
+            { external_use=true; break; }
+        if( external_use ) continue;         // Uses from outside function
+      }                                      // All uses are function-internal
       if(  breached.tset(n._uid) ) continue; // Already visited?
       body.push(n);                          // Part of body
       work.addAll(n._defs);                  // Visit all defs
@@ -517,7 +525,8 @@ public class FunNode extends Node {
 
     // Look for wired new not-recursive CallEpis; these will have an outgoing
     // edge to some other RetNode, but the Call will not be wired.  Wire.
-    for( Node nn : map.values() ) {
+    for( Node n : map.keySet() ) {
+      Node nn = map.get(n);
       if( nn instanceof CallEpiNode ncepi ) {
         CallNode ncall = ncepi.call();
         for( int i=0; i<ncepi.nwired(); i++ ) {
@@ -529,7 +538,8 @@ public class FunNode extends Node {
             } else ((RootNode)xxxret).add_def(ncall);
           }
         }
-        assert ncepi.is_CG(true);
+        assert ((CallEpiNode)n).is_CG(false) && ncepi.is_CG(false);
+        assert ((CallEpiNode)n).is_CG(true ) == ncepi.is_CG(true);
       }
       // Find assert -> parm -> fun.
       // Move errors to the single unique caller arg.

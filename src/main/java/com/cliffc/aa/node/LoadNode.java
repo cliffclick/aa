@@ -46,7 +46,7 @@ public class LoadNode extends Node implements Resolvable {
     super(OP_LOAD,null,mem,adr);
     _fld = resolve_fld_name(fld);
     _bad = bad;
-    _live_use = TypeStruct.UNUSED.add_fldx(TypeFld.make(_fld));
+    _live_use = TypeStruct.UNUSED.add_fldx(TypeFld.make(_fld,Type.ALL));
   }
   // A plain "_" field is a resolving field
   private String resolve_fld_name(String fld) { return Util.eq(fld,"_") ? ("&"+_uid).intern() : fld; }
@@ -75,9 +75,9 @@ public class LoadNode extends Node implements Resolvable {
     Type tmem = mem()._val;
 
     if( !(tadr instanceof TypeNil ta) || (tadr instanceof TypeFunPtr) )
-      return tadr.oob(TypeNil.SCALAR); // Not an address
+      return tadr.oob(); // Not an address
     if( !(tmem instanceof TypeMem tm) )
-      return tmem.oob(TypeNil.SCALAR); // Not a memory
+      return tmem.oob(); // Not a memory
     if( ta==TypeNil.NIL || ta==TypeNil.XNIL )
       ta = (TypeNil)ta.meet(PrimNode.PINT._val);
 
@@ -122,7 +122,7 @@ public class LoadNode extends Node implements Resolvable {
   // The only memory required here is what is needed to support the Load.
   // If the Load is alive, so is the address.
   @Override public Type live_use( int i ) {
-    assert _live==Type.ALL;
+    //assert _live==Type.ALL;
     Type adr = adr()._val;
     // Since the Load is alive, the address is alive
     if( i!=MEM_IDX ) return Type.ALL;
@@ -333,9 +333,10 @@ public class LoadNode extends Node implements Resolvable {
     TV3 ptr1 = ptr0;            // TODO: error might already be a Ptr or Struct
     TVStruct tstr=null;
     if( ptr1 instanceof TVLeaf ) {
+      assert !(ta instanceof TypeStruct); // TODO: Remove all this, and fold into set_tvar
       if( ta instanceof TypeStruct ) {
-        //TV3 tstr = TV3.from_flow(ta);
-        progress = ptr1.unify(tstr=new TVStruct(true),test);
+        tstr = (TVStruct)TV3.from_flow(ta);
+        progress = ptr1.unify(tstr,test);
       } else if( ta instanceof TypeMemPtr ) {
         throw unimpl();         // Force ptr
       } if( ta == TypeNil.NIL || ta == TypeNil.XNIL ) {

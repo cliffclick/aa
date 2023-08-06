@@ -782,6 +782,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       //   FA:x:=7;    // x:=7 and DUP FA
       //       :=7     // 0:=7
       //   FA: :=7     // 0:=7 and DUP FA
+      //         int:7 // 0 =int:7
       if( fld_num!= -2 ) { //
         int oldx = _x;
         String lab = id_num();  // Might be a label, or a DUP or a DUP: or a type-prefix after field assignment
@@ -793,9 +794,11 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
           }
           // lab is a type-prefix or a 'DUP:'
           assert dup==null;
-          if( peek(':') ) return type(lab,any,fld_num);
-          Type t = _dups.get(lab);
-          if( t!=null ) { assert t instanceof TypeFld; return t; }
+          if( !(Util.eq(lab,"int") || Util.eq(lab,"flt")) ) {
+            if( peek(':') ) return type(lab,any,fld_num);
+            Type t = _dups.get(lab);
+            if( t!=null ) { assert t instanceof TypeFld; return t; }
+          }
         }
         assert dup==null;
         // lab is a type-prefix

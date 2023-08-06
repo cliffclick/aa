@@ -524,7 +524,7 @@ public class TypeMem extends Type<TypeMem> {
   
 
   // Everything in the 'escs' set is flattened to UNUSED.
-  public TypeMem remove(BitsAlias escs) {
+  public TypeMem kill(BitsAlias escs) {
     if( escs==BitsAlias.EMPTY ) return this;
     if( escs==BitsAlias.NALL  ) throw com.cliffc.aa.AA.unimpl(); // Shortcut
     // See if any changes
@@ -545,6 +545,29 @@ public class TypeMem extends Type<TypeMem> {
     return make0(_any,tos);
   }
 
+  // The fld in the alias set is flattened to set to ANY
+  public TypeMem kill(BitsAlias escs, String fld) {
+    assert escs.above_center();
+    assert _objs[1]==TypeStruct.UNUSED;
+    // See if any changes
+    boolean found=false;
+    for( int alias : escs ) {
+      TypeStruct ts = at(alias);
+      int idx = ts.find(fld);
+      if( idx!= -1 && at(idx) != Type.ANY )
+        { found=true; break; }
+    }
+    if( !found ) return this;
+    
+    TypeStruct[] tos = _objs.clone();
+    tos[0] = null;
+    for( int alias : escs )
+      if( alias < tos.length && tos[alias]!=null )
+        tos[alias] = tos[alias].kill(fld);
+    return make0(_any,tos);
+  }
+
+  
   // False if field is modifiable across any alias
   public boolean fld_not_mod( BitsAlias aliases, String name) {
     for( int alias : aliases ) {

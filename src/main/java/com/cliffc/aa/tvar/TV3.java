@@ -598,7 +598,7 @@ abstract public class TV3 implements Cloneable {
       : new TVLambda(tfp.nargs(),from_flow(tfp.dsp(),d),from_flow(tfp._ret,d));
     case TypeMemPtr tmp -> {
       TVStruct ts = (TVStruct)from_flow(tmp._obj,d);
-      StoreAbs.unify(tmp._aliases,ts,false);
+      StoreXNode.unify(tmp._aliases,ts,false);
       yield new TVPtr(tmp._aliases,ts);
     }
     case TypeStruct ts -> {
@@ -778,8 +778,13 @@ abstract public class TV3 implements Cloneable {
     } catch(CloneNotSupportedException cnse) {throw unimpl();}
   }
 
+  // Initial state after loading e.g. primitives.
+  public static int _INIT0_CNT = 99999;
+  public static void init0() {
+    _INIT0_CNT = CNT;
+  }
   public static void reset_to_init0() {
-    CNT=0;
+    CNT=_INIT0_CNT;
     TVField.reset_to_init0();
     TVStruct.reset_to_init0();
     TVExpanding.reset_to_init0();

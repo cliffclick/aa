@@ -592,7 +592,8 @@ public abstract class Node implements Cloneable, IntSupplier {
     TV3 old = _tvar;
     if( old==null ) return;
     if( _val == Type.ANY ) { /*tvar().deps_add_deep(this); */ return; } // No HM progress on untyped code
-    if( _live== Type.ANY && !has_call_use() ) // No HM progress on dead code
+    // No HM progress on dead code, except for Call uses; required to unify calls.
+    if( _live== Type.ANY && !has_call_use() ) 
       return;
     if( unify(false) ) {
       assert !_tvar.find().unify(old.find(),true);// monotonic: unifying with the result is no-progress
@@ -603,7 +604,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       for( Node use : _uses ) if(              use.has_tvar() ) use.add_flow();
     }
   }
-  private boolean has_call_use() { for( Node use : _uses ) if( use._op==OP_CALL ) return true; return false; }
+  private boolean has_call_use() { return this instanceof FunPtrNode; }
 
   // Return any type error message, or null if no error
   public ErrMsg err( boolean fast ) { return null; }

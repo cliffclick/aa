@@ -745,6 +745,14 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     return make_from(flds);
   }
 
+  TypeStruct kill( String fld ) {
+    int idx = find(fld);
+    if( idx == -1 ) return this;
+    TypeFld[] flds = TypeFlds.clone(_flds);
+    flds[idx] = TypeFld.make(fld,ANY);
+    return make_from(flds);
+  }
+  
   @Override public boolean is_con() {
     if( !_def.is_con() ) return false;
     for( TypeFld fld : _flds )
