@@ -168,7 +168,7 @@ public class Env implements AutoCloseable {
     // Promote forward refs to the next outer scope
     StructNode stk = _scope.stk();
     assert stk.is_closed();
-    stk.promote_forward( _par._scope.stk());
+    stk.promote_forward( _par._scope);
     for( String tname : _scope.typeNames() ) {
       TypeNil t = _scope.get_type(tname);
       //if( t.is_forward_type() )

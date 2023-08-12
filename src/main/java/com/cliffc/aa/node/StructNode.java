@@ -5,7 +5,6 @@ import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVErr;
-import com.cliffc.aa.tvar.TVLeaf;
 import com.cliffc.aa.tvar.TVStruct;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
@@ -106,8 +105,11 @@ public class StructNode extends Node {
   }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
-    return super.equals(o) && o instanceof StructNode rec &&
-      _closed==rec._closed &&
+    if( !(o instanceof StructNode rec) ||
+        // Open structs can expand in different ways, never equal
+        !_closed || !rec._closed || !super.equals(o) )
+      return false;
+    return 
       _flds.equals(rec._flds) &&
       _accesses.equals(rec._accesses) &&
       _def==rec._def;
@@ -170,7 +172,7 @@ public class StructNode extends Node {
   // first found in this scope are assumed to be defined in some outer scope
   // and get promoted.  Other locals are no longer kept alive, but live or die
   // according to use.
-  public void promote_forward( StructNode parent ) {
+  public void promote_forward( ScopeNode parent ) {
     assert parent != null;
     for( int i=0; i<_defs._len; i++ ) {
       if( in(i) instanceof ForwardRefNode fref && Util.eq(fref._name,fld(i))) {
@@ -181,15 +183,14 @@ public class StructNode extends Node {
           throw unimpl();        // TODO: Access input by field name
         } else {
           // Make field in the parent
-          if( !parent.is_prim() ) {
-            parent.add_fld(fref._name,TypeFld.Access.RW,fref,_fld_starts.at(i)).xval();
-            // Stomp field locally to load from parent
-            //FieldNode fld = new FieldNode(parent,fref._name,_fld_starts.at(i));
-            //fld._val = val(i);
-            //set_def(i,fld);
-            //Env.GVN.add_work_new(fld);
-            throw unimpl();
-          }
+          assert !parent.is_prim();
+          parent.stk().add_fld(fref._name,TypeFld.Access.RW,fref,_fld_starts.at(i)).xval();
+          // Stomp field locally to load from parent
+          LoadNode fld = new LoadNode(parent.mem(),parent.ptr(),fref._name,_fld_starts.at(i)).init();
+          fld._val = val(i);
+          set_def(i,fld);
+          parent.mem().xval();
+          Env.GVN.add_work_new(fld);
         }
       }
     }
@@ -250,14 +251,14 @@ public class StructNode extends Node {
 
   @Override public boolean has_tvar() { return true; }
 
-  // Used to close the cycle between the ints and flts
-  public void init_tvar() {
-    _tvar = new TVStruct(_flds);
-  }
 
   // Self is always @{flds...}
   @Override public TV3 _set_tvar() {
-    if( _tvar==null ) init_tvar();
+    if( _tvar==null )
+      // Must set _tvar before recursively calling set_tvar.  The primitive
+      // ClzClz gets a specific type which triggers asserts for everybody else,
+      // so uses a special constructor.
+      _tvar = this==PrimNode.ZCLZ ? TVStruct.make_clzclz() : new TVStruct(_flds);
     TVStruct ts = (TVStruct)_tvar;
     // Unify all fields
     for( int i=0; i<len(); i++ )

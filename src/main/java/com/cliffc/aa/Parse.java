@@ -2,10 +2,7 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.AryInt;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.Util;
+import com.cliffc.aa.util.*;
 
 import java.text.NumberFormat;
 import java.text.ParsePosition;
@@ -519,100 +516,44 @@ public class Parse implements Comparable<Parse> {
       _e = e._par;            // Pop nested environment
     };
 
+    // Find common set of new names
     ScopeNode f_scope = (ScopeNode)Node.pop(f_scope_x);
     ScopeNode t_scope = (ScopeNode)Node.pop(t_scope_x);
-
     StructNode f_stk = f_scope.stk();
     StructNode t_stk = t_scope.stk();
-
-    // Add offside missing field errors
     Parse bad = errMsg();
-
+    
     // Merge results
-    int rez_x;
-    ScopeNode scope = scope();
-    try( GVNGCM.Build<Node> X = Env.GVN.new Build<>() ) {
-      // Control-merge the trinary
-      Node r = set_ctrl(X.xform(new RegionNode(null,t_scope.ctrl(),f_scope.ctrl())));
-      // Mem-merge the trinary
-      PhiNode phi_mem = new PhiNode(TypeMem.ALLMEM,bad,r,t_scope.mem (),f_scope.mem ());
-      scope.set_def(MEM_IDX,null);
-      Node x_mem = X.xform(phi_mem);
-      //// Load the stack frame from above the trinary.
-      //// We will promote common vars to it.
-      //Node x_stk_now = X.xform(new LoadNode(x_mem,scope.ptr(),null));
-      //
-      //// Phi-merge result of the whole trinary
-      //Node rez = X.xform(new PhiNode(TypeNil.SCALAR,bad,r,t_scope.rez (),f_scope.rez ())) ; // Ifex result
-      //rez_x = rez.push();
-      //
-      //// Load the stack frames from each T/F side
-      //Node t_stk_now = X.xform(new LoadNode(t_scope.mem(),t_scope.ptr(),null));
-      //Node f_stk_now = X.xform(new LoadNode(f_scope.mem(),f_scope.ptr(),null));
-      //
-      //// Common variables are made Fresh on both sides, then Phi'd, then
-      //// exported to the stack frame.
-      //for( int i=1,j; i<t_stk.len(); i++ ) { // Walk true side, skip display
-      //  String fld = t_stk.fld(i);         // Field name
-      //  if( (j=f_stk.find(fld)) >= 0 ) {       // Variable is common to both
-      //    Node t_fsh = _fresh_field(X,t_stk_now,fld);
-      //    Node f_fsh = _fresh_field(X,f_stk_now,fld);
-      //    Access access = t_stk.access(i).meet(f_stk.access(j));
-      //    x_stk_now = _phi(X,r,t_fsh,f_fsh,fld,access,x_stk_now,bad);
-      //  }
-      //}
-      //
-      //// Vars in LHS not in RHS get an error
-      //for( int i=1; i<t_stk.len(); i++ ) { // Walk true side, skip display
-      //  String fld = t_stk.fld(i);         // Field name
-      //  if( f_stk.find(fld) == -1 ) {      // Missing in false side
-      //    Node t_var = _fresh_field(X,t_stk_now,fld);
-      //    Node f_var = _err_not_def(X,f_scope,fld,false,bad);
-      //    x_stk_now = _phi(X,r,t_var,f_var,fld,Access.bot(),x_stk_now,bad);
-      //  }
-      //}
-      //
-      //// Vars in RHS not in LHS get an error
-      //for( int i=1; i<f_stk.len(); i++ ) { // Walk false side, skip display
-      //  String fld = f_stk.fld(i);         // Field name
-      //  if( t_stk.find(fld) == -1 ) {      // Missing in true side
-      //    Node t_var = _err_not_def(X,t_scope,fld,true ,bad);
-      //    Node f_var = _fresh_field(X,f_stk_now,fld);
-      //    x_stk_now = _phi(X,r,t_var,f_var,fld,Access.bot(),x_stk_now,bad);
-      //  }
-      //}
-      //
-      //StoreNode post_mem = new StoreNode(x_mem,scope.ptr(),x_stk_now,null);
-      //scope.set_def(MEM_IDX,null);
-      //scope.set_mem(X.xform(post_mem));
-      //Env.GVN.revalive(x_mem,post_mem);
-      //
-      //Env.GVN.add_unuse(t_scope);
-      //Env.GVN.add_unuse(f_scope);
-      //Env.GVN.add_unuse(t_stk_now);
-      //Env.GVN.add_unuse(f_stk_now);
+    set_ctrl(new RegionNode(null,t_scope.ctrl(),f_scope.ctrl()).init());      
+
+    // Walk both sides and introduce error stores on 1-sided defs
+    for( int i=1; i<f_stk.len(); i++ ) {
+      String fld = f_stk.fld(i);
+      scope().stk().add_fld(fld,Access.RW,Env.ANY,null); // Promote name to top level
+      if( t_stk.find(fld)== -1 ) {
+        Node err = new ErrNode(f_scope.ctrl(),bad,"'"+fld+"' not defined on "+true+" arm of trinary").init();
+        t_scope.set_mem(new StoreNode(t_scope.mem(),t_scope.ptr(),err,fld,Access.RW,bad).init());        
+      }
     }
-    //Env.GVN.iter();
-    //return Node.pop(rez_x);
-    throw unimpl();
-  }
 
-  private Node _fresh_field(GVNGCM.Build<Node> X, Node stk_now, String fld) {
-    //Node val = X.xform(new FieldNode(stk_now,fld,null));  // Dunno clazz or not
-    //return X.xform(new FreshNode(val,_e));
-    throw unimpl();
-  }
+    for( int i=1; i<t_stk.len(); i++ ) {
+      String fld = t_stk.fld(i);
+      if( t_stk.find(fld)== -1 ) {
+        scope().stk().add_fld(fld,Access.RW,Env.ANY,null); // Promote name to top level
+        Node err = new ErrNode(t_scope.ctrl(),bad,"'"+fld+"' not defined on "+false+" arm of trinary").init();
+        f_scope.set_mem(new StoreNode(f_scope.mem(),f_scope.ptr(),err,fld,Access.RW,bad).init());        
+      }
+    }
 
-  private Node _err_not_def(GVNGCM.Build<Node> X, ScopeNode scope, String fld, boolean side, Parse bad) {
-    String msg = "'"+fld+"' not defined on "+side+" arm of trinary";
-    return X.xform(new ErrNode(scope.ctrl(),bad,msg));
-  }
-  
-  private Node _phi(GVNGCM.Build<Node> X, Node r, Node t_var, Node f_var, String fld, Access access, Node x_stk_now, Parse bad) {
-    //Node phi = X.xform(new PhiNode(TypeNil.SCALAR,bad,r,t_var,f_var));
-    //scope().stk().add_fld(fld,Access.RW,con(TypeNil.NIL),null);
-    //return X.xform(new SetFieldNode(fld,access,x_stk_now,phi,bad));
-    throw unimpl();
+    set_mem (  new  PhiNode(TypeMem.ALLMEM,null,ctrl(),t_scope.mem (),f_scope.mem ()).init());    
+    Node rez = new  PhiNode(TypeNil.SCALAR,bad ,ctrl(),t_scope.rez (),f_scope.rez ()).init() ;
+    int rez_x = rez.push();
+
+    Env.GVN.add_unuse(f_scope);
+    Env.GVN.add_unuse(t_scope);
+
+    Env.GVN.iter();
+    return Node.pop(rez_x);
   }
   
   
@@ -866,7 +807,7 @@ public class Parse implements Comparable<Parse> {
         Node arg1 = stmts();
         args = (StructNode)Node.peek(aidx);
         // Parse rest of arguments
-        _tuple(oldx-1,arg1,errMsg(first_arg_start),args); // Parse argument list
+        _tuple(oldx-1,arg1,errMsg(first_arg_start),args,1); // Parse argument list
         args = (StructNode)init(Node.pop(aidx));
         n = Node.pop(nidx);                       // Function
         Parse[] badargs = args.fld_starts();      // Args from tuple
@@ -1053,16 +994,17 @@ public class Parse implements Comparable<Parse> {
     StructNode nn = new StructNode(0,false,errMsg(oldx), Type.ALL).init();
     Parse bad = errMsg(first_arg_start);
     int sidx = nn.push();
-    _tuple(oldx,s,bad,nn);
+    nn.add_fld(TypeFld.CLZ,Access.Final, PrimNode.PCLZ, null);
+    _tuple(oldx,s,bad,nn,0);
     Node ptr = gvn(new NewNode());
     nn = (StructNode)init(Node.pop(sidx));
     int pidx = ptr.push();
     set_mem(gvn(new StoreXNode(mem(),ptr,nn,bad)));
     return Node.pop(pidx);
   }
-  private void _tuple(int oldx, Node s, Parse bad, StructNode nn) {
+  private void _tuple(int oldx, Node s, Parse bad, StructNode nn, int fnum) {
     while( s!= null ) {         // More args
-      nn.add_fld((""+nn.len()).intern(),Access.Final,s,bad);
+      nn.add_fld((""+fnum++).intern(),Access.Final,s,bad);
       if( !peek(',') ) break;   // Final comma is optional
       skipWS();                 // Skip to arg start before recording arg start
       bad = errMsg();           // Record arg start

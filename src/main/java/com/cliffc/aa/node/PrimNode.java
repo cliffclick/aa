@@ -73,28 +73,28 @@ public abstract class PrimNode extends Node {
     // int opers
     PrimNode[][] INTS = new PrimNode[][]{
       { new AddI64(), new AddIF64() },
-      //{ new SubI64(), new SubIF64() },
+      { new SubI64(), new SubIF64() },
       { new MulI64(), new MulIF64() },
       //{ new DivI64(), new DivIF64() },
       //{ new LT_I64(), new LT_IF64() },
-      //{ new LE_I64(), new LE_IF64() },
+      { new LE_I64(), new LE_IF64() },
       //{ new GT_I64(), new GT_IF64() },
       //{ new GE_I64(), new GE_IF64() },
       //{ new EQ_I64(), new EQ_IF64() },
       //{ new NE_I64(), new NE_IF64() },
-      { new MinusI64() }, { new NotI64() }, { new ModI64() },
+      //{ new MinusI64() }, { new NotI64() }, { new ModI64() },
       //{ new AndI64() }, { new OrI64() },
       //{ new AndThen() }, { new OrElse() },
     };
 
     PrimNode[][] FLTS = new PrimNode[][]{
       //{ new AddF64(), new AddFI64() },
-      //{ new SubF64(), new SubFI64() },
+      { new SubF64(), new SubFI64() },
       { new MulF64(), new MulFI64() },
       //{ new DivF64(), new DivFI64() },
       //{ new LT_F64(), new LT_FI64() },
       //{ new GE_F64(), new GE_FI64() },
-      //{ new LE_F64(), new LE_FI64() },
+      { new LE_F64(), new LE_FI64() },
       //{ new GT_F64(), new GT_FI64() },
       //{ new EQ_F64(), new EQ_FI64() },
       //{ new NE_F64(), new NE_FI64() },
@@ -131,6 +131,7 @@ public abstract class PrimNode extends Node {
     // ClazzClazz
     ZCLZ.close();
     PCLZ.init();
+    ZCLZ.set_tvar();
 
     // Gather
     Ary<PrimNode> allprims = new Ary<>(others);
@@ -159,15 +160,11 @@ public abstract class PrimNode extends Node {
     while( (n0=Env.GVN.pop_flow())!= null ) {
       n0.xval();
       n0.xliv();
-
-      if( n0.has_tvar() ) {
-        if( n0._tvar==null ) n0.set_tvar();
-        else {
-          if( n0.unify(false) ) {
-            n0.add_flow_defs();
-            n0.add_flow_uses();
-          }
-        }
+      if( !n0.has_tvar() ) continue;
+      if( n0._tvar==null ) { n0.set_tvar(); continue; }
+      if( n0.unify(false) ) {
+        n0.add_flow_defs();
+        n0.add_flow_uses();
       }
     }
     assert Env.KEEP_ALIVE.walk((n,x) -> chk(n) ? x : x+1 )==0;
@@ -264,6 +261,7 @@ public abstract class PrimNode extends Node {
 
   // Build and install match package
   private static NewNode make_math(PrimNode rand) {
+    ZMATH.add_fld(TypeFld.CLZ,Access.Final,PCLZ,null);
     Node pi = con(TypeFlt.PI.wrap());
     ZMATH.add_fld("pi",Access.Final,pi,null);
     ZMATH.add_fld(rand._name,Access.Final,rand.as_fun(),null);

@@ -298,15 +298,6 @@ public class FieldNode extends Node implements Resolvable {
     //return err;
   }
 
-  // No matches to pattern (no YESes, no MAYBEs).  Empty patterns might have no NOs.
-  public boolean resolve_failed_no_match() {
-    String err = "No choice % resolves"+resolve_failed_msg()+": ";
-    TV3 pattern = tvar();
-    TV3 tv0 = tvar(0);
-    assert tv0.as_struct().idx(_fld)==-1;             // No resolving field on RHS?  TODO: Delete & progress
-    return tv0.unify_err(err,pattern,_bad,false);
-  }
-
   public boolean resolve_ambiguous_msg() {
     TV3 pattern = tvar();
     TVStruct rhs = tvar(0).as_struct();

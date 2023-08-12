@@ -2,6 +2,7 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
+import com.cliffc.aa.node.LoadNode;
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.NonBlockingHashMapLong;
@@ -74,11 +75,10 @@ public interface Resolvable {
 
     switch( yes ) {
     case 0:
-      //// No YESes, no MAYBES, this is an error
-      //if( maybe==0 ) return ((FieldNode)this).resolve_failed_no_match();
-      //// no YESes, but more maybes: wait.
-      //else return stall(rhs);
-      throw unimpl();
+      // No YESes, no MAYBES, this is an error
+      if( maybe==0 ) return ((LoadNode)this).resolve_failed_no_match();
+      // no YESes, but more maybes: wait.
+      else return stall(rhs);
     case 1:
       // Exactly one yes and no maybes: we can resolve this now
       if( maybe==0 ) return test || resolve_it(outie,pattern,rhs,lab);

@@ -1,8 +1,6 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Combo;
-import com.cliffc.aa.Env;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
@@ -155,13 +153,23 @@ public class LoadNode extends Node implements Resolvable {
     //if( adr instanceof FreshNode frsh ) adr = frsh.id();
     // If we can find an exact previous store, fold immediately to the value.
     Node ps = find_previous_struct(this, mem(), adr, tn._aliases);
-    if( ps instanceof StoreNode st ) {
-    //  Node rez = st.rez();
-    //  if( rez==null ) return null;
-    //  if( _live.isa(rez._live) ) return rez; // Stall until liveness matches
-    //  deps_add(this);                        // Self-add if live-ness updates
-    //  return null;
-      throw unimpl();
+    if( ps instanceof StoreAbs sta ) {
+      if( sta instanceof StoreNode st ) {
+        // match field in store
+        throw unimpl();
+      } else {
+        // find struct, match field in struct
+        StructNode str = ((StoreXNode)sta).struct();
+        int idx = str.find(_fld);
+        if( idx == -1 ) throw unimpl(); // Repeat a fixed-class lookup?
+        Node val = str.in(idx);
+        // demand val&live monotonic or deps_add
+        if( val._val.isa(_val) && _live.isa(val._live) )
+          return val;
+        deps_add(this);         // Self-add if updates
+        val.deps_add(this);     // Val -add if updates
+        return null;        
+      }
     }
 
     return null;
@@ -332,10 +340,10 @@ public class LoadNode extends Node implements Resolvable {
     if( ptr0 instanceof TVErr ) throw unimpl();
     TV3 ptr1 = ptr0;            // TODO: error might already be a Ptr or Struct
     TVStruct tstr=null;
-    if( ptr1 instanceof TVLeaf ) {
-      assert !(ta instanceof TypeStruct); // TODO: Remove all this, and fold into set_tvar
-      if( ta instanceof TypeStruct ) {
-        tstr = (TVStruct)TV3.from_flow(ta);
+    if( ptr1 instanceof TVLeaf ) { // Leaf, because we do not know if looking at a ptr or struct yet
+      if( ta instanceof TypeStruct ) { // Struct: standard for wrapped primitives
+        //tstr = (TVStruct)TV3.from_flow(ta);
+        tstr = new TVStruct(true);
         progress = ptr1.unify(tstr,test);
       } else if( ta instanceof TypeMemPtr ) {
         throw unimpl();         // Force ptr
@@ -352,15 +360,6 @@ public class LoadNode extends Node implements Resolvable {
     } else if( ptr1 instanceof TVPtr ptr ) tstr = ptr.load();
     else if( ptr1 instanceof TVStruct ts1 ) tstr = ts1;
     else throw unimpl();
-
-    //// TODO: Still this is a problem! In my (fact(2),fact(2.2)) case fact is
-    //// not inlined, and not specialized.  The incoming argument becomes
-    //// %[4,5][] - a mix of int/flt - and NOT a ptr.  The standard load against
-    //// it mixes int/flt struct result.
-    //
-    //// Since the parm is %[INT + FLT][], the N460 Load believes its the NO-OP
-    //// but really it is a normal load.  Since NO-OP, does not push H-M types
-    //// uphill to call arg, and so not uphill to caller.
 
     // Attempt resolve
     if( is_resolving() )
@@ -397,6 +396,54 @@ public class LoadNode extends Node implements Resolvable {
     // No progress, try again if self changes
     if( !test ) tvar().deps_add_deep(this);
     return false;
+  }
+
+
+  
+  // Build a sane error message for a failed resolve.
+  //   @{x=7}.y            Unknown field '.y' in @{x= int8}          - LHS   known, no  clazz, field not found in instance, instance yes struct
+  //   "abc".y             Unknown field '.y' in "abc"               - LHS   known, yes clazz, field not found in either  , not pinned, report instance
+  //   "abc"&1             Unknown operator '_&_' in str:            - LHS   known, yes clazz, field not found in either  , yes pinned, report clazz
+  //   { x -> x+1 }        Unable to resolve operator '_+_' "        - LHS unknown, no  clazz but pinned field
+  //   { x -> 1+x }                                                  - LHS   known, yes clazz, ambiguous, report choices and match
+  //                       Ambiguous, matching choices ({ int:int64 int:int64 -> int:int64 }, { int:int64 flt:nflt64 -> flt:flt64 }) vs { int:1 A -> B }
+  //   ( { x -> x*2 }, { x -> x*3 })._ 4                             - LHS   known, no  clazz, ambiguous, report choices and match
+  //                       Ambiguous, matching choices ({ A B -> C }, { D E -> F }) vs { G int:4 -> H }
+
+  private String resolve_failed_msg() {
+    String fld = null;          // Overloaded field name
+    // If overloaded field lookup, reference field name in message
+    if( is_resolving() ) {
+      if( in(0) instanceof LoadNode xfld )
+        fld = xfld._fld;        // Overloaded field name
+    } else fld = _fld;
+    if( fld==null ) return "";
+    return (Oper.is_oper(fld) ? " operator '" : " field '.") + fld + "'";
+    //boolean oper = fld!=null && Oper.is_oper(fld); // Is an operator?
+    //if( oper && !_clz ) {
+    //  String clz = FieldNode.clz_str(fldn.val(0));
+    //  if( clz!=null ) fld = clz+fld; // Attempt to be clazz specific operator
+    //}
+    //TVStruct tvs = match_tvar() instanceof TVStruct ts ? ts : null;
+    //String err, post;
+    //if( !is_resolving() ) { err = "Unknown"; post=" in %: "; }
+    //else if( tvs!=null && ambi(tvar(),tvs) ) { err = "Ambiguous, matching choices %"; post = " vs "; }
+    //else if( unable(tvs) ) { err = "Unable to resolve"; post=": "; }
+    //else { err = "No choice % resolves"; post=": "; }
+    //if( fld!=null )
+    //  err += (oper ? " operator '" : " field '.")+fld+"'";
+    //err += post;
+    //return err;
+  }
+
+
+  // No matches to pattern (no YESes, no MAYBEs).  Empty patterns might have no NOs.
+  public boolean resolve_failed_no_match() {
+    String err = "No choice % resolves"+resolve_failed_msg()+": ";
+    TV3 pattern = tvar();
+    TV3 tv0 = tvar(0);
+    assert tv0.as_struct().idx(_fld)==-1;             // No resolving field on RHS?  TODO: Delete & progress
+    return tv0.unify_err(err,pattern,_bad,false);
   }
 
 

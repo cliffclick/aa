@@ -1,8 +1,7 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.node.Node;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeFld;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 
 import java.util.Arrays;
@@ -25,7 +24,7 @@ public class TVStruct extends TVExpanding {
   public static final String[] FLDS0 = new String[0];
   public static final TV3   [] TVS0  = new TV3   [0];
   // Empty closed struct.  Used for e.g. no-class Structs.
-  public static final TVStruct EMPTY = new TVStruct(false);
+  //public static final TVStruct EMPTY = new TVStruct(false);
   
   // True if more fields can be added.  Generally false for a known Struct, and
   // true for a Field reference to an unknown struct.
@@ -63,13 +62,21 @@ public class TVStruct extends TVExpanding {
     _open = open;
     _max = flds.length;
     assert tvs.length==_max;
-    assert idx(TypeFld.CLZ)<=0;
   }
 
+  public static TVStruct make_clzclz() {
+    return new TVStruct(new String[]{TypeFld.CLZ},new TV3[]{ TVBase.make(TypeNil.NIL)});
+  }
+
+  // TODO: Unclear if this API makes sense.
+  //   ClzClz is closed and has a CLZ field with _tv3[0] being TVBase(nil).
+  //   Other structs have a CLZ field, with _tv3[0] being an empty TVStruct (no known class yet)
+  //                                                     OR  recursive again
+  //
   // Clazz for this struct, or null for ClazzClazz
   public TVPtr pclz() {
-    if( _max==0 || !Util.eq(_flds[0],TypeFld.CLZ) ) return null;
-    return (TVPtr)arg(0);
+    return _flds.length>0 && Util.eq(_flds[0],TypeFld.CLZ) &&
+      arg(0) instanceof TVPtr ptr ? ptr : null;
   }
   
   @Override boolean can_progress() { throw unimpl(); }
@@ -178,47 +185,92 @@ public class TVStruct extends TVExpanding {
     ts._open = ts._open & _open;
   }
 
+  // Unify this into that.  Ultimately "this" will be U-F'd into "that" and so
+  // all structure changes go into "that".
   @Override boolean _unify_impl( TV3 tv3 ) {
     TVStruct that = (TVStruct)tv3; // Invariant when called
     assert !this.unified() && !that.unified();
     TVStruct thsi = this;
     
-    // Unify LHS fields into RHS
-    boolean open = that.is_open();
-    for( int i=0; i<thsi._max; i++ ) {
-      TV3 fthis = thsi.arg(i);       // Field of this      
-      String key = thsi._flds[i];
-      int ti = that.idx(key);
-      if( ti == -1 ) {          // Missing field in that
-        if( open ) {
-          that.add_fld(key,fthis,thsi._pins[i]); // Add to RHS
-        } else if( Resolvable.is_resolving(key) ) {
-          that.add_fld(key,fthis,thsi._pins[i]); // Add to RHS
-          add_delay_resolve(that);
-        } else
-          that.del_fld(key);    // Remove from RHS
-      } else {
-        TV3 fthat = that.arg(ti);  // Field of that
-        fthis._unify(fthat,false); // Unify both into RHS
-        that._pins[ti] |= thsi._pins[i];  // Unify pinned
-        // Progress may require another find()
+    // Unify LHS CLZ into RHS CLZ
+    TVPtr clz0 =      pclz();
+    TVPtr clz1 = that.pclz();
+    if( clz0!=null ) that.do_fld(this,0);
+    if( clz1!=null ) this.do_fld(that,0);
+
+    
+    // Unify LHS fields into RHS.
+    for( int i=1; i<thsi._max; i++ ) {
+      boolean progress = that.do_fld(thsi,i);
+      
+      
+      //int ti = that.idx(key);
+      //if( ti == -1 ) {          // Missing field in that
+      //  //if( open ) {
+      //  //  that.add_fld(key,fthis,thsi._pins[i]); // Add to RHS
+      //  //} else if( Resolvable.is_resolving(key) ) {
+      //  //  that.add_fld(key,fthis,thsi._pins[i]); // Add to RHS
+      //  //  add_delay_resolve(that);
+      //  //} else {
+      //  //  that.del_fld(key);    // Remove from RHS
+      //  //}
+      //  // TIME TO DO PINNED UNIFY
+      //  throw unimpl();
+      //} else {
+      //}
+      if( progress ) {          // May have to re-find
         thsi = (TVStruct)thsi.find();
         that = (TVStruct)that.find();
       }
     }
 
     // Fields on the RHS are aligned with the LHS also
-    for( int i=0; i<that._max; i++ ) {
+    for( int i=1; i<that._max; i++ ) {
       String key = that._flds[i];
       int idx = thsi.idx(key);
       if( idx== -1 ) {                               // Missing field in this
         if( Resolvable.is_resolving(key) ) continue; // Do not remove until resolved
-        if( !is_open() ) thsi.del_fld(key); // Drop from RHS
+        if( !is_open() )
+          throw unimpl();       // TODO: Have to find harder?  Or not?
+          //thsi.del_fld(key); // Drop from RHS
       }
     }
 
     assert !that.unified(); // Missing a find
     return ptrue();
+  }
+
+  // Find field fld in TVStruct.
+  // If directly there, report it.
+  // If not pinned, walk up TVStruct clazz chain for a hit & report/unify.
+  // If no hit, report first open clazz & insert.
+  // If no hit, and no open, miss_fld.
+  private boolean do_fld( TVStruct that, int i ) {
+    String  fld = that._flds[i];
+    TV3 tv3     = that. arg (i);
+    boolean pin = that._pins[i];
+    // really need to loop here, so can tell first open, from no clazz from other cases
+    TVStruct clz = this, open_clz = null;
+    while( true ) {
+      int idx = clz.idx(fld);
+      if( idx != -1 ) {
+        clz._pins[idx] |= pin;
+        return clz.arg(idx).unify(tv3,false);
+      }
+      if( pin ) {
+        if( !clz.is_open() ) throw unimpl();   // "this" is closed, cannot add, so miss-field
+        return add_fld(fld,tv3,pin);
+      }
+      // Record deepest open clazz
+      if( open_clz==null && clz.is_open() ) open_clz = clz;
+      // Not pinned, so scan up thru clazz
+      if( clz._flds.length>0 && Util.eq(clz._flds[0],TypeFld.CLZ) &&
+          clz.arg(0) instanceof TVPtr ptr )
+        clz = ptr.load();
+      else break;
+    }
+    // No clazz, missed.  Add to the deepest open clazz, if any.
+    throw unimpl();
   }
   
   // -------------------------------------------------------------
@@ -238,14 +290,16 @@ public class TVStruct extends TVExpanding {
               
         if( is_open() || that.is_open() || resolving ) {
           if( test ) return ptrue(); // Will definitely make progress
-          TV3 nrhs = lhs._fresh();
-          if( resolving ) {
-            progress |= that.add_fld(_flds[i],nrhs,_pins[i]);
-          } else if( that.is_open() ) {
-            progress |= that.add_fld(_flds[i],nrhs,_pins[i]);
-          } else { // RHS not open, put copy of LHS into RHS with miss_fld error
-            throw unimpl();                   // miss_fld
-          }
+          //TV3 nrhs = lhs._fresh();
+          //if( resolving ) {
+          //  progress |= that.add_fld(_flds[i],nrhs,_pins[i]);
+          //} else if( that.is_open() ) {
+          //  progress |= that.add_fld(_flds[i],nrhs,_pins[i]);
+          //} else { // RHS not open, put copy of LHS into RHS with miss_fld error
+          //throw unimpl();                   // miss_fld
+          //}
+          // TIME TO DO PINNED UNIFY
+          throw unimpl();
         } else missing = true; // Else neither side is open, field is not needed in RHS
         
       } else {
@@ -421,13 +475,12 @@ public class TVStruct extends TVExpanding {
     boolean is_tup = is_tup(debug), once=_open;
     sb.p(is_tup ? "(" : "@{");
     for( int idx : sorted_flds() ) {
-      if( !debug && Util.eq("^",_flds[idx]) ) continue; // Displays are private by default
       if( !debug && Resolvable.is_resolving(_flds[idx]) ) continue;
       if( !is_tup ) {                         // Skip tuple field names
         sb.p(_flds[idx]);
         sb.p("= ");
       }
-      if( _args[idx] == null ) sb.p("_");
+      if( _args[idx] == null ) sb.p("___");
       else _args[idx]._str(sb,visit,dups,debug,prims);
       sb.p(is_tup ? ", " : "; ");
       once=true;
@@ -457,13 +510,13 @@ public class TVStruct extends TVExpanding {
       for( int j=i+1; j<_max; j++ ) {
         String fi = _flds[is[i]];
         String fj = _flds[is[j]];
-        if( fi!=null && (fj==null || fj.compareTo(fi) < 0) )
+        if( fi!=null && !Util.eq(fi,TypeFld.CLZ) && (fj==null || Util.eq(fj,TypeFld.CLZ) || fj.compareTo(fi) < 0) )
           { int tmp = is[i]; is[i] = is[j]; is[j] = tmp; }
       }
     return is;
   }
   
   public static void reset_to_init0() {
-    EMPTY._deps = null;
+    //EMPTY._deps = null;
   }
 }

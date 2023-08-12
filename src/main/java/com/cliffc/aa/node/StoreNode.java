@@ -166,18 +166,11 @@ public class StoreNode extends StoreAbs {
 
   @Override public boolean unify( boolean test ) {
     TVPtr ptr = (TVPtr)adr().tvar();
-    TV3 fld = rez().tvar();
-    BitsAlias aliases = ptr.aliases();
-    assert aliases!=BitsAlias.NALL;
-    boolean progress = false;
-    for( int alias : aliases ) {
-      // Each alias unifies into the global field state
-      TVPtr nptr = (TVPtr)NewNode.get(alias).tvar();
-      TV3 xfld = nptr.load().arg(_fld);
-      progress |= fld.unify(xfld,test);
-      if( test && progress ) return true;
-    }
-    return progress;
+    TV3 self_fld = rez().tvar();
+    assert !is_prim();
+    TVStruct ts = ptr.load();
+    TV3 ptr_fld = ts.arg(_fld);
+    return self_fld.unify(ptr_fld,test);
   }
 
   @Override public ErrMsg err( boolean fast ) {

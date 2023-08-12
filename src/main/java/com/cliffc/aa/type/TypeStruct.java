@@ -229,7 +229,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     return malloc(false,ALL,TypeFlds.make(TypeFld.make_clz(clz),fld0,fld1));
   }
   public static TypeStruct malloc_prim( Type clz, Type fld ) {
-    return malloc(false,ALL,TypeFlds.ts(TypeFld.malloc_clz(clz),TypeFld.make("_",fld)));
+    return malloc(false,ALL,TypeFlds.ts(TypeFld.malloc_clz(clz),TypeFld.make(TypeFld.PRIM,fld)));
   }
   public TypeStruct hashcons_free() {
     // All subparts already interned

@@ -13,7 +13,7 @@ import java.util.function.BinaryOperator;
 // accesses make a small lattice of: {choice,r/w,final,r-o}.  Note that mixing
 // r/w and final moves to r-o and loses the final property.  No field order.
 public class TypeFld extends Type<TypeFld> implements Cyclic {
-  public static final String CLZ = "."; // Class field name
+  public static final String CLZ = "^"; // Class field name
   public static final String PRIM = "_"; // Wrapped primitive field name
 
   // Are the fields in order?  Ties report true.

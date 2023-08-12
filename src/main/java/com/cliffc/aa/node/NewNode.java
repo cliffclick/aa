@@ -67,7 +67,8 @@ public class NewNode extends Node {
   private boolean used() {
     if( is_prim() ) return true;
     for( Node use : _uses )
-      if( !(use instanceof StoreNode st) || st.rez()==this )
+      if( !(use instanceof StoreAbs sta) ||
+          ( sta instanceof StoreNode st && st.rez()==this) )
         return true;
     return false;
   }

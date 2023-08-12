@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV3;
@@ -42,7 +43,7 @@ public class StoreXNode extends StoreAbs {
   }
 
   @Override TypeMem _live_kill(TypeMemPtr tmp) {
-    throw unimpl();
+    return ((TypeMem)_live).kill(tmp._aliases);
   }
 
   // Is this Store alive, based on given liveness?
@@ -67,9 +68,11 @@ public class StoreXNode extends StoreAbs {
   @Override public boolean unify( boolean test ) {
     TVPtr   ptr = (TVPtr   )adr().tvar();
     TVStruct ts = (TVStruct)rez().tvar();
-    return unify(ptr.aliases(),ts,test);
+    if( Combo.pre() )
+      return unify(ptr.aliases(),ts,test);
+    return ptr.load().unify(ts,test);
   }
-  public static final boolean unify( BitsAlias aliases, TVStruct ts, boolean test ) {
+  public static boolean unify( BitsAlias aliases, TVStruct ts, boolean test ) {
     assert aliases!=BitsAlias.NALL;
     boolean progress = false;
     for( int alias : aliases ) {
