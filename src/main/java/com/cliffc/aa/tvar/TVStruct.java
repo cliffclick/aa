@@ -46,7 +46,7 @@ public class TVStruct extends TVExpanding {
   public TVStruct(boolean open) { this(FLDS0,TVS0,open); }
   // Normal StructNode constructor, all pinned Leaf fields
   public TVStruct( Ary<String> flds ) {  this(flds.asAry(),leafs(flds.len()));  }
-  private static TV3[] leafs(int len) {
+  public static TV3[] leafs(int len) {
     TV3[] ls = new TV3[len];
     for( int i=0; i<len; i++ ) ls[i] = new TVLeaf();
     return ls;
@@ -107,17 +107,20 @@ public class TVStruct extends TVExpanding {
   }
 
   // Remove
-  boolean del_fld(int idx) {
-    String  fld = _flds[idx];
-    TV3     tv3 = _args[idx];
-    boolean pin = _pins[idx];
-    assert !Util.eq(fld,TypeFld.CLZ); // Never remove clazz
+  boolean del_fld0(int idx) {
+    assert !Util.eq(_flds[idx],TypeFld.CLZ); // Never remove clazz
     _args[idx] = _args[_max-1];
     _flds[idx] = _flds[_max-1];
     _pins[idx] = _pins[_max-1];
     _max--;
     // Changed struct shape, move delayed-fresh updates to now
     move_delay();
+    return ptrue();
+  }
+  
+  boolean del_fld(int idx) {
+    boolean pin = _pins[idx];
+    del_fld0(idx);
     // UN-Pinned fields are re-inserted into the next open super-clazz
     if( !pin )
       throw unimpl();
@@ -193,84 +196,80 @@ public class TVStruct extends TVExpanding {
     TVStruct thsi = this;
     
     // Unify LHS CLZ into RHS CLZ
-    TVPtr clz0 =      pclz();
-    TVPtr clz1 = that.pclz();
-    if( clz0!=null ) that.do_fld(this,0);
-    if( clz1!=null ) this.do_fld(that,0);
-
-    
-    // Unify LHS fields into RHS.
-    for( int i=1; i<thsi._max; i++ ) {
-      boolean progress = that.do_fld(thsi,i);
-      
-      
-      //int ti = that.idx(key);
-      //if( ti == -1 ) {          // Missing field in that
-      //  //if( open ) {
-      //  //  that.add_fld(key,fthis,thsi._pins[i]); // Add to RHS
-      //  //} else if( Resolvable.is_resolving(key) ) {
-      //  //  that.add_fld(key,fthis,thsi._pins[i]); // Add to RHS
-      //  //  add_delay_resolve(that);
-      //  //} else {
-      //  //  that.del_fld(key);    // Remove from RHS
-      //  //}
-      //  // TIME TO DO PINNED UNIFY
-      //  throw unimpl();
-      //} else {
-      //}
-      if( progress ) {          // May have to re-find
-        thsi = (TVStruct)thsi.find();
-        that = (TVStruct)that.find();
+    TVPtr clz0 = this.pclz(), clz1 = that.pclz();
+    TVStruct clz;
+    // Basically 3 choices: both have one, only one CLZ but the other is open, no CLZ.
+    if( clz0==null ) {          // No LHS CLZ
+      clz = clz1==null ? null : clz1.load(); // Shared CLZ is only RHS
+    } else {
+      if( clz1==null ) {        // CLZ only on LHS
+        that.add_fld( TypeFld.CLZ, clz=clz0.load(), this._pins[0] ); // Move shared CLZ into RHS
+      } else {
+        // Both, unify
+        clz = clz1.load();
+        clz0._unify(clz1,false);
       }
     }
+    
+    // Unify LHS fields into RHS.  None in are the CLZ
+    for( int i=0; i<thsi._max; i++ ) {
+      String key  = _flds[i];
+      TV3 fthis   = arg(i);
+      boolean pin = _pins[i];
+      if( Util.eq(key,TypeFld.CLZ) ) continue; // Already unified CLZ
+      // Fold into the shared CLZ, if possible
+      if( clz!=null && clz.do_into_clz(key,fthis,pin) )
+        continue;               // Leave field in LHS, its gonna unify anyways
 
+      // Check RHS
+      int ti = that.idx(key);
+      if( ti == -1 ) {          // Missing field in that
+        if( that.is_open() ) {
+          that.add_fld(key,fthis,thsi._pins[i]); // Add to RHS
+        } else if( Resolvable.is_resolving(key) ) {
+          that.add_fld(key,fthis,thsi._pins[i]); // Add to RHS
+          add_delay_resolve(that);
+        } else {
+          that.del_fld(key);    // Remove from RHS
+        }
+      } else {
+        fthis._unify(that.arg(ti),false); // Unify fields
+      }
+      thsi = (TVStruct)thsi.find();
+      that = (TVStruct)that.find();
+    }
+    
     // Fields on the RHS are aligned with the LHS also
-    for( int i=1; i<that._max; i++ ) {
+    for( int i=0; i<that._max; i++ ) {
       String key = that._flds[i];
+      if( Util.eq(key,TypeFld.CLZ) ) continue; // Already unified CLZ
+      if( clz!=null && clz.do_into_clz(key,that.arg(i),that._pins[i]) ) {
+        that.del_fld0(i--);          // Nuke field from RHS, folded into CLZ
+        continue;
+      }
       int idx = thsi.idx(key);
       if( idx== -1 ) {                               // Missing field in this
         if( Resolvable.is_resolving(key) ) continue; // Do not remove until resolved
         if( !is_open() )
-          throw unimpl();       // TODO: Have to find harder?  Or not?
-          //thsi.del_fld(key); // Drop from RHS
-      }
+          thsi.del_fld(key); // Drop from RHS to match LHS
+      }                      // Else, since field already in RHS do nothing
     }
-
+    
     assert !that.unified(); // Missing a find
     return ptrue();
   }
 
-  // Find field fld in TVStruct.
-  // If directly there, report it.
-  // If not pinned, walk up TVStruct clazz chain for a hit & report/unify.
-  // If no hit, report first open clazz & insert.
-  // If no hit, and no open, miss_fld.
-  private boolean do_fld( TVStruct that, int i ) {
-    String  fld = that._flds[i];
-    TV3 tv3     = that. arg (i);
-    boolean pin = that._pins[i];
-    // really need to loop here, so can tell first open, from no clazz from other cases
-    TVStruct clz = this, open_clz = null;
-    while( true ) {
-      int idx = clz.idx(fld);
-      if( idx != -1 ) {
-        clz._pins[idx] |= pin;
-        return clz.arg(idx).unify(tv3,false);
-      }
-      if( pin ) {
-        if( !clz.is_open() ) throw unimpl();   // "this" is closed, cannot add, so miss-field
-        return add_fld(fld,tv3,pin);
-      }
-      // Record deepest open clazz
-      if( open_clz==null && clz.is_open() ) open_clz = clz;
-      // Not pinned, so scan up thru clazz
-      if( clz._flds.length>0 && Util.eq(clz._flds[0],TypeFld.CLZ) &&
-          clz.arg(0) instanceof TVPtr ptr )
-        clz = ptr.load();
-      else break;
+  // If field i exists in clz (recursively) then
+  //   if field is not pinned, remove from here and unify there.
+  //   else dup-field error
+  boolean do_into_clz( String fld, TV3 tvf, boolean pin ) {
+    TV3 arg = arg(fld);         // Find in CLZ
+    if( arg != null ) {
+      if( pin ) throw unimpl(); // Found in CLZ but pinned here - so dup-field error
+      return tvf._unify(arg,false); // Unify (and return true)
     }
-    // No clazz, missed.  Add to the deepest open clazz, if any.
-    throw unimpl();
+    TVPtr pclz = pclz();
+    return pclz != null && pclz.load().do_into_clz( fld, tvf, pin );
   }
   
   // -------------------------------------------------------------
