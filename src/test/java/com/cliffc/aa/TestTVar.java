@@ -1,6 +1,6 @@
-package com.cliffc.aa.tvar;
+package com.cliffc.aa;
 
-import com.cliffc.aa.AA;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import org.junit.Test;
 
@@ -73,13 +73,12 @@ public class TestTVar {
       TV3 vs1 = tvs[0], vs3 = tvs[1], v0 = tvs[2], vlam2 = tvs[3];      
       boolean rez = vs3.fresh_unify(null,vs1,null,false);
       assertTrue(rez);
-      assertSame(v0.find(),vlam2.find());
+      assertEquals( 1, v0.find().trial_unify_ok( vlam2 ) ); // Always a hard yes in a trial
     }
     { TV3[] tvs = _testUnifyClz0();
       TV3 vs1 = tvs[0], vs3 = tvs[1], v0 = tvs[2], vlam2 = tvs[3];      
       boolean rez = vs1.fresh_unify(null,vs3,null,false);
-      assertTrue(rez);
-      assertSame(v0.find(),vlam2.find());
+      assertFalse(rez);
     }
   }
   
@@ -99,11 +98,10 @@ public class TestTVar {
     return tvs;
   }
 
-  @Test public void testUnifyClz1() {
+  private static TV3[] _testUnifyClz1() {
     // Should get cross-fields from both and unify with the CLZ field in the other.    
     //   @{ ^=@{ fld0={ int -> V2 }, ...}, fld1= { int -> V4} }
     //   @{ ^=@{ fld1={ V3 -> flt }, ...}, fld0= { V5 -> flt} }
-
     TVStruct[] tvs0 = superchain(new TVStruct[2]);
     TVStruct[] tvs1 = superchain(new TVStruct[2]);
     
@@ -122,27 +120,56 @@ public class TestTVar {
     vs0.add_fld("fld1",vlam1,false);
     vs1.add_fld("fld0",vlam4,false);
 
-    boolean rez = vs0.unify(vs1,false);
-    assertTrue(rez);
-    // Both share the same CLZ
-    assertSame(vs0.pclz(),vs1.find().as_struct().pclz());
-    // Instance fields from either unified with same from CLZ in other
-    assertSame(vlam0 .find(),vlam4 .find());
-    assertSame(vlam1 .find(),vlam3 .find());
+    return new TV3[]{ vs0, vs1, vlam0, vlam1, vlam3, vlam4 };
+  }
+  @Test public void testUnifyClz1() {
+    { TV3[] tvs = _testUnifyClz1();
+      TV3 vs0 = tvs[0], vs1 = tvs[1], vlam0 = tvs[2], vlam1 = tvs[3], vlam3 = tvs[4], vlam4 = tvs[5];
+      boolean rez = vs0.unify(vs1,false);
+      assertTrue(rez);
+      // Both share the same CLZ
+      assertSame(vs0.as_struct().pclz(),vs1.find().as_struct().pclz());
+      // Instance fields from either unified with same from CLZ in other
+      assertSame(vlam0 .find(),vlam4 .find());
+      assertSame(vlam1 .find(),vlam3 .find());
+    }
+    { TV3[] tvs = _testUnifyClz1();
+      TV3 vs0 = tvs[0], vs1 = tvs[1], vlam0 = tvs[2], vlam1 = tvs[3], vlam3 = tvs[4], vlam4 = tvs[5];
+      boolean rez = vs0.fresh_unify(null,vs1,null,false);
+      assertTrue(rez);
+      // Both look alike
+      assertEquals( 1, vs0.find().trial_unify_ok( vs1 ) ); // Always a hard yes in a trial
+      // Instance fields from either unified with same from CLZ in other
+      assertEquals( 1, vlam0.find().trial_unify_ok( vlam4.find() ) );
+      assertEquals( 1, vlam1.find().trial_unify_ok( vlam3.find() ) );
+      assertTrue( ((TVLambda)vlam3).dsp() instanceof TVBase base && base._t==TypeInt.INT64);
+      assertTrue( ((TVLambda)vlam4).dsp() instanceof TVBase base && base._t==TypeInt.INT64);
+    }
+    { TV3[] tvs = _testUnifyClz1();
+      TV3 vs0 = tvs[0], vs1 = tvs[1], vlam0 = tvs[2], vlam1 = tvs[3], vlam3 = tvs[4], vlam4 = tvs[5];
+      boolean rez = vs1.fresh_unify(null,vs0,null,false);
+      assertTrue(rez);
+      // Both look alike
+      assertEquals( 1, vs1.find().trial_unify_ok( vs0 ) ); // Always a hard yes in a trial
+      // Instance fields from either unified with same from CLZ in other
+      assertEquals( 1, vlam0.find().trial_unify_ok( vlam4.find() ) );
+      assertEquals( 1, vlam1.find().trial_unify_ok( vlam3.find() ) );
+      assertTrue( ((TVLambda)vlam0).ret() instanceof TVBase base && base._t==TypeFlt.FLT64);
+      assertTrue( ((TVLambda)vlam1).ret() instanceof TVBase base && base._t==TypeFlt.FLT64);
+    }
   }
 
-  @Test public void testUnifyClz2() {
-    // 3 CLZs deep.
-    // CLZA open, empty        <<== CLZB, closed field1 <<== INST C, has unpinned field0, open
-    // CLZA closed, has field0 <<== CLZB, closed field1 <<== INST C, has pinned field 2.
-    // Unify:
-    // CLZA, closed, unified field0 <<== CLZB closed unified field1 <<== INST C field 2
-
+  // 3 CLZs deep.
+  // CLZA open, empty        <<== CLZB, closed field1 <<== INST C, has unpinned field0, open
+  // CLZA closed, has field0 <<== CLZB, closed field1 <<== INST C, has pinned field 2.
+  // Unify:
+  // CLZA, closed, unified field0 <<== CLZB closed unified field1 <<== INST C field 2
+  private static TV3[] _testUnifyClz2() {
     TVStruct[] tvs0 = superchain(new TVStruct[3]);
     TVStruct[] tvs1 = superchain(new TVStruct[3]);
 
     // CLZA
-    TVStruct vclzA1 = tvs0[1];
+    TVStruct vclzA1 = tvs1[0];
     TV3 v0 = new TVLeaf();
     vclzA1.add_fld("fld0",v0,true );
     vclzA1.close();
@@ -166,14 +193,45 @@ public class TestTVar {
     vclzC1.add_fld("fld2",v2_1,true );
     vclzC1.close();
     
-    boolean rez = vclzC0.unify(vclzC1,false);
-    assertTrue(rez);
-    // Both share the same CLZ
-    assertSame(vclzC0.pclz(),vclzC1.find().as_struct().pclz());
-    // Instance fields from either unified with same from CLZ in other
-    assertSame(v0.find(),v2_0.find());
-    assertSame(v1_0.find(),v1_1.find());
-    assertTrue(vclzC1.idx("fld2") != -1);
+    return new TV3[]{ vclzC0, vclzC1, v0, v2_0, v1_0, v1_1 };
+  }
+  
+  @Test public void testUnifyClz2() {
+    { TV3[] tvs = _testUnifyClz2();
+      TVStruct vclzC0 = (TVStruct)tvs[0], vclzC1 = (TVStruct)tvs[1];
+      TV3 v0 = tvs[2], v2_0 = tvs[3], v1_0 = tvs[4], v1_1 = tvs[5];
+      boolean rez = vclzC0.unify(vclzC1,false);
+      assertTrue(rez);
+      // Both share the same CLZ
+      assertSame(vclzC0.pclz(),vclzC1.find().as_struct().pclz());
+      // Instance fields from either unified with same from CLZ in other
+      assertSame(v0.find(),v2_0.find());
+      assertSame(v1_0.find(),v1_1.find());
+      assertTrue(vclzC1.idx("fld2") != -1);
+    }
+    { TV3[] tvs = _testUnifyClz2();
+      TVStruct vclzC0 = (TVStruct)tvs[0], vclzC1 = (TVStruct)tvs[1];
+      TV3 v0 = tvs[2], v2_0 = tvs[3], v1_0 = tvs[4], v1_1 = tvs[5];
+      boolean rez = vclzC0.fresh_unify(null,vclzC1,null,false);
+      assertTrue(rez);
+      // Both look alike
+      assertEquals( 1, vclzC0.find().trial_unify_ok( vclzC1 ) ); // Always a hard yes in a trial
+      assertTrue( vclzC0.pclz().aliases().abit() > 0 );           // Single alias
+      assertEquals( -1, vclzC1.pclz().aliases().abit() );         // Unified aliases
+    }
+    { TV3[] tvs = _testUnifyClz2();
+      TVStruct vclzC0 = (TVStruct)tvs[0], vclzC1 = (TVStruct)tvs[1];
+      TV3 v0 = tvs[2], v2_0 = tvs[3], v1_0 = tvs[4], v1_1 = tvs[5];
+      boolean rez = vclzC1.fresh_unify(null,vclzC0,null,false);
+      assertTrue(rez);
+      // Both look alike
+      assertEquals( 1, vclzC1.find().trial_unify_ok( vclzC0 ) ); // Always a hard yes in a trial
+      assertTrue( vclzC1.pclz().aliases().abit() > 0 );           // Single alias
+      assertEquals( -1, vclzC0.pclz().aliases().abit() );         // Unified aliases
+      assertEquals( -1, vclzC0.idx( "fld0" ) );
+      assertTrue(vclzC0.idx("fld2") > 0  );
+    }
+
   }
 
   

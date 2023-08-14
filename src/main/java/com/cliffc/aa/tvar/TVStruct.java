@@ -196,38 +196,39 @@ public class TVStruct extends TVExpanding {
     TVStruct thsi = this;
     
     // Unify LHS CLZ into RHS CLZ
-    TVPtr clz0 = this.pclz(), clz1 = that.pclz();
+    TVPtr pclz0 = this.pclz(), pclz1 = that.pclz();
     TVStruct clz;
     // Basically 3 choices: both have one, only one CLZ but the other is open, no CLZ.
-    if( clz0==null ) {          // No LHS CLZ
-      clz = clz1==null ? null : clz1.load(); // Shared CLZ is only RHS
+    if( pclz0==null ) {          // No LHS CLZ
+      clz = pclz1==null ? null : pclz1.load(); // Shared CLZ is only RHS
     } else {
-      if( clz1==null ) {        // CLZ only on LHS
-        that.add_fld( TypeFld.CLZ, clz=clz0.load(), this._pins[0] ); // Move shared CLZ into RHS
+      if( pclz1==null ) {        // CLZ only on LHS
+        clz=pclz0.load();
+        that.add_fld( TypeFld.CLZ, pclz0, this._pins[0] ); // Move shared CLZ into RHS
       } else {
         // Both, unify
-        clz = clz1.load();
-        clz0._unify(clz1,false);
+        clz = pclz1.load();
+        pclz0._unify(pclz1,false);
       }
     }
     
     // Unify LHS fields into RHS.  None in are the CLZ
     for( int i=0; i<thsi._max; i++ ) {
-      String key  = _flds[i];
-      TV3 fthis   = arg(i);
-      boolean pin = _pins[i];
+      String key  = thsi._flds[i];
+      TV3 fthis   = thsi.arg(i);
+      boolean pin = thsi._pins[i];
       if( Util.eq(key,TypeFld.CLZ) ) continue; // Already unified CLZ
       // Fold into the shared CLZ, if possible
-      if( clz!=null && clz.do_into_clz(key,fthis,pin) )
+      if( clz!=null && clz.do_into_clz(key,fthis,pin,false,false)!=0 )
         continue;               // Leave field in LHS, its gonna unify anyways
 
       // Check RHS
       int ti = that.idx(key);
       if( ti == -1 ) {          // Missing field in that
         if( that.is_open() ) {
-          that.add_fld(key,fthis,thsi._pins[i]); // Add to RHS
+          that.add_fld(key,fthis,pin); // Add to RHS
         } else if( Resolvable.is_resolving(key) ) {
-          that.add_fld(key,fthis,thsi._pins[i]); // Add to RHS
+          that.add_fld(key,fthis,pin); // Add to RHS
           add_delay_resolve(that);
         } else {
           that.del_fld(key);    // Remove from RHS
@@ -243,7 +244,7 @@ public class TVStruct extends TVExpanding {
     for( int i=0; i<that._max; i++ ) {
       String key = that._flds[i];
       if( Util.eq(key,TypeFld.CLZ) ) continue; // Already unified CLZ
-      if( clz!=null && clz.do_into_clz(key,that.arg(i),that._pins[i]) ) {
+      if( clz!=null && clz.do_into_clz(key,that.arg(i),that._pins[i], false, false)!=0 ) {
         that.del_fld0(i--);          // Nuke field from RHS, folded into CLZ
         continue;
       }
@@ -262,44 +263,73 @@ public class TVStruct extends TVExpanding {
   // If field i exists in clz (recursively) then
   //   if field is not pinned, remove from here and unify there.
   //   else dup-field error
-  boolean do_into_clz( String fld, TV3 tvf, boolean pin ) {
+  // Returns 0 if not found, -1 if found & no progress, 1 if found & progress
+  // If not-fresh, then only returns 0 or 1
+  int do_into_clz( String fld, TV3 tvf, boolean pin, boolean test, boolean fresh ) {
     TV3 arg = arg(fld);         // Find in CLZ
     if( arg != null ) {
       if( pin ) throw unimpl(); // Found in CLZ but pinned here - so dup-field error
-      return tvf._unify(arg,false); // Unify (and return true)
+      boolean progress = fresh ? tvf._fresh_unify(arg,test) : tvf._unify(arg,test); // Unify (and return true)
+      return progress ? 1 : -1;
     }
     TVPtr pclz = pclz();
-    return pclz != null && pclz.load().do_into_clz( fld, tvf, pin );
+    if( pclz==null ) return 0;
+    return pclz.load().do_into_clz( fld, tvf, pin, test, fresh );
   }
   
   // -------------------------------------------------------------
   @Override boolean _fresh_unify_impl(TV3 tv3, boolean test) {
     boolean progress = false, missing = false;
     assert !unified() && !tv3.unified();    
-
-    trial_resolve_all(false,this); assert !unified();
-    progress |= trial_resolve_all(false,(TVStruct)tv3);
     TVStruct that = (TVStruct)tv3.find();
     
+    // Unify LHS CLZ into RHS CLZ
+    TVPtr pclz0 = this.pclz(), pclz1 = that.pclz();
+    TVStruct clz;
+    // Basically 3 choices: both have one, only one CLZ but the other is open, no CLZ.
+    if( pclz0==null ) {          // No LHS CLZ
+      clz = pclz1==null ? null : pclz1.load(); // Shared CLZ is only RHS
+    } else {
+      if( pclz1==null ) {        // CLZ only on LHS
+        that.add_fld( TypeFld.CLZ, pclz1 = (TVPtr)pclz0._fresh(), this._pins[0] ); // Move shared CLZ into RHS
+        progress = true;
+      } else {
+        // Both, unify into RHS clz
+        progress |= pclz0._fresh_unify(pclz1,false);
+      }
+      // RHS CLZ changed; check to see if any local fields move into CLZ
+      clz = pclz1.find().as_ptr().load();
+      if( progress ) {
+        for( int i=0; i<that._max; i++ ) {
+          String key = that._flds[i];
+          if( !Util.eq(key,TypeFld.CLZ) && // Already unified CLZ
+              clz.do_into_clz(key,that.arg(i),that._pins[i],test,false) != 0 ) // Hit in clazz, done with unify
+            that.del_fld0(i--); // Nuke field from RHS, folded into CLZ
+        }
+      }
+    }
+
+    // Now do non-CLZ fields
     for( int i=0; i<_max; i++ ) {
+      String key = _flds[i];
+
+      if( Util.eq(key,TypeFld.CLZ) ) continue; // Already unified CLZ
+      // Fold into the shared CLZ, if possible
       TV3 lhs = arg(i);
-      boolean resolving = Resolvable.is_resolving(_flds[i]);
+      if( clz!=null ) {
+        int rez = clz.do_into_clz(key,lhs,_pins[i],test,true);
+        if( rez!=0 ) { progress |= rez>0; continue; } // Hit in clazz, done with unify
+      }
+      
       int ti = that.idx(_flds[i]);
       if( ti == -1 ) {          // Missing in RHS
-              
-        if( is_open() || that.is_open() || resolving ) {
+
+        if( that.is_open() || Resolvable.is_resolving(key) ) {
           if( test ) return ptrue(); // Will definitely make progress
-          //TV3 nrhs = lhs._fresh();
-          //if( resolving ) {
-          //  progress |= that.add_fld(_flds[i],nrhs,_pins[i]);
-          //} else if( that.is_open() ) {
-          //  progress |= that.add_fld(_flds[i],nrhs,_pins[i]);
-          //} else { // RHS not open, put copy of LHS into RHS with miss_fld error
-          //throw unimpl();                   // miss_fld
-          //}
-          // TIME TO DO PINNED UNIFY
-          throw unimpl();
-        } else missing = true; // Else neither side is open, field is not needed in RHS
+          progress |= that.add_fld(key,lhs._fresh(),_pins[i]);
+        } else if( is_open() ) // RHS not open, put copy of LHS into RHS with miss_fld error
+          throw unimpl();       // miss_fld
+        else missing = true; // Else neither side is open, field is not needed in RHS
         
       } else {
         TV3 rhs = that.arg(ti); // Lookup via field name
@@ -317,8 +347,13 @@ public class TVStruct extends TVExpanding {
     // are removed.
     if( !is_open() && (_max != that._max || missing) )
       for( int i=0; i<that._max; i++ ) {
-        if( Resolvable.is_resolving(that._flds[i]) ) continue;
-        TV3 lhs = arg(that._flds[i]); // Lookup vis field name
+        String key = that._flds[i];
+        if( Util.eq(key,TypeFld.CLZ) ) continue; // Already unified CLZ
+        if( Resolvable.is_resolving(key) )
+          throw unimpl();
+          //continue;
+        
+        TV3 lhs = arg(key); // Lookup vis field name
         if( lhs==null ) {
           if( test ) return ptrue();
           progress |= that.del_fld(i--);
@@ -332,10 +367,10 @@ public class TVStruct extends TVExpanding {
       that._open = false;
     }
 
-    if( trial_resolve_all(false,that) ) {
-      progress = ptrue();
-      trial_resolve_all(false,this);
-    }
+    //if( trial_resolve_all(false,that) ) {
+    //  progress = ptrue();
+    //  trial_resolve_all(false,this);
+    //}
     
     if( _open ) add_delay_fresh(); // If this Struct can add fields, must fresh-unify that Struct
     
