@@ -803,7 +803,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         assert dup==null;
         // lab is a type-prefix
         _x = oldx;              // Reset type parse
-        return TypeFld.malloc((""+fld_num).intern(),type(lab,any,-2), TypeFld.Access.Final);
+        return TypeFld.malloc((""+fld_num).intern(),type(null,any,-2), TypeFld.Access.Final);
       }
 
       return switch( skipWS() ) {
@@ -942,7 +942,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     }
     // Rules for an ID character
     private static boolean isId0(char c) {
-      return c=='.' || c=='_' ||
+      return c=='.' || c=='_' || c==TypeFld.CLZ.charAt(0) ||
         ('A' <= c && c <= 'Z') ||
         ('a' <= c && c <= 'z');
     }

@@ -364,6 +364,9 @@ public class LoadNode extends Node implements Resolvable {
     // Attempt resolve
     if( is_resolving() )
       return try_resolve(tstr,test) | progress;
+    // Look for self-resolved field; can happen
+    if( TVField.FIELDS.get(resolve_fld_name(_fld)) != null )
+      TVStruct.trial_resolve_all(true,tstr);
 
     // Search up the super-clazz chain
     for( ; tstr!=null; tstr = tstr.pclz().load() ) {
@@ -386,7 +389,11 @@ public class LoadNode extends Node implements Resolvable {
   }
 
   private boolean try_resolve( TVStruct str, boolean test ) {
-    // If struct is open, more fields might appear and cannot do a resolve.
+    // Put the resolving field in the struct; it will be present in the answer
+    // in SOME field we just don't which one.
+    if( str.idx(_fld) == -1 )
+      str.add_fld(_fld, tvar(), false);
+    // If struct is open, more fields might appear and cannot do a resolve.    
     if( str.is_open() ) {
       str.deps_add(this);
       return false;

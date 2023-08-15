@@ -83,6 +83,7 @@ public abstract class PrimNode extends Node {
       //{ new EQ_I64(), new EQ_IF64() },
       //{ new NE_I64(), new NE_IF64() },
       //{ new MinusI64() }, { new NotI64() }, { new ModI64() },
+      { new NotI64() }, 
       //{ new AndI64() }, { new OrI64() },
       //{ new AndThen() }, { new OrElse() },
     };

@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.util.*;
 
 import java.util.HashMap;
@@ -123,7 +122,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     return malloc(any,nil,sub,aliases,obj).hashcons_free();
   }
   TypeMemPtr malloc_from(TypeStruct obj) {
-    return malloc(_any, _nil, _sub,_aliases,obj);
+    return malloc(_any, _nil, _sub,_is_con,_aliases,obj);
   }
 
   public static TypeMemPtr make( int alias, TypeStruct obj ) { return make(false,BitsAlias.make0(alias),obj); }
@@ -134,11 +133,11 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
 
   // Legacy constructor for legacy HM tests
   public static final int STR_ALIAS = 4; // Legacy str ptr value
-  public static TypeMemPtr make_str(String s) { return make_str(TypeInt.con(s.length()>0 ? s.charAt(0):0)); }
+  public static TypeMemPtr make_str(String s) { return make_str(TypeInt.con( s.isEmpty() ? 0 : s.charAt(0))); }
   public static TypeMemPtr make_str(Type t) { return make_str(BitsAlias.make0(STR_ALIAS),t); }
   public static TypeMemPtr make_str(BitsAlias aliases, Type t) {
     // Make a string object
-    TypeStruct ts = TypeStruct.make_prim(TypeFld.make_clz(TypeStruct.XSTRZ),TypeFld.make_prim(t));
+    TypeStruct ts = TypeStruct.make_prim(TypeFld.make_clz(TypeStruct.XSTRZ()),TypeFld.make_prim(t));
     return TypeMemPtr.make(aliases.test(0),aliases.clear(0),ts);
   }
   public boolean is_str() { return _obj.is_str(); }
@@ -169,6 +168,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public  static final TypeMemPtr INTPTR = TypeMemPtr.make_con(BitsAlias.INT,true,TypeStruct.UNUSED);   // Ptr-to-wrapped int
   public  static final TypeMemPtr FLTPTR = TypeMemPtr.make_con(BitsAlias.FLT,true,TypeStruct.UNUSED);   // Ptr-to-wrapped flt
   public  static final TypeMemPtr STRPTR = make_str(TypeInt.INT8);
+  public  static final TypeMemPtr CLZ_CLZ = TypeMemPtr.make_con(BitsAlias.CLZ,true,TypeStruct.UNUSED);
 
   static final Type[] TYPES = new Type[]{ISUSED0,EMTPTR,DISPLAY,DISPLAY_PTR};
   public static void init1( HashMap<String,TypeNil> types ) {

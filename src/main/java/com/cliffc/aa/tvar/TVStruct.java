@@ -120,9 +120,10 @@ public class TVStruct extends TVExpanding {
   
   boolean del_fld(int idx) {
     boolean pin = _pins[idx];
+    String fld = _flds[idx];
     del_fld0(idx);
     // UN-Pinned fields are re-inserted into the next open super-clazz
-    if( !pin )
+    if( !pin && !Resolvable.is_resolving( fld ))
       throw unimpl();
     return ptrue();
   }
@@ -382,7 +383,7 @@ public class TVStruct extends TVExpanding {
   // TODO  move to Resolvable?
   // Attempt to resolve any unresolved fields.
   // Remove any pre-resolved fields.
-  static boolean trial_resolve_all(boolean outie, TVStruct t) {
+  public static boolean trial_resolve_all( boolean outie, TVStruct t ) {
     boolean progress = false;
     for( int i=0; i<t._max; i++ ) {
       t = ((TVStruct)t.find());

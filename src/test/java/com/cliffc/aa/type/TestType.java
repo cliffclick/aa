@@ -14,9 +14,7 @@ public class TestType {
   @Test public void testType() {
     Ary<Type> ts = Type.ALL_TYPES();
 
-    TypeInt ti = TypeInt.INT64;
-    TypeFlt tf = TypeFlt.FLT64;
-    Type mt = ti.meet(tf);
+    Type t = Type._valueOf("SA:~(^!=!~*[nANY]SA, ...)");
     //assertSame(mt,f);
   }
 
@@ -467,18 +465,18 @@ public class TestType {
     // AS0AS0AS0AS0AS0AS0...
     final int alias2 = BitsAlias.new_alias(BitsAlias.ALLX);
     TypeMemPtr tptr2= TypeMemPtr.make_nil(alias2,TypeStruct.ISUSED); // *[0,2]
-    TypeStruct ta2 = TypeStruct.make_test(Type.ALL,TypeStruct.XINTZ,TypeFld.make("n",tptr2),fldv); // @{n:*[0,2],v:int}
+    TypeStruct ta2 = TypeStruct.make_test(Type.ALL,TypeStruct.XINTZ(),TypeFld.make("n",tptr2),fldv); // @{n:*[0,2],v:int}
 
     // Peel A once without the nil: Memory#3: A:@{n:*[2],v:int}
     // ASAS0AS0AS0AS0AS0AS0...
     final int alias3 = BitsAlias.new_alias(BitsAlias.ALLX);
     TypeMemPtr tptr3= TypeMemPtr.make(alias3,TypeStruct.ISUSED); // *[3]
-    TypeStruct ta3 = TypeStruct.make_test(Type.ALL,TypeStruct.XINTZ,TypeFld.make("n",tptr2),fldv); // @{n:*[0,2],v:int}
+    TypeStruct ta3 = TypeStruct.make_test(Type.ALL,TypeStruct.XINTZ(),TypeFld.make("n",tptr2),fldv); // @{n:*[0,2],v:int}
 
     // Peel A twice without the nil: Memory#4: A:@{n:*[3],v:int}
     // ASASAS0AS0AS0AS0AS0AS0...
     final int alias4 = BitsAlias.new_alias(BitsAlias.ALLX);
-    TypeStruct ta4 = TypeStruct.make_test(Type.ALL,TypeStruct.XINTZ,TypeFld.make("n",tptr3),fldv); // @{n:*[3],v:int}
+    TypeStruct ta4 = TypeStruct.make_test(Type.ALL,TypeStruct.XINTZ(),TypeFld.make("n",tptr3),fldv); // @{n:*[3],v:int}
 
     // Then make a MemPtr{3,4}, and ld - should be a PeelOnce
     // Starting with the Struct not the A we get:
@@ -498,12 +496,12 @@ public class TestType {
     Type mta = mem234.ld(ptr34);
     //assertEquals(ta3,mta);
     TypeMemPtr ptr023 = (TypeMemPtr)TypeMemPtr.make_nil(alias2,TypeStruct.ISUSED).meet(TypeMemPtr.make(alias3,TypeStruct.ISUSED));
-    TypeStruct xta = TypeStruct.make_test(Type.ALL,TypeStruct.XINTZ,TypeFld.make("n",ptr023),fldv);
+    TypeStruct xta = TypeStruct.make_test(Type.ALL,TypeStruct.XINTZ(),TypeFld.make("n",ptr023),fldv);
     assertEquals(xta,mta);
 
     // Mismatched Names in a cycle; force a new cyclic type to appear
     final int alias5 = BitsAlias.new_alias(BitsAlias.ALLX);
-    TypeStruct tfb = TypeStruct.make_test(Type.ALL,TypeStruct.XSTRZ,TypeFld.make("n",TypeMemPtr.make_nil(alias5,TypeStruct.ISUSED)),TypeFld.make("v",TypeFlt.FLT64));
+    TypeStruct tfb = TypeStruct.make_test(Type.ALL,TypeStruct.XSTRZ(),TypeFld.make("n",TypeMemPtr.make_nil(alias5,TypeStruct.ISUSED)),TypeFld.make("v",TypeFlt.FLT64));
     Type mtab = ta2.meet(tfb);
 
     // TODO: Needs a way to easily test simple recursive types
@@ -549,8 +547,8 @@ public class TestType {
     Type.RECURSIVE_MEET++;
     TypeFld fldn1 = TypeFld.malloc("n");
     TypeFld fldn4 = TypeFld.malloc("n");
-    TypeStruct as1 = TypeStruct.malloc_test(TypeStruct.XINTZ,fldn1,fldvi);
-    TypeStruct bs4 = TypeStruct.malloc_test(TypeStruct.XSTRZ,fldn4,fldvf);
+    TypeStruct as1 = TypeStruct.malloc_test(TypeStruct.XINTZ(),fldn1,fldvi);
+    TypeStruct bs4 = TypeStruct.malloc_test(TypeStruct.XSTRZ(),fldn4,fldvf);
     TypeMemPtr ap5 = TypeMemPtr.make(alias,as1);
     TypeMemPtr bp2 = TypeMemPtr.make(alias,bs4);
     fldn1.setX(bp2);

@@ -311,8 +311,8 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   // A fake Type Clazz hierarchy.  Fake because it does not have all the fields
   // found in PrimNode.  Useful for testing.
   public static final TypeStruct XCLZCLZ = ISUSED;
-  public static final TypeStruct XSTRZ = make_test(TypeFld.make_dsp(XCLZCLZ), TypeFld.make("#_",UNUSED) );
-  public static final TypeStruct XINTZ = make_test(TypeFld.make_dsp(XCLZCLZ), TypeFld.make("!_",UNUSED));
+  public static final TypeStruct XSTRZ() { return make_test(TypeFld.make_dsp(XCLZCLZ), TypeFld.make("#_",UNUSED)); }
+  public static final TypeStruct XINTZ() { return make_test(TypeFld.make_dsp(XCLZCLZ), TypeFld.make("!_",UNUSED)); }
 
   // A bunch of types for tests
   public  static final TypeStruct POINT = make_test(TypeFld.make("x",TypeFlt.FLT64),TypeFld.make("y",TypeFlt.FLT64));
@@ -643,7 +643,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     if( ind ) sb.ii(1);
     boolean sep=false;
     for( TypeFld fld : _flds ) {
-      if( fld==TypeFld.ANY_CLZ ) sb.p('_'); // Short-cut the ever-present display
+      if( fld==TypeFld.CLZ_CLZ ) sb.p('_'); // Short-cut the ever-present display
       else {
         if( ind ) sb.nl().i();
         fld._str(visit,dups, sb, debug, indent ); // Field name, access mod, type
@@ -695,7 +695,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
       if( P.peek('$') )
         { ts._def = P.type(null,false,-2); break; }
       TypeFld fld = ts.len()==0 && P.peek('_')
-        ? TypeFld.ANY_CLZ
+        ? TypeFld.CLZ_CLZ
         // Request a parse of:
         //   label:=type (yielding a TypeFld); label can be a number; or
         //   type (yielding a "fld_num=" type TypeFld) or

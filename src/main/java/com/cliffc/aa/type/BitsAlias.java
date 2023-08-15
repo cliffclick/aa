@@ -38,6 +38,7 @@ public class BitsAlias extends Bits<BitsAlias> {
 
   public static final BitsAlias EXT = make0(EXTX);
   public static final BitsAlias LOC = make0(LOCX);
+  public static final BitsAlias CLZ = make0(CLZX);
   public static final BitsAlias INT = make0(INTX);
   public static final BitsAlias FLT = make0(FLTX);
   public static final BitsAlias RPC = make0(RPCX);
