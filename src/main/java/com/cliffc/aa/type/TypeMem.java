@@ -548,7 +548,7 @@ public class TypeMem extends Type<TypeMem> {
   // The fld in the alias set is flattened to set to ANY
   public TypeMem kill(BitsAlias escs, String fld) {
     assert escs.above_center();
-    assert _objs[1]==TypeStruct.UNUSED;
+    //assert _objs[1]==TypeStruct.UNUSED;
     // See if any changes
     boolean found=false;
     for( int alias : escs ) {

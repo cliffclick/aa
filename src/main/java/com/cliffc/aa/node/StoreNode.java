@@ -177,6 +177,11 @@ public class StoreNode extends StoreAbs {
     ErrMsg err = super.err(fast);
     if( err!=null ) return err;
     // Check for storing over final
-    throw unimpl();
+    if( !(adr()._val instanceof TypeMemPtr ptr) ) return null;
+    if( !(mem()._val instanceof TypeMem    mem) ) return null;
+    TypeStruct ts = mem.ld(ptr);
+    TypeFld fld = ts.get(_fld);
+    if( fld==null ) return ts._def==Type.ANY ? null : ErrMsg.FAST;
+    return fld._access==Access.RW ? null : ErrMsg.FAST;
   }
 }

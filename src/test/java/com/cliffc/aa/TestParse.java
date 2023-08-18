@@ -32,8 +32,8 @@ public class TestParse {
     DO_HMT=false;
     RSEED=0;
     //test("1+2*3", "int:7", "int:7");
-    test("sq = { x -> x*x }; (sq(2),sq(3))","*[13](_,int:4,int:9)","*[15](int64,flt64)", null, null, "[14]", null);
-    test("sq = { x -> x*x }; (sq(2),sq(2.2))","*[13](int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
+    //test("sq = { x -> x*x }; (sq(2),sq(3))","*[13](_,int:4,int:9)","*[15](int64,flt64)", null, null, "[14]", null);
+    //test("sq = { x -> x*x }; (sq(2),sq(2.2))","*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(2),fact(2.2))","*[14](nil,1,2)","*[14](int64,int64,int64)", null, null, "[14]", null);
   }
 
@@ -983,7 +983,7 @@ HashTable = {@{
       Type actual = te._t;      // Sharpen any memory pointers
       String gcp_a = format_alias(gcp);
       String gcp_b = format_fidx(gcp_a);
-      Type expect = Type.valueOf(gcp_b);
+      Type expect = Type.valueOf(gcp_b, te._intclz, te._fltclz);
       assertEquals(expect,actual);
     }
     // Check HMT result

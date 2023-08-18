@@ -134,7 +134,7 @@ public abstract class Combo {
   public static boolean post  () { return  AA.LIFTING &&  HM_FREEZE; }
 
   public static void opto() {
-    assert Env.GVN.work_is_clear();
+    assert !PrimNode.post_init() || Env.GVN.work_is_clear();
     // This pass LIFTS not FALLs
     AA.LIFTING = false;
 

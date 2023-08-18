@@ -30,7 +30,7 @@ public class TestLift {
     // 289: *[3](^=any, _289$, _289$, _289$)
     Type.RECURSIVE_MEET++;
     TypeFld[] flds = TypeFlds.get(4);
-    flds[0]=TypeFld.CLZ_CLZ;
+    flds[0]=Cons.CLZ_FLD;
     TypeFld fld0 = flds[1] = TypeFld.malloc("0",null,Access.Final);
     TypeFld fld1 = flds[2] = TypeFld.malloc("1",null,Access.Final);
     TypeFld fld2 = flds[3] = TypeFld.malloc("2",null,Access.Final);
@@ -45,7 +45,7 @@ public class TestLift {
 
     // 917: *[3](^=any, _917$, SCALR, SCALR)
     TypeFld[] flds2 = TypeFlds.get(4);
-    flds2[0]=TypeFld.CLZ_CLZ;
+    flds2[0]=Cons.CLZ_FLD;
     TypeFld fld21 = flds2[2] = TypeFld.make_tup(TypeNil.SCALAR,ARG_IDX+1);
     TypeFld fld22 = flds2[3] = TypeFld.make_tup(TypeNil.SCALAR,ARG_IDX+2);
     Type.RECURSIVE_MEET++;
@@ -120,7 +120,7 @@ public class TestLift {
     // 289: *[3](^=any, _289$)
     Type.RECURSIVE_MEET++;
     TypeFld fld1 = TypeFld.malloc("0",null,Access.Final);
-    TypeStruct ts1 = TypeStruct.malloc_test(TypeFld.CLZ_CLZ,fld1);
+    TypeStruct ts1 = TypeStruct.malloc_test(Cons.CLZ_FLD,fld1);
     TypeMemPtr ret1 = TypeMemPtr.make(false,B3,ts1);
     fld1.setX(ret1);
     Type.RECURSIVE_MEET--;
@@ -129,7 +129,7 @@ public class TestLift {
 
     // 917: *[3](^=any, 0=SCALR)
     TypeFld fld2 = TypeFld.make_tup(TypeNil.SCALAR,ARG_IDX);
-    TypeStruct ts2 = TypeStruct.make_test(TypeFld.CLZ_CLZ,fld2);
+    TypeStruct ts2 = TypeStruct.make_test(Cons.CLZ_FLD,fld2);
     TypeMemPtr ret2 = TypeMemPtr.make(false,B3,ts2);
     
     // Build rezt2 from HM.apply_lift

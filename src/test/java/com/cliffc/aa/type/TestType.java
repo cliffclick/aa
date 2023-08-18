@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.node.PrimNode;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
@@ -12,21 +11,23 @@ import static org.junit.Assert.*;
 public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
-    Ary<Type> ts = Type.ALL_TYPES();
+    //Ary<Type> ts = Type.ALL_TYPES();
 
-    Type t = Type._valueOf("SA:~(^!=!~*[nANY]SA, ...)");
-    //assertSame(mt,f);
+    Type t0 = Type.valueOf("PA:*[nALL](^=PA)");
+    Type t1 = Type.valueOf("*[3](_, 1, ~Scalar)");
+    Type m01 = t0.meet(t1);
+    Type m10 = t1.meet(t0);
+    assertSame(m01,m10);
   }
 
   // Test for a collection of Types, that toString and valueOf are a bijection
   @Test public void testToString() {
     Ary<Type> ts = Type.ALL_TYPES();
-    Object dummy = Env.PRIM;
     String[] ss = new String[ts.len()];
     for( int i=0; i<ts.len(); i++ )
       ss[i] = ts.at(i).str(new SB(), true, false).toString();
     for( int i=0; i<ts.len(); i++ ) {
-      Type t = Type._valueOf(ss[i]);
+      Type t = Type._valueOf(ss[i],null,null);
       assertSame(ts.at(i),t);
     }
   }
@@ -430,7 +431,6 @@ public class TestType {
   // Test limits on recursive type structures; recursively building nested
   // structures caps out in the type system at some reasonable limit.
   @Test public void testRecursive() {
-    Object dummy0 = TypeMemPtr.DISPLAY_PTR; // Must <clinit> out of RECURSIVE_MEET
     final int alias1 = BitsAlias.new_alias(BitsAlias.ALLX);
 
     // Anonymous recursive structs -
@@ -536,8 +536,6 @@ public class TestType {
 
   // Test a cycle with two names on mismatched cycle boundaries
   @Test public void testNameCycle() {
-    Object dummy0 = TypeMemPtr.DISPLAY_PTR; // Must <clinit> out of RECURSIVE_MEET
-    Object dummy1 = TypeFunPtr.EMPTY;       // Must <clinit> out of RECURSIVE_MEET
     // Make a cycle: 0_A: -> 1_(n=*,v=i64) -> 2_TMP -> 3_B: -> 4_(n=*,v=f64) -> 5_TMP ->
     // Dual; then meet ~4_() and ~0_A
     final int alias = BitsAlias.ALLX;
@@ -577,7 +575,6 @@ public class TestType {
   }
 
   @Test public void testLoad() {
-    Object dummy0 = TypeStruct.TYPES;
     int alias0 = BitsAlias.ALLX;
     int alias1 = BitsAlias.new_alias(alias0);
     int alias2 = BitsAlias.new_alias(alias1);

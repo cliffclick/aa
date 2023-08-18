@@ -627,7 +627,7 @@ abstract public class TV3 implements Cloneable {
   static final NonBlockingHashMapLong<Type> ADUPS = new NonBlockingHashMapLong<>();
   public Type as_flow( Node dep ) {
     ADUPS.clear();
-    return _as_flow(dep);
+    return Cyclic.install(_as_flow(dep),null);
   }
   abstract Type _as_flow( Node dep );
 

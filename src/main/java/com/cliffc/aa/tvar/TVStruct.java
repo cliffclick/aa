@@ -108,6 +108,7 @@ public class TVStruct extends TVExpanding {
 
   // Remove
   boolean del_fld0(int idx) {
+    assert !unified();
     assert !Util.eq(_flds[idx],TypeFld.CLZ); // Never remove clazz
     _args[idx] = _args[_max-1];
     _flds[idx] = _flds[_max-1];
@@ -212,15 +213,17 @@ public class TVStruct extends TVExpanding {
         pclz0._unify(pclz1,false);
       }
     }
-    
+
     // Unify LHS fields into RHS.  None in are the CLZ
     for( int i=0; i<thsi._max; i++ ) {
+      thsi = (TVStruct)thsi.find();
+      that = (TVStruct)that.find();
       String key  = thsi._flds[i];
       TV3 fthis   = thsi.arg(i);
       boolean pin = thsi._pins[i];
       if( Util.eq(key,TypeFld.CLZ) ) continue; // Already unified CLZ
       // Fold into the shared CLZ, if possible
-      if( clz!=null && clz.do_into_clz(key,fthis,pin,false,false)!=0 )
+      if( clz!=null && (clz=clz.find().as_struct()).do_into_clz(key,fthis,pin,false,false)!=0 )
         continue;               // Leave field in LHS, its gonna unify anyways
 
       // Check RHS
@@ -237,16 +240,21 @@ public class TVStruct extends TVExpanding {
       } else {
         fthis._unify(that.arg(ti),false); // Unify fields
       }
-      thsi = (TVStruct)thsi.find();
-      that = (TVStruct)that.find();
     }
-    
+    thsi = (TVStruct)thsi.find();
+    that = (TVStruct)that.find();
+
     // Fields on the RHS are aligned with the LHS also
+    assert !that.unified(); // Missing a find
     for( int i=0; i<that._max; i++ ) {
+      assert !that.unified(); // Missing a find
       String key = that._flds[i];
       if( Util.eq(key,TypeFld.CLZ) ) continue; // Already unified CLZ
       if( clz!=null && clz.do_into_clz(key,that.arg(i),that._pins[i], false, false)!=0 ) {
+        thsi = (TVStruct)thsi.find();
+        that = (TVStruct)that.find();
         that.del_fld0(i--);          // Nuke field from RHS, folded into CLZ
+        assert !that.unified(); // Missing a find
         continue;
       }
       int idx = thsi.idx(key);
@@ -254,6 +262,7 @@ public class TVStruct extends TVExpanding {
         if( Resolvable.is_resolving(key) ) continue; // Do not remove until resolved
         if( !is_open() )
           thsi.del_fld(key); // Drop from RHS to match LHS
+        assert !that.unified(); // Missing a find
       }                      // Else, since field already in RHS do nothing
     }
     
@@ -297,6 +306,7 @@ public class TVStruct extends TVExpanding {
       } else {
         // Both, unify into RHS clz
         progress |= pclz0._fresh_unify(pclz1,false);
+        that = (TVStruct)that.find(); // Might have to update
       }
       // RHS CLZ changed; check to see if any local fields move into CLZ
       clz = pclz1.find().as_ptr().load();
@@ -304,8 +314,9 @@ public class TVStruct extends TVExpanding {
         for( int i=0; i<that._max; i++ ) {
           String key = that._flds[i];
           if( !Util.eq(key,TypeFld.CLZ) && // Already unified CLZ
-              clz.do_into_clz(key,that.arg(i),that._pins[i],test,false) != 0 ) // Hit in clazz, done with unify
-            that.del_fld0(i--); // Nuke field from RHS, folded into CLZ
+              clz.do_into_clz(key,that.arg(i),that._pins[i],test,false) != 0 ) { // Hit in clazz, done with unify
+            that.del_fld0( i-- ); // Nuke field from RHS, folded into CLZ
+          }
         }
       }
     }
@@ -318,6 +329,7 @@ public class TVStruct extends TVExpanding {
       // Fold into the shared CLZ, if possible
       TV3 lhs = arg(i);
       if( clz!=null ) {
+        clz = clz.find().as_struct();
         int rez = clz.do_into_clz(key,lhs,_pins[i],test,true);
         if( rez!=0 ) { progress |= rez>0; continue; } // Hit in clazz, done with unify
       }
@@ -448,7 +460,22 @@ public class TVStruct extends TVExpanding {
   }
 
   // -------------------------------------------------------------
-  @Override Type _as_flow( Node dep ) { throw unimpl(); }
+  @Override Type _as_flow( Node dep ) {
+    Type t = ADUPS.get(_uid);
+    if( t!=null )
+      return t;     // Been there, done that
+    TypeFld[] flds = TypeFlds.get(_max);
+    for( int i=0; i<_max; i++ )
+      flds[i] = TypeFld.malloc(_flds[i],null,TypeFld.Access.Final);
+    TypeStruct ts = TypeStruct.malloc(false,false,false,Type.ALL.oob(is_open()),flds);
+    ADUPS.put(_uid,ts);         // Stop cycles
+
+    // Recursively type fields
+    for( int i=0; i<_max; i++ )
+      flds[i]._t = arg(i)._as_flow(dep);
+
+    return ts;
+  }
   @Override void _widen( byte widen ) {
     for( int i=0; i<len(); i++ )
       if( !Resolvable.is_resolving(_flds[i]) )

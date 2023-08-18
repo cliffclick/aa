@@ -79,7 +79,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     if( _any ) sb.p('~');
-    sb.p(_is_con ? '#' : '*');
+    sb.p(_is_con ? '$' : '*');
     if( debug ) _aliases.str(sb);
     sb = _obj._str(visit,dups, sb, debug, indent);
     return _str_nil(sb);
@@ -87,10 +87,13 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
 
   @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return _obj._str_complex(visit,dups); }
 
-  static TypeMemPtr valueOf(Parse P, String cid, boolean any) {
-    P.require('*');
+  static TypeMemPtr valueOf(Parse P, String cid, boolean any, boolean is_con) {
+    P.require(is_con ? '$' : '*');
     var aliases = P.bits(BitsAlias.EMPTY);
-    TypeMemPtr tmp = malloc(any, aliases.test(0),aliases.clear(0),null);
+    boolean haz_nil = aliases.test(0);
+    boolean nil = any &  haz_nil;
+    boolean sub = any | !haz_nil;
+    TypeMemPtr tmp = malloc(any, nil, sub, is_con, aliases.clear(0),null);
     if( cid!=null ) P._dups.put(cid,tmp);
     assert !tmp.interned();
     tmp._obj = (TypeStruct)P.type();
@@ -148,7 +151,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public static final TypeMemPtr DISPLAY_PTR;
   public static final TypeFld    DISP_FLD;
   static {
-    // Install a (to be cyclic) DISPLAY.  Not cyclic during the install, since
+    // Install a (to be cyclic) DISPLAY.  Not cyclic during installation, since
     // we cannot build the cycle all at once.
     DISP_FLD = TypeFld.malloc(TypeFld.CLZ,null,TypeFld.Access.Final);
     TypeStruct.RECURSIVE_MEET++;
@@ -168,7 +171,6 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public  static final TypeMemPtr INTPTR = TypeMemPtr.make_con(BitsAlias.INT,true,TypeStruct.UNUSED);   // Ptr-to-wrapped int
   public  static final TypeMemPtr FLTPTR = TypeMemPtr.make_con(BitsAlias.FLT,true,TypeStruct.UNUSED);   // Ptr-to-wrapped flt
   public  static final TypeMemPtr STRPTR = make_str(TypeInt.INT8);
-  public  static final TypeMemPtr CLZ_CLZ = TypeMemPtr.make_con(BitsAlias.CLZ,true,TypeStruct.UNUSED);
 
   static final Type[] TYPES = new Type[]{ISUSED0,EMTPTR,DISPLAY,DISPLAY_PTR};
   public static void init1( HashMap<String,TypeNil> types ) {
@@ -179,7 +181,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     BitsAlias ad = _aliases.dual();
     TypeStruct od = _obj.dual();
     boolean xor = _nil == _sub;
-    return malloc(!_any,_nil^xor,_sub^xor,_is_con,ad,od);
+    return malloc(!_any,_nil^xor,_sub^xor,!_is_con,ad,od);
   }
   @Override void rdual() { _dual._obj = _obj._dual; }
   @Override protected TypeMemPtr xmeet( Type t ) {
@@ -191,7 +193,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     boolean nil = _nil & ptr._nil;
     boolean sub = _sub & ptr._sub;
     boolean is_con = _is_con & ptr._is_con;
-    return malloc(any,nil,sub,_is_con,aliases, to).hashcons_free();
+    return malloc(any,nil,sub,is_con,aliases, to).hashcons_free();
   }
 
   // Widens, not lowers.

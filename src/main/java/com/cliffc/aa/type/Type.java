@@ -763,7 +763,12 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     final String _str;
     int _x;
     final NonBlockingHashMap<String,Type> _dups = new NonBlockingHashMap<>();
-    Parse(String str) { _str = str; }
+    final TypeMemPtr _intclz, _fltclz;
+    Parse(String str, TypeMemPtr intclz, TypeMemPtr fltclz) {
+      _str = str; 
+      _intclz = intclz;
+      _fltclz = fltclz;
+    }
     Type type() { return type(null,false,-2); }
 
     // dup: the parsed type has a dup label, and as soon as possible needs to
@@ -813,7 +818,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       case ':' -> throw unimpl();
       case '#' -> TypeRPC   .valueOf(this,dup,any) ;
       case '{' -> TypeTuple .valueOf(this,dup,any) ;
-      case '*' -> TypeMemPtr.valueOf(this,dup,any);
+      case '*' -> TypeMemPtr.valueOf(this,dup,any,false);
+      case '$' -> TypeMemPtr.valueOf(this,dup,any,true );
       case '(' -> TypeStruct.valueOf(this,dup,any,true );
       case '@' -> TypeStruct.valueOf(this,dup,any,false);
       case '%' -> TypeNil   .valueOf(this,dup,any);
@@ -843,14 +849,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
           int oldx2 = _x;
 
           // Shortcut for ints/flts.  Check for "int:int_type" or "flt:flt_type"
-          if( Util.eq(id,"int") ) {
-            TypeInt tint = TypeInt.valueOfInt(id_num());
-            yield maybe_dup(dup,(tint==null ? TypeInt.con((long)back_num(oldx2)) : tint).wrap());
-          }
-          if( Util.eq(id,"flt") ) {
-            TypeFlt tflt = TypeFlt.valueOfFlt(id_num());
-            yield maybe_dup(dup,(tflt==null ? TypeFlt.con(      back_num(oldx2)) : tflt).wrap());
-          }
+          if( Util.eq(id,"int") )  yield maybe_int(dup,oldx2);
+          if( Util.eq(id,"flt") )  yield maybe_flt(dup,oldx2);
 
           // Ok, really start a recursive type
           yield type(id,any,fld_num);
@@ -866,9 +866,23 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       }
     };
     }
+    
     // Helper for int/flt parse
     private double back_num(int oldx2) { _x=oldx2; return _num(); }
-    private Type maybe_dup(String dup, Type t) { if( dup!=null ) _dups.put(dup,t);  return t;  }
+    private Type maybe_int(String dup, int oldx2) {
+      TypeInt t = TypeInt.valueOfInt(id_num());
+      if( t==null ) t = TypeInt.con((long)back_num(oldx2));
+      TypeStruct wrap = t.wrap_deep(_intclz);
+      if( dup!=null ) _dups.put(dup,wrap);
+      return wrap;
+    }
+    private Type maybe_flt(String dup, int oldx2) {
+      TypeFlt t = TypeFlt.valueOfFlt(id_num());
+      if( t==null ) t = TypeFlt.con(back_num(oldx2));
+      TypeStruct wrap = t.wrap_deep(_fltclz);
+      if( dup!=null ) _dups.put(dup,wrap);
+      return wrap;
+    }
 
     // Something like { int64, any, ~Scalar, nil } or null
     private Type simple_type(String id) {
@@ -976,8 +990,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     }
     @Override public String toString() { return _str.substring(_x); }
   }
-  public static Type _valueOf( String str ) {
-    Parse P = new Parse(str);
+  public static Type _valueOf( String str, TypeMemPtr intclz, TypeMemPtr fltclz ) {
+    Parse P = new Parse(str,intclz,fltclz);
     Type t1 = P.type();
     Type t2 = t1 instanceof TypeTuple || t1 instanceof TypeMem
       ? t1                       // Since never recursive, these call Cyclic.install internally
@@ -986,10 +1000,13 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   }
   public static Type valueOf( String str ) {
     if( str==null ) return null;
-    Type t = _valueOf(str);
+    Type t = _valueOf(str,null,null);
     //String rez = t.str(new SB(), true, false).toString();
     //assert stripIndent(rez).equals(stripIndent(str));
     return t;
+  }
+  public static Type valueOf( String str, TypeMemPtr intclz, TypeMemPtr fltclz ) {
+    return str==null ? null : _valueOf(str,intclz,fltclz);    
   }
   private static String stripIndent(String s){ return s.replace("\n","").replace(" ",""); }
 

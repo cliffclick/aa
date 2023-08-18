@@ -128,8 +128,11 @@ abstract public class TVExpanding extends TV3 {
     if( dfs==null || dfs.len()==0 ) return;
     if( _delay_fresh==null ) _delay_fresh = dfs;
     else {
-      if( _delay_fresh.find(dfs.at(0)) != -1 ) return;
-      _delay_fresh.addAll(dfs);
+      // If no progress on the first element, we already added and do not try
+      // to add the rest again - AND we stop the cyclic add-all-fields.
+      if( !add_delay_fresh(dfs.at(0)) ) return;
+      for( DelayFresh df : dfs )
+        add_delay_fresh(df);
     }
     super.merge_delay_fresh(dfs);
   }
@@ -144,7 +147,7 @@ abstract public class TVExpanding extends TV3 {
   // Record that on the delayed fresh list and return that.  If `this` ever
   // unifies to something, we need to Fresh-unify the something with `that`.
   @Override void add_delay_fresh() { if( FRESH_ROOT!=null ) add_delay_fresh(FRESH_ROOT); }
-  private void add_delay_fresh( DelayFresh df ) {
+  private boolean add_delay_fresh( DelayFresh df ) {
     df.update();
     // Lazy make a list to hold
     if( _delay_fresh==null ) _delay_fresh = new Ary<>(new DelayFresh[1],0);
@@ -160,11 +163,12 @@ abstract public class TVExpanding extends TV3 {
         }
       }
       // Inserting ROOT, unless a dup
-      if( df.eq(_delay_fresh.at(i)) )
-        return;                 // Dup, do not insert
+      if( df.eq(dfi) )
+        return false;           // Dup, do not insert
     }
     _delay_fresh.push(df);
     assert _delay_fresh.len()<=10; // Switch to worklist format
+    return true;
   }
 
   void add_delay_resolve(TVStruct tvs) {

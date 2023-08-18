@@ -137,8 +137,6 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   public static TypeFld make_tup( Type t, int order ) { return make(TUPS[order],t,Access.Final);  }
   public TypeFld make_from(Type t) { return t==_t ? this : make(_fld,t,_access); }
   public TypeFld make_from(Type t, Access a) { return (t==_t && a==_access) ? this : make(_fld,t,a); }
-  // For some tests
-  public static final TypeFld CLZ_CLZ = make(CLZ,TypeMemPtr.CLZ_CLZ,Access.Final);
 
   @Override protected TypeFld xdual() {
     if( _t==_t.dual() && _access==_access.dual() )

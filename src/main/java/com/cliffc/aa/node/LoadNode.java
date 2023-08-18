@@ -109,7 +109,7 @@ public class LoadNode extends Node implements Resolvable {
     if( ts._def==Type.ANY ) return Type.ANY;
     // Miss on closed structs looks at superclass.
     if( ts.len()>=1 && Util.eq(ts.fld(0)._fld,TypeFld.CLZ) ) {
-      TypeMemPtr ptr = (TypeMemPtr)ts.fld(0)._t;
+      TypeNil ptr = (TypeNil)ts.fld(0)._t;
       TypeStruct obj = mem.ld(ptr);
       return lookup(obj,mem);
     }

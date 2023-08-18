@@ -68,8 +68,8 @@ public class TVPtr extends TV3 {
   @Override Type _as_flow( Node dep ) {
     deps_add(dep);
     // Compatible escaped aliases
-    BitsAlias aliases = Env.ROOT.matching_escaped_aliases(this, dep);
-    return TypeMemPtr.make(false,_may_nil,aliases,TypeStruct.ISUSED);
+    BitsAlias aliases = Env.ROOT==null ? _aliases : Env.ROOT.matching_escaped_aliases(this, dep);
+    return TypeMemPtr.malloc(false,_may_nil,aliases,(TypeStruct)load()._as_flow(dep));
   }
 
   @Override void _widen( byte widen ) { }
