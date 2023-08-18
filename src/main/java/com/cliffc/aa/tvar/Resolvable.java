@@ -60,11 +60,6 @@ public interface Resolvable {
         assert pattern.trial_unify_ok(rhsx)== -1;
         continue;
       }
-      if( pattern.find_trial() == rhsx.find_trial() ) {
-        assert pattern.trial_unify_ok(rhsx)>=  0;
-        yes++; lab=id;
-        continue;
-      }
       // Count YES, NO, and MAYBEs
       switch( pattern.trial_unify_ok( rhsx ) ) {
       case -1 -> HARD_NO.put( dbl_uid, rhsx ); // Cheaper fail next time

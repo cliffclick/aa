@@ -429,7 +429,6 @@ public class TVStruct extends TVExpanding {
     TVStruct that = tv3.as_struct(); // Invariant when called
     int cmp = 1;                     // Assume trial is a YES
     for( int i=0; i<_max; i++ ) {
-      assert !Resolvable.is_resolving( _flds[i] ); // No longer storing resolving fields?
       TV3 lhs = arg(i);
       TV3 rhs = that.arg(_flds[i]); // RHS lookup by field name
       if( lhs!=rhs && rhs!=null ) {

@@ -59,6 +59,8 @@ public class TVPtr extends TV3 {
   // -------------------------------------------------------------
   @Override int _trial_unify_ok_impl( TV3 tv3 ) {
     TVPtr that = (TVPtr)tv3; // Invariant when called
+    // Cannot fail a trial for non-overlapping aliases, since a union can add
+    // aliases later, until the sets overlap.
     return load()._trial_unify_ok(that.load());
   }
 
