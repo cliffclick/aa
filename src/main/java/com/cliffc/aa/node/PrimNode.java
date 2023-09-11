@@ -75,32 +75,32 @@ public abstract class PrimNode extends Node {
       { new AddI64(), new AddIF64() },
       { new SubI64(), new SubIF64() },
       { new MulI64(), new MulIF64() },
-      //{ new DivI64(), new DivIF64() },
-      //{ new LT_I64(), new LT_IF64() },
+      { new DivI64(), new DivIF64() },
+      { new LT_I64(), new LT_IF64() },
       { new LE_I64(), new LE_IF64() },
-      //{ new GT_I64(), new GT_IF64() },
-      //{ new GE_I64(), new GE_IF64() },
-      //{ new EQ_I64(), new EQ_IF64() },
-      //{ new NE_I64(), new NE_IF64() },
-      //{ new MinusI64() }, { new NotI64() }, { new ModI64() },
+      { new GT_I64(), new GT_IF64() },
+      { new GE_I64(), new GE_IF64() },
+      { new EQ_I64(), new EQ_IF64() },
+      { new NE_I64(), new NE_IF64() },
+      { new MinusI64() }, { new NotI64() }, { new ModI64() },
       { new NotI64() }, 
-      //{ new AndI64() }, { new OrI64() },
-      //{ new AndThen() }, { new OrElse() },
+      { new AndI64() }, { new OrI64() },
+      { new AndThen() }, { new OrElse() },
     };
 
     PrimNode[][] FLTS = new PrimNode[][]{
-      //{ new AddF64(), new AddFI64() },
-      { new SubF64(), new SubFI64() },
-      { new MulF64(), new MulFI64() },
-      //{ new DivF64(), new DivFI64() },
-      //{ new LT_F64(), new LT_FI64() },
-      //{ new GE_F64(), new GE_FI64() },
-      { new LE_F64(), new LE_FI64() },
-      //{ new GT_F64(), new GT_FI64() },
-      //{ new EQ_F64(), new EQ_FI64() },
-      //{ new NE_F64(), new NE_FI64() },
-      //{ new MinusF64() },
-      //{ new SinF64() },
+      { new AddF64(), new AddFI64() },
+      { new SubFI64(), new SubF64() },
+      { new MulFI64(), new MulF64() },
+      { new DivF64(), new DivFI64() },
+      { new LT_F64(), new LT_FI64() },
+      { new GE_F64(), new GE_FI64() },
+      { new LE_FI64(), new LE_F64() },
+      { new GT_F64(), new GT_FI64() },
+      { new EQ_F64(), new EQ_FI64() },
+      { new NE_F64(), new NE_FI64() },
+      { new MinusF64() },
+      { new SinF64() },
     };
 
     PrimNode[][] STRS = new PrimNode[][] {
@@ -132,6 +132,9 @@ public abstract class PrimNode extends Node {
     // ClazzClazz
     ZCLZ.close();
     PCLZ.init();
+    StoreXNode mem = new StoreXNode(Env.SCP_0.mem(),PCLZ.add_flow(),ZCLZ,null).init();
+    mem._live = TypeMem.ALLMEM;
+    Env.SCP_0.set_mem(mem);
     ZCLZ.set_tvar();
 
     // Gather
@@ -143,6 +146,7 @@ public abstract class PrimNode extends Node {
     // Build the int and float prototypes
     make_prim(ZFLT,"flt:",PFLT,FLTS);
     make_prim(ZINT,"int:",PINT,INTS);
+    // String prototypes, uses ints, but ints do not depend on strs.
     make_prim(ZSTR,"str:",PSTR,STRS);
 
     // Math package
@@ -154,7 +158,6 @@ public abstract class PrimNode extends Node {
     IBOOL = new TVStruct(ss, new TV3[]{PINT.set_tvar(),TVBase.make(TypeInt. BOOL )},false);
     IFLT  = new TVStruct(ss, new TV3[]{PFLT.set_tvar(),TVBase.make(TypeFlt. FLT64)},false);
     INFLT = new TVStruct(ss, new TV3[]{PFLT.set_tvar(),TVBase.make(TypeFlt.NFLT64)},false);
-
 
     // Loop, setting initial types for all primitives
     Node n0;
@@ -298,9 +301,9 @@ public abstract class PrimNode extends Node {
       }
       TypeNil tformal = (TypeNil)_formals.at(i);
       Type actual = val(i-DSP_IDX);
-      if( actual==Type.ALL ) return Type.ALL;
+      if( !(actual instanceof TypeStruct sactual) ) return actual.oob();
       // Unwrap
-      TypeNil ptn = (TypeNil)((TypeStruct)actual).at(1);
+      TypeNil ptn = (TypeNil)sactual.at(TypeFld.PRIM);
       // Cap it at the formal
       TypeNil t = TS[i-DSP_IDX] = ptn==TypeNil.NIL ? TypeNil.NIL : (TypeNil)tformal.dual().meet(ptn);
       if( t != TypeNil.NIL && !t.is_con() ) {

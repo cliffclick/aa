@@ -1,4 +1,104 @@
 =======================================
+09/11/2023
+
+Final result: each Fresh instance of an unresolved field might require a
+different label.
+
+Either this should not type OR I can type it, but require inlining for an
+efficient solution.
+
+These can be inlined, making a specific instance per-use and thus type.
+But this requires *inlining* to allow *typing*.
+
+    `sq = { x -> x*x }; (sq(2),sq(2.2))`
+
+Here I need to resolve a load from operator _*_.  The standard set is
+  ( { int int -> int }, { int flt -> flt } )  // Integer MUL
+  ( { flt int -> flt }, { flt flt -> flt } )  // Float   MUL
+`sq(2  )` needs field `0` to get `{ int int -> int }`
+`sq(2.2)` needs field `1` to get `{ flt flt -> flt }`
+
+This example types fine, except I cannot choose between fields `0` and `1`.
+Stalled on having a dynamic field load resolution; one that does not depend
+on code cloning in *every* case.
+
+
+So here's a "bad" good solution-
+- At every Fresh usage, I tag the value with a unique v-table (unique-per-Fresh).
+- At the usage sute of a tagged value, I have a constant lookup.
+  This gets me the field offset.
+- So at the `sq( 2 )` place, I take `sq` with vtable[0]=0;
+- So at the `sq(2.2)` place, I take `sq` with vtable[0]=4;
+- Since args are not uniform, I wrap.
+- Inside of `sq`, I use the vtable of `x` to lookup `_*_` at a fixed offset.
+- At the one dynamic field, I lookup vtable[0], get a field (0 or 1) or field offset (0 or 4)
+- I load from tuple+offset, getting either {int int -> int} or {flt flt -> flt}.
+
+Again for `fact`:
+
+      `fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(2),fact(2.2))`
+
+Here the inside `fact` has no Fresh, so this is identical to the `sq` solution.
+
+
+General rule...
+- if i can type at all, the unresolved field becomes resolved at some level
+- last LET before it becomes unresolved takes a vtable, indexed by each usage site.
+- eg ( z = ... (x = ... ( y = ... struct._ ... ))); ( ...x..y..z.., ...x..y..z.. )
+- - if x & y types still have unresolved, but z does not, then x gets vtable.
+- - Or maybe y gets vtable from x.
+
+Big Picture Answer right now
+- Allow mismatched field offset
+- I think there's an "acceptable" fast solution
+- More inlining might reduce cost to icache-bloat
+- Expect to inline for true primitives anyways
+
+
+=======================================
+08/19/2023
+
+About to go to BM, so dumping some state here.
+
+Still failing to type: "fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(2), fact(2.2))".
+
+Issue is the FRESH type of "fact" pushes its internal Resolving fields (for the opers <=, -, *)
+into the pre-FRESH types.  These pre-FRESH types are already set to either INT CLZ or FLT CLZ
+which then forces the internal field resolves.
+
+This is correct for "_<=_" because I match ({A int:1 -> A}, ...) vs both
+({int int -> int},{int flt -> flt})
+({flt int -> int},{flt flt -> flt})
+and field 0 works for both.
+Same reason works for "_-_".
+
+Fails for "x*fact(x-1)" because the match is: ({A A -> A}, ...) vs
+({int int -> int},{int flt -> flt})
+({flt int -> int},{flt flt -> flt})
+Which requires field 0 for INTs and field 1 for FLTs.
+
+I've known all along I need to clone `fact` for primitives.
+Issue right now is: I'm getting a broken type instead of a failed typing.
+
+
+Theory:
+
+fresh_unify does NOT push its &123 Resolving fields into `that`?
+Might be I never resolve inside of unify, directly.
+Instead, I attempt resolve for a particular copy a TVStruct.
+If it works (yes or no, not maybe), I record the answer so faster in future -
+and I record the selected field in the Load.  There might be several unrelated
+field choices (e.g. `fact` will demand the `_*_` pick different fields).
+
+If the Load has only 1 pick, we take it and Done!
+If the load has several picks, I need to fail out for ambiguous, (and demand more cloning).
+
+"Demand more cloning" - in "Iter" pass, if a fcn recieves mixed primitives &
+ref args, clone for arg types!!!
+
+
+
+=======================================
 06/25/2023
 
 More on overloads

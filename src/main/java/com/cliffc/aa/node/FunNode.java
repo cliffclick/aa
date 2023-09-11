@@ -501,7 +501,7 @@ public class FunNode extends Node {
     path_call.set_fdx(new_funptr); // Force new_funptr, will re-wire later
 
     // For all aliases split in this pass, update in-node both old and new.
-    // This changes their hash, and afterwards the keys cannot be looked up.
+    // This changes their hash, and afterward the keys cannot be looked up.
     for( Map.Entry<Node,Node> e : map.entrySet() )
       if( e.getKey() instanceof MemSplitNode memsplit )
         //memsplit.split_alias(e.getValue(),aliases);

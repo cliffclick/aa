@@ -22,7 +22,7 @@ public interface Cyclic {
 
   static <T extends Type> T install( T head ) { return install(head,null); }
 
-  static <T extends Type> T install( T head, Map<String,Type> map ) {
+  static <T extends Type, K extends Object, V extends Type> T install( T head, Map<K,V> map ) {
     long t0 = System.currentTimeMillis();
     TypeStruct.MEETS0.clear();
     _reachable(head,true);      // Compute 1st-cut reachable
@@ -42,7 +42,7 @@ public interface Cyclic {
 
     // Update the mapping
     if( map != null )
-      map.replaceAll((k,v) -> v.interned() ? v : v.intern_get());
+      map.replaceAll((k,v) -> v.interned() ? v : (V)(v._hash==0 ? v.hashcons_free() : v.intern_get()));
     // Free anything interned to a previous Type
     while( SCC_FREE_FLDS._len>0 )
       SCC_FREE_FLDS.pop().flds_free();
@@ -115,7 +115,7 @@ public interface Cyclic {
       // in a different order on a later install.  Requires 2 passes.
       long cyc_hash=0;
       for( Type c : ts )  cyc_hash ^= c.static_hash(); // Just XOR all the static hashes
-      if( cyc_hash==0 ) cyc_hash = 0xcafebabeL;        // Disallow zero hash
+      if( cyc_hash==0 )   cyc_hash = 0xcafebabeL;      // Disallow zero hash
       for( Type c : ts )  c._cyc_hash = cyc_hash;      // Set cyc_hash to the same for all cycle members
       for( Type c : ts )  c._hash = c.compute_hash();  // Now compute proper hash - depends on cyc_hash plus the member specifics
 
@@ -492,7 +492,7 @@ public interface Cyclic {
 
 
   @SuppressWarnings("unchecked")
-  private static <T extends Type> T _dfa_min(T nt, Map<String,Type> map) {
+  private static <T extends Type, K extends Object, V extends Type> T _dfa_min(T nt, Map<K,V> map) {
     // Walk the reachable set and all forward edges, building a reverse-edge set.
     for( Type t : REACHABLE )  {
       assert (t._hash==0) == (t.dual()==null);  // Invariant: not-interned has no hash
@@ -522,7 +522,7 @@ public interface Cyclic {
     if( map!=null )
       map.replaceAll((k,v) -> {
           Partition P = Partition.TYPE2PART.get(v._uid);
-          return P==null ? v : P.head();
+          return P==null ? v : (V)P.head();
         });
 
     // Free all the Types declared as replicas

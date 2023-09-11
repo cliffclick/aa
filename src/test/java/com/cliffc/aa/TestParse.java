@@ -31,9 +31,9 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
-    //test("1+2*3", "int:7", "int:7");
-    //test("sq = { x -> x*x }; (sq(2),sq(3))","*[13](_,int:4,int:9)","*[15](int64,flt64)", null, null, "[14]", null);
-    //test("sq = { x -> x*x }; (sq(2),sq(2.2))","*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
+    test("sq = { x -> x*x }; (sq(2),sq(2.2))","*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
+    test("1", "int:1", "int:1");
+    test("sq = { x -> x*x }; (sq(2),sq(3))","*[13](_,int:4,int:9)","*[15](int64,flt64)", null, null, "[14]", null);
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(2),fact(2.2))","*[14](nil,1,2)","*[14](int64,int64,int64)", null, null, "[14]", null);
   }
 
@@ -55,7 +55,7 @@ public class TestParse {
 
   // Some HM related type tests
   @Test public void testParse99() {
-    test("1", "1", "1");
+    test("1", "int:1", "int:1");
     // Simple primitive expansion, pre-combo
     test("1+2", "3", "3");
     // Big enough that the primitives do not all inline before Combo, so Combo
@@ -1014,7 +1014,7 @@ HashTable = {@{
          // Specific to a weak solo HMT: without GCP nearly everything escapes, so
          // everything has a default input, so many things cannot resolve.
          (gcp==null && hmt!=null)) ) {
-      assertTrue(te._errs != null && te._errs.size()>=1);
+      assertTrue(te._errs != null && !te._errs.isEmpty() );
       String err2 = format_alias(err );
       String err3 = format_fidx (err2);
       String actual = te._errs.get(0).toString();

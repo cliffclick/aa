@@ -224,7 +224,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   public final SB str( SB sb, VBitSet typebs, NonBlockingHashMapLong<String> dups, boolean debug, boolean indent ) {
     if( dups==null ) {
       assert typebs==null;
-      _str_dups(typebs = new VBitSet(), dups = new NonBlockingHashMapLong<>(), new UCnt());
+      _str_dups(typebs = new VBitSet(), dups = new NonBlockingHashMapLong<>(), new UCnt(), indent);
       typebs.clr();
     }
     return _str(typebs, dups, sb, debug, indent );
@@ -236,7 +236,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // fields being filled, or the types being interned or having their hash.
   // Walk the entire reachable set of types and gather the dups, and come up
   // with a nice name for each dup.
-  public void _str_dups(VBitSet visit, NonBlockingHashMapLong<String> ignore, UCnt ucnt) { visit.tset(_uid); }
+  public void _str_dups(VBitSet visit, NonBlockingHashMapLong<String> ignore, UCnt ucnt, boolean indent) { visit.tset(_uid); }
 
   // Internal tick of tick-tock printing
   final SB _str( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {

@@ -11,7 +11,7 @@ abstract public class TVExpanding extends TV3 {
   // If it ever changes (add_fld to TVStruct, or TVLeaf unify), we need to re-Fresh the deps.
   static Ary<DelayFresh> DELAY_FRESH  = new Ary<>(new DelayFresh[1],0);
   // If this TV expands, we need to re-check resolving fields in these structs
-  static Ary<TVStruct> DELAY_RESOLVE  = new Ary<>(new TVStruct[1],0);
+  private static Ary<TVStruct> DELAY_RESOLVE  = new Ary<>(new TVStruct[1],0);
 
   // This TV3 is used Fresh against another TV3.
   // If it ever changes, we need to re-Fresh the dependents.
@@ -97,8 +97,10 @@ abstract public class TVExpanding extends TV3 {
     //if( Combo.HM_AMBI ) // Having failed alread, will never result
     //  DELAY_RESOLVE.clear();
     //else
-    while( DELAY_RESOLVE.len() > 0 )
-      TVStruct.trial_resolve_all(true,DELAY_RESOLVE.pop().find().as_struct());
+    while( DELAY_RESOLVE.len() > 0 ) {
+      TVStruct tv = DELAY_RESOLVE.pop();
+      TVStruct.trial_resolve_all(true,tv.find().as_struct());
+    }
   }
 
   // Union this into that.  Merge the delay worklist

@@ -115,7 +115,7 @@ public class CallNode extends Node {
   public Node mem() { return in(MEM_IDX); }
   public Node dsp() { return in(DSP_IDX); } // Display
   public Node fdx() { return in(nargs()); } // Function
-  Node arg ( int x ) { assert x>=0; return _defs.at(x); }
+  Node arg( int x ) { assert x>=0; return _defs.at(x); }
   // Set arguments
   void set_xmem() { set_def(MEM_IDX, Env.ANY); }
   void set_xarg(int idx) { assert idx>=DSP_IDX && idx <nargs();  set_def(idx, Env.ANY); }
@@ -428,7 +428,7 @@ public class CallNode extends Node {
     // more sensible.
     BitsFun.Tree<BitsFun> tree = fidxs.tree();
     for( int j=ARG_IDX; j<nargs(); j++ ) {
-      Type actual = arg(j).sharptr(mem());
+      Type actual = arg(j)._val; // Actual argument, not sharpened
       Ary<Type> ts=null;
       for( int fidx : fidxs ) {
         if( fidx==0 ) continue;

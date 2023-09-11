@@ -39,10 +39,10 @@ public class TypeTuple extends Type<TypeTuple> {
   // Never part of a cycle so the normal equals works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
 
-  @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
+  @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt, boolean indent ) {
     for( Type t : _ts )
       if( t!=null )
-        t._str_dups(visit,dups,ucnt);
+        t._str_dups(visit,dups,ucnt,indent);
   }
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {

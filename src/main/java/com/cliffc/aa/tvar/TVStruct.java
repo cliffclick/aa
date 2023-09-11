@@ -213,18 +213,22 @@ public class TVStruct extends TVExpanding {
         pclz0._unify(pclz1,false);
       }
     }
+    thsi = (TVStruct)thsi.find();
+    that = (TVStruct)that.find();
 
     // Unify LHS fields into RHS.  None in are the CLZ
     for( int i=0; i<thsi._max; i++ ) {
-      thsi = (TVStruct)thsi.find();
-      that = (TVStruct)that.find();
+      assert !thsi.unified();
       String key  = thsi._flds[i];
       TV3 fthis   = thsi.arg(i);
       boolean pin = thsi._pins[i];
       if( Util.eq(key,TypeFld.CLZ) ) continue; // Already unified CLZ
       // Fold into the shared CLZ, if possible
-      if( clz!=null && (clz=clz.find().as_struct()).do_into_clz(key,fthis,pin,false,false)!=0 )
+      if( clz!=null && (clz=clz.find().as_struct()).do_into_clz(key,fthis,pin,false,false)!=0 ) {
+        thsi = (TVStruct)thsi.find();
+        that = (TVStruct)that.find();
         continue;               // Leave field in LHS, its gonna unify anyways
+      }
 
       // Check RHS
       int ti = that.idx(key);
@@ -232,17 +236,17 @@ public class TVStruct extends TVExpanding {
         if( that.is_open() ) {
           that.add_fld(key,fthis,pin); // Add to RHS
         } else if( Resolvable.is_resolving(key) ) {
-          that.add_fld(key,fthis,pin); // Add to RHS
           add_delay_resolve(that);
+          that.add_fld(key,fthis,pin); // Add to RHS
         } else {
           that.del_fld(key);    // Remove from RHS
         }
       } else {
         fthis._unify(that.arg(ti),false); // Unify fields
       }
+      thsi = (TVStruct)thsi.find();
+      that = (TVStruct)that.find();
     }
-    thsi = (TVStruct)thsi.find();
-    that = (TVStruct)that.find();
 
     // Fields on the RHS are aligned with the LHS also
     assert !that.unified(); // Missing a find
@@ -334,11 +338,19 @@ public class TVStruct extends TVExpanding {
         if( rez!=0 ) { progress |= rez>0; continue; } // Hit in clazz, done with unify
       }
       
-      int ti = that.idx(_flds[i]);
+      int ti = that.idx(key);
       if( ti == -1 ) {          // Missing in RHS
 
         if( that.is_open() || Resolvable.is_resolving(key) ) {
-          if( test ) return ptrue(); // Will definitely make progress
+          if( test ) {
+            if( that.is_open() ) return ptrue(); // Will definitely make progress
+            else continue;
+          }
+          // If that is open and missing, just force a copy in.  If that is
+          // closed, but the fresh field is resolving, force it in anyways and
+          // demand that RHS resolves.
+          if( !that.is_open() && Resolvable.is_resolving( key) )
+            that.add_delay_resolve( that );
           progress |= that.add_fld(key,lhs._fresh(),_pins[i]);
         } else if( is_open() ) // RHS not open, put copy of LHS into RHS with miss_fld error
           throw unimpl();       // miss_fld

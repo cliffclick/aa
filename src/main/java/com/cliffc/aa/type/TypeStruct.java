@@ -601,7 +601,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     return false;
   }
 
-  @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
+  @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt, boolean indent ) {
     if( visit.tset(_uid) ) {
       if( !dups.containsKey(_uid) )
         dups.put(_uid,"S"+(char)('A'+ucnt._ts++));
@@ -609,11 +609,11 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     }
     // Do not walk the primitive prototype from the primitive, because it will
     // use short-cut printing.
-    if( is_prim_clz() ) return;
+    if( !indent && is_prim_clz() ) return;
 
     for( int i=0; i<len(); i++ ) // DO NOT USE iter syntax, else toString fails when the iter pool exhausts during a debug session
       if( get(i)!=null )
-        get(i)._str_dups(visit,dups,ucnt);
+        get(i)._str_dups(visit,dups,ucnt,indent);
   }
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
@@ -621,14 +621,16 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     // To distinguish "DUP:(...)" from "CLZ:(...)" we require another ':' IFF DUP is present.
     //       ()  -- parses as a no-dup tuple
     //   dup:()  -- parses as a    dup tuple
-    if( is_top_clz() ) return sb.p("@{TOP}");
-    if( is_int_clz() ) return sb.p("@{INT}");
-    if( is_flt_clz() ) return sb.p("@{FLT}");
-    if( is_str_clz() ) return sb.p("@{STR}");
-    if( is_math_clz()) return sb.p("@{MATH}");
-    if( is_str() ) return sb.p("str:("+_flds[1]._t+")");
-
-    if( _flds.length>1 && Util.eq(_flds[0]._fld,TypeFld.CLZ) && _flds[0]._t instanceof TypeMemPtr pclz && pclz._is_con ) {
+    if( !indent ) {
+      if( is_top_clz() ) return sb.p("@{TOP}");
+      if( is_int_clz() ) return sb.p("@{INT}");
+      if( is_flt_clz() ) return sb.p("@{FLT}");
+      if( is_str_clz() ) return sb.p("@{STR}");
+      if( is_math_clz()) return sb.p("@{MATH}");
+      if( is_str() ) return sb.p("str:("+_flds[1]._t+")");
+    }
+    
+    if( _flds.length>1 && Util.eq(_flds[0]._fld,TypeFld.CLZ) && _flds[0]._t instanceof TypeMemPtr pclz && pclz._is_con && !indent ) {
       if( pclz._aliases==BitsAlias.INT ) return _flds[1]._t._str(visit,dups,sb.p("int:"),debug,indent);
       if( pclz._aliases==BitsAlias.FLT ) return _flds[1]._t._str(visit,dups,sb.p("flt:"),debug,indent);
     }
@@ -663,8 +665,8 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return true; }
 
   boolean is_top_clz () { return _flds.length>1 && Util.eq("math",_flds[1]._fld); }
-  boolean is_int_clz () { return _flds.length>1 && Util.eq("!_"  ,_flds[1]._fld); }
-  boolean is_flt_clz () { return _flds.length>1 && Util.eq("-_"  ,_flds[1]._fld); }
+  boolean is_int_clz () { return find("!_" ) != -1; }
+  boolean is_flt_clz () { return find("sin") != -1; }
   boolean is_str_clz () { return _flds.length>1 && Util.eq("#_"  ,_flds[1]._fld); }
   boolean is_math_clz() { return _flds.length>1 && Util.eq("pi"  ,_flds[0]._fld); }
   boolean is_prim_clz() {
@@ -750,6 +752,13 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     if( idx == -1 ) return this;
     TypeFld[] flds = TypeFlds.clone(_flds);
     flds[idx] = TypeFld.make(fld,ANY);
+    return make_from(flds);
+  }
+  
+  @Override public TypeStruct sharptr2( TypeMem mem ) {
+    TypeFld[] flds = TypeFlds.clone(_flds);
+    for( int i=0; i<flds.length; i++ )
+      flds[i] = flds[i].sharptr2(mem);
     return make_from(flds);
   }
   

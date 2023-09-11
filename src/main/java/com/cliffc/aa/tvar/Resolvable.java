@@ -124,11 +124,7 @@ public interface Resolvable {
   // Resolve failed; if ambiguous report that; if nothing present report that;
   // otherwise force unification on all choices which will trigger an error on
   // each choice.
-  default void resolve_failed() {
-    Node fld = (Node)this;
-    Env.GVN.add_flow(fld);
-    fld.deps_work_clear();
-  }
+  abstract void resolve_or_fail();
 
   public static void reset_to_init0() {
     HARD_NO.clear();

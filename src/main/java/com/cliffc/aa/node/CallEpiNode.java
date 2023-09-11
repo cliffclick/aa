@@ -402,6 +402,7 @@ public final class CallEpiNode extends Node {
           Env.GVN.add_reduce(in(i)); // Fewer uses of Ret
           fun.remove(call);     // Remove from Fun
           remove(in(i));        // Remove from Ret
+          i--;
         }
       }
     }

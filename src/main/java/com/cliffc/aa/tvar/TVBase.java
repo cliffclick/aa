@@ -45,7 +45,9 @@ public class TVBase extends TVExpanding {
   // -------------------------------------------------------------
   @Override public void _union_impl(TV3 t) {
     TVBase that = (TVBase)t;    // Invariant when called
-    that._t = that._t.meet(_t);
+    Type mt = that._t.meet(_t);
+    if( mt==that._t ) return;
+    that._t = mt;
   }
   
   @Override boolean _unify_impl(TV3 t ) { return true; }

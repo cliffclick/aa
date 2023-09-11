@@ -533,6 +533,16 @@ abstract public class TV3 implements Cloneable {
     _deps = null;
   }
 
+  public void reset_deps() { DEPS_VISIT.clear(); _reset_deps(); }
+  private void _reset_deps() {
+    if( DEPS_VISIT.tset(_uid) ) return;
+    if( _deps!=null ) _deps = null;
+    if( _args!=null )
+      for( int i=0; i<len(); i++ )
+        if( _args[i]!=null )
+          _args[i]._reset_deps();
+  }
+
   // -----------------
   public static TV3 from_flow(Type t) { return from_flow(t,0); }
   private static TV3 from_flow(Type t, int d) {
@@ -541,7 +551,7 @@ abstract public class TV3 implements Cloneable {
     case TypeFunPtr tfp ->  tfp.is_full() ? new TVLeaf() // Generic Function Ptr
       : new TVLambda(tfp.nargs(),from_flow(tfp.dsp(),d),from_flow(tfp._ret,d));
     case TypeMemPtr tmp -> {
-      TVStruct ts = (TVStruct)from_flow(tmp._obj,d);
+      TVStruct ts = tmp.is_simple_ptr() ? new TVStruct(true) : (TVStruct)from_flow(tmp._obj,d);
       StoreXNode.unify(tmp._aliases,ts,false);
       yield new TVPtr(tmp._aliases,ts);
     }

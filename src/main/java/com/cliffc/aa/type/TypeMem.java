@@ -117,10 +117,10 @@ public class TypeMem extends Type<TypeMem> {
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
 
-  @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
+  @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt, boolean indent ) {
     for( int i = 1; i< _objs.length; i++ )
       if( _objs[i]!=null )
-        _objs[i]._str_dups(visit,dups,ucnt);
+        _objs[i]._str_dups(visit,dups,ucnt,indent);
   }
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
@@ -357,7 +357,7 @@ public class TypeMem extends Type<TypeMem> {
   // --------------------------------------------------------------------------
   // Sharpen a dull pointer against this memory.
   public TypeMemPtr sharpen( TypeMemPtr dull ) {
-    assert dull==dull.simple_ptr();
+    assert dull.is_simple_ptr();
     if( _sharp_cache != null ) { // Check the cache first
       TypeMemPtr sharp = _sharp_cache.get(dull._aliases);
       if( sharp != null ) return sharp;
@@ -381,17 +381,18 @@ public class TypeMem extends Type<TypeMem> {
     // See if we need to cycle-install any cyclic types
     if( dull_cache.isEmpty() )
       return sharp;
-    // On exit, cyclic-intern all cyclic things; remove from dull cache.
-    TypeStruct mt = Cyclic.install(sharp._obj);
-    sharp = dull.make_from(mt);
-    return sharput(dull._aliases,sharp);
+    // On exit, cyclic-intern all cyclic things; remove from dull cache and sharpen all
+    TypeStruct mt = Cyclic.install(sharp._obj, dull_cache);
+    // Move from sharpened dull cache to sharp cache
+    for( TypeMemPtr tmp : dull_cache.values() )
+      sharput(tmp._aliases,tmp);
+    return sharp_get(dull._aliases);
   }
   TypeMemPtr sharp_get( BitsAlias aliases ) { return _sharp_cache==null ? null : _sharp_cache.get(aliases); }
-  TypeMemPtr sharput( BitsAlias aliases, TypeMemPtr sharp ) {
+  void sharput( BitsAlias aliases, TypeMemPtr sharp ) {
     assert sharp.interned();
     if( _sharp_cache==null ) _sharp_cache = new HashMap<>();
     _sharp_cache.put(aliases,sharp);
-    return sharp;               // return new not old
   }
   // Sharpen if a maybe-pointer
   @Override public Type sharptr( Type ptr ) { return ptr.sharptr2(this); }
@@ -435,7 +436,7 @@ public class TypeMem extends Type<TypeMem> {
   private static TypeMemPtr _is_sharp(Type t) {
     if( DULLV.tset(t._uid) ) return null;
     if( !(t instanceof Cyclic) ) return null;
-    if( t instanceof TypeMemPtr tmp && tmp._obj==TypeStruct.ISUSED ) return tmp;
+    if( t instanceof TypeMemPtr tmp && tmp.is_simple_ptr() ) return tmp;
     return t.walk((fld,ignore) -> _is_sharp(fld), (x,y)-> x==null ? y : x);
   }
 

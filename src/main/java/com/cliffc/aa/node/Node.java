@@ -383,8 +383,8 @@ public abstract class Node implements Cloneable, IntSupplier {
     VBitSet hmt_bs   = new VBitSet();
     VBitSet hmt_dups = new VBitSet();
     for( Node n : nodes ) {
-      n._val ._str_dups(typebs, dups, ucnt);
-      n._live._str_dups(typebs, dups, ucnt);
+      n._val ._str_dups(typebs, dups, ucnt, false);
+      n._live._str_dups(typebs, dups, ucnt, false);
       if( n._tvar!=null ) n._tvar._get_dups(hmt_bs,hmt_dups,true,prims);
     }
     typebs.clr();
@@ -762,6 +762,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     assert is_prim();           // Primitives
     _elock = false;             // Clear elock if reset_to_init0
     _deps = null;               // No deps
+    if( _tvar!=null ) _tvar.reset_deps();
     walk_reset0();              // Special reset
 
     // Remove non-prim inputs to a prim.  Skips all asserts and worklists.

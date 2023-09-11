@@ -68,13 +68,13 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     return _obj == t2._obj || _obj.cycle_equals(t2._obj);
   }
 
-  @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
+  @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt, boolean indent ) {
     if( visit.tset(_uid) ) {
       if( !dups.containsKey(_uid) )
         dups.put(_uid,"P"+(char)('A'+ucnt._tmp++));
       return;
     }
-    _obj._str_dups(visit,dups,ucnt);
+    _obj._str_dups(visit,dups,ucnt, indent);
   }
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
@@ -168,8 +168,8 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public  static final TypeMemPtr ISUSED = make(false,BitsAlias.NALL,TypeStruct.ISUSED); // Excludes nil
   public  static final TypeMemPtr EMTPTR = malloc(false,false,BitsAlias.EMPTY,TypeStruct.UNUSED).hashcons_free();
   public  static final TypeMemPtr DISP_SIMPLE= make(false,BitsAlias.NALL,TypeStruct.ISUSED); // closed display
-  public  static final TypeMemPtr INTPTR = TypeMemPtr.make_con(BitsAlias.INT,true,TypeStruct.UNUSED);   // Ptr-to-wrapped int
-  public  static final TypeMemPtr FLTPTR = TypeMemPtr.make_con(BitsAlias.FLT,true,TypeStruct.UNUSED);   // Ptr-to-wrapped flt
+  public  static final TypeMemPtr INTPTR = TypeMemPtr.make_con(BitsAlias.INT,true,TypeStruct.ISUSED);   // Simple ptr-to-wrapped int
+  public  static final TypeMemPtr FLTPTR = TypeMemPtr.make_con(BitsAlias.FLT,true,TypeStruct.ISUSED);   // Simple ptr-to-wrapped flt
   public  static final TypeMemPtr STRPTR = make_str(TypeInt.INT8);
 
   static final Type[] TYPES = new Type[]{ISUSED0,EMTPTR,DISPLAY,DISPLAY_PTR};
@@ -201,6 +201,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     if( _obj.len()==0 ) return this;
     return make_from(_obj.oob(TypeStruct.ISUSED));
   }
+  public final boolean is_simple_ptr() { return _obj==TypeStruct.ISUSED; }
 
   public BitsAlias aliases() { return _aliases; }
 

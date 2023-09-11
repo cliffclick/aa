@@ -6,6 +6,7 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
+import java.util.HashSet;
 
 // Load a struct from memory.  Does its own nil-check testing.
 //
@@ -39,12 +40,17 @@ public class LoadNode extends Node implements Resolvable {
 
   // A struct using just the field; just a cache for faster live-use
   private final TypeStruct _live_use;
+
+  // If this is a unresolved Load, this is the collection of resolve choices.
+  private final HashSet<String> _flds;
+  
   
   public LoadNode( Node mem, Node adr, String fld, Parse bad ) {
     super(OP_LOAD,null,mem,adr);
     _fld = resolve_fld_name(fld);
     _bad = bad;
     _live_use = TypeStruct.UNUSED.add_fldx(TypeFld.make(_fld,Type.ALL));
+    _flds = is_resolving() ? new HashSet<>() : null;
   }
   // A plain "_" field is a resolving field
   private String resolve_fld_name(String fld) { return Util.eq(fld,"_") ? ("&"+_uid).intern() : fld; }
@@ -54,13 +60,8 @@ public class LoadNode extends Node implements Resolvable {
   @Override public String fld() { assert !is_resolving(); return _fld; }
   // Set the resolved field label
   @Override public String resolve(String label) {
-    assert !Combo.HM_AMBI;  // Must resolve before ambiguous field pass
-    unelock();                  // Hash changes since label changes
-    String old = _fld;
-    _fld = label;
-    add_flow();
-    in(1).add_flow(); // Liveness sharpens to specific field
-    return old;
+    _flds.add(label);
+    return _fld;
   }
 
   
@@ -87,10 +88,12 @@ public class LoadNode extends Node implements Resolvable {
     if( is_resolving() ) {
       if( ts.above_center() ) return TypeNil.XSCALAR;
       // TODO: include clz fields
-      Type t2 = ts._def;
+      Type t2;
       if( Combo.pre() || Combo.HM_AMBI ) {
+        t2 = Type.ANY;
         for( TypeFld t3 : ts )  t2 = t2.meet(t3._t);
       } else {
+        t2 = Type.ALL;
         for( TypeFld t3 : ts )  t2 = t2.join(t3._t);
       }
       return t2;
@@ -390,7 +393,7 @@ public class LoadNode extends Node implements Resolvable {
 
   private boolean try_resolve( TVStruct str, boolean test ) {
     // Put the resolving field in the struct; it will be present in the answer
-    // in SOME field we just don't which one.
+    // in SOME field we just do not which one.
     if( str.idx(_fld) == -1 )
       str.add_fld(_fld, tvar(), false);
     // If struct is open, more fields might appear and cannot do a resolve.    
@@ -405,6 +408,17 @@ public class LoadNode extends Node implements Resolvable {
     return false;
   }
 
+
+  @Override public void resolve_or_fail() {
+    // Go ahead and resolve a field using only 1 choice.
+    if( _flds.size()== 1 ) {
+      unelock();                // Hash changes since label changes
+      _fld = _flds.iterator().next();
+    }
+    // No error if there are many choices, but requires a dynamic field lookup
+    add_flow();
+    in(1).add_flow(); // Liveness sharpens to specific field
+  }
 
   
   // Build a sane error message for a failed resolve.
@@ -421,7 +435,7 @@ public class LoadNode extends Node implements Resolvable {
     String fld = null;          // Overloaded field name
     // If overloaded field lookup, reference field name in message
     if( is_resolving() ) {
-      if( in(0) instanceof LoadNode xfld )
+      if( adr() instanceof LoadNode xfld )
         fld = xfld._fld;        // Overloaded field name
     } else fld = _fld;
     if( fld==null ) return "";
@@ -443,7 +457,14 @@ public class LoadNode extends Node implements Resolvable {
     //return err;
   }
 
-
+  @Override public ErrMsg err( boolean fast ) {
+    if( is_resolving() ) {
+      String fld = adr() instanceof LoadNode xfld ? xfld._fld : _fld;
+      return ErrMsg.field(_bad,"Unresolved field loading",fld,false,null);
+    }
+    return null;
+  }
+  
   // No matches to pattern (no YESes, no MAYBEs).  Empty patterns might have no NOs.
   public boolean resolve_failed_no_match() {
     String err = "No choice % resolves"+resolve_failed_msg()+": ";

@@ -82,13 +82,13 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     return _t.cycle_equals(((TypeFld)o)._t);
   }
 
-  @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
+  @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt, boolean indent ) {
     if( visit.tset(_uid) ) {
       if( !dups.containsKey(_uid) )
         dups.put(_uid,"F"+(char)('A'+ucnt._fld++));
       return;
     }
-    if( _t!=null ) _t._str_dups(visit,dups,ucnt);
+    if( _t!=null ) _t._str_dups(visit,dups,ucnt, indent);
   }
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
@@ -188,6 +188,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   }
 
   @Override public boolean above_center() { return _t.above_center(); }
+  @Override public TypeFld sharptr2( TypeMem mem ) { return make_from(_t.sharptr2(mem)); }
   @Override public boolean is_con() { return _t.is_con(); }
   @Override public TypeFld simple_ptr() { return make_from(_t.simple_ptr()); }
 
