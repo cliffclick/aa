@@ -83,7 +83,6 @@ public abstract class PrimNode extends Node {
       { new EQ_I64(), new EQ_IF64() },
       { new NE_I64(), new NE_IF64() },
       { new MinusI64() }, { new NotI64() }, { new ModI64() },
-      { new NotI64() }, 
       { new AndI64() }, { new OrI64() },
       { new AndThen() }, { new OrElse() },
     };
@@ -159,14 +158,18 @@ public abstract class PrimNode extends Node {
     IFLT  = new TVStruct(ss, new TV3[]{PFLT.set_tvar(),TVBase.make(TypeFlt. FLT64)},false);
     INFLT = new TVStruct(ss, new TV3[]{PFLT.set_tvar(),TVBase.make(TypeFlt.NFLT64)},false);
 
+    // Set all TVars
+    Env.KEEP_ALIVE.walk( (n,ignore) -> {
+        if( n.has_tvar() ) n.set_tvar();
+        return 0;
+      });
+    
     // Loop, setting initial types for all primitives
     Node n0;
     while( (n0=Env.GVN.pop_flow())!= null ) {
       n0.xval();
       n0.xliv();
-      if( !n0.has_tvar() ) continue;
-      if( n0._tvar==null ) { n0.set_tvar(); continue; }
-      if( n0.unify(false) ) {
+      if( n0.has_tvar() && n0.unify(false) ) {
         n0.add_flow_defs();
         n0.add_flow_uses();
       }
@@ -317,7 +320,7 @@ public abstract class PrimNode extends Node {
 
   // Wrap the PrimNode basic Type in a TMP->TS(.=ZINT, _=t).
   // Basically convert a `int` to a `Integer`
-  public static Type wrap( Type t ) {
+  public static TypeNil wrap( Type t ) {
     switch( t ) {
     case TypeInt ti: return ti.wrap();
     case TypeFlt tf: return tf.wrap();
@@ -358,7 +361,7 @@ public abstract class PrimNode extends Node {
     for( int i=DSP_IDX; i<_formals.len(); i++ ) {
       if( _formals.at(i) == Type.ANY ) continue;
       Type tactual = val(i-DSP_IDX);
-      TypeNil tformal = (TypeNil)_formals.at(i);
+      TypeNil tformal = wrap(_formals.at(i));
       if( !tactual.isa(tformal) )
         return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[i-DSP_IDX+1],tactual, tformal);
     }

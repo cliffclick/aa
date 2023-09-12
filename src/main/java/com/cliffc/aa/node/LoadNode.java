@@ -458,10 +458,10 @@ public class LoadNode extends Node implements Resolvable {
   }
 
   @Override public ErrMsg err( boolean fast ) {
-    if( is_resolving() ) {
-      String fld = adr() instanceof LoadNode xfld ? xfld._fld : _fld;
-      return ErrMsg.field(_bad,"Unresolved field loading",fld,false,null);
-    }
+    //if( is_resolving() ) {
+    //  String fld = adr() instanceof LoadNode xfld ? xfld._fld : _fld;
+    //  return ErrMsg.field(_bad,"Unresolved field loading",fld,false,null);
+    //}
     return null;
   }
   
