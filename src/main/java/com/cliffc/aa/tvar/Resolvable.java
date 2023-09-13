@@ -1,11 +1,8 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.Combo;
-import com.cliffc.aa.Env;
 import com.cliffc.aa.node.LoadNode;
-import com.cliffc.aa.node.Node;
 import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.NonBlockingHashMapLong;
 
 import static com.cliffc.aa.AA.unimpl;
 
@@ -32,57 +29,54 @@ public interface Resolvable {
   // So each match has the following 3 choices
   // - hard no , something structural is wrong
   // - hard yes, all parts match, even leaf-for-leaf.  No open struct in pattern.
-  // - maybe   , all parts match, except leafs.  Leafs might expand later and fail.
+  // - maybe   , all parts match, except leafs.  Leafs might expand later and fail or become a hard-yes.
 
   // "Pattern leafs" are just any TV3 that, if it changes might effect the match outcome.
   Ary<TVExpanding> PAT_LEAFS = new Ary<>(new TVExpanding[1],0);
+  
 
-  // A cache for hard-no and hard-yes answers.  Once a no, always a no.  Once a
-  // yes, always a yes.  Faster to lookup than to run the trial again.
-  NonBlockingHashMapLong<TV3> HARD_NO  = new NonBlockingHashMapLong<>();
-
+  // Returns progress, not successful resolve
   default boolean trial_resolve( boolean outie, TV3 pattern, TVStruct rhs, boolean test ) {
     assert !rhs.is_open() && is_resolving();
 
     // Not yet resolved.  See if there is exactly 1 choice.
+    // Hard YESes and NOs can never change, so we cache those results.
+    // The good case is: 1 YES, 0 MAYBES, and any number of NOs.
+    // Any number of MAYBEs implies we need to stall; they might turn into either a YES or a NO.
     PAT_LEAFS.clear();
     int yes=0, maybe=0;
     String lab=null;
     for( int i=0; i<rhs.len(); i++ ) {
       String id = rhs.fld(i);
       if( is_resolving(id) ) continue;
-      TV3 rhsx = rhs.arg(id);
-      // Quick fail check: having failed once, just fail again
-      long dbl_uid = pattern.dbl_uid(rhsx);
-      TV3 fail = HARD_NO.get(dbl_uid);
-      if( fail != null ) {
-        assert fail==rhsx;
-        assert pattern.trial_unify_ok(rhsx)== -1;
-        continue;
-      }
+      TV3 rhsx = rhs.arg(id);      
+
       // Count YES, NO, and MAYBEs
       switch( pattern.trial_unify_ok( rhsx ) ) {
-      case -1 -> HARD_NO.put( dbl_uid, rhsx ); // Cheaper fail next time
-      case 0 ->   maybe++;
-      case 1 -> { yes++; lab = id; } // Also track a sample YES label
-      }
+      case -1: break;                  // No.
+      case  1: yes++; lab = id; break; // Track a sample YES label
+      default: maybe++; break;
+      };
     }
 
-    switch( yes ) {
-    case 0:
-      // No YESes, no MAYBES, this is an error
-      if( maybe==0 ) return ((LoadNode)this).resolve_failed_no_match();
-      // no YESes, but more maybes: wait.
-      else return stall(rhs);
-    case 1:
-      // Exactly one yes and no maybes: we can resolve this now
-      if( maybe==0 ) return test || resolve_it(outie,pattern,rhs,lab);
-      // Got a YES, but some maybe might become another hard YES, which is an error.
-      else return stall(rhs);
-    default:
-      // 2+ hard-yes.  This is a hard error, and can never resolve.
-      throw unimpl();
-    }
+    return switch( yes ) {
+        
+      case 0 -> maybe==0
+        // No YESes, no MAYBES, this is an error
+        ? test || ((LoadNode)this).resolve_failed_no_match(pattern,rhs,test)
+        // no YESes, but more maybes: wait.
+        : stall(rhs);
+
+      case 1 -> maybe==0 
+        // Exactly one yes and no maybes: we can resolve this now
+        ? test || resolve_it(outie,pattern,rhs,lab)
+        // Got a YES, but some maybe might become another hard YES, which is an error.
+        : stall(rhs);
+        
+      default -> 
+        // 2+ hard-yes.  This is a hard error, and can never resolve.
+        throw unimpl();
+      };
   }
 
   // Stall the resolve, and see if we can resolve later.
@@ -127,6 +121,5 @@ public interface Resolvable {
   abstract void resolve_or_fail();
 
   public static void reset_to_init0() {
-    HARD_NO.clear();
   }
 }

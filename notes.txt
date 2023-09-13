@@ -1,4 +1,113 @@
 =======================================
+09/13/2023
+
+Summary
+
+Introducing a new concept of dynamic loads DynLoad and a vtable for DynLoads.
+DynLoads dynamically compute their field offset from the vtable.  Essentially
+the vtable is a mapping from DynLoad to field label (string/offset).
+
+DynLoads are written as "._" and come as the default during operator expansion.
+DynLoads use the HM field resolution and may resolve to different fields along
+different execution paths.  These different paths always come about from Fresh
+nodes and fresh uses of identifiers (generally inside functions but I can make
+function-free examples).
+
+The execution semantics for a DynLoad just do a self-lookup in the vtable
+input, get a field offset and load at the address plus offset.  In the worse
+case this is a fixed offset load from the vtable, then an add and load.
+
+The vtable starts as an empty mapping, and each time is passes by a Fresh the
+Parser inserts a DynLoadMap which updates the vtable for the Fresh.  The Fresh,
+during Combo/HM, clones its input type and this clones unresolved field types
+and these are already present in TVStruct.  During Combo resolution each unique
+instance of an unresolved field is always tied to a Fresh and gets resolved
+independently.  This resolution is put in the Fresh and DynLoadMap - so the
+vtable changes to include a {DynLoad -> label} mapping.
+
+The vtable edge gradually picks up a complete {DynLoad -> label} mapping for
+all paths, and each DynLoad can then compute its proper label during runtime.
+DynLoads with only constant labels can convert to Loads (the DynLoad dies via
+node death).  Liveness can also be used to kill { DynLoad -> label } dead
+mappings, which can kill some DynLoadMaps (DynLoadMap dies via Reduce).
+
+
+
+Example:
+
+// Using a var assignment here, so a later use of 'foo' clones via Fresh
+foo = { x y z ->
+  // Crazy expression produces a collection of functions, all different sigs
+  (
+    { int flt str -> ... },
+    { flt str int -> ... },
+    { str int flt -> ... }
+  )._(x,y,z);              <<-- DynLoad of random expression
+}
+
+// A FRESH on FOO for every pattern
+( // Gather results
+  foo( 1, 2.2, "abc"),  // FRESH on FOO
+  foo( "red", 2, 1.1),
+  foo( 3.3, "blu", 5)
+)
+
+
+
+
+So really - its a vtable-per-FRESH.
+Crazy concept
+- extra vtable edge.
+- R/M/W by FRESH, to extend/replace with self
+- passed as extra parm to funcs.
+- - scoped basically
+- merged at Phis
+- used by DynLoad to find field edge....
+- can be dead if no DynLoad uses.
+- Can be partially dead if a Fresh's choices not used by some DynLoad
+- So really its a collection of edges - 1 per Fresh, kept in parallel to all other things, like memory edges.
+- DynLoad inserts a unresolved hook in the TVStruct on address input.
+- - TVStruct has normal fields
+- - TVStruct also  has    <  -  ,DynLoad> -> <TV3 mapping,String>
+- - TVStruct Fresh adds a <Fresh,DynLoad> -> <TV3 mapping,String>
+- - Resolving fills in the String
+- vtable is a mapping <DynLoad> -> String
+- - Parse: carry mapping conservative (all DynLoad) -> (unresolved String)
+- - Extra parm, like memory, tracks everywhere (blech)
+- - Iter: DynLoadMap cannot Value update without Combo; can do Liveness at some point
+- Combo computes per-Fresh DynLoad->String map
+- Combo updates each Fresh with mapping
+- - As fields resolved can be monotonic
+- - Combo treats unresolved as high, can type-flow on the vtable mapping edge
+- - vtable edge falls from <all DynLoad> -> (unresolved) to <most DynLoads> -> <Strings>
+- - liveness per DynLoad
+- - Combo a DynLoad getting a constant string no longer keeps vtable edge alive
+- - Can thus make some Fresh DynLoad settings go dead.
+- So parallel to Fresh is a DynLoadMap
+- Which updates the vtable via the Fresh
+- And can go dead independently from other things
+
+
+
+BROKEN EXAMPLE:
+
+Example, stacked dynamic dispatch
+
+foo = { x y -> 
+  (
+    { int int -> ... },
+    { int flt -> ... },
+    { flt int -> ... },
+    { flt flt -> ... },
+  )._(x,y);              <<-- DynLoad of random expression, forces inlining?
+}
+
+baz = { x -> pred ? foo(x,2) : foo(x,2.2) }
+
+bar = { -> pred ? baz(2) : baz(2.2) }
+
+
+=======================================
 09/11/2023
 
 Final result: each Fresh instance of an unresolved field might require a

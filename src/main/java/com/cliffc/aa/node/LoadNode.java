@@ -132,8 +132,7 @@ public class LoadNode extends Node implements Resolvable {
     adr().deps_add(def);
     if( adr.above_center() ) return Type.ANY; // Nothing is demanded
     if( !(adr instanceof TypeNil ptr) )  // Demand everything not killed at this field
-      // TODO: use kills and _live_use
-      return TypeMem.ALLMEM;
+      return RootNode.def_mem(def);
   
     if( ptr._aliases.is_empty() )  return Type.ANY; // Nothing is demanded still
     // Loading from a struct does not require memory, but still needs the field
@@ -141,7 +140,7 @@ public class LoadNode extends Node implements Resolvable {
 
     // Demand memory produce the desired field from a struct
     if( ptr._aliases==BitsAlias.NALL )
-      return TypeMem.ALLMEM; // return RootNode.def_mem(def);
+      return RootNode.def_mem(def);
     // Demand field "_fld" be "ALL", which is the default
     return TypeMem.make(ptr._aliases,_live_use);
   }
@@ -402,7 +401,7 @@ public class LoadNode extends Node implements Resolvable {
       return false;
     }
     if( trial_resolve(true, tvar(), str, test) )
-      return true;              // Resolve succeeded!
+      return true;              // Resolve made progress!
     // No progress, try again if self changes
     if( !test ) tvar().deps_add_deep(this);
     return false;
@@ -466,12 +465,11 @@ public class LoadNode extends Node implements Resolvable {
   }
   
   // No matches to pattern (no YESes, no MAYBEs).  Empty patterns might have no NOs.
-  public boolean resolve_failed_no_match() {
+  public boolean resolve_failed_no_match( TV3 pattern, TVStruct rhs, boolean test ) {
     String err = "No choice % resolves"+resolve_failed_msg()+": ";
-    TV3 pattern = tvar();
-    TV3 tv0 = tvar(0);
-    assert tv0.as_struct().idx(_fld)==-1;             // No resolving field on RHS?  TODO: Delete & progress
-    return tv0.unify_err(err,pattern,_bad,false);
+    boolean old = rhs.del_fld(_fld);
+    assert old;                 // Expecting to remove pattern
+    return pattern.unify_err(err,rhs,_bad,false);
   }
 
 

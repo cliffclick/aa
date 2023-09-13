@@ -233,9 +233,12 @@ public class FunNode extends Node {
 
     // Look for appropriate type-specialize callers
     Ary<Node> body = find_body(ret);
+    ParmNode[] parms = parms();
+    // Type-splitting
+    int path = split_type(body,parms);
     // Large code-expansion allowed; can inline for other reasons
-    int path = split_size(body,parms()); // Forcible size-splitting first path
-    if( path == -1 ) return null;
+    if( path==0 ) path = split_size(body,parms()); // Forcible size-splitting first path
+    if( path == -1 ) return null;                  // Nobody wants to split
     if( !is_prim() ) {
       if( _cnt_size_inlines >= 6 ) return null;
       _cnt_size_inlines++; // Disallow infinite size-inlining of recursive non-primitives
@@ -316,6 +319,11 @@ public class FunNode extends Node {
     return body;
   }
 
+  // Split if any argument has an int (or flt) and another pointer type.
+  private int split_type( Ary<Node> body, Node[] parms ) {
+    return 0;
+  }
+  
   // Split a single-use copy (e.g. fully inline) if the function is "small
   // enough".  Include anything with just a handful of primitives, or a single
   // call, possible with a single if.  Disallow functions returning a new
@@ -473,10 +481,6 @@ public class FunNode extends Node {
       map.put(n,c);               // Map from old to new
       if( old_alias != -1 )       // Was a NewNode?
         aliases.set(old_alias);   // Record old alias before copy/split
-      // Slightly better error message when cloning constructors
-      if( n instanceof MemPrimNode mpn )
-        //mpn._badargs = path_call._badargs;
-        throw unimpl();
     }
 
     // Fill in edges.  New Nodes point to New instead of Old; everybody
