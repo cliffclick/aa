@@ -378,6 +378,7 @@ public class Parse implements Comparable<Parse> {
       Parse badf = errMsg();    // Capture location in case of field error
       String tok = token();     // Scan for 'id = ...'
       if( tok == null ) break;  // Out of ids
+      if( !isAlpha0((byte)tok.charAt(0)) ) { _x=oldx; break; } // not a "[id]* ->"
       int oldx2 = _x;           // Unwind assignment flavor point
       Type t = null;
       // x  =: ... type  assignment, handled before we get here

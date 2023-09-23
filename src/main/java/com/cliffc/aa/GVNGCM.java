@@ -109,6 +109,7 @@ public class GVNGCM {
   public <N extends Node> N init( N n ) {
     assert n._uses._len==0;     // New to GVN
     n._val = n.value();
+    if( n.is_mem() ) n._live = RootNode.def_mem(null);
     // Any new nodes made post-Combo-HM need a TVar
     if( Combo.HM_FREEZE && n.has_tvar() )
       n.set_tvar();

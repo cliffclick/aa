@@ -157,8 +157,8 @@ public class LoadNode extends Node implements Resolvable {
     Node ps = find_previous_struct(this, mem(), adr, tn._aliases);
     if( ps instanceof StoreAbs sta ) {
       if( sta instanceof StoreNode st ) {
-        // match field in store
-        throw unimpl();
+        if( Util.eq(_fld,st._fld) ) // match field in store
+          return st.rez();
       } else {
         // find struct, match field in struct
         StructNode str = ((StoreXNode)sta).struct();

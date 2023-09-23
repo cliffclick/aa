@@ -49,6 +49,9 @@ public class StoreXNode extends StoreAbs {
   // Is this Store alive, based on given liveness?
   @Override boolean _is_live( TypeStruct live ) {  return live==TypeStruct.ISUSED; }
 
+  @Override boolean st_st_check( StoreAbs sta ) {
+    return sta instanceof StoreXNode st;
+  }
  
   @Override public TV3 _set_tvar() {
     assert rez()!= Env.ANY; // Did not clear out during iter; return mem().tvar()

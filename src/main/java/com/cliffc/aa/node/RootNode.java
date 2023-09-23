@@ -210,7 +210,7 @@ public class RootNode extends Node {
   }
   private static TypeMem CACHE_DEF_MEM = TypeMem.ALLMEM;
   private static final Ary<Node> PROGRESS = new Ary<>(new Node[1],0);
-  static TypeMem def_mem(Node n) {
+  public static TypeMem def_mem(Node n) {
     if( n!=null && PROGRESS.find(n)==-1 ) PROGRESS.push(n);
     return CACHE_DEF_MEM;
   }

@@ -65,6 +65,8 @@ public abstract class StoreAbs extends Node {
   }
   abstract Type _live_use( TypeMem live0, TypeMemPtr tmp, int i );
   abstract TypeMem _live_kill(TypeMemPtr tmp);
+
+  abstract boolean st_st_check( StoreAbs st );
   
   @Override public Node ideal_reduce() {
     if( is_prim() ) return null;
@@ -92,22 +94,22 @@ public abstract class StoreAbs extends Node {
       Node adr0 = st.adr();
 //      if( adr  instanceof FreshNode f ) adr  = f.id();
 //      if( adr0 instanceof FreshNode f ) adr0 = f.id();
-      if( adr == adr0 ) {
-        throw unimpl();
-//        // Do not bypass a parallel writer
-//        if( st.check_solo_mem_writer(this) &&
-//            // And liveness aligns
-//            st._live.isa(st.mem()._live) ) {
-//          // Storing same-over-same, just use the first store
-//          if( rez()==st.rez() ) return st;
-//          // If not wiping out an error, wipe out the first store
-//          if( st.rez()==null || st.rez().err(true)==null ) {
+      if( adr == adr0 && st_st_check(st) ) {
+        // Do not bypass a parallel writer
+        if( st.check_solo_mem_writer(this) &&
+            // And liveness aligns
+            st._live.isa(st.mem()._live) ) {
+          // Storing same-over-same, just use the first store
+          if( rez()==st.rez() ) return st;
+          // If not wiping out an error, wipe out the first store
+          if( st.rez()==null || st.rez().err(true)==null ) {
 //            set_def(1,st.mem());
 //            return this;
-//          }
-//        } else {
-//          mem.deps_add(this);    // If become solo writer, check again
-//        }
+            throw unimpl();
+          }
+        } else {
+          mem.deps_add(this);    // If become solo writer, check again
+        }
       } else {
         st.adr().deps_add(this);      // If address changes, check again
       }

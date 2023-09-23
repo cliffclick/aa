@@ -31,6 +31,22 @@ public class TestParse {
     DO_GCP=true;
     DO_HMT=false;
     RSEED=0;
+
+    test(
+"""
+foo = { x y ->
+        ( { x y -> !x * !y },
+          { x y -> !x *  y.sin(3.14) },
+          { x y -> x.sin(3.14) * !y },
+          { x y -> x.sin(3.14) *  y.sin(3.14) }
+  )._(x,y)
+};
+baz = { x -> math.rand(2) ? foo(x,2) : foo(x,2.2) };
+bar = {   -> math.rand(2) ? baz(  3) : baz  (3.3) };
+bar()
+""",
+         "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
+    
     test("sq = { x -> x*x }; (sq(2),sq(2.2))","*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
     test("1", "int:1", "int:1");
     test("sq = { x -> x*x }; (sq(2),sq(3))","*[13](_,int:4,int:9)","*[15](int64,flt64)", null, null, "[14]", null);

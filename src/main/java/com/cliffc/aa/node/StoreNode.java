@@ -7,6 +7,7 @@ import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVPtr;
 import com.cliffc.aa.tvar.TVStruct;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.type.TypeFld.Access;
@@ -53,6 +54,11 @@ public class StoreNode extends StoreAbs {
     return live.at_def(_fld) == TypeMem.ALL;
   }
 
+  @Override boolean st_st_check( StoreAbs sta ) {
+    return sta instanceof StoreNode st && Util.eq(_fld,st._fld);
+  }
+
+  
 //  @Override public Node ideal_reduce() {
 //    if( is_prim() ) return null;
 //    if( _live == Type.ANY ) return null; // Dead from below; nothing fancy just await removal

@@ -40,7 +40,7 @@ public class StructNode extends Node {
 
   // Number of args in the enclosing function scope.  Inputs up to this count
   // are in the NONGEN set; inputs after this are out of the NONGEN set.  This
-  // is zero for non-function scopes, and -1 for if-half-scopes
+  // is zero for non-function scopes
   public final int _nargs;
 
   // Still adding fields or not.  Helps with asserting in the Parser
