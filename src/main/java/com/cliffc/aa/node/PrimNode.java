@@ -6,9 +6,6 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.Util;
 
-import java.util.Arrays;
-import java.util.HashMap;
-
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
 
@@ -46,17 +43,17 @@ public abstract class PrimNode extends Node {
     for( int i=DSP_IDX; i<formals._ts.length; i++ ) assert formals._ts[i] instanceof TypeNil || formals._ts[i]==Type.ANY;
     _formals = formals;
     _ret = ret;
-    _tfp=TypeFunPtr.make(fidx,formals.len(),Type.ALL,ret);
+    _tfp=TypeFunPtr.make(fidx,formals.len(),formals.at(DSP_IDX),ret);
     _badargs=null;
   }
 
 
   // Int/Float/String primitives.
-  public static final StructNode ZCLZ = new StructNode(0,false,null, Type.ALL);
-  public static final StructNode ZINT = new StructNode(0,false,null, Type.ALL);
-  public static final StructNode ZFLT = new StructNode(0,false,null, Type.ALL);
-  public static final StructNode ZSTR = new StructNode(0,false,null, Type.ALL);
-  public static final StructNode ZMATH= new StructNode(0,false,null, Type.ALL);
+  public static final StructNode ZCLZ = new StructNode(0,false,null );
+  public static final StructNode ZINT = new StructNode(0,false,null );
+  public static final StructNode ZFLT = new StructNode(0,false,null );
+  public static final StructNode ZSTR = new StructNode(0,false,null );
+  public static final StructNode ZMATH= new StructNode(0,false,null );
   public static final NewNode PCLZ = new NewNode(BitsAlias.CLZX,true);
   public static final NewNode PINT = new NewNode(BitsAlias.INTX,true);
   public static final NewNode PFLT = new NewNode(BitsAlias.FLTX,true);
@@ -72,34 +69,35 @@ public abstract class PrimNode extends Node {
 
     // int opers
     PrimNode[][] INTS = new PrimNode[][]{
-      { new AddI64(), new AddIF64() },
-      { new SubI64(), new SubIF64() },
+      //{ new AddI64(), new AddIF64() },
+      //{ new SubI64(), new SubIF64() },
       { new MulI64(), new MulIF64() },
-      { new DivI64(), new DivIF64() },
-      { new LT_I64(), new LT_IF64() },
-      { new LE_I64(), new LE_IF64() },
-      { new GT_I64(), new GT_IF64() },
-      { new GE_I64(), new GE_IF64() },
-      { new EQ_I64(), new EQ_IF64() },
-      { new NE_I64(), new NE_IF64() },
-      { new MinusI64() }, { new NotI64() }, { new ModI64() },
-      { new AndI64() }, { new OrI64() },
-      { new AndThen() }, { new OrElse() },
+      //{ new DivI64(), new DivIF64() },
+      //{ new LT_I64(), new LT_IF64() },
+      //{ new LE_I64(), new LE_IF64() },
+      //{ new GT_I64(), new GT_IF64() },
+      //{ new GE_I64(), new GE_IF64() },
+      //{ new EQ_I64(), new EQ_IF64() },
+      //{ new NE_I64(), new NE_IF64() },
+      //{ new MinusI64() }, { new ModI64() },
+      { new NotI64() },         // Triggers the shortcut for int printing
+      //{ new AndI64() }, { new OrI64() },
+      //{ new AndThen() }, { new OrElse() },
     };
 
     PrimNode[][] FLTS = new PrimNode[][]{
-      { new AddF64(), new AddFI64() },
-      { new SubFI64(), new SubF64() },
+      //{ new AddF64(), new AddFI64() },
+      //{ new SubFI64(), new SubF64() },
       { new MulFI64(), new MulF64() },
-      { new DivF64(), new DivFI64() },
-      { new LT_F64(), new LT_FI64() },
-      { new GE_F64(), new GE_FI64() },
-      { new LE_FI64(), new LE_F64() },
-      { new GT_F64(), new GT_FI64() },
-      { new EQ_F64(), new EQ_FI64() },
-      { new NE_F64(), new NE_FI64() },
-      { new MinusF64() },
-      { new SinF64() },
+      //{ new DivF64(), new DivFI64() },
+      //{ new LT_F64(), new LT_FI64() },
+      //{ new GE_F64(), new GE_FI64() },
+      //{ new LE_FI64(), new LE_F64() },
+      //{ new GT_F64(), new GT_FI64() },
+      //{ new EQ_F64(), new EQ_FI64() },
+      //{ new NE_F64(), new NE_FI64() },
+      //{ new MinusF64() },
+      { new SinF64() },         // Triggers the shortcut for float printing
     };
 
     PrimNode[][] STRS = new PrimNode[][] {
@@ -243,27 +241,33 @@ public abstract class PrimNode extends Node {
 
   // Make and install a primitive Clazz.
   private static void make_prim( StructNode clz, String clzname, NewNode ptr, PrimNode[][] primss ) {
+    ScopeNode scp = Env.SCP_0;
     clz.add_fld(TypeFld.CLZ,Access.Final,PCLZ,null);
     for( PrimNode[] prims : primss ) {
-      // Primitives are grouped into overload groups, where the 'this' or
-      // display argument is always of the primitive type, and the other
-      // arguments may vary, and the correct primitive is picked using overload
-      // resolution.
-      StructNode over = new StructNode(0,false,null,Type.ALL);
-      int cnt=0;
-      for( PrimNode prim : prims ) {
-        String fld = (""+cnt++).intern();
-        over.add_fld(fld,Access.Final,prim.as_fun(),null);
+      Node ptr0;
+      if( prims.length==1 && !prims[0].is_oper() ) {
+        ptr0 = prims[0].as_fun();
+      } else {
+        // Primitives are grouped into overload groups, where the 'this' or
+        // display argument is always of the primitive type, and the other
+        // arguments may vary, and the correct primitive is picked using
+        // overload resolution.
+        StructNode over = new StructNode(0,false,null );
+        int cnt=0;
+        for( PrimNode prim : prims ) {
+          String fld = (""+cnt++).intern();
+          over.add_fld(fld,Access.Final,prim.as_fun(),null);
+        }
+        over.init();
+        over.close();
+        ptr0 = new NewNode(BitsAlias.new_alias(BitsAlias.EXTX),true).init();
+        scp.set_mem(new StoreXNode(scp.mem(),ptr0,over,null).init());
       }
-      over.init();
-      over.close();
-      clz.add_fld(prims[0]._name,Access.Final,over,null);
+      clz.add_fld(prims[0]._name,Access.Final,ptr0,null);
     }
     clz.close();
     Env.PROTOS.put(clzname,clz); // global mapping
-    StoreXNode mem = new StoreXNode(Env.SCP_0.mem(),ptr.add_flow(),clz,null).init();
-    mem._live = TypeMem.ALLMEM;
-    Env.SCP_0.set_mem(mem);
+    scp.set_mem(new StoreXNode(scp.mem(),ptr.add_flow(),clz,null).init());
   }
 
   // Build and install match package

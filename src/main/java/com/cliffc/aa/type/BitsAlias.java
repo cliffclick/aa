@@ -30,6 +30,7 @@ public class BitsAlias extends Bits<BitsAlias> {
   public static final int FLTX = new_alias(EXTX); // Float-clazz alias
   public static final int RPCX = new_alias(EXTX); // RPC-clazz alias
   public static final int STRX = new_alias(EXTX); // String alias
+  
   // The All-Memory alias class
   public  static final BitsAlias NALL = new BitsAlias().make_impl(ALLX,null); // All aliases, no nil
   public  static final BitsAlias NANY = NALL.dual();

@@ -32,7 +32,8 @@ public class RootNode extends Node {
   @Override boolean is_CFG() { return true; }
   @Override public boolean is_mem() { return true; }
 
-  TypeMem rmem() {
+  TypeMem rmem(Node dep) {
+    deps_add(dep);
     return _val instanceof TypeTuple tt ? (TypeMem)tt.at(MEM_IDX) : TypeMem.ALLMEM.oob(_val.above_center());
   }
   Type rrez() {
@@ -75,16 +76,13 @@ public class RootNode extends Node {
     if( Combo.pre() )
       return TypeTuple.make(Type.CTRL,tmem.make_from(BitsAlias.EXTX,TypeStruct.ISUSED),TypeNil.SCALAR,TypeNil.SCALAR);
     
-    Node rez = in(REZ_IDX);
-    Type trez = rez._val;
-    // Conservative final memory
-    Node mem = in(MEM_IDX);
 
     // Walk the 'rez', all Call args (since they call Root, their args escape)
     // and function rets (since called from Root, their return escapes).
     AryInt awork = new AryInt();
     AryInt fwork = new AryInt();
     TypeNil escs = TypeNil.EXTERNAL;
+    Type trez = val(REZ_IDX);   // Returned value is the starting point
     escs = _add_all(escs,awork,fwork,trez);
     for( int i=ARG_IDX+1; i<len(); i++ ) {
       if( escs==TypeNil.SCALAR ) break; // Already maxed out
@@ -98,6 +96,7 @@ public class RootNode extends Node {
         }
       } else {
         // If function may be reached from Root, the return escapes.
+        assert in(i) instanceof RetNode;
         in(i).deps_add(this);
         Type t = in(i)._val;
         escs = _add_all(escs,awork,fwork,t);
@@ -137,6 +136,9 @@ public class RootNode extends Node {
     // Kill the killed
     escs = TypeNil.make(false,false,false,escs._aliases.subtract(KILL_ALIASES),escs._fidxs);
 
+    TypeStruct extstr = tmem.at(BitsAlias.EXTX);
+    TypeStruct extstr2 = (TypeStruct)extstr.meet( TypeStruct.make(false,escs,TypeFlds.EMPTY) );
+    tmem = tmem.set(BitsAlias.EXTX,extstr2);
 
     // RootNode value is a 4-pack
     return TypeTuple.make(Type.CTRL, tmem, trez, escs);
@@ -172,9 +174,11 @@ public class RootNode extends Node {
     if( ralias==BitsAlias.NALL ) return BitsAlias.NALL;
     BitsAlias aliases = BitsAlias.EXT;
     for( int alias : ralias )
-      if( alias>BitsAlias.EXTX && !BitsAlias.EXT.test_recur(alias) &&
-          tv3.exact_unify_ok(NewNode.get(alias).tvar()) )
-        aliases = aliases.set(alias); // Compatible escaping alias
+      for( int kid=alias; kid!=0; kid=BitsAlias.next_kid(alias,kid) ) {
+        NewNode nnn = NewNode.get(kid);
+        if( nnn!=null && tv3.exact_unify_ok(nnn.tvar()) )
+          aliases = aliases.set(kid); // Compatible escaping alias
+      }
     return aliases;
   }
 
@@ -245,10 +249,10 @@ public class RootNode extends Node {
     if( i==REZ_IDX ) {
       // Sharpen liveness for escaping function displays
       if( val(REZ_IDX) instanceof TypeFunPtr tfp ) {
-        if( tfp.dsp() instanceof TypeMemPtr tmp ) {
-          if( !ralias().overlaps(tmp.aliases()) )
-            return CallNode.FP_LIVE;
-        } else if( tfp.dsp()==Type.ANY )
+        if( tfp.dsp().above_center() )
+          return CallNode.FP_LIVE;
+        if( tfp.dsp() instanceof TypeMemPtr tmp &&
+            !ralias().overlaps(tmp.aliases()) )
           return CallNode.FP_LIVE;
       }
       deps_add(in(REZ_IDX));

@@ -716,7 +716,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // - Not an ErrNode AND
   // - Type.is_con()
   public boolean should_con(Type t) {
-    if( !t.is_con() ) return false; // Not a constant
+    if( !t.is_con() || t.above_center() ) return false; // Not a constant
     if( this instanceof ConNode    || // Already a constant
         this instanceof FunPtrNode || // Already a constant
         this instanceof NewNode    || // Can be a constant, but need the alias info

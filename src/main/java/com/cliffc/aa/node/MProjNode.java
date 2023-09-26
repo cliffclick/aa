@@ -1,8 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.type.BitsFun;
-import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.MEM_IDX;
 
@@ -16,6 +15,13 @@ public class MProjNode extends ProjNode {
   }
   @Override public String xstr() { return "MProj"+_idx; }
   @Override public boolean is_mem() { return true; }
+  @Override public Type value() {
+    Type c = val(0);
+    if( c instanceof TypeTuple ct && _idx < ct._ts.length )
+      c = ct._ts[_idx];
+    if( c!=Type.ANY && c!=Type.ALL ) return c;
+    return c.oob(TypeMem.ALLMEM);
+  }
 
   @Override public Type live_use( int i ) { return _live; }
 

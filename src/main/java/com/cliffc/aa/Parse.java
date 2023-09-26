@@ -446,7 +446,11 @@ public class Parse implements Comparable<Parse> {
     if( create ) {              // Token not already bound at any scope
       scope = scope();          // Create in the current scope
       StructNode stk = scope.stk();
-      stk.add_fld (tok,Access.RW, Env.ANY,badf); // Create at top of scope as undefined
+      // Here we make a private Env.ANY copy, so Combo gets a private Leaf for
+      // each initial variable set.  If we somehow skipped this setting
+      // (e.g. using null for ANY), then Combo could figure out not to unify
+      // unrelated variables.
+      stk.add_fld (tok,Access.RW, Node.con(Type.ANY),badf); // Create at top of scope as undefined
     }
     
     // Assert type if asked for
@@ -802,7 +806,7 @@ public class Parse implements Comparable<Parse> {
         int nidx = n.push();    // Keep alive across arg parse
         Node dsp = gvn(new FP2DSPNode(n,err));
         // Argument tuple, with "this" or display first arg
-        StructNode args = new StructNode(0,false,err, Type.ALL);
+        StructNode args = new StructNode(0,false,err );
         args.add_fld("0",Access.Final,dsp,err); // TODO: get the display start for errors
         int aidx = args.push();
         Node arg1 = stmts();
@@ -992,7 +996,7 @@ public class Parse implements Comparable<Parse> {
    */
   private Node tuple(int oldx, Node s, int first_arg_start) {
     // First stmt is parsed already
-    StructNode nn = new StructNode(0,false,errMsg(oldx), Type.ALL).init();
+    StructNode nn = new StructNode(0,false,errMsg(oldx) ).init();
     Parse bad = errMsg(first_arg_start);
     int sidx = nn.push();
     nn.add_fld(TypeFld.CLZ,Access.Final, PrimNode.PCLZ, null);
@@ -1265,7 +1269,7 @@ public class Parse implements Comparable<Parse> {
     String str = new String(_buf,oldx,_x-oldx-1).intern();
     // Convert to ptr-to-constant-memory-string
     Parse bad = errMsg(oldx);
-    StructNode scon = new StructNode(0,false,bad, Type.ALL);
+    StructNode scon = new StructNode(0,false,bad );
     scon.add_fld(".",Access.Final,PrimNode.ZSTR,bad);
     scon.add_fld("0",Access.Final,con(TypeInt.con(str.charAt(0))),bad);
     StructNode scon1 = (StructNode)gvn(scon.close());

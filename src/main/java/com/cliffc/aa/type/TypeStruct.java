@@ -259,7 +259,6 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
 
   // The TypeFld[] is not interned.
   public static TypeStruct make_flds(Type def, TypeFld[] flds) { return make(false,def,TypeFlds.hash_cons(remove_dups(def,flds))); }
-  public static TypeStruct make_flds(Type def, TypeFld fld0, TypeFld fld1) { return make_flds(def,TypeFlds.ts(fld0,fld1)); }
 
   // Used to make a few testing constants
   public static TypeStruct make_test( String fld_name, Type t, Access a ) { return make(TypeFld.make(fld_name,t,a)); }

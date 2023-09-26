@@ -389,6 +389,7 @@ public class CallNode extends Node {
         if( t == Type.ALL ) return Type.ALL;
       }
     }
+    deps_add(def);
     return t;
   }
 

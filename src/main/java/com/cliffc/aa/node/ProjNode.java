@@ -19,8 +19,9 @@ public class ProjNode extends Node {
   @Override public Type value() {
     Type c = val(0);
     if( c instanceof TypeTuple ct && _idx < ct._ts.length )
-      return ct._ts[_idx];
-    return c.oob();
+      c = ct._ts[_idx];
+    if( c!=Type.ANY && c!=Type.ALL ) return c;
+    return c.oob(TypeNil.SCALAR);
   }
   @Override Type live_use( int i ) { return i==MEM_IDX ? TypeMem.ANYMEM : _live; }
   

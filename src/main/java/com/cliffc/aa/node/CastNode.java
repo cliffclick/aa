@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
@@ -75,24 +76,28 @@ public class CastNode extends Node {
     if( maynil==notnil ) return false;
 
     // Cast-notnil vs Cast-other
-
     if( maynil instanceof TVErr merr && merr.as_ptr() != null ) maynil = merr.as_ptr();
     if( notnil instanceof TVErr nerr && nerr.as_ptr() != null ) notnil = nerr.as_ptr();
 
-    // Never a nilable nor nil
-    if( maynil instanceof TVStruct )
-      return notnil.unify(maynil,test);
 
-    // Already an expanded nilable with ptr
-    if( maynil instanceof TVPtr mptr && notnil instanceof TVPtr nptr )
+    // If either is a pointer, so is the other but clear _may_nil on this
+    if( maynil instanceof TVPtr mptr && notnil instanceof TVLeaf ) {
+      if( notnil.may_nil() ) throw AA.unimpl();
+      return test || notnil.unify(new TVPtr(mptr.aliases(),mptr.load()),test);
+    }
+
+    if( maynil instanceof TVLeaf && notnil instanceof TVPtr nptr ) {
+      assert !notnil.may_nil();
+      return test || maynil.unify(new TVPtr(nptr.aliases(),nptr.load()),test);
+    }
+
+    if( maynil instanceof TVPtr mptr && notnil instanceof TVPtr nptr ) {
+      assert !notnil.may_nil();
       return mptr.load().unify(nptr.load(),test);
+    }
 
-    // Stall, until notnil becomes a TVNilable or a TVStruct
-    if( maynil instanceof TVLeaf )
-      return maynil.deps_add_deep(this);
-
-    // Unify the maynil with a nilable version of notnil
-    return notnil.unify(maynil,test);
+    
+    throw AA.unimpl();
   }
 
   @Override public @NotNull CastNode copy( boolean copy_edges) {

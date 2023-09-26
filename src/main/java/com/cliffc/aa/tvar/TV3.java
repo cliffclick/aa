@@ -139,6 +139,7 @@ abstract public class TV3 implements Cloneable {
   public  long dbl_uid( TV3 t ) { assert !t.unified(); return dbl_uid(t._uid); }
   private long dbl_uid(long uid) {  assert !unified(); return ((long)_uid<<32)|uid; }
 
+  public boolean may_nil() { return _may_nil; }
   TV3 strip_nil() { _may_nil = false; return this; }
 
   // Set may_nil flag.  Return progress flag.

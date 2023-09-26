@@ -221,10 +221,8 @@ public final class CallEpiNode extends Node {
     // - Above center ones do not wire, so this loop is empty then.
     // - Might fall through some middle fidxs, then hit NALL.  Middle fidxs wire, and are precise.
     // - NALL requires mixing in Root def_mem
-    if( !Combo.pre() && fidxs==BitsFun.NALL ) {
-      Env.ROOT.deps_add(this);
-      return TypeTuple.make(Type.CTRL,Env.ROOT.rmem().meet(CallNode.emem(tcall)),tfptr._ret); // Error state
-    }
+    if( !Combo.pre() && fidxs==BitsFun.NALL )
+      return TypeTuple.make(Type.CTRL,Env.ROOT.rmem(this).meet(CallNode.emem(tcall)),tfptr._ret); // Error state
 
     // Post-Combo:
     // - fidxs are conservative, may get removed, and will not be NALL (checked above).
@@ -244,7 +242,7 @@ public final class CallEpiNode extends Node {
       } else {                  // Calling Root, taking Root return value
         assert in(i)==Env.ROOT;
         fidx = BitsFun.EXTX;
-        rmem = Env.ROOT.rmem();
+        rmem = Env.ROOT.rmem(this);
         rrez = Env.ROOT.ext_caller();
       }
       if( !fidxs.test_recur(fidx) ) continue;

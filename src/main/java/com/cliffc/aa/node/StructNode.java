@@ -50,14 +50,6 @@ public class StructNode extends Node {
   // Only modify if !_closed
   private boolean _forward_ref;
 
-  // A collection of fields which *almost* make up a TypeStruct.  Almost,
-  // because missing the field Types, which come from the Node inputs are not
-  // otherwise part of a StructNode.
-
-  // Default type for unnamed fields.  Frequently 'ALL' except for primitive
-  // classes which support direct lattice isa() tests vs XNIL.
-  public final Type _def;
-
   // Field names mapped one-to-one with inputs.  Not sorted.
   // Order is IGNORED for H-M purposes.
   // Only modify if !_closed
@@ -77,11 +69,10 @@ public class StructNode extends Node {
   private final Parse _paren_start;
   private final Ary<Parse> _fld_starts;
 
-  public StructNode(int nargs, boolean forward_ref, Parse paren_start, Type def) {
+  public StructNode(int nargs, boolean forward_ref, Parse paren_start ) {
     super(OP_STRUCT);
     _nargs = nargs;
     _forward_ref = forward_ref;
-    _def = def;
     _flds = new Ary<>(new String[1],0);
     _accesses = new Ary<>(new TypeFld.Access[1],0);
     _paren_start = paren_start;
@@ -101,7 +92,7 @@ public class StructNode extends Node {
 
   // Structs with the same inputs and same field names are the same.
   @Override public int hashCode() {
-    return super.hashCode() ^ _flds.hashCode() ^ _accesses.hashCode() ^ (int)_def._hash;
+    return super.hashCode() ^ _flds.hashCode() ^ _accesses.hashCode();
   }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
@@ -111,8 +102,7 @@ public class StructNode extends Node {
       return false;
     return 
       _flds.equals(rec._flds) &&
-      _accesses.equals(rec._accesses) &&
-      _def==rec._def;
+      _accesses.equals(rec._accesses);
   }
 
   // String-to-node-index
@@ -218,7 +208,7 @@ public class StructNode extends Node {
       flds[i] = TypeFld.make(_flds.at(i),val(i),_accesses.at(i));
     // Fields are sorted in TypeStruct so I can merge-sort
     Arrays.sort(flds,( tf0, tf1) -> TypeFld.scmp(tf0._fld,tf1._fld));
-    return TypeStruct.make_flds(_def,flds);
+    return TypeStruct.make_flds(Type.ALL.oob(_closed),flds);
   }
 
   // Return liveness for a field

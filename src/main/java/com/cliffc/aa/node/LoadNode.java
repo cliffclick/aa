@@ -88,13 +88,13 @@ public class LoadNode extends Node implements Resolvable {
     if( is_resolving() ) {
       if( ts.above_center() ) return TypeNil.XSCALAR;
       // TODO: include clz fields
-      Type t2;
+      Type t2 = ts._def;
       if( Combo.pre() || Combo.HM_AMBI ) {
-        t2 = Type.ANY;
         for( TypeFld t3 : ts )  t2 = t2.meet(t3._t);
+        t2 = t2.join(TypeNil. SCALAR);
       } else {
-        t2 = Type.ALL;
         for( TypeFld t3 : ts )  t2 = t2.join(t3._t);
+        t2 = t2.meet(TypeNil.XSCALAR);
       }
       return t2;
     }
@@ -109,14 +109,15 @@ public class LoadNode extends Node implements Resolvable {
     int idx = ts.find(_fld);
     if( idx != -1 ) return ts.at(idx);
     // Miss on open structs dunno if the field will yet appear
-    if( ts._def==Type.ANY ) return Type.ANY;
+    if( ts._def==Type.ANY ) return TypeNil.XSCALAR;
     // Miss on closed structs looks at superclass.
     if( ts.len()>=1 && Util.eq(ts.fld(0)._fld,TypeFld.CLZ) ) {
       TypeNil ptr = (TypeNil)ts.fld(0)._t;
       TypeStruct obj = mem.ld(ptr);
       return lookup(obj,mem);
     }
-    return ts._def;
+    //assert ts._def==Type.ALL;
+    return Env.ROOT.ext_scalar(this);
   }
 
   
@@ -135,8 +136,6 @@ public class LoadNode extends Node implements Resolvable {
       return RootNode.def_mem(def);
   
     if( ptr._aliases.is_empty() )  return Type.ANY; // Nothing is demanded still
-    // Loading from a struct does not require memory, but still needs the field
-    if( ptr instanceof TypeStruct ) throw unimpl();
 
     // Demand memory produce the desired field from a struct
     if( ptr._aliases==BitsAlias.NALL )
@@ -163,7 +162,7 @@ public class LoadNode extends Node implements Resolvable {
         // find struct, match field in struct
         StructNode str = ((StoreXNode)sta).struct();
         int idx = str.find(_fld);
-        if( idx == -1 ) throw unimpl(); // Repeat a fixed-class lookup?
+        if( idx == -1 ) return null; // Repeat a fixed-class lookup?
         Node val = str.in(idx);
         // demand val&live monotonic or deps_add
         if( val._val.isa(_val) && _live.isa(val._live) )
@@ -278,7 +277,7 @@ public class LoadNode extends Node implements Resolvable {
             assert call.is_copy(0)==null;
             // The load is allowed to bypass the call if the alias is not killed.
             // Conservatively: the alias is not available to any called function,
-            // so its not in the reachable argument alias set and not globally escaped.
+            // so it's not in the reachable argument alias set and not globally escaped.
             BitsAlias esc_aliases = Env.ROOT.ralias();
             // Collides, might be use/def by call
             if( aliases.overlaps(esc_aliases) ) {
@@ -327,8 +326,28 @@ public class LoadNode extends Node implements Resolvable {
   @Override public TV3 _set_tvar() {
     if( is_resolving() )
       TVField.FIELDS.put(_fld,this); // Track resolving field names
-    // Unsure if input is a ptr or a struct
-    return new TVLeaf();
+
+    // Load takes a pointer
+    TV3 ptr0 = adr().set_tvar();
+    TVPtr ptr;
+    if( ptr0 instanceof TVPtr ptr1 ) {
+      ptr = ptr1;
+    } else {
+      ptr0.unify(new TVPtr(BitsAlias.EMPTY, new TVStruct(true) ),false);
+      ptr = ptr0.find().as_ptr();
+    } 
+
+    // Struct needs to have the named field
+    TVStruct str = ptr.load();
+    TV3 fld = str.arg(_fld);
+    TV3 self = new TVLeaf();
+    if( fld==null ) {
+      str.add_fld(_fld,self,false);
+    } else {
+      self.unify(fld,false);
+    }
+    
+    return self.find();
   }
 
   // All field loads against a pointer.
@@ -340,28 +359,29 @@ public class LoadNode extends Node implements Resolvable {
     // See if we force the input to choose between ptr and struct.
     // Get a struct in the end
     if( ptr0 instanceof TVErr ) throw unimpl();
-    TV3 ptr1 = ptr0;            // TODO: error might already be a Ptr or Struct
-    TVStruct tstr=null;
-    if( ptr1 instanceof TVLeaf ) { // Leaf, because we do not know if looking at a ptr or struct yet
-      if( ta instanceof TypeStruct ) { // Struct: standard for wrapped primitives
-        //tstr = (TVStruct)TV3.from_flow(ta);
-        tstr = new TVStruct(true);
-        progress = ptr1.unify(tstr,test);
-      } else if( ta instanceof TypeMemPtr ) {
-        throw unimpl();         // Force ptr
-      } if( ta == TypeNil.NIL || ta == TypeNil.XNIL ) {
-        throw unimpl();
-      }
-      // No progress, just stall until adr falls to ptr or struct
-      if( !progress ) {
-        adr().deps_add(this);
-        return false;
-      }
-      // Progress!
-      if( test ) return true;
-    } else if( ptr1 instanceof TVPtr ptr ) tstr = ptr.load();
-    else if( ptr1 instanceof TVStruct ts1 ) tstr = ts1;
-    else throw unimpl();
+    TVPtr ptr = ptr0.as_ptr();
+    TVStruct tstr = ptr.load();
+    //if( ptr1 instanceof TVLeaf ) { // Leaf, because we do not know if looking at a ptr or struct yet
+    //  if( ta instanceof TypeStruct ) { // Struct: standard for wrapped primitives
+    //    //tstr = (TVStruct)TV3.from_flow(ta);
+    //    tstr = new TVStruct(true);
+    //    progress = ptr1.unify(tstr,test);
+    //  } else if( ta instanceof TypeMemPtr tmp ) {
+    //    tstr = new TVStruct(true);
+    //    progress = ptr1.unify(new TVPtr(tmp._aliases,tstr),test);
+    //  } if( ta == TypeNil.NIL || ta == TypeNil.XNIL ) {
+    //    throw unimpl();
+    //  }
+    //  // No progress, just stall until adr falls to ptr or struct
+    //  if( !progress ) {
+    //    adr().deps_add(this);
+    //    return false;
+    //  }
+    //  // Progress!
+    //  if( test ) return true;
+    //} else if( ptr1 instanceof TVPtr ptr ) tstr = ptr.load();
+    //else if( ptr1 instanceof TVStruct ts1 ) tstr = ts1;
+    //else throw unimpl();
 
     // Attempt resolve
     if( is_resolving() )

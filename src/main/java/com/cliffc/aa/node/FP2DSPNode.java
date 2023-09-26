@@ -1,11 +1,12 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVLambda;
 import com.cliffc.aa.tvar.TVLeaf;
+import com.cliffc.aa.type.*;
 
 // Strip out the display argument from a bound function.
 // Inverse of BindFP.
@@ -18,9 +19,10 @@ public class FP2DSPNode extends Node {
   @Override public Type value() {
     Type fpt = fp()._val;
     if( fpt == Type.ANY || fpt == Type.ALL ) return fpt;
-    return (fpt instanceof TypeFunPtr tfp)
-      ? (tfp.has_dsp() ? tfp.dsp() : Type.ANY )
-      : fpt.oob();
+    if( fpt.above_center() ) return TypeNil.XSCALAR;
+    if( fpt instanceof TypeFunPtr tfp )
+      return tfp.has_dsp() ? tfp.dsp() : Type.ANY;
+    return TypeMemPtr.make_con(Env.ROOT.ralias(),false,TypeStruct.ISUSED);
   }
 
   private static final Type DSP_LIVE = TypeStruct.UNUSED.add_fldx(TypeFld.make("dsp",Type.ALL));

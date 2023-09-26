@@ -32,6 +32,9 @@ public class TestParse {
     DO_HMT=false;
     RSEED=0;
 
+
+    test("{ x y -> !x *  y.sin() }","[11]{any,5 -> flt}","{ int flt -> flt}", null, null, "[14]", null);
+    
     test(
 """
 foo = { x y ->
