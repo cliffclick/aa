@@ -25,11 +25,11 @@ public class BitsAlias extends Bits<BitsAlias> {
   public static final int ALLX = TREE.split(0);   // Split from 0
   public static final int EXTX = new_alias(ALLX); // External aliases
   public static final int LOCX = new_alias(ALLX); // Internal aliases
-  public static final int CLZX = new_alias(EXTX); // Clazz-clazz alias
-  public static final int INTX = new_alias(EXTX); // Integer-clazz alias
-  public static final int FLTX = new_alias(EXTX); // Float-clazz alias
-  public static final int RPCX = new_alias(EXTX); // RPC-clazz alias
-  public static final int STRX = new_alias(EXTX); // String alias
+  public static final int CLZX = new_alias(LOCX); // Clazz-clazz alias
+  public static final int INTX = new_alias(LOCX); // Integer-clazz alias
+  public static final int FLTX = new_alias(LOCX); // Float-clazz alias
+  public static final int RPCX = new_alias(LOCX); // RPC-clazz alias
+  public static final int STRX = new_alias(LOCX); // String alias
   
   // The All-Memory alias class
   public  static final BitsAlias NALL = new BitsAlias().make_impl(ALLX,null); // All aliases, no nil

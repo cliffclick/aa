@@ -75,10 +75,10 @@ public class TVStruct extends TVExpanding {
   //
   // Clazz for this struct, or null for ClazzClazz
   public TVPtr pclz() {
-    return _flds.length>0 && Util.eq(_flds[0],TypeFld.CLZ) &&
-      arg(0) instanceof TVPtr ptr ? ptr : null;
+    TV3 clz = arg(TypeFld.CLZ);
+    return clz instanceof TVPtr ptr ? ptr : null;
   }
-  
+
   @Override boolean can_progress() { throw unimpl(); }
 
   // Common accessor not called 'find' which already exists
@@ -88,6 +88,8 @@ public class TVStruct extends TVExpanding {
   }
   
   public boolean add_fld(String fld, TV3 tvf, boolean pin) {
+    assert idx(fld)== -1;
+    ptrue();
     if( _max == _flds.length ) {
       int len=1;
       while( len<=_max ) len<<=1;
@@ -103,20 +105,20 @@ public class TVStruct extends TVExpanding {
     tvf.widen(_widen,false);
     // Changed struct shape, move delayed-fresh updates to now
     move_delay();
-    return ptrue();
+    return true;
   }
 
   // Remove
-  boolean del_fld0(int idx) {
+  void del_fld0( int idx) {
     assert !unified();
     assert !Util.eq(_flds[idx],TypeFld.CLZ); // Never remove clazz
+    ptrue();
     _args[idx] = _args[_max-1];
     _flds[idx] = _flds[_max-1];
     _pins[idx] = _pins[_max-1];
     _max--;
     // Changed struct shape, move delayed-fresh updates to now
     move_delay();
-    return ptrue();
   }
   
   boolean del_fld(int idx) {

@@ -58,7 +58,7 @@ public abstract class PrimNode extends Node {
   public static final NewNode PINT = new NewNode(BitsAlias.INTX,true);
   public static final NewNode PFLT = new NewNode(BitsAlias.FLTX,true);
   public static final NewNode PSTR = new NewNode(BitsAlias.STRX,true); // String clazz, not strings
-  public static final NewNode PMATH= new NewNode(BitsAlias.new_alias(BitsAlias.EXTX),true);
+  public static final NewNode PMATH= new NewNode(BitsAlias.new_alias(BitsAlias.LOCX),true);
   public static TV3 IINT, IBOOL, IFLT, INFLT; // Integer, float instances
 
   private static PrimNode[] PRIMS = null; // All primitives

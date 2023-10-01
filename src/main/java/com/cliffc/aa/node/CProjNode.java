@@ -18,10 +18,7 @@ public class CProjNode extends ProjNode {
   @Override public Type value() {
     if( in(0)._op==OP_ROOT ) return Type.CTRL; // Program Start
     // Normal projection, except pinch to CTRL.
-    Type x = super.value();
-    if( x==Type.ANY ) return Type.XCTRL;
-    if( x==Type.ALL ) return Type. CTRL;
-    return x;
+    return super.value().oob(Type.CTRL);
   }
   @Override Type live_use( int i ) { return i==MEM_IDX ? TypeMem.ANYMEM : Type.ALL; }
 

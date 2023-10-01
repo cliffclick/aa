@@ -37,7 +37,7 @@ public class StoreNode extends StoreAbs {
       if( i==1 ) return live0;
       TypeStruct luse = live0.ld(tmp);
       assert i==2 || i==3;        // Address & value live
-      return luse.oob();          // Address is ANY/ALL
+      return luse.at_def(_fld);   // Address is ANY/ALL from field
     }
     
     throw unimpl();

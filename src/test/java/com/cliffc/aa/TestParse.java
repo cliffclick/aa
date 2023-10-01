@@ -33,8 +33,6 @@ public class TestParse {
     RSEED=0;
 
 
-    test("{ x y -> !x *  y.sin() }","[11]{any,5 -> flt}","{ int flt -> flt}", null, null, "[14]", null);
-    
     test(
 """
 foo = { x y ->
@@ -49,7 +47,9 @@ bar = {   -> math.rand(2) ? baz(  3) : baz  (3.3) };
 bar()
 """,
          "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
-    
+
+    test("{ x y -> !x *  y.sin() }","[11]{any,5 -> %[2][2,11]? }","{A *[]int *[]flt -> B }", null, null, null, "[11]");
+
     test("sq = { x -> x*x }; (sq(2),sq(2.2))","*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
     test("1", "int:1", "int:1");
     test("sq = { x -> x*x }; (sq(2),sq(3))","*[13](_,int:4,int:9)","*[15](int64,flt64)", null, null, "[14]", null);

@@ -19,7 +19,7 @@ public class FP2DSPNode extends Node {
   @Override public Type value() {
     Type fpt = fp()._val;
     if( fpt == Type.ANY || fpt == Type.ALL ) return fpt;
-    if( fpt.above_center() ) return TypeNil.XSCALAR;
+    if( fpt.above_center() ) return Type.ANY;
     if( fpt instanceof TypeFunPtr tfp )
       return tfp.has_dsp() ? tfp.dsp() : Type.ANY;
     return TypeMemPtr.make_con(Env.ROOT.ralias(),false,TypeStruct.ISUSED);

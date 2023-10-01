@@ -494,6 +494,7 @@ public class Parse implements Comparable<Parse> {
     // True side
     int t_scope_x;
     try( Env e = _e = new Env(_e, null, -1, ctrl(), mem(), scope().ptr(), null) ) { // Nest an environment for the local vars
+      // TODO: Insert cast
       Node t_exp = stmt(false); // Parse true expression
       if( t_exp == null ) t_exp = err_ctrl2("missing expr after '?'");
       scope().stk().close();
@@ -513,6 +514,7 @@ public class Parse implements Comparable<Parse> {
     // False side
     int f_scope_x;
     try( Env e = _e = new Env(_e, null, -1, ctrl(), mem(), scope().ptr(), null) ) { // Nest an environment for the local vars
+      // TODO: Insert cast
       Node f_exp = peek(':') ? stmt(false) : con(TypeNil.NIL);
       if( f_exp == null ) f_exp = err_ctrl2("missing expr after ':'");
       scope().stk().close();
@@ -771,31 +773,30 @@ public class Parse implements Comparable<Parse> {
         }
         tok=tok.intern();
 
-        Node castnn = gvn(new CastNode(ctrl(),n,TypeMemPtr.ISUSED)); // Remove nil choice
-
         // Store or load against memory
         if( peek(":=") || peek_not('=','=')) {
           Access fin = _buf[_x-2]==':' ? Access.RW : Access.Final;
-          n = stmt(false);
-          if( n == null )
+          Node val = stmt(false);
+          if( val == null )
             return err_ctrl2("Missing stmt after assigning field '."+tok+"'");
           Parse bad = errMsg(fld_start);
-          int nidx = n.push();
-          scope().replace_mem( new StoreNode(mem(),castnn,n,tok,fin,bad));
-          return Node.pop(nidx);
+          int vidx = val.push();
+          scope().replace_mem( new StoreNode(mem(),n,val,tok,fin,bad));
+          return Node.pop(vidx); // Return the value stored
         } else {
-          boolean is_oper = Oper.is_oper(tok);
-          Parse bad = errMsg(fld_start);
-          int cidx = castnn.push();
-          // Using a plain underscore for the field name is a Resolving field.
-          // If an oper load, then load from the clazz and not local struct.
-          Node fd = gvn(new LoadNode(mem(),castnn,tok,bad));
-          // Loading an explicit Oper-name field Binds late (now), and
-          // binds on the loaded overload.
-          castnn = Node.pop(cidx);
-
-          n = is_oper ? gvn(new BindFPNode(fd, castnn, true)) : fd;
-          if( !is_oper ) { Env.GVN.add_flow(Env.GVN.add_reduce(castnn)); kill(castnn); }
+          Parse bad = errMsg(fld_start);          
+          if( Oper.is_oper(tok) ) {
+            int aidx = n.push();  // Save address for bind
+            // Using a plain underscore for the field name is a Resolving field.
+            // If an oper load, then load from the clazz and not local struct.
+            Node fd = gvn(new LoadNode(mem(),n,tok,bad));
+            // Loading an explicit Oper-name field Binds late (now), and
+            // binds on the loaded overload.
+            n = gvn(new BindFPNode(fd, Node.pop(aidx), true));
+          } else {
+            // Normal non-oper load
+            n = gvn(new LoadNode(mem(),n,tok,bad));
+          }          
         }
 
       } else if( peek('(') ) {  // Attempt a function-call

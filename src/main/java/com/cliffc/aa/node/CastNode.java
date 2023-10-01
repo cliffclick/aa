@@ -14,7 +14,7 @@ public class CastNode extends Node {
 
   @Override public Type value() {
     Type c = val(0);
-    if( c != Type.CTRL ) return c.oob();
+    if( c != Type.CTRL ) return c.oob(TypeNil.SCALAR);
     Type t = val(1);
 
     // If the cast is in-error, we cannot lift.

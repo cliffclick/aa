@@ -37,9 +37,9 @@ public class StoreXNode extends StoreAbs {
     if( i==1 ) return live1;
     // Struct live passes through
     TypeStruct luse = live0.ld(tmp);
-    if( i==3 ) return luse;
+    if( i==3 ) return luse;     // Full detail liveness
     assert i==2;                // Address live
-    return luse.oob();          // Address is ANY/ALL
+    return luse==TypeStruct.UNUSED ? Type.ANY : Type.ALL; // Address is ANY/ALL if any field is live
   }
 
   @Override TypeMem _live_kill(TypeMemPtr tmp) {

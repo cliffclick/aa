@@ -74,10 +74,7 @@ public final class FunPtrNode extends Node {
       return TypeFunPtr.EMPTY;
     RetNode ret = ret();
     TypeTuple tret = (TypeTuple)(ret._val instanceof TypeTuple ? ret._val : ret._val.oob(TypeTuple.RET));
-    ParmNode ndsp = ret.fun().parm(DSP_IDX);
-    if( ndsp!=null ) ndsp.deps_add(this);
-    Type tdsp = ndsp==null ? Type.ANY : ndsp._val;
-    return TypeFunPtr.make(ret._fidx,nargs(),tdsp,tret.at(REZ_IDX));
+    return TypeFunPtr.make_no_dsp(ret._fidx,nargs(),tret.at(REZ_IDX));
   }
 
   // FunPtrs return RetNode liveness for memory
