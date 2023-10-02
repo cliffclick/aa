@@ -81,13 +81,13 @@ public class TVLambda extends TV3 {
   // Check arguments, not return nor omem.
   @Override int _trial_unify_ok_impl( TV3 tv3 ) {
     TVLambda that = (TVLambda)tv3; // Invariant when called
-    if( nargs() != that.nargs() ) return -1; // Fails to be equal
+    if( nargs() != that.nargs() ) return 7; // Fails to be equal
     // Check all other arguments
     int cmp = 1;
     for( int i=DSP_IDX; i<nargs(); i++ ) {
       int acmp = arg(i)._trial_unify_ok(that.arg(i));
-      if( acmp == -1 ) return -1; // Arg failed so trial fails
       cmp &= acmp;                // Maybe arg makes trial a maybe
+      if( cmp == 7 ) return 7;    // Arg failed so trial fails
     }
     return cmp;                   // Trial result
   }

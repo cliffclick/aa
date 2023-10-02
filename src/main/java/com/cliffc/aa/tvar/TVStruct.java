@@ -447,22 +447,22 @@ public class TVStruct extends TVExpanding {
       TV3 rhs = that.arg(_flds[i]); // RHS lookup by field name
       if( lhs!=rhs && rhs!=null ) {
         int acmp = lhs._trial_unify_ok(rhs);
-        if( acmp == -1 ) return -1; // Arg failed so trial fails
-        cmp &= acmp;                // Maybe arg makes trial a maybe
+        cmp |= acmp;                // Maybe arg makes trial a maybe
+        if( cmp == 7 ) return cmp;  // Arg failed so trial fails
       }
     }
 
     // Allow unification with extra fields.  The normal unification path
     // will not declare an error, it will just remove the extra fields.
-    return cmp & this.mismatched_child(that) & that.mismatched_child(this);
+    return cmp | this.mismatched_child(that) | that.mismatched_child(this);
   }
 
   private int mismatched_child(TVStruct that ) {
-    if( that.is_open() ) return 0; // Missing fields maybe add later
+    if( that.is_open() ) return 3; // Missing fields maybe add later
     for( int i=0; i<_max; i++ )
-      if( that.arg(_flds[i])==null ) // Missing key in RHS
-        return -1;                   // Trial unification failed
-    return 1;
+      if( !Resolvable.is_resolving( _flds[i] ) && that.arg(_flds[i])==null ) // Missing key in RHS
+        return 7;                   // Trial unification failed
+    return 1;                       // OK
   }
 
   @Override boolean _exact_unify_impl( TV3 tv3 ) {
@@ -480,7 +480,7 @@ public class TVStruct extends TVExpanding {
     TypeFld[] flds = TypeFlds.get(_max);
     for( int i=0; i<_max; i++ )
       flds[i] = TypeFld.malloc(_flds[i],null,TypeFld.Access.Final);
-    TypeStruct ts = TypeStruct.malloc(false,false,false,Type.ALL.oob(is_open()),flds);
+    TypeStruct ts = TypeStruct.malloc(false,false,false,Type.ANY.oob(is_open()),flds);
     ADUPS.put(_uid,ts);         // Stop cycles
 
     // Recursively type fields

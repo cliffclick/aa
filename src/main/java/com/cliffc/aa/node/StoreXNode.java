@@ -12,7 +12,7 @@ import static com.cliffc.aa.AA.unimpl;
 
 // Store a whole struct into memory.
 public class StoreXNode extends StoreAbs {
-  public StoreXNode( Node mem, Node adr, StructNode val, Parse bad ) {
+  public StoreXNode( Node mem, Node adr, Node val, Parse bad ) {
     super(mem,adr,val,bad);
   }
 

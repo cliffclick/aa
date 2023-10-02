@@ -1,4 +1,20 @@
 =======================================
+10/1/2023
+
+Splitting normal field Load from a DynLoad (Dynamic Load) node.  DynLoad will
+take a field offset input (much like an array load), but the input will contain
+a mapping from TV3s to field labels.  The address to a DynLoad, same as a field
+Load, will have a TVPtr to a TVStruct.  Once exactly one of the offset TV3s
+trial-unifies with the DynLoad self, the field is chosen.  If this doesn't
+happen during the compile, the DynLoad will do a dynamic lookup.  The lookup
+math can be reduced (same as a vtable) to lookup up the field offset, at a
+fixed offset in the vfield array.
+
+vfields are produced trivially by New (unsure) and by Fresh.
+
+
+
+=======================================
 09/13/2023
 
 Summary

@@ -1,7 +1,7 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.Combo;
-import com.cliffc.aa.node.LoadNode;
+import com.cliffc.aa.node.DynLoadNode;
 import com.cliffc.aa.util.Ary;
 
 import static com.cliffc.aa.AA.unimpl;
@@ -53,8 +53,8 @@ public interface Resolvable {
 
       // Count YES, NO, and MAYBEs
       switch( pattern.trial_unify_ok( rhsx ) ) {
-      case -1: break;                  // No.
-      case  1: yes++; lab = id; break; // Track a sample YES label
+      case 7: break;                  // No.
+      case 1: yes++; lab = id; break; // Track a sample YES label
       default: maybe++; break;
       };
     }
@@ -63,8 +63,10 @@ public interface Resolvable {
         
       case 0 -> maybe==0
         // No YESes, no MAYBES, this is an error
-        ? test || ((LoadNode)this).resolve_failed_no_match(pattern,rhs,test)
+        ? test || ((DynLoadNode)this).resolve_failed_no_match(pattern,rhs,test)
         // no YESes, but more maybes: wait.
+        : (maybe==1)
+        ? (test || resolve_it(outie,pattern,rhs,lab))
         : stall(rhs);
 
       case 1 -> maybe==0 

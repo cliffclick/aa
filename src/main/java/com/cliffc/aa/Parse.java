@@ -628,7 +628,7 @@ public class Parse implements Comparable<Parse> {
       // against the primitive clazz.
       Node over= gvn(new LoadNode(mem(),lhs,binop._name,err));
       // Resolve the set of primitive choices
-      Node fun = gvn(new LoadNode(mem(),over,"_",err));
+      Node fun = gvn(new DynLoadNode(mem(),over,err));
       // Bind the LHS to the function
       Node bind= gvn(new BindFPNode(fun,Node.peek(lhsidx),false));
       int fidx = bind.push();
@@ -746,7 +746,7 @@ public class Parse implements Comparable<Parse> {
       // otherwise this converts a reference to a value.
       Node over= gvn(new LoadNode(mem(),e0,op._name,err));
       // Resolve the correct function from the overload choices
-      Node fun = gvn(new LoadNode(mem(),over,"_",err));
+      Node fun = gvn(new DynLoadNode(mem(),over,err));
       // Call the operator
       n = do_call(errMsgs(oldx,oldx),args(Node.pop(e0idx),fun));
     } else {
@@ -787,12 +787,13 @@ public class Parse implements Comparable<Parse> {
           Parse bad = errMsg(fld_start);          
           if( Oper.is_oper(tok) ) {
             int aidx = n.push();  // Save address for bind
-            // Using a plain underscore for the field name is a Resolving field.
-            // If an oper load, then load from the clazz and not local struct.
             Node fd = gvn(new LoadNode(mem(),n,tok,bad));
             // Loading an explicit Oper-name field Binds late (now), and
             // binds on the loaded overload.
             n = gvn(new BindFPNode(fd, Node.pop(aidx), true));
+          } else if( Util.eq(tok,"_") ) {
+            // Using a plain underscore for the field name is a Resolving field.
+            n = gvn(new DynLoadNode(mem(),n,bad));
           } else {
             // Normal non-oper load
             n = gvn(new LoadNode(mem(),n,tok,bad));
@@ -889,7 +890,7 @@ public class Parse implements Comparable<Parse> {
     // Get the overloaded operator field, always late binding
     Node overplus = gvn(new LoadNode(mem(),n,"_+_",bad));
     // Resolve primitive choices
-    Node plus = gvn(new LoadNode(mem(),overplus,"_",bad));
+    Node plus = gvn(new DynLoadNode(mem(),overplus,bad));
     Node inc = con(TypeInt.con(d));
     // Add
     Node sum = do_call0(true,errMsgs(_x-2,_x,_x), args(Node.peek(nidx),inc,plus));
@@ -1003,9 +1004,9 @@ public class Parse implements Comparable<Parse> {
     nn.add_fld(TypeFld.CLZ,Access.Final, PrimNode.PCLZ, null);
     _tuple(oldx,s,bad,nn,0);
     Node ptr = gvn(new NewNode());
-    nn = (StructNode)init(Node.pop(sidx));
+    Node nn0 = init(Node.pop(sidx));
     int pidx = ptr.push();
-    set_mem(gvn(new StoreXNode(mem(),ptr,nn,bad)));
+    set_mem(gvn(new StoreXNode(mem(),ptr,nn0,bad)));
     return Node.pop(pidx);
   }
   private void _tuple(int oldx, Node s, Parse bad, StructNode nn, int fnum) {
