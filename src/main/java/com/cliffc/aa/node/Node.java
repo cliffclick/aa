@@ -717,7 +717,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // - Not an ErrNode AND
   // - Type.is_con()
   public boolean should_con(Type t) {
-    if( !t.is_con() || t.above_center() ) return false; // Not a constant
+    if( !t.is_con()) return false; // Not a constant
     if( this instanceof ConNode    || // Already a constant
         this instanceof FunPtrNode || // Already a constant
         this instanceof NewNode    || // Can be a constant, but need the alias info
@@ -787,6 +787,8 @@ public abstract class Node implements Cloneable, IntSupplier {
   // At least as alive
   private Node merge(Node x) {
     x._live = x._live.meet(_live);
+    if( Combo.post() && tvar() != x.tvar() )
+      tvar().unify(x.tvar(),false);
     return Env.GVN.add_flow(x);
   }
 

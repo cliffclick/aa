@@ -79,6 +79,12 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     if( _any ) sb.p('~');
+    // Shortcut for printing boxed primitives
+    if( is_prim() && _aliases==BitsAlias.EMPTY ) {
+      if( _obj.at(0)==INTPTR ) return _obj.at(1)._str(visit,dups,sb.p("int:"),debug,indent);
+      if( _obj.at(0)==FLTPTR ) return _obj.at(1)._str(visit,dups,sb.p("flt:"),debug,indent);      
+    }
+    if( is_clz_ptr() ) return sb.p("*CLZ");
     sb.p(_is_con ? '$' : '*');
     if( debug ) _aliases.str(sb);
     sb = _obj._str(visit,dups, sb, debug, indent);
@@ -87,6 +93,8 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
 
   @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return _obj._str_complex(visit,dups); }
 
+  boolean is_clz_ptr() { return _obj==TypeStruct.UNUSED && _aliases.abit()==BitsAlias.CLZX; }
+  
   static TypeMemPtr valueOf(Parse P, String cid, boolean any, boolean is_con) {
     P.require(is_con ? '$' : '*');
     var aliases = P.bits(BitsAlias.EMPTY);
@@ -123,6 +131,9 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   }
   public static TypeMemPtr make(boolean any, boolean nil, boolean sub, BitsAlias aliases, TypeStruct obj ) {
     return malloc(any,nil,sub,aliases,obj).hashcons_free();
+  }
+  public static TypeMemPtr make(boolean any, boolean nil, boolean sub, boolean is_con, BitsAlias aliases, TypeStruct obj ) {
+    return malloc(any,nil,sub,is_con,aliases,obj).hashcons_free();
   }
   TypeMemPtr malloc_from(TypeStruct obj) {
     return malloc(_any, _nil, _sub,_is_con,_aliases,obj);
@@ -288,7 +299,15 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     return obj == null ? this : make_from(obj);
   }
 
-  @Override public Type sharptr2( TypeMem mem ) { return mem.sharpen(this); }
+  @Override public Type sharptr2( TypeMem mem ) {
+    // Primitives are boxed, and so not immediately shallow (but their clazz is
+    // shallow, so sharpen it).
+    if( is_prim() )
+      return make_from(_obj.sharptr2(mem));
+    
+    return mem.sharpen(this);
+  }
+  public boolean is_prim() { return _obj.is_prim(); }
 
   @Override BitsFun _all_reaching_fidxs( TypeMem tmem) {
     BitsFun fidxs = BitsFun.EMPTY;
@@ -299,7 +318,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     return fidxs;
   }
 
-  @Override public boolean is_con() { return _is_con; }
+  @Override public boolean is_con() { return _is_con && _obj.is_con(); }
 
   @Override public Type widen() { return this; }
 

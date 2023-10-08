@@ -156,7 +156,7 @@ public class GVNGCM {
       //assert Env.KEEP_ALIVE.more_work() == 0;
       //assert Env.ROOT.no_more_ideal();
     }
-    assert AA.once_per() || Env.ROOT.more_work()==0;
+    assert AA.once_per() || Env.KEEP_ALIVE.more_work()==0;
     //assert Env.ROOT == null || Env.ROOT.no_more_ideal();
     ITER_CNT=cnt;
   }

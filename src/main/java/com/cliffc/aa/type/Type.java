@@ -243,7 +243,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     if( _hash==0 ) sb.p("!!!");
 
     // Some early cutouts for common bulky cases
-    if( this instanceof TypeStruct && this==TypeStruct.ISUSED ) return sb.p("()"); // Shortcut for common case
+    if( this instanceof TypeStruct && this==TypeStruct.ISUSED ) return sb.p("(...)"); // Shortcut for common case
 
     // Print a dups label, and optionally the type
     String s = dups.get(_uid);
@@ -872,14 +872,14 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     private Type maybe_int(String dup, int oldx2) {
       TypeInt t = TypeInt.valueOfInt(id_num());
       if( t==null ) t = TypeInt.con((long)back_num(oldx2));
-      TypeStruct wrap = t.wrap_deep(_intclz);
+      TypeMemPtr wrap = t.wrap_deep(_intclz);
       if( dup!=null ) _dups.put(dup,wrap);
       return wrap;
     }
     private Type maybe_flt(String dup, int oldx2) {
       TypeFlt t = TypeFlt.valueOfFlt(id_num());
       if( t==null ) t = TypeFlt.con(back_num(oldx2));
-      TypeStruct wrap = t.wrap_deep(_fltclz);
+      TypeMemPtr wrap = t.wrap_deep(_fltclz);
       if( dup!=null ) _dups.put(dup,wrap);
       return wrap;
     }
@@ -924,16 +924,17 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       return ((long)d)==d ? TypeInt.con((long)d) : TypeFlt.con(d);
     }
     double _num() {
+      int oldx = _x;
       int i=0, d;
       int neg = peek('-') ? -1 : 1;
       while( !eos() &&  (d=at(_x)-'0') >= 0 && d<=9 )
         { i = i*10+d; _x++; }
       if( eos() || !peek('.') ) return i*neg; // Pure integer
-      double dd = i, frac=10;
+      // Find end of digits, and just parse as double
       while( !eos() &&  (d=at(_x)-'0') >= 0 && d<=9 )
-        { dd += d/frac; frac *= 10; _x++; }
-      if( peek('f') ) dd = (float)dd; // A float
-      return dd*neg;                  // A double
+        _x++;
+      String str = _str.substring(oldx,_x);
+      return Double.parseDouble(str);
     }
     // Skip whitespace and parse an identifier.
     // Disallows numbers
@@ -972,6 +973,9 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       if( peek(']') ) return b; // Empty
       if( peek("nALL]") ) return b.set(1);
       if( peek("nANY]") ) return b.set(1).dual();
+      if( peek("CLZ]" ) ) return b.set(BitsAlias.CLZX);
+      if( peek("INT]" ) ) return b.set(BitsAlias.INTX);
+      if( peek("FLT]" ) ) return b.set(BitsAlias.FLTX);
       boolean dual = peek('~');
       do b = b.set(is_all() ? 1 : (int)_num());
       while( peek(dual ? '+' : ',') );

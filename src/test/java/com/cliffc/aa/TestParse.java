@@ -29,17 +29,19 @@ public class TestParse {
     JIG=true;
 
     DO_GCP=true;
-    DO_HMT=false;
+    DO_HMT=true;
     RSEED=0;
 
     // Simpler overload tests
-    test("!(2,3.14)._","[11]{any,5 -> %[2][2,11]? }","{A *[]int *[]flt -> B }", null, null, null, "[11]");
-    test("(2,3.14)._.sin()","[11]{any,5 -> %[2][2,11]? }","{A *[]int *[]flt -> B }", null, null, null, "[11]");
-
-    test("q=(2,3.14); (!q._,q._.sin())","[11]{any,5 -> %[2][2,11]? }","{A *[]int *[]flt -> B }", null, null, null, "[11]");
-
+    test("!(2,3.14)._","nil","int:int1", null, null, null, null);
+    test("(2,3.14)._.sin()","flt:0.0015926529164868282","flt:flt64", null, null, null, null);
+    // Two DynLoads
+    test("q=(2,3.14); (!q._,q._.sin())","*[16](_, nil, flt:0.0015926529164868282)","*[16](_,int:int1,flt:flt64)", null, null, "[16]", null);
+    // Overload is exposed to Root
     test("{ x y -> !x *  y.sin() }","[11]{any,5 -> %[2][2,11]? }","{A *[]int *[]flt -> B }", null, null, null, "[11]");
-    
+
+
+
     test(
 """
 foo = { x y ->

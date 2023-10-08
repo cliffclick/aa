@@ -129,6 +129,8 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   public static TypeFld make_dsp(Type t) { return make(CLZ,t,Access.Final); }
   public static TypeFld make_clz(Type t) { return make(CLZ,t,Access.Final); }
   public static TypeFld make_prim(Type t) { return make(PRIM,t,Access.Final); }
+  public boolean is_clz () { return Util.eq(CLZ ,_fld); }
+  public boolean is_prim() { return Util.eq(PRIM,_fld); }
 
   // Some convenient default constructors
   static final String[] ARGS = new String[]{" ctl", " mem", CLZ,"x","y","z"};

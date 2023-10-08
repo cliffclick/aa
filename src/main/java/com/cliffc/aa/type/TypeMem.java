@@ -409,7 +409,7 @@ public class TypeMem extends Type<TypeMem> {
   void _dull( Type dull, final HashMap<BitsAlias,TypeMemPtr> dull_cache ) {
     if( !(dull instanceof Cyclic) ) return; // Nothing to sharpen
     // Check caches and return
-    if( dull instanceof TypeMemPtr tmp ) {
+    if( dull instanceof TypeMemPtr tmp && tmp.is_simple_ptr() ) {
       BitsAlias aliases = tmp._aliases;
       if( sharp_get(aliases) != null ) return;
       if( dull_cache.get(aliases) != null ) return;
@@ -452,7 +452,7 @@ public class TypeMem extends Type<TypeMem> {
   Type _sharp(Type dull, final HashMap<BitsAlias,TypeMemPtr> dull_cache, final VBitSet visit ) {
     if( !(dull instanceof Cyclic) ) return dull; // Nothing to sharpen
     Type t;
-    if( dull instanceof TypeMemPtr tmp ) {
+    if( dull instanceof TypeMemPtr tmp && tmp.is_simple_ptr() ) {
       t = sharp_get(tmp._aliases);
       if( t !=null ) return t;
       t = dull_cache.get(tmp._aliases);

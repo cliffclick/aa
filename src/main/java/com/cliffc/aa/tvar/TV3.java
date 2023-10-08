@@ -491,14 +491,9 @@ abstract public class TV3 implements Cloneable {
     // Leafs never fail
     if( this instanceof TVLeaf leaf && !(that instanceof TVErr) ) return Resolvable.add_pat_dep(leaf); // No error
     if( that instanceof TVLeaf leaf && !(this instanceof TVErr) ) return Resolvable.add_pat_dep(leaf); // No error
-    // Different classes will//, except we try the parent field of a prim wrapper struct
-    if( getClass() != that.getClass() ) {
-      //if( this instanceof TVStruct ) throw unimpl();
-      TVPtr clz;
-      if( this instanceof TVPtr && that instanceof TVStruct str && (clz=str.pclz())!=null )
-        return _trial_unify_ok(clz);
+    // Different classes will also fail
+    if( getClass() != that.getClass() )
       return 7;
-    }
     // Subclasses check sub-parts
     return _trial_unify_ok_impl(that);
   }

@@ -155,11 +155,10 @@ public class TypeInt extends TypeNil<TypeInt> {
   }
   public TypeInt maxsize(TypeInt ti) { return (TypeInt)meet(ti);  }
   // Shallow wrap
-  public TypeStruct wrap() {
-    return TypeStruct.make_prim(TypeFld.make_clz(TypeMemPtr.INTPTR),TypeFld.make_prim(this)); // Wrapped primitive
-  }
+  public TypeMemPtr wrap() { return wrap_deep(null); }
   // Deep wrap
-  public TypeStruct wrap_deep(TypeMemPtr clz) {
-    return TypeStruct.make_prim(TypeFld.make_clz(clz==null ? TypeMemPtr.INTPTR : clz),TypeFld.make_prim(this)); // Wrapped primitive
+  public TypeMemPtr wrap_deep(TypeMemPtr clz) {
+    if( clz == null ) clz = TypeMemPtr.INTPTR;
+    return TypeMemPtr.make(false,false,false,true,BitsAlias.EMPTY,TypeStruct.make_prim(TypeFld.make_clz(clz),TypeFld.make_prim(this))); // Wrapped primitive
   }
 }

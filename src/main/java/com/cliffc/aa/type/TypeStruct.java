@@ -267,6 +267,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   public static TypeStruct make_test( Type def, TypeStruct clz, TypeFld fld0, TypeFld fld1 ) {
     return make(false,def,TypeFlds.make(TypeFld.make_clz(clz),fld0,fld1));
   }
+  public boolean is_prim() { return _flds.length==2 && _flds[0].is_clz() && _flds[1].is_prim(); }
 
   // Add a field to an under construction TypeStruct; _flds is not interned.
   public TypeStruct add_fld( TypeFld fld ) {
@@ -602,7 +603,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
 
   @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt, boolean indent ) {
     if( visit.tset(_uid) ) {
-      if( !dups.containsKey(_uid) )
+      if( !dups.containsKey(_uid) && _flds.length > 0 )
         dups.put(_uid,"S"+(char)('A'+ucnt._ts++));
       return;
     }
@@ -620,18 +621,15 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     // To distinguish "DUP:(...)" from "CLZ:(...)" we require another ':' IFF DUP is present.
     //       ()  -- parses as a no-dup tuple
     //   dup:()  -- parses as a    dup tuple
+
+    // Shortcuts for the large primitive clazz structures
     if( !indent ) {
-      if( is_top_clz() ) return sb.p("@{TOP}");
-      if( is_int_clz() ) return sb.p("@{INT}");
-      if( is_flt_clz() ) return sb.p("@{FLT}");
-      if( is_str_clz() ) return sb.p("@{STR}");
-      if( is_math_clz()) return sb.p("@{MATH}");
+      if( is_top_clz() ) return sb.p("@{TOPCLZ}");
+      if( is_int_clz() ) return sb.p("@{INTCLZ}");
+      if( is_flt_clz() ) return sb.p("@{FLTCLZ}");
+      if( is_str_clz() ) return sb.p("@{STRCLZ}");
+      if( is_math_clz()) return sb.p("@{MATHCLZ}");
       if( is_str() ) return sb.p("str:("+_flds[1]._t+")");
-    }
-    
-    if( _flds.length>1 && Util.eq(_flds[0]._fld,TypeFld.CLZ) && _flds[0]._t instanceof TypeMemPtr pclz && pclz._is_con && !indent ) {
-      if( pclz._aliases==BitsAlias.INT ) return _flds[1]._t._str(visit,dups,sb.p("int:"),debug,indent);
-      if( pclz._aliases==BitsAlias.FLT ) return _flds[1]._t._str(visit,dups,sb.p("flt:"),debug,indent);
     }
 
     boolean is_tup = is_tup();
@@ -652,8 +650,8 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
       sb.p(is_tup ? ", " : "; "); // Between fields
       sep=true;
     }
-    if( _def==ANY ) sb.p("..."); // Any extra fields are allowed
-    else if( _def==ALL ) {       // No extra fields
+    if( _def==ALL ) sb.p("..."); // Any extra fields are allowed
+    else if( _def==ANY ) { // No extra fields
       if( sep ) sb.unchar().unchar();
     } else sb.p('$').p(_def);    // Unusual extra fields
     if( ind ) sb.nl().di(1).i();
@@ -684,7 +682,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   // e.g. (), (^=any), (^=any,"abc"), (3.14), (3.14,"abc",:=123)
   // @{}, @{x=3.14; y="abc"; z:=123}
   static TypeStruct valueOf(Parse P, String dup, boolean any, boolean is_tup ) {
-    TypeStruct ts = malloc(any,ALL.oob(any),TypeFlds.get(0));
+    TypeStruct ts = malloc(any,ANY,TypeFlds.get(0));
     if( dup!=null ) P._dups.put(dup,ts);
     if( !is_tup ) { P.require('@');  P.require('{'); } else P.require('(');
     char close = is_tup ? ')' : '}';
@@ -692,7 +690,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
 
     int fld_num = 0;
     while(true) {
-      if( P.peek("...") ) { assert any; break; }
+      if( P.peek("...") ) { ts._def=ALL; break; }
       if( P.peek('$') )
         { ts._def = P.type(null,false,-2); break; }
       TypeFld fld = ts.len()==0 && P.peek('_')
@@ -763,6 +761,8 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   
   @Override public boolean is_con() {
     if( !_def.is_con() ) return false;
+    if( is_prim() )
+      return _flds[1].is_con();
     for( TypeFld fld : _flds )
       if( !fld.is_con() )
         return false;

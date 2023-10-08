@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.node.PrimNode;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import org.junit.Test;
@@ -53,8 +52,8 @@ public class TestType {
       "flt32",                  // Simple primitive range
       "3.14",                   // Class Float
       "flt64",                  // Class Float range
-      "%[4][]",                 // BitsAlias.EXT no nil
-      "%[4][]?",                // BitsAlias.EXT yes nil
+      "%[CLZ][]",               // BitsAlias.CLZ no nil
+      "%[CLZ][]?",              // BitsAlias.CLZ yes nil
       "*[17](_, 1, ~Scalar)",   // Bare ~type as a field
       "[23]{any,3 -> *[7](3, Scalar) }", // Function returning a struct
       "*[3](_, 0=PA:*[3]@{_; _*_=*[nALL](); f=flt64}, *[](), 2=PA)", // Struct with self-references
@@ -394,8 +393,6 @@ public class TestType {
 
 
   @Test public void testFunction() {
-    PrimNode[] ignore2 = PrimNode.PRIMS(); // Force node
-
     TypeFunPtr gf = TypeFunPtr.GENERIC_FUNPTR;
     // New functions fall squarely between +/- GENERIC_FUNPTR.
 

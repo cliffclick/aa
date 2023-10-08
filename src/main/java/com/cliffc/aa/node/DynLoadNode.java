@@ -6,7 +6,6 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
-import java.util.HashSet;
 
 // Load a struct from memory.  Does its own nil-check testing.  Display/Frames
 // are normal structs, so local vars are ALSO normal struct loads.
@@ -45,11 +44,16 @@ public class DynLoadNode extends Node implements Resolvable {
   
   Node mem() { return in(MEM_IDX); }
   Node adr() { return in(DSP_IDX); }
-  private Node set_mem(Node a) { return set_def(MEM_IDX,a); }
 
   @Override public String fld() { return _fld; }
-  @Override public String resolve(String lab) { throw AA.unimpl(); }
-  @Override public boolean is_resolving() { return true; }
+  @Override public String resolve(String lab) {
+    unelock();                  // Hash changes
+    String old = _fld;
+    _fld = lab;
+    add_flow();
+    return old;
+  }
+  @Override public boolean is_resolving() { return Resolvable.is_resolving( _fld ); }
   
   @Override public Type value() {
     Type tadr = adr()._val;
@@ -61,23 +65,20 @@ public class DynLoadNode extends Node implements Resolvable {
       return tmem.oob(); // Not a memory
     if( ta==TypeNil.NIL || ta==TypeNil.XNIL )
       ta = (TypeNil)ta.meet(PrimNode.PINT._val);
-
-    // Loads can be issued directly against a TypeStruct, if we are loading
-    // against an inlined object.  In this case the Load is a no-op.
-    TypeStruct ts = ta instanceof TypeStruct ts0 ? ts0 : tm.ld(ta);
-
+    
     // Still resolving, dunno which field yet
-    if( ts.above_center() ) return TypeNil.XSCALAR;
-    // TODO: include clz fields
-    Type t2 = ts._def;
-    if( Combo.pre() || Combo.HM_AMBI ) {
-      for( TypeFld t3 : ts )  t2 = t2.meet(t3._t);
-      t2 = t2.join(TypeNil. SCALAR);
-    } else {
-      for( TypeFld t3 : ts )  t2 = t2.join(t3._t);
-      t2 = t2.meet(TypeNil.XSCALAR);
-    }
-    return t2;
+    if( is_resolving() )
+      return TypeNil.XSCALAR.oob(Combo.pre());
+    
+    TypeStruct ts = ta instanceof TypeMemPtr tmp && !tmp.is_simple_ptr()
+      ? tmp._obj
+      : tm.ld(ta);
+
+    Type t = LoadNode.lookup(ts,ta,tm,_fld);
+    if( t!=null ) return t;
+
+    // Did not find field
+    return Env.ROOT.ext_scalar(this);
   }
 
   
@@ -152,6 +153,8 @@ public class DynLoadNode extends Node implements Resolvable {
       str.deps_add(this);
       return false;
     }
+    if( !is_resolving() ) return false;
+
     if( trial_resolve(true, tvar(), str, test) )
       return true;              // Resolve made progress!
     // No progress, try again if self changes

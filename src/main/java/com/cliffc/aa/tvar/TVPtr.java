@@ -4,7 +4,9 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.Util;
 import com.cliffc.aa.util.VBitSet;
+
 
 /** A ptr-to-struct or ground term TypeInt/TypeFlt.
  *  The ground term includes a ptr-to-int-clazz.
@@ -75,8 +77,20 @@ public class TVPtr extends TV3 {
   }
 
   @Override void _widen( byte widen ) { }
+
+  boolean is_clz_ptr() {
+    return _aliases==BitsAlias.CLZ &&
+      load().len()==1 && Util.eq(TypeFld.CLZ,load().fld(0));
+  }
+
+  boolean is_prim() { return _aliases==BitsAlias.EMPTY && load().is_prim(); }
+
   
- @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
+  @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
+    if( is_clz_ptr() ) return sb.p("_");
+    if( is_prim() ) // Shortcut for boxed primitives
+      return load()._str(sb,visit,dups,debug,prims);
+
     sb.p("*");
     _aliases.str(sb);
     if( _args.length>0 && _args[0]!=null ) arg(0)._str(sb,visit,dups,debug,prims);

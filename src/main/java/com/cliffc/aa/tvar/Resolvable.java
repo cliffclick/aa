@@ -1,5 +1,6 @@
 package com.cliffc.aa.tvar;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.Combo;
 import com.cliffc.aa.node.DynLoadNode;
 import com.cliffc.aa.util.Ary;
@@ -53,9 +54,10 @@ public interface Resolvable {
 
       // Count YES, NO, and MAYBEs
       switch( pattern.trial_unify_ok( rhsx ) ) {
-      case 7: break;                  // No.
-      case 1: yes++; lab = id; break; // Track a sample YES label
-      default: maybe++; break;
+      case 7: break;                    // No.  Don't lose label tracking
+      case 3: maybe++; lab = id; break; // Track a sample MAYBE label
+      case 1: yes++  ; lab = id; break; // Track a sample YES   label
+      default: throw AA.unimpl();
       };
     }
 
@@ -64,10 +66,10 @@ public interface Resolvable {
       case 0 -> maybe==0
         // No YESes, no MAYBES, this is an error
         ? test || ((DynLoadNode)this).resolve_failed_no_match(pattern,rhs,test)
-        // no YESes, but more maybes: wait.
-        : (maybe==1)
+        // no YESes, but more maybes:
+        : (maybe==1)            // One maybe can move to a yes, but no more maybes will appear
         ? (test || resolve_it(outie,pattern,rhs,lab))
-        : stall(rhs);
+        : stall(rhs);  // Too many maybes: wait
 
       case 1 -> maybe==0 
         // Exactly one yes and no maybes: we can resolve this now
@@ -110,11 +112,11 @@ public interface Resolvable {
   }
 
   // Track expanding terms; this need to recheck the match if they expand.
-  // Already return 0 for a "maybe".
+  // Already return 3 for a "maybe".
   static int add_pat_dep(TVExpanding leaf) {
     if( PAT_LEAFS.find(leaf)== -1 )
       PAT_LEAFS.add(leaf);
-    return 0;                   // Always reports a "maybe"
+    return 3;                   // Always reports a "maybe"
   }
 
   // Resolve failed; if ambiguous report that; if nothing present report that;

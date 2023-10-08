@@ -785,19 +785,16 @@ public class Parse implements Comparable<Parse> {
           return Node.pop(vidx); // Return the value stored
         } else {
           Parse bad = errMsg(fld_start);          
-          if( Oper.is_oper(tok) ) {
-            int aidx = n.push();  // Save address for bind
-            Node fd = gvn(new LoadNode(mem(),n,tok,bad));
-            // Loading an explicit Oper-name field Binds late (now), and
-            // binds on the loaded overload.
-            n = gvn(new BindFPNode(fd, Node.pop(aidx), true));
-          } else if( Util.eq(tok,"_") ) {
+          int aidx = n.push();  // Save address for bind
+          if( Util.eq(tok,"_") ) {
             // Using a plain underscore for the field name is a Resolving field.
             n = gvn(new DynLoadNode(mem(),n,bad));
           } else {
             // Normal non-oper load
             n = gvn(new LoadNode(mem(),n,tok,bad));
-          }          
+          }
+          // Bind after load
+          n = gvn(new BindFPNode(n, Node.pop(aidx), true));
         }
 
       } else if( peek('(') ) {  // Attempt a function-call

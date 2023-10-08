@@ -8,7 +8,7 @@ import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
-
+import java.lang.Math;
 
 // Primitives are nodes to do primitive operations.  Internally they carry a
 // '_formals' to type their arguments.  Similar to functions and FunNodes and
@@ -39,7 +39,7 @@ public abstract class PrimNode extends Node {
     super(OP_PRIM);
     _name = name;
     _is_lazy = is_lazy;
-    int fidx = BitsFun.new_fidx(BitsFun.EXTX);
+    int fidx = BitsFun.new_fidx(BitsFun.INTX);
     for( int i=DSP_IDX; i<formals._ts.length; i++ ) assert formals._ts[i] instanceof TypeNil || formals._ts[i]==Type.ANY;
     _formals = formals;
     _ret = ret;
@@ -151,10 +151,10 @@ public abstract class PrimNode extends Node {
 
     // TVar for wrapped primitive instance
     String[] ss  = new String[]{TypeFld.CLZ,TypeFld.PRIM};
-    IINT  = new TVStruct(ss, new TV3[]{PINT.set_tvar(),TVBase.make(TypeInt. INT64)},false);
-    IBOOL = new TVStruct(ss, new TV3[]{PINT.set_tvar(),TVBase.make(TypeInt. BOOL )},false);
-    IFLT  = new TVStruct(ss, new TV3[]{PFLT.set_tvar(),TVBase.make(TypeFlt. FLT64)},false);
-    INFLT = new TVStruct(ss, new TV3[]{PFLT.set_tvar(),TVBase.make(TypeFlt.NFLT64)},false);
+    IINT  = new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PINT.set_tvar(),TVBase.make(TypeInt. INT64)},false));
+    IBOOL = new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PINT.set_tvar(),TVBase.make(TypeInt. BOOL )},false));
+    IFLT  = new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.set_tvar(),TVBase.make(TypeFlt. FLT64)},false));
+    INFLT = new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.set_tvar(),TVBase.make(TypeFlt.NFLT64)},false));
 
     // Set all TVars
     Env.KEEP_ALIVE.walk( (n,ignore) -> {
@@ -260,7 +260,7 @@ public abstract class PrimNode extends Node {
         }
         over.init();
         over.close();
-        ptr0 = new NewNode(BitsAlias.new_alias(BitsAlias.EXTX),true).init();
+        ptr0 = new NewNode(BitsAlias.new_alias(BitsAlias.LOCX),true).init();
         scp.set_mem(new StoreXNode(scp.mem(),ptr0,over,null).init());
       }
       clz.add_fld(prims[0]._name,Access.Final,ptr0,null);
@@ -308,9 +308,8 @@ public abstract class PrimNode extends Node {
       }
       TypeNil tformal = (TypeNil)_formals.at(i);
       Type actual = val(i-DSP_IDX);
-      if( !(actual instanceof TypeStruct sactual) ) return actual.oob();
-      // Unwrap
-      TypeNil ptn = (TypeNil)sactual.at(TypeFld.PRIM);
+      TypeNil ptn = unwrap(actual);
+      if( ptn==null )return actual.oob(); // Not a primitive
       // Cap it at the formal
       TypeNil t = TS[i-DSP_IDX] = ptn==TypeNil.NIL ? TypeNil.NIL : (TypeNil)tformal.dual().meet(ptn);
       if( t != TypeNil.NIL && !t.is_con() ) {
@@ -332,7 +331,12 @@ public abstract class PrimNode extends Node {
     default: throw unimpl();
     }
   }
+  public static TypeNil unwrap( Type t ) {
+    if( !(t instanceof TypeMemPtr tmp) ) return null;
+    return (TypeNil)tmp._obj.at(TypeFld.PRIM);
+  }
 
+  
   @Override public Node ideal_reduce() { return in(0)==this ? Env.ANY : null; }
 
   @Override public boolean has_tvar() { return true; }
@@ -417,7 +421,7 @@ public abstract class PrimNode extends Node {
   static class SinF64 extends Prim1OpF64 {
     SinF64() { super("sin"); }
     @Override boolean is_oper() { return false; }
-    @Override double op( double d ) { throw AA.unimpl(); }
+    @Override double op( double d ) { return Math.sin(d); }
   }
 
   // 1Ops have uniform input/output types, so take a shortcut on name printing

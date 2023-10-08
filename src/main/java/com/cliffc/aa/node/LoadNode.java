@@ -48,27 +48,34 @@ public class LoadNode extends Node {
     if( ta==TypeNil.NIL || ta==TypeNil.XNIL )
       ta = (TypeNil)ta.meet(PrimNode.PINT._val);
 
-    // Loads can be issued directly against a TypeStruct, if we are loading
-    // against an inlined object.  In this case the Load is a no-op.
-    TypeStruct ts = ta instanceof TypeStruct ts0 ? ts0 : tm.ld(ta);
+    TypeStruct ts = ta instanceof TypeMemPtr tmp && !tmp.is_simple_ptr()
+      ? tmp._obj
+      : tm.ld(ta);
 
-    return lookup(ts,tm);
+    Type t = lookup(ts,ta,tm,_fld);
+    if( t!=null ) return t;
+
+    // Did not find field
+    return Env.ROOT.ext_scalar(this);
   }
 
 
   // Field lookup, might check superclass
-  private Type lookup( TypeStruct ts, TypeMem mem ) {
+  static Type lookup( TypeStruct ts, TypeNil ptr, TypeMem mem, String fld ) {
+    
     // Check for direct field
-    int idx = ts.find(_fld);
+    int idx = ts.find(fld);
     if( idx != -1 ) return ts.at(idx);
+
+    // Have a super class?
+    if( ts.len()==0 || !Util.eq(ts.fld(0)._fld,TypeFld.CLZ) )
+      return ts._def.above_center() ? TypeNil.XSCALAR : null;
+
     // Miss on closed structs looks at superclass.
-    if( ts.len()>=1 && Util.eq(ts.fld(0)._fld,TypeFld.CLZ) ) {
-      TypeNil ptr = (TypeNil)ts.fld(0)._t;
-      TypeStruct obj = mem.ld(ptr);
-      return lookup(obj,mem);
-    }
-    //assert ts._def==Type.ALL;
-    return Env.ROOT.ext_scalar(this);
+    ptr = (TypeNil)ts.fld(0)._t; // Load clazz ptr
+    // Load the clazz struct type from memory
+    ts = mem.ld(ptr);
+    return lookup(ts,ptr,mem,fld);
   }
 
   

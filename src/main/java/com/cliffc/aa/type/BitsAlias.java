@@ -1,5 +1,7 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.SB;
+
 import java.util.HashMap;
 
 // Alias Bits supporting a lattice; immutable; hash-cons'd.
@@ -76,4 +78,12 @@ public class BitsAlias extends Bits<BitsAlias> {
       return this;
     return NALL;
   }
+
+  @Override public SB str( SB sb ) {
+    if( this==CLZ ) return sb.p("[CLZ]");
+    if( this==INT ) return sb.p("[INT]");
+    if( this==FLT ) return sb.p("[FLT]");
+    return super.str(sb);
+  }
+  
 }

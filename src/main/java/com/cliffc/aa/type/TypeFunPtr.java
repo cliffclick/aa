@@ -6,30 +6,58 @@ import java.util.function.*;
 
 import static com.cliffc.aa.AA.unimpl;
 
+
 // Function indices or function pointers; a single instance can include all
 // possible aliased function pointers.  Function pointers can be executed, are
 // not GC'd, and cannot be Loaded or Stored through (although they can be
 // loaded & stored).
-//
+
 // A function pointer includes a display (a back pointer to the enclosing
-// environment); i.e. function pointers are "fat".  The display is typed as
-// a TMP to a TypeStruct, or e.g. ANY (not live, nobody uses or cares or XNIL).
-//
+// environment or instance); i.e. function pointers are "fat".  The display is typed as
+// a TMP to a TypeStruct, or ANY (not live, nobody uses or cares) or XNIL.
+
 // The TFP indicates if it carries a display or not; a TFP without a display
 // cannot be called and has to be bound to a display first.  An unbound TFP
 // uses ANY.  For "static" functions, the display is bound to the prototype
 // object immediately.
-//
+
 // Other arguments are not currently curried in the TFP itself, only nargs.
-//
+
 // Each function index (or fidx) is a constant value, a classic code pointer.
 // Cloning the code immediately also splits the fidx with a new fidx bit for
 // both the original and the new code.
-//
+
+// Displays are semantically always part of a function, as an extra 0th argument.
+// For functions declared in closures, they represent the enclosing environment.
+// For functions declare in structs, they represent the "this" pointer.
+
+// Functions declared in closures are bound immediately upon definition, and no
+// unbound version ever exists.
+
+// Functions declared in structs get their "this" when loaded from the structs
+// class pointer.  This is for efficiency, because the semantics otherwise
+// require making a this-bound version of the function pointer with every new
+// allocation.  In the meantime, they are stored as functions with "unbound"
+// displays.
+
+// An instance field load of a function will always already be bound (a "fat pointer").
+// A final class field load of a function may or may not be bound,
+// determined at typing time, not parsing time.
+//   "@{ foo = rand ? { . -> 2 } : { . -> 3 }; }"
+// Here foo is a self function and needs binding, but it is a const expr not a direct function.
+//   "@{ foo = fetch_some_fcn(); }"
+// Here "foo" is a final field with a function type, but this isnt known until post Combo.
+// So the Parser will insert Binds after every field load, and some Binds will be no-ops,
+// and the typing system will sort it out.
+
+// _dsp == ANY  , unbound display.  Bind binds, and moves to XSCALAR as a minimum.
+// _dsp == other, pre-bound display.  Bind leaves untouched
+
 public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   int _nargs;            // Number of formals, including the ctrl, mem, display
   public Type _ret;      // Return scalar type
-  private Type _dsp; // Display; often a TMP to a TS; ANY is dead (not live, nobody uses).
+  
+  private Type _dsp;     // Display; basically a hidden 0th argument
 
   private TypeFunPtr init(boolean any, boolean nil, boolean sub, BitsFun fidxs, int nargs, Type dsp, Type ret ) {
     super.init(any,nil,sub,BitsAlias.EMPTY,fidxs);

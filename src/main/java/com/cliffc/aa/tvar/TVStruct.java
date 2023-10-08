@@ -68,11 +68,40 @@ public class TVStruct extends TVExpanding {
     return new TVStruct(new String[]{TypeFld.CLZ},new TV3[]{ TVBase.make(TypeNil.NIL)});
   }
 
-  // TODO: Unclear if this API makes sense.
-  //   ClzClz is closed and has a CLZ field with _tv3[0] being TVBase(nil).
-  //   Other structs have a CLZ field, with _tv3[0] being an empty TVStruct (no known class yet)
-  //                                                     OR  recursive again
-  //
+  @Override public int len() { return _max; }  
+
+  public String fld( int i ) { assert !unified();  return _flds[i]; }
+  
+  // Return the TV3 for field 'fld' or null if missing
+  public TV3 arg(String fld) {
+    assert !unified();
+    int i = idx(fld);
+    return i>=0 ? arg(i) : null;
+  }
+
+  // Return the TV3 for field 'fld' or null if missing.
+  // Searches the super class chain
+  public TV3 arg_clz(String fld) {
+    TV3 tv3 = arg(fld);         // Local search
+    if( tv3 != null ) return tv3;
+    TVPtr clz = pclz();
+    return clz==null ? null : clz.load().arg_clz(fld);
+  }
+  
+  // Return the TV3 for field 'fld' or null if missing, with OUT rollups
+  public TV3 debug_arg(String fld) {
+    int i = idx(fld);
+    return i>=0 ? debug_arg(i) : null;
+  }
+
+  public boolean is_open() { return _open; }
+  // Close if open
+  public void close() {
+    if( !_open ) return;
+    _open=false;
+    _deps_work_clear();
+  }
+  
   // Clazz for this struct, or null for ClazzClazz
   public TVPtr pclz() {
     TV3 clz = arg(TypeFld.CLZ);
@@ -135,32 +164,7 @@ public class TVStruct extends TVExpanding {
     int idx = idx(fld);
     return idx != -1 && del_fld(idx);
   }
-  
-  @Override public int len() { return _max; }  
-
-  public String fld( int i ) { assert !unified();  return _flds[i]; }
-  
-  // Return the TV3 for field 'fld' or null if missing
-  public TV3 arg(String fld) {
-    assert !unified();
-    int i = idx(fld);
-    return i>=0 ? arg(i) : null;
-  }
-  
-  // Return the TV3 for field 'fld' or null if missing, with OUT rollups
-  public TV3 debug_arg(String fld) {
-    int i = idx(fld);
-    return i>=0 ? debug_arg(i) : null;
-  }
-
-  public boolean is_open() { return _open; }
-  // Close if open
-  public void close() {
-    if( !_open ) return;
-    _open=false;
-    _deps_work_clear();
-  }
-  
+   
   // Partial unify two structs.  Unify matching fields in this with that.  If
   // field is missing in that and that is closed, remove the field from 'this'.
   // Skip a special field, if null.
@@ -208,7 +212,8 @@ public class TVStruct extends TVExpanding {
     } else {
       if( pclz1==null ) {        // CLZ only on LHS
         clz=pclz0.load();
-        that.add_fld( TypeFld.CLZ, pclz0, this._pins[0] ); // Move shared CLZ into RHS
+        assert _pins[idx(TypeFld.CLZ)]; // CLZ always pinned
+        that.add_fld( TypeFld.CLZ, pclz0, true ); // Move shared CLZ into RHS, but RHS fields might need to be in CLZ
       } else {
         // Both, unify
         clz = pclz1.load();
@@ -226,7 +231,7 @@ public class TVStruct extends TVExpanding {
       boolean pin = thsi._pins[i];
       if( Util.eq(key,TypeFld.CLZ) ) continue; // Already unified CLZ
       // Fold into the shared CLZ, if possible
-      if( clz!=null && (clz=clz.find().as_struct()).do_into_clz(key,fthis,pin,false,false)!=0 ) {
+      if( clz!=null && (clz=clz.find().as_struct()).do_into_clz(key,this,i,false,false)!=0 ) {
         thsi = (TVStruct)thsi.find();
         that = (TVStruct)that.find();
         continue;               // Leave field in LHS, its gonna unify anyways
@@ -256,11 +261,10 @@ public class TVStruct extends TVExpanding {
       assert !that.unified(); // Missing a find
       String key = that._flds[i];
       if( Util.eq(key,TypeFld.CLZ) ) continue; // Already unified CLZ
-      if( clz!=null && clz.do_into_clz(key,that.arg(i),that._pins[i], false, false)!=0 ) {
+      if( clz!=null && clz.do_into_clz(key,that,i, false, false)!=0 ) {
         thsi = (TVStruct)thsi.find();
         that = (TVStruct)that.find();
-        that.del_fld0(i--);          // Nuke field from RHS, folded into CLZ
-        assert !that.unified(); // Missing a find
+        i--;                    // Field was removed, go again
         continue;
       }
       int idx = thsi.idx(key);
@@ -281,16 +285,20 @@ public class TVStruct extends TVExpanding {
   //   else dup-field error
   // Returns 0 if not found, -1 if found & no progress, 1 if found & progress
   // If not-fresh, then only returns 0 or 1
-  int do_into_clz( String fld, TV3 tvf, boolean pin, boolean test, boolean fresh ) {
+  int do_into_clz( String fld, TVStruct str, int i, boolean test, boolean fresh ) {
     TV3 arg = arg(fld);         // Find in CLZ
     if( arg != null ) {
-      if( pin ) throw unimpl(); // Found in CLZ but pinned here - so dup-field error
+      if( str._pins[i] ) throw unimpl(); // Found in CLZ but pinned here - so dup-field error
+      if( test ) return 1;      // Always makes progress
+      TV3 tvf = str.arg(i);     // Field to be moved into CLZ
+      if( !fresh )              // Delete field from RHS
+        str.del_fld0(i);
       boolean progress = fresh ? tvf._fresh_unify(arg,test) : tvf._unify(arg,test); // Unify (and return true)
-      return progress ? 1 : -1;
+      return 1;
     }
     TVPtr pclz = pclz();
     if( pclz==null ) return 0;
-    return pclz.load().do_into_clz( fld, tvf, pin, test, fresh );
+    return pclz.load().do_into_clz( fld, str, i, test, fresh );
   }
   
   // -------------------------------------------------------------
@@ -320,8 +328,8 @@ public class TVStruct extends TVExpanding {
         for( int i=0; i<that._max; i++ ) {
           String key = that._flds[i];
           if( !Util.eq(key,TypeFld.CLZ) && // Already unified CLZ
-              clz.do_into_clz(key,that.arg(i),that._pins[i],test,false) != 0 ) { // Hit in clazz, done with unify
-            that.del_fld0( i-- ); // Nuke field from RHS, folded into CLZ
+              clz.do_into_clz(key,that,i,test,false) != 0 ) { // Hit in clazz, done with unify
+            i--;                // Field was removed, go again
           }
         }
       }
@@ -336,7 +344,7 @@ public class TVStruct extends TVExpanding {
       TV3 lhs = arg(i);
       if( clz!=null ) {
         clz = clz.find().as_struct();
-        int rez = clz.do_into_clz(key,lhs,_pins[i],test,true);
+        int rez = clz.do_into_clz(key,this,i,test,true);
         if( rez!=0 ) { progress |= rez>0; continue; } // Hit in clazz, done with unify
       }
       
@@ -377,8 +385,7 @@ public class TVStruct extends TVExpanding {
         String key = that._flds[i];
         if( Util.eq(key,TypeFld.CLZ) ) continue; // Already unified CLZ
         if( Resolvable.is_resolving(key) )
-          throw unimpl();
-          //continue;
+          continue;
         
         TV3 lhs = arg(key); // Lookup vis field name
         if( lhs==null ) {
@@ -443,24 +450,40 @@ public class TVStruct extends TVExpanding {
     TVStruct that = tv3.as_struct(); // Invariant when called
     int cmp = 1;                     // Assume trial is a YES
     for( int i=0; i<_max; i++ ) {
+      if( Resolvable.is_resolving(_flds[i]) )
+          { cmp |= 3; continue; } // A solid maybe: this field needs to resolve first
       TV3 lhs = arg(i);
-      TV3 rhs = that.arg(_flds[i]); // RHS lookup by field name
-      if( lhs!=rhs && rhs!=null ) {
-        int acmp = lhs._trial_unify_ok(rhs);
-        cmp |= acmp;                // Maybe arg makes trial a maybe
-        if( cmp == 7 ) return cmp;  // Arg failed so trial fails
+      TV3 rhs = that.arg_clz(_flds[i]); // RHS lookup by field name, searching superclass
+      if( lhs==rhs ) continue;          // Fast path
+      if( rhs==null ) {                 // Missing in RHS
+        cmp |= that.is_open() ? 3 : 7;  // If RHS is open, may appear later so maybe, else fail
+      } else {
+        cmp |= lhs._trial_unify_ok(rhs); // Trial unify recursively
       }
+      if( cmp == 7 ) return cmp;  // Arg failed so trial fails
     }
 
     // Allow unification with extra fields.  The normal unification path
     // will not declare an error, it will just remove the extra fields.
-    return cmp | this.mismatched_child(that) | that.mismatched_child(this);
+    // CNC : BUG HUMM???
+
+    if( this.is_open() ) {
+      return 3;                 // More fields may add, which need to be unified
+    } else {
+      for( int i=0; i<that._max; i++ ) {
+        if( !Resolvable.is_resolving( _flds[i] ) && that.arg_clz(_flds[i])==null ) // Missing key in RHS
+          return 7;
+      }
+      return 1;
+    }
+   
+    
   }
 
   private int mismatched_child(TVStruct that ) {
     if( that.is_open() ) return 3; // Missing fields maybe add later
     for( int i=0; i<_max; i++ )
-      if( !Resolvable.is_resolving( _flds[i] ) && that.arg(_flds[i])==null ) // Missing key in RHS
+      if( !Resolvable.is_resolving( _flds[i] ) && that.arg_clz(_flds[i])==null ) // Missing key in RHS
         return 7;                   // Trial unification failed
     return 1;                       // OK
   }
@@ -507,6 +530,9 @@ public class TVStruct extends TVExpanding {
   boolean is_str_clz() { return idx("#_"  ) >= 0; }
   boolean is_math_clz(){ return idx("pi"  ) >= 0; }
   boolean is_top_clz() { return idx("math") >= 0; }
+  boolean is_prim() {
+    return _max==2 && Util.eq(TypeFld.CLZ,_flds[0]) && Util.eq(TypeFld.PRIM,_flds[1]);
+  }
 
   @Override public VBitSet _get_dups_impl(VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     TV3 clz = debug_arg(TypeFld.CLZ);

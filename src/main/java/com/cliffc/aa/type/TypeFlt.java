@@ -132,11 +132,10 @@ public class TypeFlt extends TypeNil<TypeFlt> {
   @Override public boolean is_con() { return _z==0; }
   
   // Shallow wrap
-  public TypeStruct wrap() {
-    return TypeStruct.make_prim(TypeFld.make_clz(TypeMemPtr.FLTPTR),TypeFld.make_prim(this)); // Wrapped primitive
-  }
+  public TypeMemPtr wrap() { return wrap_deep(null); }
   // Deep wrap
-  public TypeStruct wrap_deep(TypeMemPtr clz) {
-    return TypeStruct.make_prim(TypeFld.make_clz(clz==null ? TypeMemPtr.INTPTR : clz),TypeFld.make_prim(this)); // Wrapped primitive
+  public TypeMemPtr wrap_deep(TypeMemPtr clz) {
+    if( clz == null ) clz = TypeMemPtr.FLTPTR;
+    return TypeMemPtr.make(false,false,false,true,BitsAlias.EMPTY,TypeStruct.make_prim(TypeFld.make_clz(clz),TypeFld.make_prim(this))); // Wrapped primitive 
   }
 }
