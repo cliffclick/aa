@@ -14,13 +14,17 @@ public interface Resolvable {
   static boolean is_resolving(String id) { return id.charAt(0)=='&'; }
   // Resolved label; error if still resolving
   String fld();
-  // Resolve to string 'lab'
-  String resolve(String lab);
   // Self type var; pattern tvar
   TV3 tvar();
   // Match type tvar (as opposed to pattern)
-  TV3 match_tvar();
+  //TV3 match_tvar();
+  
+  // Resolve to string 'lab'
+  String resolve(String lab);
 
+  String match(TVStruct rhs);
+  void record_match(TVStruct rhs, String lab);
+  
   // Attempt to resolve an unresolved field.  No change if test, but reports progress.
   // ( @{name:str, ... } @{ age=A } ) -vs- @{ age=B } // Ambiguous, first struct could pick up age, 2nd struct A & B could fail later
   // ( @{name:str      } @{ age=A } ) -vs- @{ age=B } // Ambiguous, first struct is a clear miss  , 2nd struct A & B could fail later
@@ -38,10 +42,10 @@ public interface Resolvable {
 
   // Returns progress, not successful resolve
   default boolean trial_resolve( boolean outie, TV3 pattern, TVStruct rhs, boolean test ) {
-    assert !rhs.is_open() && is_resolving();
+    assert !rhs.is_open();
+    assert match(rhs) == null; // Not already matched
 
     // Not yet resolved.  See if there is exactly 1 choice.
-    // Hard YESes and NOs can never change, so we cache those results.
     // The good case is: 1 YES, 0 MAYBES, and any number of NOs.
     // Any number of MAYBEs implies we need to stall; they might turn into either a YES or a NO.
     PAT_LEAFS.clear();
@@ -97,9 +101,9 @@ public interface Resolvable {
 
   // Field can be resolved to label
   default boolean resolve_it(boolean outie, TV3 pattern, TVStruct rhs, String lab ) {
-    String old_fld = resolve(lab);      // Change field label
-    boolean old = rhs.del_fld(old_fld); // Remove old label from rhs, if any
-    TV3 prior = rhs.arg(lab);           // Get prior matching rhs label, if any
+    record_match(rhs, lab);           // Record match
+    boolean old = rhs.del_fld(fld()); // Remove old label from rhs, if any
+    TV3 prior = rhs.arg(lab);         // Get prior matching rhs label, if any
     if( prior==null ) {
       assert old;               // Expect an unresolved label
       //rhs.add_fld(lab,pattern); // Add label and pattern, basically replace unresolved old_fld with lab

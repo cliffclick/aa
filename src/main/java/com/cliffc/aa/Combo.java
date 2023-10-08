@@ -221,9 +221,11 @@ public abstract class Combo {
 
   private static void add_new_leaf_work() { }
   private static void add_ambi_work() {
-    for( Resolvable fld : TVField.FIELDS.values() )
-      if( fld.is_resolving() )
-        fld.resolve_or_fail();
+    // TODO: Figure out error handling.  For now, no errors
+    for( Resolvable dyn : TVField.FIELDS.values() )
+      ((Node)dyn).add_flow();
+    //  if( fld.is_resolving() )
+    //    fld.resolve_or_fail();
   }
 
   private static final NonBlockingHashMapLong<Node> FREEZE_WORK = new NonBlockingHashMapLong<>();

@@ -32,6 +32,8 @@ public class TestParse {
     DO_HMT=true;
     RSEED=0;
 
+    // One DynLoad but Freshed twice
+    test("noinline_f={(2,3.14)._}; (!noinline_f(),noinline_f().sin())","*[16](_, nil, flt:0.0015926529164868282)","*[16](_,int:int1,flt:flt64)", null, null, "[16]", null);
     // Simpler overload tests
     test("!(2,3.14)._","nil","int:int1", null, null, null, null);
     test("(2,3.14)._.sin()","flt:0.0015926529164868282","flt:flt64", null, null, null, null);

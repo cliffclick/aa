@@ -416,8 +416,7 @@ public class TVStruct extends TVExpanding {
   // TODO  move to Resolvable?
   // Attempt to resolve any unresolved fields.
   // Remove any pre-resolved fields.
-  public static boolean trial_resolve_all( boolean outie, TVStruct t ) {
-    boolean progress = false;
+  public static void trial_resolve_all( boolean outie, TVStruct t ) {
     for( int i=0; i<t._max; i++ ) {
       t = ((TVStruct)t.find());
       String key = t._flds[i];
@@ -428,12 +427,10 @@ public class TVStruct extends TVExpanding {
       if( res.is_resolving() ) {
         if( !t.is_open() && // More fields possible, so trial_resolve cannot be tried
             res.trial_resolve(outie,t.arg(i),t, false) ) { // Attempt resolve
-          progress = true;
           t = t.find().as_struct();
           i--;                  // Rerun after removing resolved field
         }
       } else {
-        progress = true;
         // key is resolving, but Field is already resolved
         TV3 old = t.arg(i);        // Old unresolved value
         t.del_fld(i);              // Remove resolving key
@@ -443,7 +440,6 @@ public class TVStruct extends TVExpanding {
         else old._unify(t3, false); // Unify into existing (fold labels together)
       }
     }
-    return progress;
   }
 
   @Override int _trial_unify_ok_impl( TV3 tv3 ) {

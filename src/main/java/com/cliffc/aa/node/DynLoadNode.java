@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
@@ -29,6 +30,8 @@ import static com.cliffc.aa.AA.*;
 public class DynLoadNode extends Node implements Resolvable {
 
   private String _fld;
+  // Resolved fields
+  private final Ary<Resolved> _resolveds;
   
   // Where to report errors
   private final Parse _bad;
@@ -37,6 +40,7 @@ public class DynLoadNode extends Node implements Resolvable {
     super(OP_DYNLD,null,mem,adr);
     _bad = bad;
     _fld = "&"+_uid;
+    _resolveds = new Ary<>(Resolved.class);
   }
 
   @Override public String xstr() { return "."+_fld; }   // Self short name
@@ -53,7 +57,24 @@ public class DynLoadNode extends Node implements Resolvable {
     add_flow();
     return old;
   }
-  @Override public boolean is_resolving() { return Resolvable.is_resolving( _fld ); }
+  @Override public String match(TVStruct rhs) {
+    for( Resolved r : _resolveds )
+      if( r.rhs()==rhs )
+        return r._label;
+    return null;
+  }
+  @Override public void record_match(TVStruct rhs, String lab) {
+    Resolved r = new Resolved(rhs,lab);
+    // Assert no dups on entry
+    for( Resolved r2 : _resolveds )
+      throw AA.unimpl();
+    _resolveds.push(r);
+  }
+
+  
+  @Override public boolean is_resolving() {
+    return true;
+  }
   
   @Override public Type value() {
     Type tadr = adr()._val;
@@ -67,14 +88,18 @@ public class DynLoadNode extends Node implements Resolvable {
       ta = (TypeNil)ta.meet(PrimNode.PINT._val);
     
     // Still resolving, dunno which field yet
-    if( is_resolving() )
-      return TypeNil.XSCALAR.oob(Combo.pre());
-    
+    if( !Combo.HM_AMBI )
+      return TypeNil.XSCALAR.oob(AA.LIFTING);
+
+    // Set of fields being picked over
     TypeStruct ts = ta instanceof TypeMemPtr tmp && !tmp.is_simple_ptr()
       ? tmp._obj
       : tm.ld(ta);
 
-    Type t = LoadNode.lookup(ts,ta,tm,_fld);
+    // Meet over all possible choices
+    Type t = TypeNil.XSCALAR;
+    for( Resolved r : _resolveds )
+      t = t.meet(LoadNode.lookup(ts,ta,tm,r._label));
     if( t!=null ) return t;
 
     // Did not find field
@@ -107,29 +132,20 @@ public class DynLoadNode extends Node implements Resolvable {
 
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
-    TVField.FIELDS.put(_fld,this); // Track resolving field names
+    TVField.FIELDS.put(_fld,this); // Track resolving field names which are DynLoad node ids
 
     // Load takes a pointer
     TV3 ptr0 = adr().set_tvar();
     TVPtr ptr;
-    if( ptr0 instanceof TVPtr ptr1 ) {
-      ptr = ptr1;
-    } else {
-      ptr0.unify(new TVPtr(BitsAlias.EMPTY, new TVStruct(true) ),false);
-      ptr = ptr0.find().as_ptr();
-    } 
+    if( ptr0 instanceof TVPtr ptr1 ) ptr = ptr1;
+    else ptr0.unify(ptr = new TVPtr(BitsAlias.EMPTY, new TVStruct(true) ),false);
 
     // Struct needs to have the named field
     TVStruct str = ptr.load();
-    TV3 fld = str.arg(_fld);
-    TV3 self = new TVLeaf();
-    if( fld==null ) {
-      str.add_fld(_fld,self,false);
-    } else {
-      self.unify(fld,false);
-    }
-    
-    return self.find();
+    TV3 fld = str.arg(_fld), self;
+    if( fld==null ) str.add_fld(_fld,self=new TVLeaf(),false);
+    else            self = fld;
+    return self;
   }
 
   // All field loads against a pointer.
@@ -143,17 +159,13 @@ public class DynLoadNode extends Node implements Resolvable {
     TVPtr ptr = ptr0.as_ptr();
     TVStruct str = ptr.load();
 
-    // Attempt resolve
-    // Put the resolving field in the struct; it will be present in the answer
-    // in SOME field we just do not which one.
-    if( str.idx(_fld) == -1 )
-      str.add_fld(_fld, tvar(), false);
     // If struct is open, more fields might appear and cannot do a resolve.    
     if( str.is_open() ) {
       str.deps_add(this);
       return false;
     }
-    if( !is_resolving() ) return false;
+    if( match(str) != null )
+      return false;             // Already matched
 
     if( trial_resolve(true, tvar(), str, test) )
       return true;              // Resolve made progress!
@@ -163,6 +175,27 @@ public class DynLoadNode extends Node implements Resolvable {
   }
 
 
+  // A mapping from TVStruct pattern to the field that matches 'this._tvar'.
+  // TVStructs can unify, so a normal HashMap doesn't work.
+  private static class Resolved {
+    TVStruct _rhs;
+    final String _label;
+    Resolved(TVStruct rhs, String lab) {
+      assert !rhs.unified();
+      _rhs=rhs;
+      _label=lab;
+    }
+    @Override public String toString() { return "["+_label+": "+_rhs+"]"; }
+
+    TVStruct rhs() {
+      TVStruct rhs = (TVStruct)_rhs.find();
+      if( rhs == _rhs ) return rhs;
+      // Since RHS rolled up, might need to check for dups in match
+      throw AA.unimpl();
+    }
+  }
+
+  
   @Override public void resolve_or_fail() {
     //// Go ahead and resolve a field using only 1 choice.
     //if( _flds.size()== 1 ) {
@@ -232,7 +265,7 @@ public class DynLoadNode extends Node implements Resolvable {
   }
 
 
-  @Override public TV3 match_tvar() { return tvar(0); }
+  //@Override public TV3 match_tvar() { return tvar(0); }
 
   // clones during inlining change resolvable field names
   @Override public DynLoadNode copy(boolean copy_edges) {
