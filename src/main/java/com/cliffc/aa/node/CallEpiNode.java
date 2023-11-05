@@ -387,7 +387,7 @@ public final class CallEpiNode extends Node {
     for( int i=1; i<len(); i++ ) {
       call.deps_add(this);      // Call sharpens can remove
       int fidx = in(i) instanceof RetNode ret ? ret._fidx : BitsFun.EXTX;
-      boolean ok_nargs = !(in(i) instanceof RetNode ret) || (call.nargs()==tfp.nargs() && tfp.nargs() == ret.fun().nargs());
+      boolean ok_nargs = !(in(i) instanceof RetNode ret) || (call.nargs()== ret.fun().nargs());
       if( fidxs.above_center() || !fidxs.test_recur(fidx) || !ok_nargs ) {
         progress=true;
         call.add_flow();
@@ -417,8 +417,7 @@ public final class CallEpiNode extends Node {
           if( ret2.is_copy() ) continue;
           FunNode fun2 = ret2.fun();
           if( fun2==null ) continue; // Broken function
-          if( call.nargs() != tfp.nargs() || tfp.nargs() != fun2.nargs() )
-            continue; // Mismatched
+          if( call.nargs() != fun2.nargs() ) continue; // Mismatched
           ParmNode mem = fun2.parm(MEM_IDX);
           if( mem != null ) {
             // Call liveness are already meeting EXTMEM.

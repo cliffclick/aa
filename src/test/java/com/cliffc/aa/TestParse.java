@@ -32,16 +32,81 @@ public class TestParse {
     DO_HMT=true;
     RSEED=0;
 
-    // One DynLoad but Freshed twice
-    test("noinline_f={(2,3.14)._}; (!noinline_f(),noinline_f().sin())","*[16](_, nil, flt:0.0015926529164868282)","*[16](_,int:int1,flt:flt64)", null, null, "[16]", null);
+    // No DynLoad
+    test("1", "int:1", "int:1");
+    // One DynLoad, no Fresh, resolves local
+    test("!3", "nil", "int:int1");
     // Simpler overload tests
     test("!(2,3.14)._","nil","int:int1", null, null, null, null);
     test("(2,3.14)._.sin()","flt:0.0015926529164868282","flt:flt64", null, null, null, null);
-    // Two DynLoads
+    // Two DynLoads, no Fresh
     test("q=(2,3.14); (!q._,q._.sin())","*[16](_, nil, flt:0.0015926529164868282)","*[16](_,int:int1,flt:flt64)", null, null, "[16]", null);
-    // Overload is exposed to Root
-    test("{ x y -> !x *  y.sin() }","[11]{any,5 -> %[2][2,11]? }","{A *[]int *[]flt -> B }", null, null, null, "[11]");
+    // One DynLoad, one Fresh, Function in-between
+    test("noinline_f={(2,3.14)._}; noinline_f().sin()","flt:0.0015926529164868282","flt:flt64", null, null, null, null);
+    // One DynLoad, one Fresh, Function in-between, plus 2nd DynLoad on Bang
+    test("noinline_f={(2,3.14)._}; !noinline_f()","nil","int:int1", null, null, null, null);
+    // One DynLoad but Freshed twice plus 2nd DynLoad on Bang
+    test("noinline_f={(2,3.14)._}; (!noinline_f(),noinline_f().sin())","*[16](_, nil, flt:0.0015926529164868282)","*[16](_,int:int1,flt:flt64)", null, null, "[16]", null);
 
+    // Simpler test, just return a struct with 1 field, and pick the struct/field
+    test("""
+            noinline_foo = {
+                    ( @{ a=1 },
+                      @{ b=2 }
+              )._
+            };
+            math.rand(2) ? noinline_foo().a : noinline_foo().b
+            """,
+            "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
+
+    // Simpler test, just X no Y
+    test("""
+            noinline_foo = { x ->
+                    ( { x -> !x },
+                      { x -> x.sin() }
+              )._(x)
+            };
+            math.rand(2) ? noinline_foo(3) : noinline_foo(3.3)
+            """,
+            "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
+
+    // open bugs: return from foo is int:%[][5,6] - a mix of int & float
+    // but the clazz is INT not a blend of INT/FLT
+
+    // bug store of noinline_foo does not replace the prior store of ANY in
+    // the new field slot
+    test("""
+            noinline_foo = { x y ->
+                    ( { x y -> !x * !y },
+                      { x y -> x.sin() * !y }
+              )._(x,y)
+            };
+            math.rand(2) ? noinline_foo(3,5) : noinline_foo(3.3,5)
+            """,
+            "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
+
+    // Open bug: foo inlines here but not in the next case below.
+    // Surprised foo inlines.
+    test("""
+            foo = { x y ->
+                    ( { x y -> !x * !y },
+                      { x y -> x.sin() * !y }
+              )._(x,y)
+            };
+            math.rand(2) ? foo(3,5) : foo(3.3,5)
+            """,
+            "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
+
+    test("""
+            foo = { x y ->
+                    ( { x y -> !x * !y },
+                      { x y -> x.sin() * !y }
+              )._(x,y)
+            };
+            baz = { x -> foo(x,5) };
+            math.rand(2) ? baz(3) : baz(3.3)
+            """,
+            "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
 
 
     test(
@@ -59,9 +124,10 @@ bar()
 """,
          "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
 
+    // Overload is exposed to Root
+    test("{ x y -> !x *  y.sin() }","[11]{any,5 -> %[2][2,11]? }","{A *[]int *[]flt -> B }", null, null, null, "[11]");
 
     test("sq = { x -> x*x }; (sq(2),sq(2.2))","*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
-    test("1", "int:1", "int:1");
     test("sq = { x -> x*x }; (sq(2),sq(3))","*[13](_,int:4,int:9)","*[15](int64,flt64)", null, null, "[14]", null);
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(2),fact(2.2))","*[14](nil,1,2)","*[14](int64,int64,int64)", null, null, "[14]", null);
   }

@@ -34,7 +34,7 @@ public class TVPtr extends TV3 {
   @Override public void _union_impl(TV3 that) {
     assert !unified();
     TVPtr ptr = (TVPtr)that;    // Invariant when called
-    _aliases = _aliases.meet(ptr._aliases);
+    ptr._aliases = _aliases.meet(ptr._aliases);
   }
 
   @Override boolean _unify_impl(TV3 that ) {
@@ -50,7 +50,7 @@ public class TVPtr extends TV3 {
     
     // Update aliases
     if( aliases != ptr._aliases ) {
-      ptr._aliases = aliases;
+      if( !test ) ptr._aliases = aliases;
       progress = ptrue();
     }
     if( test && progress ) return progress;

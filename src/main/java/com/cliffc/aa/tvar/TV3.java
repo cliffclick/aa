@@ -54,7 +54,8 @@ abstract public class TV3 implements Cloneable {
   // to the leader in many, many places.  Classic U-F cost model.
   TV3 _uf;
 
-  // Outgoing edges for structural recursion.
+  // Outgoing edges for structural recursion.  For Struct, its the fields.  For
+  // Ptr, its the Struct.  For Lambda, its the args and return.
   TV3[] _args;
 
   // True if this type can be specified by some generic Root argument.
@@ -294,6 +295,21 @@ abstract public class TV3 implements Cloneable {
   // Make a (lazy) fresh copy of 'this' and unify it with 'that'.  This is
   // the same as calling 'fresh' then 'unify', without the clone of 'this'.
   // Returns progress.
+
+  // This is a cycle-aware recursive descent structure walker, done in a
+  // tik-tok style.  Common work is in _fresh_unify, which then calls subclass
+  // specific work in _fresh_unify_impl, which recursively calls back into
+  // _fresh_unify.
+  
+  // Example: 'this' == { A B -> A }, 'that' = { X Y -> Y }
+  // After fresh unify 'this' is ALWAYS unchanged, but X and Y are forced to be
+  // unified because 'this' return is the same as arg0, and 'that' return is
+  // the same as arg1.  SO 'that' == { XY XY -> XY }
+  //
+  // Also, future changes to either A or B have to be reflected in XY, which is
+  // the job of delay_fresh.
+
+  
   static private final IdentityHashMap<TV3,TV3> VARS = new IdentityHashMap<>();
   // A per-fresh-unify DelayFresh
   static TVExpanding.DelayFresh FRESH_ROOT;
@@ -301,7 +317,7 @@ abstract public class TV3 implements Cloneable {
   public boolean fresh_unify( FreshNode frsh, TV3 that, TV3[] nongen, boolean test ) {
     if( this==that ) return false;
     assert VARS.isEmpty() && DUPS.isEmpty() && FRESH_ROOT ==null;
-    FRESH_ROOT = new TVExpanding.DelayFresh(this,that,nongen,frsh);
+    FRESH_ROOT = new TVExpanding.DelayFresh(this,that,frsh,nongen);
     boolean progress = _fresh_unify(that,test);
     VARS.clear();  DUPS.clear();
     FRESH_ROOT = null;
@@ -319,13 +335,20 @@ abstract public class TV3 implements Cloneable {
     // Must check this after the cyclic check, in case the 'this' is cyclic
     if( this==that ) return false;
 
+    if( !test )
+      Resolvable.fresh_add(this,that,FRESH_ROOT._frsh);
+
     // Famous 'occurs-check': In the non-generative set, so do a hard unify,
     // not a fresh-unify.
     if( nongen_in() ) return vput(that,_unify(that,test));
 
     // LHS leaf, RHS is unchanged but goes in the VARS
-    if( this instanceof TVLeaf lf ) { if( !test ) lf.add_delay_fresh(); return vput(that,false); }
-    if( that instanceof TVLeaf    ) // RHS is a tvar; union with a deep copy of LHS
+    boolean progress = false;
+    if( this instanceof TVLeaf lf ) {
+      if( !test ) lf.add_delay_fresh();
+      return vput(that,progress);
+    }
+    if( that instanceof TVLeaf ) // RHS is a tvar; union with a deep copy of LHS
       return test || vput(that,that.union(_fresh()));
 
     //// Special handling for nilable
@@ -337,7 +360,6 @@ abstract public class TV3 implements Cloneable {
       return that instanceof TVErr terr
         ? terr._fresh_unify_err_fresh(this,test)
         : this._fresh_unify_err      (that,test);
-    boolean progress = false;
 
     // Progress on parts
     if( _may_nil && !that._may_nil ) {
@@ -489,8 +511,8 @@ abstract public class TV3 implements Cloneable {
     if( TDUPS.putIfAbsent(duid,this)!=null )
       return 1;                 // Visit only once, and assume will resolve
     // Leafs never fail
-    if( this instanceof TVLeaf leaf && !(that instanceof TVErr) ) return Resolvable.add_pat_dep(leaf); // No error
-    if( that instanceof TVLeaf leaf && !(this instanceof TVErr) ) return Resolvable.add_pat_dep(leaf); // No error
+    if( this instanceof TVLeaf leaf && !(that instanceof TVErr) ) return 3; // Maybe
+    if( that instanceof TVLeaf leaf && !(this instanceof TVErr) ) return 3; // Maybe
     // Different classes will also fail
     if( getClass() != that.getClass() )
       return 7;
@@ -742,7 +764,6 @@ abstract public class TV3 implements Cloneable {
   }
   public static void reset_to_init0() {
     CNT=_INIT0_CNT;
-    TVField.reset_to_init0();
     TVStruct.reset_to_init0();
     TVExpanding.reset_to_init0();
     Resolvable.reset_to_init0();

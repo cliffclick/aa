@@ -294,7 +294,7 @@ public class LoadNode extends Node {
 
     // Struct needs to have the named field
     TVStruct str = ptr.load();
-    TV3 fld = str.arg(_fld);
+    TV3 fld = str.arg_clz(_fld);
     TV3 self = new TVLeaf();
     if( fld==null ) {
       str.add_fld(_fld,self,false);

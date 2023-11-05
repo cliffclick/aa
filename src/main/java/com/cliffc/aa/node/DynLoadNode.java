@@ -3,8 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
 
@@ -27,54 +25,108 @@ import static com.cliffc.aa.AA.*;
 // Load._+_  1    (unbound function choices)
 // Bind      1       bound function
 
-public class DynLoadNode extends Node implements Resolvable {
+/*
+#- Kill dead code, remove RESOLVING, RESOLVABLE
+#- No need for Fresh on pending resolves
+#- DynLoad gets pattern -> label mappings
+#- - mappings will start null/missing
+#- - mappings are added over time (monotonic)
+#- - patterns are added over time
+#- - patterns can unify with each other, or some other pattern
+#- - mappings can go to 2+ labels; this is a ambiguous error
+#- - As labels appear on mapping RHS, value call starts MEET over those fields
 
-  private String _fld;
-  // Resolved fields
-  private final Ary<Resolved> _resolveds;
-  
+Took a walk, need to go back & keep much of this infra:
+- TVStruct needs a resolving/resolved list (or at least resolving).
+- - This is so we keep picking up constraints on Dyn/Fresh pairs.
+- Resolvable has Dyn/Fresh/Pat/Label
+- Unify merges based on (Dyn/Fresh); merged labels can get more than 1, this is
+  an error.  Merged pats just unify also; this is just merging many uses of the
+  same field (which isn't known yet).
+- Fresh copies the (Dyn/Fresh) with a Fresh Pat & same labels.
+- Keep a global list of Resolving/Resolveds as before.
+- Incremental: could track all Pat & Struct children & re-resolve.  Or keep my
+  current stupid global state.
+
+- More thots: why only 1 Fresh?
+- Indeed my latest big test case has 2 Freshes on purpose.
+- I think I need a DynLoad plus a *lexical path* of Freshes.  A dynamic path is
+  death.  A lexical path gives an exponential set of chocies, which jives with
+  my vague notion that worse-case HM types go exponential.
+- Or maybe its just a Pattern (unique along a path anyways) maps to an offset.
+
+- So at the DynLoad itself, it does a runtime dynamic mapping from the dict
+  that comes with the TVStruct.  That is, every TVStruct producer also
+  produces a dictionary mapping Dyn->label.
+- Every TVStruct has a Dyn->label mapping.  The mapping starts unknown
+  but includes a pattern.
+- Unify two TVStructs unifies their Dyn mappings.
+- Updating a TVStruct fields (via unify) can re-check the dyn mappings?
+- No error if we can force a Dyn into a single label - all TVStructs
+  seeing the same Dyn->Label mapping.
+- Where we cannot, the Dyn is *dynamic* and needs another input - the mapping from dyn to label.
+- - This Dyn is not broken, just *dynamic*
+- Fresh just clones the TVStruct including Dyn labels.
+- At some outer levels, the TVStruct dyn mappings do get mapped to a label.
+- Multiple YES mappings are errors.
+- Multiple maybes just delay.
+- During Unify (and Fresh-Unify), if progress comes from a TVStruct innards, we can re-check its Dyn mappings
+- Still open Q: when is ambiguous error?
+
+Brings me to a TVDyn -> TVStruct, TVDyn has the field type, and "resolves" when it can.
+Every function takes as hidden extra args, all the TVDyn ever mentioned.  This is similar to a typeclass dictionary?
+Callers unify with a hidden extra arg dyn->struct.
+
+In my stacked TestParse case, mapping lookups are stacked
+foo = { x y ->
+        ( { x y -> !x * !y },
+          { x y -> !x *  y.sin(3.14) },
+          { x y -> x.sin(3.14) * !y },
+          { x y -> x.sin(3.14) *  y.sin(3.14) }
+  )._(x,y)
+};
+baz = { x -> math.rand(2) ? foo(x,2) : foo(x,2.2) };
+bar = {   -> math.rand(2) ? baz(  3) : baz  (3.3) };
+bar()
+
+Foo returns a [dyn -> (0:,1:,2:,3:)] mapping
+So foo gets type { x y [dyn -> (0:,1:,2:,3:)] -> dyn } // where the dyn-> TVDyn type becomes the final result once resolved
+So for `baz = { x -> math.rand(2) ? foo(x,2) : foo(x,2.2) };`
+each of the foo calls passes in a different table:
+  foo(x,2  ,A:[dyn -> (0:,2:)]) with a fresh dyn result
+  foo(x,2.2,B:[dyn -> (1:,3:)]) with a fresh dyn result
+So baz type { x [A,B] -> dyn }
+And finally bar
+
+
+Another thought: any given Fresh uniquely identifies a unique lexical path, but
+this isn't neccesarily how the code execution arrives at the Dyn.
+
+So theory:
+TVStruct carries Dyn->pattern mapping, with the label if resolved.
+Unify TVStruct unified patterns for same Dyn.  This can pats go to multi-Yes (ambiguous).
+Fresh adds a Fresh in front of the existing mappings; can nest Freshes then?
+Or the pattern is [Dyn,Fresh... in any order, no dups] -> Pat/Label.
+So map TVStruct carries { UQNodes -> Pattern }.
+
+ */
+
+
+public class DynLoadNode extends Node {
+
   // Where to report errors
   private final Parse _bad;
   
   public DynLoadNode( Node mem, Node adr, Parse bad ) {
     super(OP_DYNLD,null,mem,adr);
     _bad = bad;
-    _fld = "&"+_uid;
-    _resolveds = new Ary<>(Resolved.class);
   }
 
-  @Override public String xstr() { return "."+_fld; }   // Self short name
+  @Override public String xstr() { return "._"; }   // Self short name
   String  str() { return xstr(); } // Inline short name
   
-  Node mem() { return in(MEM_IDX); }
-  Node adr() { return in(DSP_IDX); }
-
-  @Override public String fld() { return _fld; }
-  @Override public String resolve(String lab) {
-    unelock();                  // Hash changes
-    String old = _fld;
-    _fld = lab;
-    add_flow();
-    return old;
-  }
-  @Override public String match(TVStruct rhs) {
-    for( Resolved r : _resolveds )
-      if( r.rhs()==rhs )
-        return r._label;
-    return null;
-  }
-  @Override public void record_match(TVStruct rhs, String lab) {
-    Resolved r = new Resolved(rhs,lab);
-    // Assert no dups on entry
-    for( Resolved r2 : _resolveds )
-      throw AA.unimpl();
-    _resolveds.push(r);
-  }
-
-  
-  @Override public boolean is_resolving() {
-    return true;
-  }
+  public Node mem() { return in(MEM_IDX); }
+  public Node adr() { return in(DSP_IDX); }
   
   @Override public Type value() {
     Type tadr = adr()._val;
@@ -84,26 +136,32 @@ public class DynLoadNode extends Node implements Resolvable {
       return tadr.oob(); // Not an address
     if( !(tmem instanceof TypeMem tm) )
       return tmem.oob(); // Not a memory
+
     if( ta==TypeNil.NIL || ta==TypeNil.XNIL )
       ta = (TypeNil)ta.meet(PrimNode.PINT._val);
-    
-    // Still resolving, dunno which field yet
-    if( !Combo.HM_AMBI )
-      return TypeNil.XSCALAR.oob(AA.LIFTING);
+    if( !(ta instanceof TypeMemPtr tmp) )
+      return TypeNil.SCALAR.oob(ta);
 
     // Set of fields being picked over
-    TypeStruct ts = ta instanceof TypeMemPtr tmp && !tmp.is_simple_ptr()
-      ? tmp._obj
-      : tm.ld(ta);
+    TypeStruct ts = tmp.is_simple_ptr() ? tm.ld(ta) : tmp._obj;
 
-    // Meet over all possible choices
-    Type t = TypeNil.XSCALAR;
-    for( Resolved r : _resolveds )
-      t = t.meet(LoadNode.lookup(ts,ta,tm,r._label));
-    if( t!=null ) return t;
-
-    // Did not find field
-    return Env.ROOT.ext_scalar(this);
+    // Still resolving, dunno which field yet
+    if( Combo.pre() ) {
+      Type t = ts._def;
+      for( TypeFld tf : ts )
+        t = t.meet(tf._t);
+      return t;
+    }
+    
+    // Meet over all possible choices.  This DynLoad might have resolved
+    // differently with different TV3s from different paths, so meet over all
+    // possible choices.
+    //Type t = TypeNil.XSCALAR;
+    //for( Resolvable r : Resolvable.RESOLVEDS.values() )
+    //  if( r._dyn==this )
+    //    t = t.meet(LoadNode.lookup(ts,tmp,tm,r._lab));
+    //return t;
+    throw AA.unimpl();
   }
 
   
@@ -130,157 +188,37 @@ public class DynLoadNode extends Node implements Resolvable {
     return TypeMem.make(ptr._aliases,TypeStruct.ISUSED);
   }
 
+  @Override public Node ideal_reduce() {
+    String lab=null;            // Null: no label found, "": conflicting labels found
+    Resolvable rbest = null;
+    // Search for matching DynLoads.  Check for a single label resolved;
+    // if so, we collapse to a normal Load
+    // TODO: Keep local DynLoads in this self DynLoad
+    for( Resolvable r : Resolvable.RESOLVEDS.values() )
+      if( r._dyn==this ) {
+        if( r._frsh==null ) { assert rbest==null; rbest = r; }
+        if( lab==null ) lab = r._lab; // First label
+        else if( !lab.equals(r._lab) )
+          lab = "";             // Conflicting labels
+      }
+    assert rbest==null || rbest._lab.equals(lab);
+    if( lab!=null && lab.length()>0 )
+      return new LoadNode(mem(),adr(),lab,_bad);
+    return null;
+  }
+  
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
-    TVField.FIELDS.put(_fld,this); // Track resolving field names which are DynLoad node ids
 
     // Load takes a pointer
     TV3 ptr0 = adr().set_tvar();
     TVPtr ptr;
     if( ptr0 instanceof TVPtr ptr1 ) ptr = ptr1;
     else ptr0.unify(ptr = new TVPtr(BitsAlias.EMPTY, new TVStruct(true) ),false);
-
-    // Struct needs to have the named field
-    TVStruct str = ptr.load();
-    TV3 fld = str.arg(_fld), self;
-    if( fld==null ) str.add_fld(_fld,self=new TVLeaf(),false);
-    else            self = fld;
-    return self;
-  }
-
-  // All field loads against a pointer.
-  @Override public boolean unify( boolean test ) {
-    TV3 ptr0 = adr().tvar();
-    Type ta = adr()._val;
-
-    // See if we force the input to choose between ptr and struct.
-    // Get a struct in the end
-    if( ptr0 instanceof TVErr ) throw unimpl();
-    TVPtr ptr = ptr0.as_ptr();
-    TVStruct str = ptr.load();
-
-    // If struct is open, more fields might appear and cannot do a resolve.    
-    if( str.is_open() ) {
-      str.deps_add(this);
-      return false;
-    }
-    if( match(str) != null )
-      return false;             // Already matched
-
-    if( trial_resolve(true, tvar(), str, test) )
-      return true;              // Resolve made progress!
-    // No progress, try again if self changes
-    if( !test ) tvar().deps_add_deep(this);
-    return false;
-  }
-
-
-  // A mapping from TVStruct pattern to the field that matches 'this._tvar'.
-  // TVStructs can unify, so a normal HashMap doesn't work.
-  private static class Resolved {
-    TVStruct _rhs;
-    final String _label;
-    Resolved(TVStruct rhs, String lab) {
-      assert !rhs.unified();
-      _rhs=rhs;
-      _label=lab;
-    }
-    @Override public String toString() { return "["+_label+": "+_rhs+"]"; }
-
-    TVStruct rhs() {
-      TVStruct rhs = (TVStruct)_rhs.find();
-      if( rhs == _rhs ) return rhs;
-      // Since RHS rolled up, might need to check for dups in match
-      throw AA.unimpl();
-    }
-  }
-
-  
-  @Override public void resolve_or_fail() {
-    //// Go ahead and resolve a field using only 1 choice.
-    //if( _flds.size()== 1 ) {
-    //  unelock();                // Hash changes since label changes
-    //  _fld = _flds.iterator().next();
-    //}
-    //// No error if there are many choices, but requires a dynamic field lookup
-    //add_flow();
-    //in(1).add_flow(); // Liveness sharpens to specific field
-    throw unimpl();
-  }
-
-  
-  // Build a sane error message for a failed resolve.
-  //   @{x=7}.y            Unknown field '.y' in @{x= int8}          - LHS   known, no  clazz, field not found in instance, instance yes struct
-  //   "abc".y             Unknown field '.y' in "abc"               - LHS   known, yes clazz, field not found in either  , not pinned, report instance
-  //   "abc"&1             Unknown operator '_&_' in str:            - LHS   known, yes clazz, field not found in either  , yes pinned, report clazz
-  //   { x -> x+1 }        Unable to resolve operator '_+_' "        - LHS unknown, no  clazz but pinned field
-  //   { x -> 1+x }                                                  - LHS   known, yes clazz, ambiguous, report choices and match
-  //                       Ambiguous, matching choices ({ int:int64 int:int64 -> int:int64 }, { int:int64 flt:nflt64 -> flt:flt64 }) vs { int:1 A -> B }
-  //   ( { x -> x*2 }, { x -> x*3 })._ 4                             - LHS   known, no  clazz, ambiguous, report choices and match
-  //                       Ambiguous, matching choices ({ A B -> C }, { D E -> F }) vs { G int:4 -> H }
-
-  private String resolve_failed_msg() {
-    String fld = null;          // Overloaded field name
-    throw unimpl();
-    //// If overloaded field lookup, reference field name in message
-    //if( is_resolving() ) {
-    //  if( adr() instanceof LoadNode xfld )
-    //    fld = xfld._fld;        // Overloaded field name
-    //} else fld = _fld;
-    //if( fld==null ) return "";
-    //return (Oper.is_oper(fld) ? " operator '" : " field '.") + fld + "'";
-
     
-    //boolean oper = fld!=null && Oper.is_oper(fld); // Is an operator?
-    //if( oper && !_clz ) {
-    //  String clz = FieldNode.clz_str(fldn.val(0));
-    //  if( clz!=null ) fld = clz+fld; // Attempt to be clazz specific operator
-    //}
-    //TVStruct tvs = match_tvar() instanceof TVStruct ts ? ts : null;
-    //String err, post;
-    //if( !is_resolving() ) { err = "Unknown"; post=" in %: "; }
-    //else if( tvs!=null && ambi(tvar(),tvs) ) { err = "Ambiguous, matching choices %"; post = " vs "; }
-    //else if( unable(tvs) ) { err = "Unable to resolve"; post=": "; }
-    //else { err = "No choice % resolves"; post=": "; }
-    //if( fld!=null )
-    //  err += (oper ? " operator '" : " field '.")+fld+"'";
-    //err += post;
-    //return err;
-  }
-
-  @Override public ErrMsg err( boolean fast ) {
-    //if( is_resolving() ) {
-    //  String fld = adr() instanceof LoadNode xfld ? xfld._fld : _fld;
-    //  return ErrMsg.field(_bad,"Unresolved field loading",fld,false,null);
-    //}
-    return null;
-  }
-  
-  // No matches to pattern (no YESes, no MAYBEs).  Empty patterns might have no NOs.
-  public boolean resolve_failed_no_match( TV3 pattern, TVStruct rhs, boolean test ) {
-    String err = "No choice % resolves"+resolve_failed_msg()+": ";
-    boolean old = rhs.del_fld(_fld);
-    assert old;                 // Expecting to remove pattern
-    return pattern.unify_err(err,rhs,_bad,false);
-  }
-
-
-  //@Override public TV3 match_tvar() { return tvar(0); }
-
-  // clones during inlining change resolvable field names
-  @Override public DynLoadNode copy(boolean copy_edges) {
-    DynLoadNode nnn = (DynLoadNode)super.copy(copy_edges);
-    nnn._fld = "&"+nnn._uid;
-    Env.GVN.add_flow(this);     // Alias changes flow
-    return nnn;
-  }
-
-  @Override public int hashCode() { return super.hashCode()+_fld.hashCode(); }
-  @Override public boolean equals(Object o) {
-    if( this==o ) return true;
-    if( !super.equals(o) ) return false;
-    if( !(o instanceof DynLoadNode fld) ) return false;
-    return Util.eq(_fld,fld._fld);
+    _tvar = new TVLeaf();
+    Resolvable.make(this);
+    return _tvar;
   }
 
 }

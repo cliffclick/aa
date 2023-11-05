@@ -1,4 +1,63 @@
 =======================================
+10/21/2023
+
+DynLoad has a result TV3, call it TV_dyn.
+This TV_dyn maps back to the DynLoad TVPtr input, which can load() a TVStruct called TV_match
+
+During a fresh_unify, if the TV_dyn freshes against 'that',
+we need to do a trial_resolve(outie,'that',TV_match,test).
+This instanceof TV_dyn made Fresh gets its own match.
+
+I think we actually need to push forward with more mappings if fresh_unify.
+So during fresh_unify, if see TV_dyn has a mapping, give mapping to 'that' as
+well.  Also toss on delayed_resolve worklist.
+
+For the map TV_dyn -> TV_match, since TV_dyn can unify, might try `unify`
+updates this mapping.  We can assume the mapping is always correct because
+`unify` corrects it.
+
+If TV_dyn is deep, and innards change, and not already resolved, we need
+to re-trial resolve.  This means changes on the inside should force a
+re-trial.
+
+So here's a simpler algo:
+
+DynLoad puts TV_dyn on the "to be resolved" list, and tags TV_dyn with the
+TV_match list.  Fresh_unify copies the list, unify merges the list.  Anything
+listed goes on the "to be resolved" list.  The TBR contains the match pattern
+(varies by fresh unify) and the tagged TV3.  
+A DelayResolve is a pair (TV3,TVStruct).  Each pair resolves independently.
+I need dup-removal, with simple O(n^2) search.
+
+Once the main worklist is done, we trial_resolve the "to be resolved" list.
+If any progress, we go back to combo.
+
+Same concept can happen for delay_fresh.  Suppose TV_fresh fresh_unifies with
+'that'.  Every TVExpanding inside of TV_fresh may later expand, and requires
+another round of fresh.  So TVExpanding carries a list of FreshNodes; if they
+expand those FreshNodes go on the to-be-re-Freshed list.  Once main worklist is
+done, we go back a do more fresh_unify.
+
+Action items: drop existing DELAY_RESOLVE lists.
+* Global DelayResolve pair list (TV3,TVStruct)
+* DynLoad puts a pair on.
+* Fresh of a TV_dyn, puts a 'that' as a pair on: (that,TVStruct,Fresh)
+* I assume both TV3 and TVStruct update during main worklist, but do not track
+* At end of work, I recheck resolve.
+* Resolved TV3s can be removed forever, always resolved.
+* Progress restarts main worklist.
+
+Ponder simplifying delay_fresh; this broke in HM and I don't remember how.
+Possibly a self-cycle fresh/unify where a TV3 appeared both on the LHS and RHS
+at the same time.
+
+Theory: I can make delay_fresh *shallow*, each TV3 in LHS maps to a TV3 in RHS;
+changes in LHS need to re-fresh in RHS.  Theory: just call fresh on changed LHS
+and mapped RHS.  Cycles might be an issue!
+
+
+
+=======================================
 10/1/2023
 
 Splitting normal field Load from a DynLoad (Dynamic Load) node.  DynLoad will

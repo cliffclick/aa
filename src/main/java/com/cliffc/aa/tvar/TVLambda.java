@@ -29,7 +29,7 @@ public class TVLambda extends TV3 {
   // return in slot 0, memory in slot 1, display in slot 2, args in slots 3+
   public TV3 ret () { return arg(0); }
   public TV3 dsp () { return arg(DSP_IDX); }
-  public int nargs(){ return len(); }
+  public int nargs(){ return _args.length; }
   public TVLambda clr_dsp() { _args[DSP_IDX] = null; return this; }
 
   @Override public TVLambda as_lambda() { return this; }
@@ -78,7 +78,7 @@ public class TVLambda extends TV3 {
 
   // -------------------------------------------------------------
   // Sub-classes specify trial_unify on sub-parts.
-  // Check arguments, not return nor omem.
+  // Check arguments, not return
   @Override int _trial_unify_ok_impl( TV3 tv3 ) {
     TVLambda that = (TVLambda)tv3; // Invariant when called
     if( nargs() != that.nargs() ) return 7; // Fails to be equal

@@ -10,51 +10,57 @@ abstract public class TVExpanding extends TV3 {
   // This is used Fresh against that.
   // If it ever changes (add_fld to TVStruct, or TVLeaf unify), we need to re-Fresh the deps.
   static Ary<DelayFresh> DELAY_FRESH  = new Ary<>(new DelayFresh[1],0);
-  // If this TV expands, we need to re-check resolving fields in these structs
-  private static Ary<TVStruct> DELAY_RESOLVE  = new Ary<>(new TVStruct[1],0);
 
   // This TV3 is used Fresh against another TV3.
   // If it ever changes, we need to re-Fresh the dependents.
+  // TODO: Do this from can_progress()
   // - Leaf expands/unions
   // - Base type drops
   // - Struct adds/dels fields
   // - Ptr becomes may/use-nil
   // - Lambda becomes may/use-nil
-  private Ary<DelayFresh> _delay_fresh;
-
-  // This Leaf/Base is used to resolve a field.
-  // If it ever changes, we need to re-check the resolves
-  private Ary<TVStruct> _delay_resolve;
+  Ary<DelayFresh> _delay_fresh;
 
   TVExpanding() { this(null); }
   TVExpanding( TV3[]tvs ) { super(tvs); }
   
   // -----------------
-  // Delayed-Fresh-Unify of LHS vs RHS.  LHS was a leaf and so imparted no
-  // structure to RHS.  When LHS changes to a non-leaf, the RHS needs to
-  // re-Fresh-Unify.
-  static class DelayFresh {
+  static abstract class DelayUpdate {
     TV3 _lhs, _rhs;
-    TV3[] _nongen;
-    DelayFresh _next;
     FreshNode _frsh;
-    DelayFresh(TV3 lhs, TV3 rhs, TV3[] nongen, FreshNode frsh) {
+    DelayUpdate(TV3 lhs, TV3 rhs, FreshNode frsh) {
       assert !lhs.unified() && !rhs.unified();
       _lhs=lhs;
       _rhs=rhs;
-      _nongen=nongen;
       _frsh = frsh;
     }
+    TV3 lhs() { return _lhs.unified() ? (_lhs=_lhs.find()) : _lhs; }
+    TV3 rhs() { return _rhs.unified() ? (_rhs=_rhs.find()) : _rhs; }
     boolean update() {
       if( !_lhs.unified() && ! _rhs.unified() ) return false;
       _lhs = _lhs.find();
       _rhs = _rhs.find();
       return true;              // Requires dup-check
     }
+    boolean eq( DelayUpdate du ) {
+      if( this==du ) return true;
+      if( _lhs!=du._lhs || _rhs!=du._rhs ) return false;
+      if( _frsh!=du._frsh ) return false;
+      return true;
+    }
+    abstract public String toString();
+  }
+  // Delayed-Fresh-Unify of LHS vs RHS.  LHS was a leaf and so imparted no
+  // structure to RHS.  When LHS changes to a non-leaf, the RHS needs to
+  // re-Fresh-Unify.
+  static class DelayFresh extends DelayUpdate {
+    TV3[] _nongen;
+    DelayFresh(TV3 lhs, TV3 rhs, FreshNode frsh, TV3[] nongen) {
+      super(lhs,rhs,frsh);
+      _nongen=nongen;
+    }
     boolean eq( DelayFresh df ) {
-      if( this==df ) return true;
-      if( _lhs!=df._lhs || _rhs!=df._rhs ) return false;
-      if( _frsh!=df._frsh ) return false;
+      if( !super.eq(df) ) return false;
       assert eq_nongen(df);
       return true;
     }
@@ -71,11 +77,12 @@ abstract public class TVExpanding extends TV3 {
       return "delayed_fresh_unify["+_lhs+" to "+_rhs+", "+_nongen+"]";
     }
   }
-
+  
+  
   // Used by FreshNode to mark delay_fresh on all nongen parts
   public void make_nongen_delay(TV3 rhs, TV3[] nongen, FreshNode frsh ) {
     assert !rhs.unified();
-    DelayFresh df = new DelayFresh(this,rhs,nongen,frsh);
+    DelayFresh df = new DelayFresh(this,rhs,frsh,nongen);
     for( TV3 ng : nongen )
       if( ng instanceof TVExpanding tex )
         tex.add_delay_fresh(df);
@@ -87,19 +94,9 @@ abstract public class TVExpanding extends TV3 {
     int cnt=0;
     while( DELAY_FRESH.len() > 0 ) {
       DelayFresh df = DELAY_FRESH.pop();
-      boolean progress = df._lhs.find().fresh_unify(df._frsh,df._rhs.find(),df._nongen,false);
+      boolean progress = df.lhs().fresh_unify(df._frsh,df.rhs(),df._nongen,false);
       df._frsh.add_flow();
       assert cnt++ < 20;
-    }
-  }
-  public static void do_delay_resolve() {
-    // TODO: Do not have delayed resolve sorted out right
-    //if( Combo.HM_AMBI ) // Having failed alread, will never result
-    //  DELAY_RESOLVE.clear();
-    //else
-    while( DELAY_RESOLVE.len() > 0 ) {
-      TVStruct tv = DELAY_RESOLVE.pop();
-      TVStruct.trial_resolve_all(true,tv.find().as_struct());
     }
   }
 
@@ -111,11 +108,10 @@ abstract public class TVExpanding extends TV3 {
 
   // Move delayed-fresh updates onto not-delayed update list.
   void move_delay() {
-    _move_delay(DELAY_FRESH  ,_delay_fresh  );
-    _move_delay(DELAY_RESOLVE,_delay_resolve);
+    _move_delay(DELAY_FRESH,_delay_fresh );
+    // TODO: Clean up, move may_nil,use_nil,widen into can_progress
     if( _may_nil && _use_nil && _widen==2 && !can_progress() ) {
-      if( _delay_fresh  !=null ) _delay_fresh  .clear();
-      if( _delay_resolve!=null ) _delay_resolve.clear();
+      if( _delay_fresh !=null ) _delay_fresh.clear();
     }
   }
   // Copy from src to dst, stripping dups
@@ -174,20 +170,20 @@ abstract public class TVExpanding extends TV3 {
   }
 
   void add_delay_resolve(TVStruct tvs) {
-    if( _delay_resolve==null ) _delay_resolve = new Ary<>(new TVStruct[1],0);
-    if( _delay_resolve.find(tvs)== -1 )
-      _delay_resolve.push(tvs);
+    //if( _delay_resolve==null ) _delay_resolve = new Ary<>(new TVStruct[1],0);
+    //if( _delay_resolve.find(tvs)== -1 )
+    //  _delay_resolve.push(tvs);
+    throw unimpl();
   }
 
   @Override public TVExpanding copy() {
     TVExpanding tex = (TVExpanding)super.copy();
     tex._delay_fresh = null;
-    tex._delay_resolve = null;
+    //tex._delay_resolve = null;
     return tex;
   }
 
   public static void reset_to_init0() {
     DELAY_FRESH.clear();
-    DELAY_RESOLVE.clear();
   }
 }

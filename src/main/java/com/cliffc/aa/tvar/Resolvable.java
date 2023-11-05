@@ -1,29 +1,64 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.AA;
-import com.cliffc.aa.Combo;
+import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.node.DynLoadNode;
-import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.node.FreshNode;
 
 import static com.cliffc.aa.AA.unimpl;
 
-public interface Resolvable {
-  // True if this field is still resolving: the actual field being referenced
-  // is not yet known.
-  boolean is_resolving();
-  static boolean is_resolving(String id) { return id.charAt(0)=='&'; }
-  // Resolved label; error if still resolving
-  String fld();
-  // Self type var; pattern tvar
-  TV3 tvar();
-  // Match type tvar (as opposed to pattern)
-  //TV3 match_tvar();
-  
-  // Resolve to string 'lab'
-  String resolve(String lab);
+abstract public class Resolvable {
 
-  String match(TVStruct rhs);
-  void record_match(TVStruct rhs, String lab);
+//public static NonBlockingHashMapLong<Resolvable> RESOLVINGS  = new NonBlockingHashMapLong<>();
+//public static NonBlockingHashMapLong<Resolvable> RESOLVEDS   = new NonBlockingHashMapLong<>();
+//
+//public DynLoadNode _dyn;      // DynLoad is where match comes from
+//public FreshNode _frsh;       // Fresh makes new patterns
+//TV3 _pat;                     // Pattern from deep inside Fresh's TVar
+//public String _lab;           // Resolved label
+//
+//Resolvable( DynLoadNode dyn, FreshNode frsh, TV3 pat ) {
+//  _dyn = dyn;
+//  _frsh = frsh;
+//  _pat = pat;
+//}
+//
+//@Override public String toString() {
+//  return "resolvable Dyn"+_dyn._uid+", pat "+_pat+(_frsh==null ? "" : " from Fresh"+_frsh._uid);
+//}
+//
+//public static Resolvable make(DynLoadNode dyn) {
+//  Resolvable r = new Resolvable(dyn,null,dyn.tvar());
+//  Resolvable old = RESOLVINGS.put(r.key(),r);
+//  assert old==null;
+//  return r;
+//}
+//
+//// Collect delayed-resolve requests
+//public static void fresh_add(TV3 pat, TV3 newpat, FreshNode fresh) {
+//  assert !pat.unified();
+//  for( Resolvable r : RESOLVEDS.values() )
+//    if( r.pattern()==pat )
+//      throw unimpl();
+//  for( Resolvable r : RESOLVINGS.values() )
+//    if( r.pattern()==pat )
+//      r.add_copy(fresh,newpat);
+//}
+//
+//private static Resolvable FREE=null;
+//private void add_copy( FreshNode fresh, TV3 newpat ) {
+//  assert _frsh != fresh;       // New pattern 'that' for a new FreshNode
+//  Resolvable r = FREE == null ? new Resolvable(_dyn,fresh,newpat) : FREE.init(_dyn,fresh,newpat);
+//  if( RESOLVEDS.containsKey(r.key()) ) return; // Already got this and resolved it
+//  Resolvable old = RESOLVINGS.putIfAbsent(r.key(),r);
+//  if( old!=null ) FREE = r.free();
+//}
+//private Resolvable init( DynLoadNode dyn, FreshNode fresh, TV3 newpat ) { _dyn = dyn; _frsh=fresh; _pat=newpat; FREE=null; return this; }
+//private Resolvable free() { _dyn=null; _frsh=null; _pat=null; _lab=null; return this; }
+//
+//
+//// Pattern to match
+//private TV3 pattern() { return _pat.unified() ? (_pat=_pat.find()) : _pat; }
   
   // Attempt to resolve an unresolved field.  No change if test, but reports progress.
   // ( @{name:str, ... } @{ age=A } ) -vs- @{ age=B } // Ambiguous, first struct could pick up age, 2nd struct A & B could fail later
@@ -36,26 +71,23 @@ public interface Resolvable {
   // - hard yes, all parts match, even leaf-for-leaf.  No open struct in pattern.
   // - maybe   , all parts match, except leafs.  Leafs might expand later and fail or become a hard-yes.
 
-  // "Pattern leafs" are just any TV3 that, if it changes might effect the match outcome.
-  Ary<TVExpanding> PAT_LEAFS = new Ary<>(new TVExpanding[1],0);
-  
-
   // Returns progress, not successful resolve
-  default boolean trial_resolve( boolean outie, TV3 pattern, TVStruct rhs, boolean test ) {
-    assert !rhs.is_open();
-    assert match(rhs) == null; // Not already matched
-
+  public boolean trial_resolve( TVStruct match, TV3 pattern, boolean test ) {
+    //TVStruct match = ((TVPtr)_dyn.adr().tvar()).load();
+    // Immediate fail if match is open; since more fields may appear best we
+    // can do is hard-fail for 2+ yes.  Might as well wait
+    if( match.is_open() ) return false;
+    //TV3 pattern = pattern();
+    
     // Not yet resolved.  See if there is exactly 1 choice.
     // The good case is: 1 YES, 0 MAYBES, and any number of NOs.
     // Any number of MAYBEs implies we need to stall; they might turn into either a YES or a NO.
-    PAT_LEAFS.clear();
     int yes=0, maybe=0;
     String lab=null;
-    for( int i=0; i<rhs.len(); i++ ) {
-      String id = rhs.fld(i);
-      if( is_resolving(id) ) continue;
-      TV3 rhsx = rhs.arg(id);      
-
+    for( int i=0; i<match.len(); i++ ) {
+      String id = match.fld(i);
+      TV3 rhsx = match.arg(id);      
+    
       // Count YES, NO, and MAYBEs
       switch( pattern.trial_unify_ok( rhsx ) ) {
       case 7: break;                    // No.  Don't lose label tracking
@@ -64,22 +96,22 @@ public interface Resolvable {
       default: throw AA.unimpl();
       };
     }
-
+    
     return switch( yes ) {
         
       case 0 -> maybe==0
         // No YESes, no MAYBES, this is an error
-        ? test || ((DynLoadNode)this).resolve_failed_no_match(pattern,rhs,test)
+        ? test || _dyn.resolve_failed_no_match(pattern,match,test)
         // no YESes, but more maybes:
         : (maybe==1)            // One maybe can move to a yes, but no more maybes will appear
-        ? (test || resolve_it(outie,pattern,rhs,lab))
-        : stall(rhs);  // Too many maybes: wait
-
+        ? (test || resolve_it(pattern,match,lab))
+        : stall(match);  // Too many maybes: wait
+    
       case 1 -> maybe==0 
         // Exactly one yes and no maybes: we can resolve this now
-        ? test || resolve_it(outie,pattern,rhs,lab)
+        ? test || resolve_it(pattern, match, lab)
         // Got a YES, but some maybe might become another hard YES, which is an error.
-        : stall(rhs);
+        : stall(match);
         
       default -> 
         // 2+ hard-yes.  This is a hard error, and can never resolve.
@@ -87,47 +119,40 @@ public interface Resolvable {
       };
   }
 
-  // Stall the resolve, and see if we can resolve later.
-  // After HM_AMBI, it is too late, and we will never resolve.
-  default boolean stall(TVStruct rhs) {
-    if( Combo.HM_AMBI )
-      //return ((FieldNode)this).resolve_ambiguous_msg();
-      throw unimpl();
-    // Not resolvable (yet).  Delay until it can resolve.
-    while( PAT_LEAFS._len>0 )
-      PAT_LEAFS.pop().add_delay_resolve(rhs);
-    return false;
-  }
-
   // Field can be resolved to label
-  default boolean resolve_it(boolean outie, TV3 pattern, TVStruct rhs, String lab ) {
-    record_match(rhs, lab);           // Record match
-    boolean old = rhs.del_fld(fld()); // Remove old label from rhs, if any
-    TV3 prior = rhs.arg(lab);         // Get prior matching rhs label, if any
+  boolean resolve_it( TV3 pattern, TVStruct match, String lab ) {
+    Resolvable old = RESOLVINGS.remove(key()     ); assert old==this;
+    Resolvable add = RESOLVEDS .put   (key(),this); assert add==null;
+    _dyn.add_flow();            // Value call makes progress
+    _lab = lab;    
+    TV3 prior = match.arg(lab); // Get prior matching match label, if any
     if( prior==null ) {
-      assert old;               // Expect an unresolved label
-      //rhs.add_fld(lab,pattern); // Add label and pattern, basically replace unresolved old_fld with lab
       throw unimpl(); // todo needs pinned
     } else {
-      if( outie ) prior. unify(pattern,false); // Merge pattern and prior label in RHS
-      else        prior._unify(pattern,false); // Merge pattern and prior label in RHS
+      prior.unify(pattern,false); // Merge pattern and prior label in MATCH
     }
     return true;              // Progress
   }
 
-  // Track expanding terms; this need to recheck the match if they expand.
-  // Already return 3 for a "maybe".
-  static int add_pat_dep(TVExpanding leaf) {
-    if( PAT_LEAFS.find(leaf)== -1 )
-      PAT_LEAFS.add(leaf);
-    return 3;                   // Always reports a "maybe"
+  // Stall the resolve, and see if we can resolve later.
+  // After HM_AMBI, it is too late, and we will never resolve.
+  boolean stall(TVStruct match) {
+    return false;
   }
 
-  // Resolve failed; if ambiguous report that; if nothing present report that;
-  // otherwise force unification on all choices which will trigger an error on
-  // each choice.
-  abstract void resolve_or_fail();
-
-  public static void reset_to_init0() {
-  }
+  //public long key() { return ((long)_dyn._uid<<32) | (_frsh==null ? 0 : _frsh._uid); }
+  //@Override public int hashCode() {
+  //  return (_dyn._uid<<16) ^ (_frsh==null ? 0 : _frsh._uid);
+  //}
+  //
+  //@Override public boolean equals(Object o) {
+  //  if( this==o ) return true;
+  //  if( !(o instanceof Resolvable r) ) return false;
+  //  return _dyn==r._dyn && _frsh==r._frsh;
+  //}
+  //
+  //public static void reset_to_init0() {
+  //  RESOLVINGS.clear();
+  //  RESOLVEDS.clear();
+  //}
 }

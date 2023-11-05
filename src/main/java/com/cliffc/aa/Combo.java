@@ -2,7 +2,6 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.tvar.Resolvable;
-import com.cliffc.aa.tvar.TVField;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.NonBlockingHashMapLong;
 
@@ -23,8 +22,8 @@ this type unifies, beyond the expected Node graph neighbors.
 The normal HM unification steps are treated as the MAF transfer functions,
 taking type variables as inputs and producing new, unified, type variables.
 Because unification happens in-place (normal disjoint-set union), the transfer
-functions are executed for side effects only and return a progress flag.  The
-transfer functions are virtual calls on Nodes, similar to the existing
+functions can be executed for side effects only and return a progress flag.
+The transfer functions are virtual calls on Nodes, similar to the existing
 Node.value() calls.
 
 HM Bases include anything from the GCP lattice, but 'widened' to form borders
@@ -53,7 +52,7 @@ Analysis Framework.  Passed in the parsed program state (including any return
 result, i/o and memory state).  Returns the most-precise types possible, and
 replaces computed constants with constant nodes.  GCP types are computed using
 the virtual value() call, which computes a new type from the node neighbors
-without reference to the old type.  It has no side-effects.
+without reference to the old type.  value()has no side-effects.
 
 Besides the obvious GCP algorithm (and the type-precision that results from the
 analysis), GCP does a few more things:
@@ -84,9 +83,14 @@ The combined algorithm includes transfer functions taking facts from one MAF
 lattice and produces results in some other MAF lattice.
 
 For the GCP->HM direction, the HM IfNode has a custom transfer function instead
-of the usual one.  Unification looks at the GCP value, and unifies either the
-true arm, or the false arm, or both or neither.  In this way GCP allows HM to
-avoid picking up constraints from dead code.
+of the usual one.  Unification looks at the GCP predicate value, and unifies
+either the true arm, or the false arm, or both or neither.  In this way GCP
+allows HM to avoid picking up constraints from dead code.
+
+Also for GCP->HM, the HM CallNode has a custom transfer function instead of the
+usual one.  Unification looks at the GCP function type, and unifies against
+reachable functions instead of all of them.  Similar to HM IfNode unification,
+HM avoids picking up constraints from calls not in the Call Graph.
 
 Also for GCP->HM, the HM ground terms or base terms include anything from the
 GCP lattice, instead of just the usual int/float/datum/string set.
@@ -213,19 +217,20 @@ public abstract class Combo {
         if( n instanceof RootNode root ) root.CG_wire();
       }
 
+      if( Env.GVN.flow_len()==0 && !Resolvable.RESOLVINGS.isEmpty() )
+        for( Resolvable r : Resolvable.RESOLVINGS.values() )
+          r.trial_resolve(false); // Do delayed resolve
+
       // Very expensive assert: everything that can make progress is on worklist
-      //assert Env.KEEP_ALIVE.more_work()==0;
+      assert Env.KEEP_ALIVE.more_work()==0;
     }
     return cnt;
   }
 
   private static void add_new_leaf_work() { }
   private static void add_ambi_work() {
-    // TODO: Figure out error handling.  For now, no errors
-    for( Resolvable dyn : TVField.FIELDS.values() )
-      ((Node)dyn).add_flow();
-    //  if( fld.is_resolving() )
-    //    fld.resolve_or_fail();
+    //for( Resolvable r : Resolvable.RESOLVINGS.values() )
+    //  throw AA.unimpl();
   }
 
   private static final NonBlockingHashMapLong<Node> FREEZE_WORK = new NonBlockingHashMapLong<>();

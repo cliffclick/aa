@@ -14,8 +14,8 @@ public class BindFPNode extends Node {
   public BindFPNode( Node fp, Node dsp, boolean over ) { super(OP_BINDFP,fp,dsp); _over = over; }
   @Override public String xstr() {return "BindFP"; }
 
-  Node fp() { return in(0); }
-  Node dsp() { return in(1); }
+  public Node fp () { return in(0); }
+  public Node dsp() { return in(1); }
 
   // BindFP unifies its display and self.  
   // BindFP must be monotonic!
@@ -99,8 +99,7 @@ public class BindFPNode extends Node {
     if( _over && fptv instanceof TVPtr ptr ) {
       TVStruct tvs = ptr.load();
       for( int i = 0; i < tvs.len(); i++ )
-        if( !Resolvable.is_resolving(tvs.fld(i)) &&
-            tvs.arg(i) instanceof TVLambda lam )
+        if( tvs.arg(i) instanceof TVLambda lam )
           progress |= dsp_unify(lam.dsp(), dsp(), test);
     } else if( fptv instanceof TVLambda lam ) {      
       progress |= dsp_unify(lam.dsp(), dsp(), test);

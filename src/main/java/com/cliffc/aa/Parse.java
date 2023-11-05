@@ -438,7 +438,8 @@ public class Parse implements Comparable<Parse> {
   // Assign into display, changing an existing def.
   // The scope of the assignment is 'scope', or null to create in the local scope.
   private Node do_store(ScopeNode scope, Node ifex, Access mutable, String tok, Parse badf, Type t, Parse badt ) {
-    if( ifex instanceof FunPtrNode fptr )
+    Node debug = ifex instanceof BindFPNode bind ? bind.fp() : ifex;
+    if( debug instanceof FunPtrNode fptr )
       fptr.bind(tok);           // Debug only: give name to function
     // Find scope for token.  If not defining struct fields, look for any
     // prior def.  If defining a struct, tokens define a new field in this scope.
@@ -531,7 +532,7 @@ public class Parse implements Comparable<Parse> {
     Parse bad = errMsg();
     
     // Merge results
-    set_ctrl(new RegionNode(null,t_scope.ctrl(),f_scope.ctrl()).init());      
+    set_ctrl(new RegionNode(null,t_scope.ctrl(),f_scope.ctrl()).init());
 
     // Walk both sides and introduce error stores on 1-sided defs
     for( int i=1; i<f_stk.len(); i++ ) {
@@ -794,7 +795,7 @@ public class Parse implements Comparable<Parse> {
             n = gvn(new LoadNode(mem(),n,tok,bad));
           }
           // Bind after load
-          n = gvn(new BindFPNode(n, Node.pop(aidx), true));
+          n = gvn(new BindFPNode(n, Node.pop(aidx), false));
         }
 
       } else if( peek('(') ) {  // Attempt a function-call

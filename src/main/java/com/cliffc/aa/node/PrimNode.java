@@ -371,7 +371,7 @@ public abstract class PrimNode extends Node {
       Type tactual = val(i-DSP_IDX);
       TypeNil tformal = wrap(_formals.at(i));
       if( !tactual.isa(tformal) )
-        return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[i-DSP_IDX+1],tactual, tformal);
+        return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[i-DSP_IDX],tactual, tformal);
     }
     return null;
   }
