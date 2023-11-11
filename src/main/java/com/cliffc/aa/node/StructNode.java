@@ -13,7 +13,7 @@ import com.cliffc.aa.util.Util;
 
 import java.util.Arrays;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 
 // Makes a TypeStruct without allocation
 
@@ -170,7 +170,7 @@ public class StructNode extends Node {
         if( fref.is_scoped() ) {
           // Definitely defined here
           //    fref.define();
-          throw unimpl();        // TODO: Access input by field name
+          throw TODO();        // TODO: Access input by field name
         } else {
           // Make field in the parent
           assert !parent.is_prim();

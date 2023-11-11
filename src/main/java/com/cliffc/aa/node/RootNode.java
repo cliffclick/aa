@@ -128,7 +128,7 @@ public class RootNode extends Node {
             // fptr.tvar().widen((byte)1,false); // HMT widen
             fptr.deps_add(this); // Un-escaping by deleting FunPtr will trigger Root recompute
             escs = _add_all(escs,awork,fwork,ret._val);
-          } else throw unimpl(); // Untested, can i get a null here post-combo?
+          } else throw TODO(); // Untested, can i get a null here post-combo?
         }
       }
     }
@@ -228,7 +228,7 @@ public class RootNode extends Node {
     // Pre-combo, all memory is alive, except kills
     // During/post combo, check external Call users
     Type live = Combo.pre() ? TypeMem.ALLMEM : super.live(false);
-    if( live==Type.ANY ) return live;
+    if( live==Type.ANY ) return TypeMem.ANYMEM;
     TypeMem mem = (TypeMem)live;
     // Kill the killables
     for( int kill : KILL_ALIASES )
@@ -256,7 +256,6 @@ public class RootNode extends Node {
           return CallNode.FP_LIVE;
       }
       deps_add(in(REZ_IDX));
-      if( val(REZ_IDX)==Type.ANY ) return Type.ANY; // TODO: Surely broken
       return Type.ALL;
     }
     assert in(i) instanceof CallNode || in(i) instanceof RetNode;

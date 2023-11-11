@@ -6,7 +6,7 @@ import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeStruct;
 import com.cliffc.aa.util.*;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 
 /** A type error.  A collection of un-unifiable TV3s
  *
@@ -34,7 +34,7 @@ public class TVErr extends TV3 {
   //@Override public TVNil    as_nil   () { return (TVNil   )arg(XNIL); }
   @Override public TVPtr    as_ptr   () { return (TVPtr   )arg(XPTR); }
 
-  @Override int eidx() { throw unimpl(); }
+  @Override int eidx() { throw TODO(); }
 
   public TV3 make_struct() {
     assert _args[XSTR]==null;
@@ -108,10 +108,10 @@ public class TVErr extends TV3 {
       // Merge error messages
       for( String err : terr._errs )
         if( _errs.find(err)== -1 )
-          throw unimpl();         // Progress
+          throw TODO();         // Progress
       for( String err : _errs )
         if( terr._errs.find(err)== -1 )
-          throw unimpl();         // Progress
+          throw TODO();         // Progress
     }
   }
 
@@ -127,7 +127,7 @@ public class TVErr extends TV3 {
   }
   
   // -------------------------------------------------------------
-  @Override boolean _exact_unify_impl( TV3 tv3 ) { throw unimpl(); }
+  @Override boolean _exact_unify_impl( TV3 tv3 ) { throw TODO(); }
 
   // -------------------------------------------------------------
   // If there's exactly one type, we can as_flow it.  Otherwise, ambiguous and
@@ -136,7 +136,7 @@ public class TVErr extends TV3 {
     TV3 tv=null;
     for( TV3 tvar : _args ) {
       if( tvar!=null ) {
-        if( tv!=null ) throw unimpl(); // Multi choices; not sure what to do with Type
+        if( tv!=null ) throw TODO(); // Multi choices; not sure what to do with Type
         tv = tvar.find();
       }
     }

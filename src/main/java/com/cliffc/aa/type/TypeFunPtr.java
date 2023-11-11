@@ -4,7 +4,7 @@ import com.cliffc.aa.util.*;
 
 import java.util.function.*;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 
 
 // Function indices or function pointers; a single instance can include all
@@ -169,7 +169,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
 
   static TypeFunPtr valueOf(Parse P, String cid, boolean any) {
     BitsFun fidxs = P.bits(BitsFun.EMPTY);
-    if( P.peek('+') ) throw unimpl();
+    if( P.peek('+') ) throw TODO();
     P.require('{');
     TypeFunPtr tfp = malloc(any,fidxs,0,null,null);
     if( cid!=null ) P._dups.put(cid,tfp);
@@ -431,7 +431,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   }
 
   @Override public Type make_from(Type head, TypeMem map, VBitSet visit) {
-    throw unimpl();
+    throw TODO();
   }
 
   @Override public TypeFunPtr sharptr2( TypeMem mem ) { return make_from(_dsp.sharptr2(mem),_ret.sharptr2(mem)); }
@@ -441,7 +441,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     //if( Type.ARF.tset(_uid) ) return _fidxs;
     //// Myself, plus any function returns
     //return _fidxs.meet(_ret._all_reaching_fidxs(tmem));
-    throw unimpl();
+    throw TODO();
   }
 
 }

@@ -96,7 +96,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     Cyclic.Link lk = null;
     for( TypeFld fld0 : this ) {
       TypeFld fld1 = ts.get(fld0._fld);
-      if( fld1==null ) throw unimpl(); // different here
+      if( fld1==null ) throw TODO(); // different here
       Cyclic.Link dlk = Cyclic._path_diff(fld0,fld1,links);
       if( dlk==null || dlk._t0==null ) continue; // No difference
       lk = Cyclic.Link.min(lk,dlk); // Min depth
@@ -564,7 +564,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
       // i was pre-advanced, so remove field i-1
       assert !_has_hash;          // Changing, so underlying struct is mid-construction
       //_flds.remove(--_i);
-      throw unimpl();
+      throw TODO();
     }
   }
 
@@ -776,7 +776,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     //for( TypeFld fld : this )
     //  ts.add_fld(fld.make_from(head,mem,visit));
     //return ts.hashcons_free();
-    throw unimpl();
+    throw TODO();
   }
 
   @Override BitsFun _all_reaching_fidxs( TypeMem tmem) {

@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.IntSupplier;
 import java.util.function.Predicate;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 import static com.cliffc.aa.node.FunNode._must_inline;
 
 // Sea-of-Nodes
@@ -288,6 +288,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       n._defs = new Ary<>(new Node[1],0); // New empty defs
       n._uses = new Ary<>(new Node[1],0); // New empty uses
       n._elock=false;           // Not in GVN
+      if( Combo.pre() ) n._tvar=null;
       if( copy_edges )
         for( Node def : _defs )
           n.add_def(def);
@@ -559,7 +560,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   public boolean unify( boolean test ) { return false; }
 
   // Unify this Proj with the matching TV2 part from the multi-TV2-producing
-  public boolean unify_proj( ProjNode proj, boolean test ) { throw unimpl(); }
+  public boolean unify_proj( ProjNode proj, boolean test ) { throw TODO(); }
 
   // Do One Step of forwards-dataflow analysis.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
@@ -744,7 +745,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     Node con2 = VALS.get(con);
     if( con2 != null ) {        // Found a prior constant
       if( Combo.HM_FREEZE && con2._tvar != con._tvar )
-        throw unimpl();
+        throw TODO();
       con.kill();               // Kill the just-made one
       con = con2;
       con._live = Type.ALL;     // Adding more liveness
@@ -950,7 +951,7 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Aliases that a MemJoin might choose between.  Not valid for nodes which do
   // not manipulate memory.
-  //BitsAlias escapees() { throw unimpl("graph error"); }
+  //BitsAlias escapees() { throw TODO("graph error"); }
 
   // Walk a subset of the dominator tree, looking for the last place (highest
   // in tree) this predicate passes, or null if it never does.

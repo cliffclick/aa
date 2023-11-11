@@ -7,7 +7,7 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 
 
 // Allocates memory for the input
@@ -121,6 +121,6 @@ public class NewNode extends Node {
     if( nnn==null ) return null;
     if( nnn._alias==alias ) return nnn;
     // Split and renumbered in FunNode inline, fixup in NEWS
-    throw unimpl();
+    throw TODO();
   }
 }

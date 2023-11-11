@@ -36,6 +36,7 @@ public class BitsAlias extends Bits<BitsAlias> {
   // The All-Memory alias class
   public  static final BitsAlias NALL = new BitsAlias().make_impl(ALLX,null); // All aliases, no nil
   public  static final BitsAlias NANY = NALL.dual();
+  // With nil
   public  static final BitsAlias  ALL = NALL.make_impl(1,new long[]{0x3}); // All aliases
   private static final BitsAlias  ANY = ALL.dual();
 

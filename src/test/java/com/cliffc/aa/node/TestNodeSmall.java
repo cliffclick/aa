@@ -654,7 +654,7 @@ public class TestNodeSmall {
     //                            perror("Not monotonic",rezi[k],rezj[k]);
     //                      }
     //assertEquals(0,ERR);
-    throw unimpl();
+    throw TODO();
   }
 
   // Check that the Parm.value calls for these incoming args are monotonic, and
@@ -703,7 +703,7 @@ public class TestNodeSmall {
     //
     //// Record for later monotonic check
     //return new Type[]{tpm,tp1,tp2};
-    throw unimpl();
+    throw TODO();
   }
 
   static void perror( String msg, Type t1, Type t2 ) {
@@ -727,6 +727,6 @@ public class TestNodeSmall {
     //  for( int i=0; i<as.length; i++ )
     //    tos[as[i]] = ts[i];
     //return TypeMem.make0(tos);
-    throw unimpl();
+    throw TODO();
   }
 }

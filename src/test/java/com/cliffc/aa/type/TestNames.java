@@ -148,7 +148,7 @@ public class TestNames {
       return _flds.equals(s._flds);
     }
     @Override public int hashCode() {
-      throw com.cliffc.aa.AA.unimpl();
+      throw com.cliffc.aa.AA.TODO();
     }
 
 

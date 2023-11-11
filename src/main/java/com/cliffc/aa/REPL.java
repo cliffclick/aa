@@ -1,9 +1,5 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.AA.*;
-import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.*;
-
 import java.util.Scanner;
 
 /** an implementation of language AA
@@ -40,7 +36,7 @@ public abstract class REPL {
     //System.out.print(prompt);
     //System.out.flush();
     //return prog;
-    throw AA.unimpl();
+    throw AA.TODO();
   }
 
 }

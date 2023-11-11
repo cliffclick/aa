@@ -18,7 +18,7 @@ public class TVPtr extends TV3 {
 
   public TVPtr( BitsAlias aliases, TVStruct str ) {
     super(aliases.test(0),str);
-    _aliases = aliases;
+    _aliases = aliases.clear(0);
   }
 
   @Override public TVPtr as_ptr() { return this; }
@@ -90,7 +90,8 @@ public class TVPtr extends TV3 {
     if( is_clz_ptr() ) return sb.p("_");
     if( is_prim() ) // Shortcut for boxed primitives
       return load()._str(sb,visit,dups,debug,prims);
-
+    if( _may_nil && _aliases.is_empty() && load().len()==0 )
+      return sb.p("nil");
     sb.p("*");
     _aliases.str(sb);
     if( _args.length>0 && _args[0]!=null ) arg(0)._str(sb,visit,dups,debug,prims);

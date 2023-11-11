@@ -5,7 +5,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
@@ -60,7 +60,7 @@ public class MemSplitNode extends Node {
     for( int i=1; i<_escs._len; i++ )
       if( _escs.at(i).test(alias) )
         return i;
-    throw AA.unimpl(); // Should be found
+    throw AA.TODO(); // Should be found
   }
 
   // Find the escape set this esc set belongs to, or make a new one.
@@ -146,7 +146,7 @@ public class MemSplitNode extends Node {
     //for( Node use : mjn._uses )
     //  Env.GVN.add_work_new(use); // See if other uses can move into the Join
     //return head1;
-    throw unimpl();
+    throw TODO();
   }
 
   static boolean check_split( Node head1, BitsAlias head1_escs, Node tail2 ) {
@@ -161,7 +161,7 @@ public class MemSplitNode extends Node {
     //// into the split.
     //// Allow exactly 1 use
     //return tail2._uses._len==1;
-    throw unimpl();
+    throw TODO();
   }
 
 

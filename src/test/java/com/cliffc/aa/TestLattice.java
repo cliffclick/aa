@@ -176,7 +176,7 @@ public class TestLattice {
           return mt;  // Not inside both reaches, must be a meet
         }
       // Correct already
-      throw com.cliffc.aa.AA.unimpl();
+      throw com.cliffc.aa.AA.TODO();
     }
     N join(N b) {
       return _dual.meet(b._dual)._dual;

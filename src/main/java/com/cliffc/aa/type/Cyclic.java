@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.IntSupplier;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 
 // Algorithm for minimizing a not-yet-interned graph of Types
 public interface Cyclic {
@@ -376,7 +376,7 @@ public interface Cyclic {
         TypeFunPtr tfp = (TypeFunPtr) h;
         _uid(_uid(tfp.fidxs().str(sb).p("{ "), tfp.dsp()).p(" -> "), tfp._ret).p(" }");
       }
-      case Type.TARY -> throw unimpl();
+      case Type.TARY -> throw TODO();
       default -> h.str(sb, false, false);
       }
       return sb;
@@ -566,7 +566,7 @@ public interface Cyclic {
     }
     SB str(SB sb) {
       if( _t0==null ) return sb.p('_');
-      throw unimpl();
+      throw TODO();
     }
     static SB str(SB sb, NonBlockingHashMapLong<Link> links) {
       for( long key : links.keySetLong() ) {

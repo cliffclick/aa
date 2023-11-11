@@ -207,7 +207,7 @@ public final class RetNode extends Node {
     //  Env.GVN.add_unuse(call);
     //  return this;
     //}
-    throw unimpl();
+    throw TODO();
   }
 
   private static boolean check_phi_type( FunNode fun, CallNode call, int argn ) {
@@ -223,7 +223,7 @@ public final class RetNode extends Node {
     FunNode fun = fun();
     for( Node use : _uses ) {
       if( use instanceof CallEpiNode cepi ) {
-        throw unimpl();
+        throw TODO();
       }
     }
 
@@ -245,7 +245,7 @@ public final class RetNode extends Node {
     if( ret==null || ret.is_dead() ) return null;
     if( ret.fidx()==fidx ) return ret;
     // Split & renumbered FunNode, fixup in FUNS.
-    throw unimpl();
+    throw TODO();
   }
   // First match from fidxs
   public static RetNode get( BitsFun fidxs ) {

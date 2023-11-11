@@ -1,11 +1,10 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.Ary;
 import org.junit.Ignore;
 import org.junit.Test;
 
 import static com.cliffc.aa.AA.ARG_IDX;
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 import static org.junit.Assert.assertTrue;
 
 // CNC: As of 02/20/2022 I have dropped approx from the whole Type analysis
@@ -139,7 +138,7 @@ public class TestApprox {
     //    }
     //  }
     //}
-    throw unimpl();
+    throw TODO();
 
   }
 

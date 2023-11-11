@@ -7,7 +7,7 @@ import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeNil;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 
 public class TVLeaf extends TVExpanding {
 
@@ -23,7 +23,7 @@ public class TVLeaf extends TVExpanding {
   public void set_no_progress() { _no_progress=true; }
   
   // Leafs never show up in errors
-  @Override int eidx() { throw unimpl(); }
+  @Override int eidx() { throw TODO(); }
 
   // -------------------------------------------------------------
   @Override boolean _unify_impl(TV3 that ) {

@@ -121,7 +121,7 @@ public class AssertNode extends Node {
       //for( int i=1; i<arg._defs._len; i++ )
       //  gvn.set_def_reg(arg,i,gvn.xform(new TypeNode(_t,arg.in(i),_error_parse)));
       //return arg;               // Remove TypeNode, since completely replaced
-      throw AA.unimpl("untested");
+      throw AA.TODO("untested");
     }
 
     return null;

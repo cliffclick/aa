@@ -200,11 +200,13 @@ public class NonBlockingHashMapLong<TypeV>
     IteratorLong iter = new IteratorLong();
     if( !iter.hasNext() )  return "{}";
     SB sb = new SB("{");
+    boolean any=false;
     for( long key=iter.next(); iter.hasNext(); key=iter.next() ) {
       TypeV val = get(key);
       sb.p(key).p('=').p(val == this ? "(this Map)" : val.toString()).p(", ");
+      any=true;
     }
-    return sb.unchar(2).p("}").toString();
+    return sb.unchar(any?2:0).p("}").toString();
   }
 
 

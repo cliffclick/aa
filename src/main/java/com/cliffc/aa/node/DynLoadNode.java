@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 
@@ -116,10 +117,14 @@ public class DynLoadNode extends Node {
 
   // Where to report errors
   private final Parse _bad;
+
+  // Mapping from [dynload,fresh(s)] to a field pattern.
+  private final Ary<Resolvable> _resolves;
   
   public DynLoadNode( Node mem, Node adr, Parse bad ) {
     super(OP_DYNLD,null,mem,adr);
     _bad = bad;
+    _resolves = new Ary<>(Resolvable.class);
   }
 
   @Override public String xstr() { return "._"; }   // Self short name
@@ -148,20 +153,23 @@ public class DynLoadNode extends Node {
     // Still resolving, dunno which field yet
     if( Combo.pre() ) {
       Type t = ts._def;
-      for( TypeFld tf : ts )
-        t = t.meet(tf._t);
+      for( TypeFld tf : ts ) {
+        Type q = tf._t;
+        if( tf._t instanceof TypeMemPtr tmp2 && tmp2.is_simple_ptr() )
+          q = tmp2.make_from(tm.ld(tmp2));
+        t = t.meet(q);
+      }
       return t;
     }
     
     // Meet over all possible choices.  This DynLoad might have resolved
     // differently with different TV3s from different paths, so meet over all
     // possible choices.
-    //Type t = TypeNil.XSCALAR;
-    //for( Resolvable r : Resolvable.RESOLVEDS.values() )
-    //  if( r._dyn==this )
-    //    t = t.meet(LoadNode.lookup(ts,tmp,tm,r._lab));
-    //return t;
-    throw AA.unimpl();
+    Type t = TypeNil.XSCALAR;
+    for( Resolvable r : _resolves )
+      if( r._label != null )
+        t = t.meet(LoadNode.lookup(ts,tmp,tm,r._label));
+    return t;
   }
 
   
@@ -189,36 +197,44 @@ public class DynLoadNode extends Node {
   }
 
   @Override public Node ideal_reduce() {
-    String lab=null;            // Null: no label found, "": conflicting labels found
-    Resolvable rbest = null;
-    // Search for matching DynLoads.  Check for a single label resolved;
-    // if so, we collapse to a normal Load
-    // TODO: Keep local DynLoads in this self DynLoad
-    for( Resolvable r : Resolvable.RESOLVEDS.values() )
-      if( r._dyn==this ) {
-        if( r._frsh==null ) { assert rbest==null; rbest = r; }
-        if( lab==null ) lab = r._lab; // First label
-        else if( !lab.equals(r._lab) )
-          lab = "";             // Conflicting labels
+    for( Resolvable r : _resolves ) {
+      assert r._dyn==this;
+      if( r._path.size()==1 ) {
+        assert _resolves._len==1;
+        if( r._label!=null )
+          return new LoadNode(mem(),adr(),r._label,_bad);
       }
-    assert rbest==null || rbest._lab.equals(lab);
-    if( lab!=null && lab.length()>0 )
-      return new LoadNode(mem(),adr(),lab,_bad);
+    }
     return null;
+  }
+
+  // No matches to pattern (no YESes, no MAYBEs).  Empty patterns might have no NOs.
+  public boolean resolve_failed_no_match( TV3 pattern, TVStruct rhs, boolean test ) {
+    throw TODO();
   }
   
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
-
     // Load takes a pointer
     TV3 ptr0 = adr().set_tvar();
     TVPtr ptr;
     if( ptr0 instanceof TVPtr ptr1 ) ptr = ptr1;
     else ptr0.unify(ptr = new TVPtr(BitsAlias.EMPTY, new TVStruct(true) ),false);
-    
     _tvar = new TVLeaf();
-    Resolvable.make(this);
+    ptr.load().add_dynmapping(this,_tvar);
+    Resolvable r = new Resolvable(this,UQNodes.make(this),ptr.load(),_tvar);
+    assert _resolves.isEmpty();
+    _resolves.push(r);
     return _tvar;
   }
 
+  @Override public boolean unify( boolean test ) {
+    boolean progress = false;
+    for( Resolvable r : _resolves ) {
+      progress |= r.trial_resolve(test);
+      if( progress && test ) return true;
+    }
+    return progress;
+  }
+  
 }

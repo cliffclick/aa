@@ -6,8 +6,8 @@ import com.cliffc.aa.node.Node;
  */
 
 public abstract class AA {
-  public static RuntimeException unimpl() { return unimpl("unimplemented"); }
-  public static RuntimeException unimpl(String msg) { throw new RuntimeException(msg); }
+  public static RuntimeException TODO() { return TODO("unimplemented"); }
+  public static RuntimeException TODO( String msg) { throw new RuntimeException(msg); }
   // Indices common between Nodes & Types & TVars.
   public static final int CTL_IDX=0; // Often 0 is just used directly
   public static final int MEM_IDX=1; // Memory index

@@ -2,7 +2,7 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.util.NonBlockingHashMap;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 
 /** Operator parsing.
 
@@ -76,7 +76,7 @@ public class Oper {
     case '=', '!'      -> 3; // includes ==, !=
     case '&'           -> 2; // includes &&
     case '|'           -> 1; // includes ||
-    default -> throw unimpl();
+    default -> throw TODO();
     };
   }
 
@@ -117,7 +117,7 @@ public class Oper {
       if( ss.length==2 ||                        // E.g. [_] for array alloc
           (ss.length==3 && ss[2].length()==0) )  // %{ e0 }%= e1
         return install(tok,0,false);
-      throw unimpl(); // return false; // Too many args? "[_]=_?_"
+      throw TODO(); // return false; // Too many args? "[_]=_?_"
     }
     // Leading expr.
     if( ss.length==3 ) { // Includes "_+_" and "_[_]"
@@ -125,12 +125,12 @@ public class Oper {
       if( !isOp0(c) ) return false;
       if( ss[2].length()==0 ) // Standard binary op
         return install(tok,prec(ss[1].charAt(0)),lazy);
-      throw unimpl();
+      throw TODO();
     }
     // TODO: check for valid balanced unary, binary, trinary
     // TODO: balanced ops install twice; once for just the prefix, which might
     // be shared amongst several balanced ops.
-    throw unimpl();
+    throw TODO();
   }
   private static boolean install(String tok, int prec, boolean lazy) { OPERS.put(tok,new Oper(tok,prec,lazy)); return true; }
 
@@ -146,7 +146,7 @@ public class Oper {
     for( int i=1; i<s.length(); i++ ) {
       String t = s.substring(i)+"_";
       if( OPERS.get(t)!=null )
-        throw unimpl(); // return false; // Ambiguous
+        throw TODO(); // return false; // Ambiguous
     }
     return false;
   }
@@ -154,7 +154,7 @@ public class Oper {
   // Balanced op.  Some amount of "[{<" in s0, and the reverse ">}]" in s1.
   // "{<" cannot appear as 1st char in s0.
   private static boolean is_bal_op(String s0, String s1) {
-    throw unimpl();
+    throw TODO();
   }
 
   // Lookup the tok as a unary operator, or the first part of a balanced
@@ -192,7 +192,7 @@ public class Oper {
   // match, or the Oper with the longest matching name and prec.  Adds '_' as
   // needed.
   public static Oper balanced( String tok0, String tok1 ) {
-    throw unimpl();
+    throw TODO();
   }
 
   // Chosen op can be shorter than tok, adjust Parsers _x

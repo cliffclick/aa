@@ -7,7 +7,7 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVLeaf;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 import static com.cliffc.aa.AA.CTL_IDX;
 
 // Merge results; extended by ParmNode
@@ -122,7 +122,7 @@ public class PhiNode extends Node {
         if( tfp.has_dsp() ) has_dsp = true;
         else                 no_dsp = true;
     if( has_dsp && no_dsp )
-      throw unimpl();
+      throw TODO();
     
     return null;
   }

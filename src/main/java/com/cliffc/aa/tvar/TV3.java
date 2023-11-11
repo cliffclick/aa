@@ -8,7 +8,7 @@ import com.cliffc.aa.util.*;
 
 import java.util.IdentityHashMap;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 
 /** Type variable base class
  *
@@ -115,7 +115,7 @@ abstract public class TV3 implements Cloneable {
 
   // Bases return the not-nil base; pointers return the not-nil pointer.
   // Nested nils collapse.
-  //TV3 find_nil() { throw unimpl(); }
+  //TV3 find_nil() { throw TODO(); }
 
   // Fetch a specific arg index, with rollups
   public TV3 arg( int i ) {
@@ -132,10 +132,10 @@ abstract public class TV3 implements Cloneable {
   public int len() { return _args.length; }
 
   abstract int eidx();
-  public TVStruct as_struct() { throw unimpl(); }
-  public TVLambda as_lambda() { throw unimpl(); }
-  //public TVNil    as_nil   () { throw unimpl(); }
-  public TVPtr    as_ptr   () { throw unimpl(); }
+  public TVStruct as_struct() { throw TODO(); }
+  public TVLambda as_lambda() { throw TODO(); }
+  //public TVNil    as_nil   () { throw TODO(); }
+  public TVPtr    as_ptr   () { throw TODO(); }
 
   public  long dbl_uid( TV3 t ) { assert !t.unified(); return dbl_uid(t._uid); }
   private long dbl_uid(long uid) {  assert !unified(); return ((long)_uid<<32)|uid; }
@@ -148,19 +148,19 @@ abstract public class TV3 implements Cloneable {
   boolean add_may_nil(boolean test) {
     if( _may_nil ) return false;   // No change
     if( test ) return ptrue();     // Will be progress
-    if( _use_nil ) throw unimpl(); // unify_errs("May be nil",work);
+    if( _use_nil ) throw TODO(); // unify_errs("May be nil",work);
     return (_may_nil=ptrue());     // Progress
   }
   // Set use_nil flag. Set an error if both may_nil and use-nil.
   void add_use_nil() {
     if( !_use_nil ) {
       _use_nil=true;                 // Progress
-      if( _may_nil ) throw unimpl(); // unify_errs("May be nil",work);
+      if( _may_nil ) throw TODO(); // unify_errs("May be nil",work);
     }
   }
 
   public static boolean HALT_IF_PROGRESS = false;
-  boolean ptrue() {
+  public static boolean ptrue() {
     if( HALT_IF_PROGRESS ) {
       System.err.println("progress ");
     }
@@ -175,7 +175,7 @@ abstract public class TV3 implements Cloneable {
     assert !unified() && !that.unified(); // Cannot union twice
     if( _may_nil ) that.add_may_nil(false);
     if( _use_nil ) that.add_use_nil();
-    if( that._may_nil && that._use_nil ) throw unimpl();
+    if( that._may_nil && that._use_nil ) throw TODO();
     _union_impl(that); // Merge subclass specific bits into that
     that.widen(_widen,false);
 
@@ -335,9 +335,6 @@ abstract public class TV3 implements Cloneable {
     // Must check this after the cyclic check, in case the 'this' is cyclic
     if( this==that ) return false;
 
-    if( !test )
-      Resolvable.fresh_add(this,that,FRESH_ROOT._frsh);
-
     // Famous 'occurs-check': In the non-generative set, so do a hard unify,
     // not a fresh-unify.
     if( nongen_in() ) return vput(that,_unify(that,test));
@@ -393,7 +390,7 @@ abstract public class TV3 implements Cloneable {
       if( progress && test ) return progress;
       // Extra args in RHS
       for( int i=_args.length; i<that._args.length; i++ )
-        throw unimpl();
+        throw TODO();
     } else assert that._args==null;
     return progress;
   }
@@ -421,7 +418,7 @@ abstract public class TV3 implements Cloneable {
     //  return false;
     //add_deps_work(work);
     //return true;
-    throw unimpl();
+    throw TODO();
   }
 
   // -----------------
@@ -521,7 +518,7 @@ abstract public class TV3 implements Cloneable {
   }
 
   // Subclasses specify on sub-parts
-  int _trial_unify_ok_impl( TV3 that ) { throw unimpl(); }
+  int _trial_unify_ok_impl( TV3 that ) { throw TODO(); }
 
   // -----------------
 
@@ -595,7 +592,7 @@ abstract public class TV3 implements Cloneable {
     case TypeNil tn -> new TVPtr( BitsAlias.make0(0), new TVStruct(true) );
     case Type tt -> {
       if( tt == Type.ANY || tt == Type.ALL ) yield new TVLeaf();
-      throw unimpl();
+      throw TODO();
     }
     };
 
@@ -754,7 +751,7 @@ abstract public class TV3 implements Cloneable {
       tv3._uid = CNT++;
       tv3._args = _args==null ? null : _args.clone();
       return tv3;
-    } catch(CloneNotSupportedException cnse) {throw unimpl();}
+    } catch(CloneNotSupportedException cnse) {throw TODO();}
   }
 
   // Initial state after loading e.g. primitives.
@@ -766,6 +763,5 @@ abstract public class TV3 implements Cloneable {
     CNT=_INIT0_CNT;
     TVStruct.reset_to_init0();
     TVExpanding.reset_to_init0();
-    Resolvable.reset_to_init0();
   }
 }

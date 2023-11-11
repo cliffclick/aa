@@ -172,7 +172,7 @@ public class Util {
   static public short[] merge_sort( short[] es0, short[] es1 ) {
     if( es0==es1 ) return es0;
     if( Arrays.equals(es0,es1) )
-      throw com.cliffc.aa.AA.unimpl();
+      throw com.cliffc.aa.AA.TODO();
     short[] xs = new short[es0.length+es1.length];
     int i=0, j=0, k=0;
     while( i<es0.length || j<es1.length ) {
@@ -183,7 +183,7 @@ public class Util {
     }
     assert k>i && k>j; // Arrays were not equals, so at least one element from each copied to other
     if( k < xs.length )
-      throw com.cliffc.aa.AA.unimpl(); // Compact
+      throw com.cliffc.aa.AA.TODO(); // Compact
     return xs;
   }
   

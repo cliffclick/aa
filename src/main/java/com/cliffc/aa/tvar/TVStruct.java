@@ -1,12 +1,14 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.node.Node;
+import com.cliffc.aa.node.DynLoadNode;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 
 import java.util.Arrays;
+import java.util.HashMap;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 
 /** A type struct.  
  *
@@ -41,7 +43,10 @@ public class TVStruct extends TVExpanding {
   private boolean[] _pins;
   
   private int _max;             // Max set of in-use flds/args
-  
+
+  // Mapping from [dynload,fresh(s)] to a field pattern.
+  HashMap<UQNodes,TV3> _dynmap;
+
   // No fields
   public TVStruct(boolean open) { this(FLDS0,TVS0,open); }
   // Normal StructNode constructor, all pinned Leaf fields
@@ -68,6 +73,18 @@ public class TVStruct extends TVExpanding {
     return new TVStruct(new String[]{TypeFld.CLZ},new TV3[]{ TVBase.make(TypeNil.NIL)});
   }
 
+  // Add/Merge a DynLoad mapping
+  public void add_dynmapping(DynLoadNode dyn, TV3 pat) {
+    assert !pat.unified();
+    if( _dynmap==null ) _dynmap = new HashMap<>();
+    UQNodes key = UQNodes.make(dyn);
+    TV3 oldpat = _dynmap.get(key);
+    if( oldpat != null ) throw TODO();
+    _dynmap.put(key,pat);
+    deps_add(dyn);
+  }
+
+  
   @Override public int len() { return _max; }  
 
   public String fld( int i ) { assert !unified();  return _flds[i]; }
@@ -108,7 +125,7 @@ public class TVStruct extends TVExpanding {
     return clz instanceof TVPtr ptr ? ptr : null;
   }
 
-  @Override boolean can_progress() { throw unimpl(); }
+  @Override boolean can_progress() { throw TODO(); }
 
   // Common accessor not called 'find' which already exists
   public int idx( String fld ) {
@@ -156,7 +173,7 @@ public class TVStruct extends TVExpanding {
     del_fld0(idx);
     // UN-Pinned fields are re-inserted into the next open super-clazz
     if( !pin )
-      throw unimpl();
+      throw TODO();
     return ptrue();
   }
   // Remove field; true if something got removed
@@ -194,6 +211,7 @@ public class TVStruct extends TVExpanding {
   @Override public void _union_impl( TV3 tv3 ) {
     TVStruct ts = (TVStruct)tv3; // Invariant when called
     ts._open = ts._open & _open;
+    assert _dynmap==null || _dynmap==ts._dynmap;
   }
 
   // Unify this into that.  Ultimately "this" will be U-F'd into "that" and so
@@ -271,7 +289,13 @@ public class TVStruct extends TVExpanding {
         assert !that.unified(); // Missing a find
       }                      // Else, since field already in RHS do nothing
     }
-    
+
+    // Merge DynMaps
+    if( that._dynmap==null ) that._dynmap=_dynmap;
+    else if( _dynmap!=null ) {
+      throw TODO();
+    }
+
     assert !that.unified(); // Missing a find
     return ptrue();
   }
@@ -284,7 +308,7 @@ public class TVStruct extends TVExpanding {
   int do_into_clz( String fld, TVStruct str, int i, boolean test, boolean fresh ) {
     TV3 arg = arg(fld);         // Find in CLZ
     if( arg != null ) {
-      if( str._pins[i] ) throw unimpl(); // Found in CLZ but pinned here - so dup-field error
+      if( str._pins[i] ) throw TODO(); // Found in CLZ but pinned here - so dup-field error
       TV3 tvf = str.arg(i);     // Field to be moved into CLZ
       if( !fresh && !test )     // Delete field from RHS
         str.del_fld0(i);
@@ -354,7 +378,7 @@ public class TVStruct extends TVExpanding {
             return ptrue(); // Will definitely make progress
           progress |= that.add_fld(key,lhs._fresh(),_pins[i]);
         } else if( is_open() ) // RHS not open, put copy of LHS into RHS with miss_fld error
-          throw unimpl();       // miss_fld
+          throw TODO();       // miss_fld
         else missing = true; // Else neither side is open, field is not needed in RHS
         
       } else {
@@ -391,6 +415,10 @@ public class TVStruct extends TVExpanding {
     }
 
     if( _open ) add_delay_fresh(); // If this Struct can add fields, must fresh-unify that Struct
+    
+    // Merge dynmaps
+    if( _dynmap != null )
+      throw TODO();
     
     return progress;
   }

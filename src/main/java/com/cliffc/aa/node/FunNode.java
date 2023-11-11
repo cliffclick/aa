@@ -121,7 +121,7 @@ public class FunNode extends Node {
   }
 
   // Never inline with a nested function
-  @Override @NotNull public FunNode copy( boolean copy_edges) { throw unimpl(); }
+  @Override @NotNull public FunNode copy( boolean copy_edges) { throw TODO(); }
   @Override boolean is_CFG() { return is_copy(0)==null; }
 
   public int nargs() { return _nargs; }
@@ -203,7 +203,7 @@ public class FunNode extends Node {
 
   @Override public Type live_use( int i ) {
     Node def = in(i);
-    if( def instanceof RootNode ) throw unimpl();
+    if( def instanceof RootNode ) throw TODO();
     if( def instanceof ConNode ) return Type.ANY; // Dead control path
     if( def==this ) return Type.ANY; // Dead self-copy
     assert def instanceof CallNode;
@@ -509,7 +509,7 @@ public class FunNode extends Node {
     for( Map.Entry<Node,Node> e : map.entrySet() )
       if( e.getKey() instanceof MemSplitNode memsplit )
         //memsplit.split_alias(e.getValue(),aliases);
-        throw unimpl();
+        throw TODO();
 
     // Rewire all unwired calls.
     for( CallEpiNode cepi : unwireds ) {

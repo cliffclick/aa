@@ -6,7 +6,7 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 
 public class TVBase extends TVExpanding {
   public Type _t;  
@@ -21,13 +21,13 @@ public class TVBase extends TVExpanding {
   @Override boolean can_progress() {
     if( _t instanceof TypeInt ) return _t!=TypeInt.INT64;
     if( _t instanceof TypeFlt ) return _t!=TypeFlt.FLT64;
-    throw unimpl();
+    throw TODO();
   }
   
   @Override int eidx() {
     if( _t instanceof TypeInt ) return TVErr.XINT;
     if( _t instanceof TypeFlt ) return TVErr.XFLT;
-    throw unimpl(); // 
+    throw TODO(); //
   }
 
   @Override TV3 strip_nil() {
@@ -39,7 +39,7 @@ public class TVBase extends TVExpanding {
   public TVPtr clz() {
     if( _t instanceof TypeInt ) return (TVPtr)PrimNode.PINT.tvar();
     if( _t instanceof TypeFlt ) return (TVPtr)PrimNode.PFLT.tvar();
-    throw unimpl();
+    throw TODO();
   }
   
   // -------------------------------------------------------------

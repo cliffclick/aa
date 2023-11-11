@@ -152,15 +152,15 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer>, Comp
   }
   @Override public int compareTo(@NotNull Bits b) {
     if( this==b ) return 0;     // Interning works
-    if(   _bits==null ) throw com.cliffc.aa.AA.unimpl();
-    if( b._bits==null ) throw com.cliffc.aa.AA.unimpl();
+    if(   _bits==null ) throw com.cliffc.aa.AA.TODO();
+    if( b._bits==null ) throw com.cliffc.aa.AA.TODO();
     if( _con != b._con ) return _con - b._con; // join is always LT meet
     for( int i=0; i<_bits.length; i++ ) {
       if( i>=b._bits.length ) return -1; // Tied, up to LHS is shorter, so lessor
       if( _bits[i]!=b._bits[i] )
         return Long.compare(_bits[i],b._bits[i]);
     }
-    throw com.cliffc.aa.AA.unimpl(); // Should not reach here
+    throw com.cliffc.aa.AA.TODO(); // Should not reach here
   }
   @Override public String toString() { return str(new SB()).toString(); }
   public SB str(SB sb) {

@@ -281,7 +281,7 @@ public class CallNode extends Node {
     if( mem instanceof MemJoinNode ) {
       if( !mem.check_solo_mem_writer(this) )
         return null;
-      throw unimpl();
+      throw TODO();
     }
     return null;
   }

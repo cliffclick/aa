@@ -11,7 +11,7 @@ import org.junit.Test;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 
 public class TestParse {
   private static final BitsFun TEST_FUNBITS = BitsFun.make0(43);
@@ -32,10 +32,13 @@ public class TestParse {
     DO_HMT=true;
     RSEED=0;
 
+    // One DynLoad, one Fresh, Function in-between
+    test("noinline_f={(2,3.14)._}; noinline_f().sin()","flt:0.0015926529164868282","flt:flt64", null, null, null, null);
+
     // No DynLoad
     test("1", "int:1", "int:1");
     // One DynLoad, no Fresh, resolves local
-    test("!3", "nil", "int:int1");
+    test("!3", "nil", "nil");
     // Simpler overload tests
     test("!(2,3.14)._","nil","int:int1", null, null, null, null);
     test("(2,3.14)._.sin()","flt:0.0015926529164868282","flt:flt64", null, null, null, null);
@@ -527,7 +530,7 @@ bar()
     //testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
     //test("x=@{n}",(ignore->TypeMemPtr.make(14,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",TypeNil.NIL,Access.RW)))),
     //     null,"@{n=0}");
-    throw unimpl();
+    throw TODO();
   }
 
   @Test public void testParse06() {
@@ -561,7 +564,7 @@ bar()
 //(a,b,c)
 //""",     "*(*A:@{n=0; v=5}, *B:@{n=$; v=3.14}, *C:@{n=$; v=*\"abc\"})",
 //         "(@{n=0,v=5},@{n=@{n=0,v=5},v=3.14},@{n=@{n=@{n=0,v=5},v=3.14},v=*\"abc\"})");
-    throw unimpl();
+    throw TODO();
   }
 
   @Test public void testParse07() {
@@ -643,7 +646,7 @@ bar()
     //test_obj_isa("map={x -> x ? (map(x.0),x.1*x.1) : 0};"+
     //             "map((math.rand(1)?0: (math.rand(1)?0: (math.rand(1)?0: (0,1.2), 2.3), 3.4), 4.5))",
     //             TypeStruct.maket(TypeMemPtr.STRUCT0,TypeFlt.FLT64));
-    throw unimpl();
+    throw TODO();
   }
 
 
@@ -743,7 +746,7 @@ map(tmp)
     //TypeMemPtr xtmp = TypeMemPtr.make(BitsAlias.ALL,xts_str);
     //
     //test_isa(ll_cona+ll_conb+ll_conc+ll_cond+ll_cone+ll_cont+ll_map2+ll_fun2+ll_apl2,xtmp);
-    throw unimpl();
+    throw TODO();
   }
 
   @Test public void testParse09() {
@@ -769,7 +772,7 @@ map(tmp)
     //// A final store, but defs of @{a} do not escape into nonline_x, hence do
     //// not merge and escape out.
     //test("noinline_x={@{a}}; noinline_x().a=2; noinline_x().a",  TypeInt.INT8);
-    throw unimpl();
+    throw TODO();
   }
 
   // Ffnls are declared with an assignment.  This is to avoid the C++/Java
@@ -828,7 +831,7 @@ map(tmp)
     //test    ("ptr=@{a:=1}; val=ptr.a; ptr.a=2; val",TypeInt.con(1));
     //// You are allowed to build final pointer cycles
     //test    ("ptr0=@{p:=0;v:=1}; ptr1=@{p=ptr0;v:=2}; ptr0.p=ptr1; ptr0.p.v+ptr1.p.v+(ptr0.p==ptr1)", TypeInt.con(4)); // final pointer-cycle is ok
-    throw unimpl();
+    throw TODO();
   }
 
   // Early function exit
@@ -897,7 +900,7 @@ map(tmp)
     //test_ptr(DO+"ary=[99]; i:=0; do {i++ < #ary} {ary[i]:=i*i};ary", "[$]int64/obj"); // sequential iteration over array
     //// ary.{e -> f(e)} // map over array elements
     //// ary.{e -> f(e)}.{e0 e1 -> f(e0,e1) } // map/reduce over array elements
-    throw unimpl();
+    throw TODO();
   }
 
   // Strings
@@ -908,12 +911,12 @@ map(tmp)
     //test_ptr("3.str()"         , TypeStr.con("3"   ), "3");
     test("\"abc\"==\"abc\"","int:1", "1"); // Constant strings intern
     //testerr("math.rand(1)?1:\"a\"", "Cannot mix GC and non-GC types",18);
-    throw unimpl();
+    throw TODO();
   }
 
   private static TypeStruct make2fldsD( String f1, Type t1, String f2, Type t2 ) {
     //return TypeStruct.make("",false,TypeFld.NO_DISP,TypeFld.make(f1,t1),TypeFld.make(f2,t2));
-    throw unimpl();
+    throw TODO();
   }
 
   // Combined H-M and GCP Typing
@@ -1016,7 +1019,7 @@ map(tmp)
     //     "out_bool=noinline_map(in_str,{str:str ->str==\"abc\"});"+ // Map over strs with str->bool conversion, returns bools
     //     "(out_istr,out_bool)",
     //     Type.ANY);
-    throw unimpl();
+    throw TODO();
 
   }
 
@@ -1062,7 +1065,7 @@ HashTable = {@{
 
 
   static private void test( String program, Type expected ) {
-    throw unimpl(); // replace with full test
+    throw TODO(); // replace with full test
   }
 
   // Run a program once, with a given seed and typing flags.
@@ -1185,19 +1188,19 @@ HashTable = {@{
   // Run a program in all 3 modes, yes function returns, no errors
   private void test( String program, Function<Type,Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect ) {
     //_test2(program,gcp_maker,formals_maker,hmt_expect,null,0);
-    throw unimpl();
+    throw TODO();
   }
 
   // Short form test: simple GCP, no formal args
   private void test( String program, Type gcp, String hmt_expect ) {
     //_test2(program,ignore->gcp,null,hmt_expect,null,0);
-    throw unimpl();
+    throw TODO();
   }
 
   // Result is expected to be a pointer, with an uninteresting alias.  The
   // expected ptr._obj is passed.
   private void test_ptr( String program, TypeStruct gcp_expect, String hmt_expect ) {
-    throw unimpl();
+    throw TODO();
     //_test2(program,
     //       actual -> actual instanceof TypeMemPtr ? ((TypeMemPtr)actual).make_from(gcp_expect) : gcp_expect,
     //       null,hmt_expect,null,0);
@@ -1205,7 +1208,7 @@ HashTable = {@{
   // Result is expected to be a pointer, with an uninteresting alias and an
   // interesting nil.  The expected nil-ness and _obj is passed.
   private void test_ptr0( String program, TypeMemPtr gcp_expect, String hmt_expect ) {
-    throw unimpl();
+    throw TODO();
     //_test2(program,
     //       actual -> actual instanceof TypeMemPtr ? gcp_expect.make_from_nil(((TypeMemPtr)actual)._aliases) : gcp_expect,
     //       null,hmt_expect,null,0);
@@ -1222,7 +1225,7 @@ HashTable = {@{
     //if( te._errs != null ) System.err.println(te._errs);
     //assertNull(te._errs);
     //assertEquals(expected,te._t);
-    throw unimpl();
+    throw TODO();
   }
   static private void test_named_tuple( String program, Type... args ) {
     //TypeEnv te = run(program);
@@ -1233,7 +1236,7 @@ HashTable = {@{
     //if( te._formals.is_tup() )
     //  for( TypeFld fld : te._formals.flds() )
     //    assertEquals(args[fld._order-ARG_IDX],fld._t);
-    throw unimpl();
+    throw TODO();
   }
 
   static private void test_obj( String program, TypeStruct expected) {
@@ -1241,21 +1244,21 @@ HashTable = {@{
     //assertTrue(te._t instanceof TypeMemPtr);
     //TypeStruct actual = te._tmem.ld((TypeMemPtr)te._t);
     //assertEquals(expected,actual);
-    throw unimpl();
+    throw TODO();
   }
   static private void test_struct( String program, TypeStruct expected) {
     //TypeEnv te = run(program);
     //TypeStruct actual = (TypeStruct)te._tmem.ld((TypeMemPtr)te._t);
     //actual = actual.replace_fld(TypeFld.NO_DISP);
     //assertEquals(expected,actual);
-    throw unimpl();
+    throw TODO();
   }
   static private void test_obj_isa( String program, TypeStruct expected) {
     //TypeEnv te = run(program);
     //int alias = ((TypeMemPtr)te._t)._aliases.strip_nil().getbit(); // internally asserts only 1 bit set
     //TypeStruct actual = te._tmem.sharpen((TypeMemPtr)te._t)._obj;
     //assertTrue(actual.isa(expected));
-    throw unimpl();
+    throw TODO();
   }
   static private void test_ptr( String program, String expected ) {
     //TypeEnv te = run(program);
@@ -1263,13 +1266,13 @@ HashTable = {@{
     //TypeStruct to = te._tmem.ld((TypeMemPtr)te._t); // Peek thru pointer
     //SB sb = to.str(new SB(),new VBitSet(),te._tmem,false);      // Print what we see, with memory
     //assertEquals(expected,strip_alias_numbers(sb.toString()));
-    throw unimpl();
+    throw TODO();
   }
   static private void test_isa( String program, Type expected ) {
     //TypeEnv te = run(program);
     //Type actual = te._tmem.sharptr(te._t);
     //assertTrue(actual.isa(expected));
-    throw unimpl();
+    throw TODO();
   }
   ////private static String strip_alias_numbers( String err ) {
   //  // Remove alias#s from the result string: *[123]@{x=1,y=2} ==> *[$]@{x=1,y=2}
@@ -1289,6 +1292,6 @@ HashTable = {@{
     //String cursor = new String(new char[cur_off]).replace('\0', ' ');
     //String err2 = new SB().p("args:1:").p(err).nl().p(program).nl().p(cursor).p('^').nl().toString();
     //assertEquals(err2,te._errs.get(0).toString());
-    throw unimpl();
+    throw TODO();
   }
 }

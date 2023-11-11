@@ -5,7 +5,7 @@ import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 import static com.cliffc.aa.AA.MEM_IDX;
 
 // Store a value into a named struct field.  Does it's own nil-check and value
@@ -39,7 +39,7 @@ public abstract class StoreAbs extends Node {
   // value into live: if values are ANY then nothing is demand-able.
   @Override final public Type live_use( int i ) {
     // Currently Stores do not have control
-    if( i==0 ) throw unimpl();
+    if( i==0 ) throw TODO();
 
     // _live is what is demanded from me;
     // - if my ptr is high, I do not know what to crush, so I might store all such aliases, so all are crushed (whole struct or just fields)
@@ -105,7 +105,7 @@ public abstract class StoreAbs extends Node {
           if( st.rez()==null || st.rez().err(true)==null ) {
 //            set_def(1,st.mem());
 //            return this;
-            throw unimpl();
+            throw TODO();
           }
         } else {
           mem.deps_add(this);    // If become solo writer, check again
@@ -117,7 +117,7 @@ public abstract class StoreAbs extends Node {
 
     // Store of a Load
     if( rez() instanceof LoadNode ld && ld.adr()==adr() && ld.mem()==mem )
-      throw unimpl(); //return mem;
+      throw TODO(); //return mem;
 
     return null;
   }
@@ -157,7 +157,7 @@ public abstract class StoreAbs extends Node {
     if( fast ) return ErrMsg.FAST;
     //boolean is_closure = adr() instanceof NewNode nnn && nnn._is_closure;
     //return ErrMsg.field(_bad,msg,_fld,is_closure,to);
-    throw unimpl();
+    throw TODO();
   }
 
 }

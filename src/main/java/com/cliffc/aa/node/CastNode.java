@@ -82,7 +82,7 @@ public class CastNode extends Node {
 
     // If either is a pointer, so is the other but clear _may_nil on this
     if( maynil instanceof TVPtr mptr && notnil instanceof TVLeaf ) {
-      if( notnil.may_nil() ) throw AA.unimpl();
+      if( notnil.may_nil() ) throw AA.TODO();
       return test || notnil.unify(new TVPtr(mptr.aliases(),mptr.load()),test);
     }
 
@@ -97,7 +97,7 @@ public class CastNode extends Node {
     }
 
     
-    throw AA.unimpl();
+    throw AA.TODO();
   }
 
   @Override public @NotNull CastNode copy( boolean copy_edges) {

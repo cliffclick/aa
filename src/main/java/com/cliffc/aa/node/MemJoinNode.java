@@ -7,7 +7,7 @@ import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.util.Ary;
 
 import static com.cliffc.aa.AA.MEM_IDX;
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 import static com.cliffc.aa.Env.GVN;
 
 // Join a split set of aliases from a SESE region, split by an earlier MemSplit.
@@ -71,12 +71,12 @@ public class MemJoinNode extends Node {
       if( head instanceof CallNode ) return null; // Do not swallow a Call/CallEpi into a Split/Join
       if( head instanceof CallEpiNode ) return null; // Do not swallow a Call/CallEpi into a Split/Join
       if( head instanceof MemSplitNode ) return null; // TODO: Handle back-to-back split/join/split/join
-      throw unimpl(); // Break out another SESE split
+      throw TODO(); // Break out another SESE split
     }
     if( mem instanceof ParmNode ) return null;
     if( mem instanceof PhiNode ) return null;
     if( mem instanceof ConNode ) return null;
-    throw unimpl(); // Break out another SESE split
+    throw TODO(); // Break out another SESE split
   }
 
   // Move one escape set from the lower Split/Join to the upper.
@@ -166,7 +166,7 @@ public class MemJoinNode extends Node {
     //// Must retype, since split memory
     //GVN.revalive(head,msp,mprj,base);
     //return this;
-    throw unimpl();
+    throw TODO();
   }
 
   // Move the given SESE region just behind of the join into the join/split
@@ -195,7 +195,7 @@ public class MemJoinNode extends Node {
     //GVN.add_flow_defs(this);
     //assert Env.START.more_work(true)==0;
     //return this;
-    throw unimpl();
+    throw TODO();
   }
 
   // Find a compatible alias edge, including base memory if nothing overlaps.

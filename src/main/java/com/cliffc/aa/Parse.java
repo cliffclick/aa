@@ -298,7 +298,7 @@ public class Parse implements Comparable<Parse> {
     //// Make a forward-ref type, if not one already
     //StructNode typenode  = _e.lookup_type(tname);
     //if( typenode == null ) typenode = type_fref(tname,is_val); // None, so create
-    //else throw unimpl(); // Double-define error
+    //else throw TODO(); // Double-define error
     //
     //// Nest an environment for parsing named type contents, usually const-expr initializers
     //int pidx;
@@ -317,16 +317,16 @@ public class Parse implements Comparable<Parse> {
     //      //construct.add_def(typenode.defalt().fill());
     //      //construct.define();     // Value type is defined
     //      //Env.GVN.add_flow(construct);
-    //      if( true ) throw unimpl();
+    //      if( true ) throw TODO();
     //    } else
-    //      throw unimpl();         // Reference type
+    //      throw TODO();         // Reference type
     //
     //  } else {
     //    // Other types?  e.g. defining a named function-type needs a breakdown of
     //    // the returned function to make a TypeFunSig.  No constructor in this
     //    // case, but can be used in type-checks.
     //    // TODO: Need to toss the un-needed typenodeb
-    //    throw unimpl();
+    //    throw TODO();
     //  }
     //
     //  e._par._scope.set_ctrl(ctrl()); // Carry any control changes back to outer scope
@@ -336,7 +336,7 @@ public class Parse implements Comparable<Parse> {
     //} // Pop lexical scope around type parse
     //
     //return Node.pop(pidx);
-    throw unimpl();
+    throw TODO();
   }
 
   /** A statement is a list of variables to final-assign or re-assign, and an
@@ -677,7 +677,7 @@ public class Parse implements Comparable<Parse> {
       assert fun==_e._fun && fun==_e._scope.ctrl();
       // Parse body
       Node rez = _expr_higher_require(op);
-      if( rez==null ) throw unimpl();
+      if( rez==null ) throw TODO();
       // Normal exit 
       frame.close();
 
@@ -739,8 +739,8 @@ public class Parse implements Comparable<Parse> {
       _x -= op.adjustx(tok); // Chosen op can be shorter than tok
       Node e0 = term();
       if( e0 == null ) { return err_ctrl2("Missing term after operator '"+op+"'"); } // Parsed a valid leading op but missing trailing expr
-      if( op.is_open() ) throw unimpl(); // Parse the close
-      if( op._nargs!=1 ) throw unimpl(); // No binary/trinary allowed here
+      if( op.is_open() ) throw TODO(); // Parse the close
+      if( op._nargs!=1 ) throw TODO(); // No binary/trinary allowed here
       int e0idx = e0.push();
       Parse err = errMsg(oldx);
       // Load against e0 pointer.  If e0 is a primitive, the Load is a no-op;
@@ -761,7 +761,7 @@ public class Parse implements Comparable<Parse> {
     while( true ) {             // Repeated application or field lookup is fine
       skipWS();                 //
       if( peek('.') ) {         // Field?
-        if( peek('(') ) throw unimpl(); // Start of e0.( e1 ) syntax, TODO: bind instance fcn e1 with 'self' e0, producing a bound TFP
+        if( peek('(') ) throw TODO(); // Start of e0.( e1 ) syntax, TODO: bind instance fcn e1 with 'self' e0, producing a bound TFP
         int fld_start=_x;       // Get field start
         tok = token0();         // Field name
         if( tok == null ) {     // Not a token, check for a field number
@@ -847,7 +847,7 @@ public class Parse implements Comparable<Parse> {
         //  if( val==null ) { n.unhook(); return err_ctrl2("Missing stmt after '"+fun._bal_close+"'"); }
         //  n = do_call(errMsgs(0,oldx,oldx2,oldx3),args(bfun.unkeep(),n.unkeep(),idx.unkeep(),val));
         //}
-        throw unimpl();
+        throw TODO();
       }
     }
     return n;
@@ -1192,11 +1192,11 @@ public class Parse implements Comparable<Parse> {
     if( s==null ) { _x = oldx; return null; } // A bare "()" pair is not a statement
     if( peek(',') ) {
       _x --;                    // Reparse the ',' in tuple
-      throw unimpl();
+      throw TODO();
     }
     //require(bfun.funptr().fun()._bal_close,oldx);
     //return do_call(errMsgs(oldx,oldx2),args(bfun,s));
-    throw unimpl();
+    throw TODO();
   }
 
   private String token() { skipWS();  return token0(); }
@@ -1262,8 +1262,8 @@ public class Parse implements Comparable<Parse> {
     int oldx = ++_x;
     byte c;
     while( (c=_buf[_x++]) != '"' ) {
-      if( c=='%' ) throw unimpl();
-      if( c=='\\' ) throw unimpl();
+      if( c=='%' ) throw TODO();
+      if( c=='\\' ) throw TODO();
       if( _x == _buf.length ) return null;
     }
     String str = new String(_buf,oldx,_x-oldx-1).intern();
@@ -1300,10 +1300,10 @@ public class Parse implements Comparable<Parse> {
     return switch( skipWS() ) {
     case '{' -> tfun();         // Function parse
     case '@' -> tstruct();      // Struct parse
-    case '[' -> throw unimpl(); // Array parse
+    case '[' -> throw TODO(); // Array parse
     case '(' -> ttuple();       // Tuple parse
-    case '=' -> throw unimpl(); // Const ifex parse
-    case '?' -> throw unimpl(); // Nilable-ref parse
+    case '=' -> throw TODO(); // Const ifex parse
+    case '?' -> throw TODO(); // Nilable-ref parse
     default  -> tvar();         // TVAR parse
     };
   }
@@ -1332,7 +1332,7 @@ public class Parse implements Comparable<Parse> {
       // Insert the field into the structure.
       flds.push(TypeFld.make(tok,t,access));
       if(  peek('}') ) break;          // End of struct,  no trailing semicolon?
-      if( !peek(';') ) throw unimpl(); // Not a type
+      if( !peek(';') ) throw TODO(); // Not a type
       if(  peek('}') ) break;          // End of struct, yes trailing semicolon?
     }
     TypeFld[] tflds = TypeFlds.get(flds.len());
@@ -1344,11 +1344,11 @@ public class Parse implements Comparable<Parse> {
   // Parse an const ifex.
   private Type tcon() {
     Node n = ifex();
-    if( n==null ) throw unimpl(); // Missing ifex expecting a const-expr
-    if( !n._val.is_con() ) throw unimpl(); // Not a const expr
+    if( n==null ) throw TODO(); // Missing ifex expecting a const-expr
+    if( !n._val.is_con() ) throw TODO(); // Not a const expr
     //return n._val;
     // TODO: function constants have to be 'hooked'
-    throw unimpl(); 
+    throw TODO();
   }
 
   // Parse a tuple type.
@@ -1359,7 +1359,7 @@ public class Parse implements Comparable<Parse> {
     while(true) {
       Type t = type();
       if( t==null ) { _x=oldx; return ts.free(null); }
-      throw unimpl();
+      throw TODO();
     }
   }
 
@@ -1430,7 +1430,7 @@ public class Parse implements Comparable<Parse> {
     //_e.add_type(tname,tn);
     //assert tn.is_forward_type();
     //return tn;
-    throw unimpl(); // TODO: is_val
+    throw TODO(); // TODO: is_val
   }
 
   // --------------------------------------------------------------------------
@@ -1504,7 +1504,7 @@ public class Parse implements Comparable<Parse> {
     return -1;
   }
   private void skipEOL  () { while( _x < _buf.length && _buf[_x] != '\n' ) _x++; }
-  private void skipBlock() { throw unimpl(); }
+  private void skipBlock() { throw TODO(); }
   // Advance parse pointer to next WS.  Used for parser syntax error recovery.
   private void skipNonWS() {
     while( _x < _buf.length && !isWS(_buf[_x]) ) _x++;

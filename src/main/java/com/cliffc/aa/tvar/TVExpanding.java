@@ -3,7 +3,7 @@ package com.cliffc.aa.tvar;
 import com.cliffc.aa.node.FreshNode;
 import com.cliffc.aa.util.Ary;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 
 abstract public class TVExpanding extends TV3 {
 
@@ -157,7 +157,7 @@ abstract public class TVExpanding extends TV3 {
       if( dfi.update() ) {      // Progress?  Do a dup-check
         for( int j=0; j<i; j++ ) {
           if( _delay_fresh.at(j) == dfi )
-            throw unimpl();     // 'i' became a dup, remove 'j'
+            throw TODO();     // 'i' became a dup, remove 'j'
         }
       }
       // Inserting ROOT, unless a dup
@@ -173,7 +173,7 @@ abstract public class TVExpanding extends TV3 {
     //if( _delay_resolve==null ) _delay_resolve = new Ary<>(new TVStruct[1],0);
     //if( _delay_resolve.find(tvs)== -1 )
     //  _delay_resolve.push(tvs);
-    throw unimpl();
+    throw TODO();
   }
 
   @Override public TVExpanding copy() {

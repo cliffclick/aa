@@ -4,7 +4,7 @@ import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.type.*;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 
 // Split control
 public class IfNode extends Node {
@@ -26,19 +26,19 @@ public class IfNode extends Node {
     if( tst._defs._len==3 &&
         (tst.val(1)==TypeNil.NIL || tst.val(2)==TypeNil.NIL) ) {
       // Remove leading test-vs-0
-      if( tst instanceof PrimNode.EQ_I64 ) throw AA.unimpl();
-      if( tst instanceof PrimNode.EQ_F64 ) throw AA.unimpl();
-      if( tst instanceof PrimNode.EQ_OOP ) throw AA.unimpl();
+      if( tst instanceof PrimNode.EQ_I64 ) throw AA.TODO();
+      if( tst instanceof PrimNode.EQ_F64 ) throw AA.TODO();
+      if( tst instanceof PrimNode.EQ_OOP ) throw AA.TODO();
 
       // Remove leading negation-vs-0 by inverting
-      if( tst instanceof PrimNode.NE_I64 ) throw AA.unimpl();
-      if( tst instanceof PrimNode.NE_F64 ) throw AA.unimpl();
-      if( tst instanceof PrimNode.NE_OOP ) throw AA.unimpl();
+      if( tst instanceof PrimNode.NE_I64 ) throw AA.TODO();
+      if( tst instanceof PrimNode.NE_F64 ) throw AA.TODO();
+      if( tst instanceof PrimNode.NE_OOP ) throw AA.TODO();
     }
 
     if( tst instanceof PrimNode.NotI64 && tst._uses._len==1 )
       //return flip(Env.GVN.xreduce(new IfNode(ctl,tst.in(ARG_IDX))));
-      throw unimpl();
+      throw TODO();
 
     return null;
   }
@@ -53,7 +53,7 @@ public class IfNode extends Node {
     //p1.subsume(x0);
     //x0._live = x1._live = that._live = this._live;
     //return that;
-    throw unimpl();
+    throw TODO();
   }
 
   @Override public TypeTuple value() {

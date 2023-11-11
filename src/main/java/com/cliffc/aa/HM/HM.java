@@ -1,5 +1,6 @@
 package com.cliffc.aa.HM;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
@@ -9,7 +10,7 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 import static com.cliffc.aa.AA.DSP_IDX;
 
 /**
@@ -313,7 +314,7 @@ public class HM {
     X = 0;
     BUF = s.getBytes();
     Syntax prog = fterm();
-    if( skipWS() != -1 ) throw unimpl("Junk at end of program: " + new String(BUF, X, BUF.length - X));
+    if( skipWS() != -1 ) throw AA.TODO("Junk at end of program: " + new String(BUF, X, BUF.length - X));
     // Inject IF at root
     return new Root(prog);
   }
@@ -368,7 +369,7 @@ public class HM {
       while( skipWS()!='}' && X < BUF.length ) {
         String id = require('=',id());
         Syntax fld = fterm();
-        if( fld==null ) throw unimpl("Missing term for field "+id);
+        if( fld==null ) throw AA.TODO("Missing term for field "+id);
         ids .push( id);
         flds.push(fld);
         if( skipWS()==';' ) X++;
@@ -377,7 +378,7 @@ public class HM {
       return new Struct(true,ids.asAry(),flds.asAry());
     }
 
-    throw unimpl("Unknown syntax");
+    throw AA.TODO("Unknown syntax");
   }
   // Parse a term with an optional following field.
   private static Syntax fterm() {
@@ -394,7 +395,7 @@ public class HM {
     while( X<BUF.length && isAlpha1(BUF[X]) )
       ID.p((char)BUF[X++]);
     String s = ID.toString().intern();
-    if( s.length()==0 ) throw unimpl("Missing id");
+    if( s.length()==0 ) throw AA.TODO("Missing id");
     if( Util.eq(s,"_") ) return null; // Field is inferred
     return s;
   }
@@ -433,12 +434,12 @@ public class HM {
   private static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }
   private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_') || (c=='*') || (c=='?') || (c=='+'); }
   private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9') || (c=='/'); }
-  private static void require(char c) { if( skipWS()!=c ) throw unimpl("Missing '"+c+"'"); X++; }
+  private static void require(char c) { if( skipWS()!=c ) throw AA.TODO("Missing '"+c+"'"); X++; }
   private static <T> T require(char c, T t) { require(c); return t; }
   private static void require() {
     skipWS();
     if( X+2 >= BUF.length || BUF[X]!= '-' || BUF[X+1]!= '>' )
-      throw unimpl("Missing '->'");
+      throw AA.TODO("Missing '->'");
     X+=2;
   }
 
@@ -584,7 +585,7 @@ public class HM {
           case 'd' -> "def";
           case 'r' -> "red";
           case 'b' -> "blue";
-          default -> throw unimpl();
+          default -> throw TODO();
           }).p('"');
 
       return _con.str(sb,true,false);
@@ -760,7 +761,7 @@ public class HM {
     }
     @Override public Type ret_type() {
       if( _flow instanceof TypeFunPtr tfp ) return tfp._ret;
-      throw unimpl();
+      throw TODO();
     }
     T2 targ(int i) { T2 targ = _targs[i].find(); return targ==_targs[i] ? targ : (_targs[i]=targ); }
     @Override boolean hm(Work<Syntax> work) {
@@ -775,7 +776,7 @@ public class HM {
       progress |= old.arg(RET).unify(_body.find(),work);
       return progress;
     }
-    @Override void add_hm_work( @NotNull Work<Syntax> work) { throw unimpl(); }
+    @Override void add_hm_work( @NotNull Work<Syntax> work) { throw TODO(); }
     @Override Type val(Work<Syntax> work) {
       // Just wrap a function around the body return
       return TypeFunPtr.makex(false,BitsFun.make0(_fidx),_args.length+DSP_IDX,Type.ANY,_body._flow);
@@ -801,7 +802,7 @@ public class HM {
     }
 
     // Ignore arguments, and return body type for a particular call site.  Very conservative.
-    Type apply(Type[] flows) { throw unimpl(); }
+    Type apply(Type[] flows) { throw TODO(); }
     @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) {
       work.add(this);
       // Body changed, all Apply sites need to recompute
@@ -865,7 +866,7 @@ public class HM {
     @Override SB p2(SB sb, VBitSet visit, VBitSet dups) { _def.p0(sb,visit,dups); return _body.p0(sb,visit,dups); }
     T2 targ() { return _def.find(); }
     @Override boolean hm(Work<Syntax> work) { return false;  }
-    @Override void add_hm_work( @NotNull Work<Syntax> work) { throw unimpl();  }
+    @Override void add_hm_work( @NotNull Work<Syntax> work) { throw TODO();  }
     @Override Type val(Work<Syntax> work) { return _body._flow; }
     // Definition changed; all dependents need to revisit
     @Override void add_val_work( Syntax child, @NotNull Work<Syntax> work) {
@@ -1133,7 +1134,7 @@ public class HM {
 
     public Root(Syntax body) { super(Type.ANY,body); }
     @Override boolean hm(final Work<Syntax> work) { return false; }
-    @Override void add_hm_work( @NotNull Work<Syntax> work) { throw unimpl(); }
+    @Override void add_hm_work( @NotNull Work<Syntax> work) { throw TODO(); }
     @Override Type val(Work<Syntax> work) {
       // arg_meet Root-called Lambdas with Root args.
       if( _fun._flow instanceof TypeFunPtr tfp )
@@ -1328,7 +1329,7 @@ public class HM {
     EXTStruct efind() {
       if( _uf==null ) return this;
       if( _uf._uf==null ) return _uf;
-      throw unimpl();
+      throw TODO();
     }
     
     @Override public T2 t2() { return _t2.unified() ? compact()._t2 : _t2; }
@@ -1405,7 +1406,7 @@ public class HM {
     private EXTLambda efind() {
       if( _uf==null ) return this;
       if( _uf._uf==null ) return _uf;
-      throw unimpl();
+      throw TODO();
     }
     @Override public T2 as_fun() { return _t2.unified() ? compact()._t2 : _t2; }
     private EXTLambda compact() {
@@ -2024,7 +2025,7 @@ public class HM {
   static class NotNil extends PrimSyn {
     @Override String name() { return " notnil"; }
     public NotNil() { super(IDS[1],T2.make_leaf(),T2.make_leaf()); }
-    @Override PrimSyn make() { throw unimpl(); /*return new NotNil(); */}
+    @Override PrimSyn make() { throw TODO(); /*return new NotNil(); */}
     @Override boolean hm(Work<Syntax> work) {
       T2 arg = targ(0);
       T2 fun = find(); assert fun.is_fun();
@@ -2422,9 +2423,9 @@ public class HM {
       }
       if( n.is_fun() ) {
         //if( !n._is_copy ) clr_cp();
-        throw unimpl();
+        throw TODO();
       }
-      if( n.is_obj() ) throw unimpl();
+      if( n.is_obj() ) throw TODO();
       if( n.is_nil() )          // Peel nested is_nil
         _args.put("?",n.arg("?"));
       if( _args.isEmpty() ) _args=null;
@@ -2547,7 +2548,7 @@ public class HM {
         return tstr;
       }
 
-      throw unimpl();
+      throw TODO();
     }
 
     // -----------------
@@ -2830,7 +2831,7 @@ public class HM {
       boolean progress = _fresh_unify(that,nongen,work);
       VARS.clear();  DUPS.clear();
       if( work==null && old!=CNT )
-        throw unimpl("busted, made T2s but just testing");
+        throw AA.TODO("busted, made T2s but just testing");
       return progress;
     }
 
@@ -2900,7 +2901,7 @@ public class HM {
         if( is_obj() && !that.is_obj() ) // Error, fresh_unify a struct into a non-struct non-leaf
           { that._is_obj=true; return that._unify(_fresh(nongen),work); }
         if( _err!=null && !Util.eq(_err,that._err) ) {
-          if( that._err!=null ) throw unimpl(); // TODO: Combine single error messages
+          if( that._err!=null ) throw TODO(); // TODO: Combine single error messages
           else { // Error, fresh_unify an error into a non-leaf non-error
             progress = true;
             that._err = _err;
@@ -3182,7 +3183,7 @@ public class HM {
           : TypeFunPtr.makex(t.above_center(),(t.above_center() ? BitsFun.EMPTY : BitsFun.NALL),size()-1+DSP_IDX, Type.ANY, trlift);
       }
 
-      throw unimpl();
+      throw TODO();
     }
 
     static Type meet_rets(BitsFun fidxs) {
@@ -3272,7 +3273,7 @@ public class HM {
     // Wait until an open record closes before we can resolve
     void add_delay_resolve(Syntax fld) {
       //assert is_leaf() || is_base() || (is_obj() && is_open());
-      if( fld==null ) throw unimpl();
+      if( fld==null ) throw TODO();
       if( _delay_resolve==null ) _delay_resolve = new Ary<>(new Syntax[1],0);
       if( _delay_resolve.find(fld)== -1 )
         _delay_resolve.push(fld);

@@ -173,7 +173,7 @@ public final class CallEpiNode extends Node {
         //  Env.GVN.add_reduce(fun);
         //  return unwire(call,ret,fun).set_is_copy(ctl2,mem2,rez2);
         //}
-        throw unimpl();
+        throw TODO();
       }
     }
 
@@ -282,7 +282,7 @@ public final class CallEpiNode extends Node {
     //    tmem3 = tmem3.lift_at((TypeMemPtr)trez_lift);  // Upgrade memory result
     //  trez = trez_lift_dull.join(trez);                // Upgrade scalar result
     // Turned off for now
-    throw unimpl();
+    throw TODO();
   }
 
   @Override public Node is_copy(int idx) { return _is_copy ? in(idx) : null; }
@@ -549,7 +549,7 @@ public final class CallEpiNode extends Node {
 
     if( tnargs > nargs )  // Missing arguments
       progress |= tvar().unify_err("Passing "+cnargs+" arguments to a function taking "+tnargs+" arguments",tfun,call._badargs[cnargs-ARG_IDX],test);
-    if( cnargs > nargs ) throw unimpl(); // Too many arguments
+    if( cnargs > nargs ) throw TODO(); // Too many arguments
     tfun.deps_add(this);
     return progress;
   }
@@ -558,7 +558,7 @@ public final class CallEpiNode extends Node {
   @Override public boolean unify_proj( ProjNode proj, boolean test ) {
     if( proj._idx==REZ_IDX )
       return tvar().unify(proj.tvar(),test);
-    throw unimpl(); // memory unify
+    throw TODO(); // memory unify
   }
 
 }

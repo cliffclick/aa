@@ -9,7 +9,7 @@ import com.cliffc.aa.tvar.TVStruct;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 import static com.cliffc.aa.type.TypeFld.Access;
 
 // Store a value into a named struct field.  Does it's own nil-check and value
@@ -40,7 +40,7 @@ public class StoreNode extends StoreAbs {
       return luse.at_def(_fld);   // Address is ANY/ALL from field
     }
     
-    throw unimpl();
+    throw TODO();
   }
   
   @Override TypeMem _live_kill(TypeMemPtr tmp) {

@@ -6,7 +6,6 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
-import java.util.HashSet;
 
 // Load a struct from memory.  Does its own nil-check testing.  Display/Frames
 // are normal structs, so local vars are ALSO normal struct loads.
@@ -148,7 +147,7 @@ public class LoadNode extends Node {
         if( adr instanceof NewNode nnn && !nnn.escaped(this) ) {
     //      Env.GVN.add_reduce(this); // Re-run reduce
     //      return set_mem(cepi.call().mem());
-          throw unimpl();
+          throw TODO();
         } else adr.deps_add(this);
       }
     } else mem.deps_add(this);
@@ -160,7 +159,7 @@ public class LoadNode extends Node {
     //    jmem.xval();
     //    return set_mem(jmem);
     //  }
-      throw unimpl();
+      throw TODO();
     }
 
     return null;
@@ -260,7 +259,7 @@ public class LoadNode extends Node {
           }
         }
 
-        case null, default -> throw unimpl(); // decide cannot be equal, and advance, or maybe-equal and return null
+        case null, default -> throw TODO(); // decide cannot be equal, and advance, or maybe-equal and return null
         }
       //} else if( mem instanceof MemJoinNode ) {
       //  Node jmem = ((MemJoinNode)mem).can_bypass(aliases);
@@ -275,7 +274,7 @@ public class LoadNode extends Node {
                  mem instanceof  ConNode) {
         return null;
       } else {
-        throw unimpl(); // decide cannot be equal, and advance, or maybe-equal and return null
+        throw TODO(); // decide cannot be equal, and advance, or maybe-equal and return null
       }
     }
   }
@@ -311,7 +310,7 @@ public class LoadNode extends Node {
     TV3 ptr0 = adr().tvar();
     Type ta = adr()._val;
 
-    if( ptr0 instanceof TVErr ) throw unimpl();
+    if( ptr0 instanceof TVErr ) throw TODO();
     TVPtr ptr = ptr0.as_ptr();
     TVStruct tstr = ptr.load();
 
@@ -327,7 +326,7 @@ public class LoadNode extends Node {
 
     // struct is end-of-super-chain, miss_field
     //return tvar().unify_err(resolve_failed_msg(),tvar(0),null,test);
-    throw unimpl();
+    throw TODO();
   }
 
   private boolean do_fld( TV3 fld, boolean test ) {

@@ -95,7 +95,7 @@ public class ScopeNode extends Node {
     //if( in(i) instanceof RetNode ) return _live;
     //// Merging exit path, or ConType
     //return def._live;
-    throw unimpl();             // TODO Test me
+    throw TODO();             // TODO Test me
   }
   
   @Override public int hashCode() { return 123456789; }

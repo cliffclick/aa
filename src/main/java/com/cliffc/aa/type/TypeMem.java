@@ -6,7 +6,7 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 import static com.cliffc.aa.type.TypeFld.Access;
 
 /**
@@ -414,7 +414,7 @@ public class TypeMem extends Type<TypeMem> {
       if( sharp_get(aliases) != null ) return;
       if( dull_cache.get(aliases) != null ) return;
       // Walk and meet "dull" fields; all TMPs will point to ISUSED (hence are dull).
-      if( aliases.above_center() ) throw unimpl();
+      if( aliases.above_center() ) throw TODO();
       TypeStruct t = TypeStruct.UNUSED;
       for( int alias : aliases )
         for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
@@ -510,7 +510,7 @@ public class TypeMem extends Type<TypeMem> {
     if( tmp.is_con() ) {
       int alias = tmp._aliases.getbit();
       //return set(alias,at(alias).update());
-      throw unimpl();
+      throw TODO();
     }
     
     // Must do struct-by-struct updates
@@ -527,7 +527,7 @@ public class TypeMem extends Type<TypeMem> {
   // Everything in the 'escs' set is flattened to UNUSED.
   public TypeMem kill(BitsAlias escs) {
     if( escs==BitsAlias.EMPTY ) return this;
-    if( escs==BitsAlias.NALL  ) throw com.cliffc.aa.AA.unimpl(); // Shortcut
+    if( escs==BitsAlias.NALL  ) throw com.cliffc.aa.AA.TODO(); // Shortcut
     // See if any changes
     boolean found=false;
     for( int alias : escs )

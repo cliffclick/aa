@@ -328,7 +328,7 @@ public abstract class PrimNode extends Node {
     case TypeInt ti: return ti.wrap();
     case TypeFlt tf: return tf.wrap();
     case TypeNil tn: return tn;
-    default: throw unimpl();
+    default: throw TODO();
     }
   }
   public static TypeNil unwrap( Type t ) {
@@ -359,7 +359,7 @@ public abstract class PrimNode extends Node {
     if( rez == TypeInt. BOOL  )  return IBOOL;
     if( rez == TypeFlt. FLT64 )  return  IFLT;
     if( rez == TypeFlt.NFLT64 )  return INFLT;
-    throw unimpl();
+    throw TODO();
   }
 
   // All work done in set_tvar, no need to unify
@@ -542,7 +542,7 @@ public abstract class PrimNode extends Node {
       // Preserve width
       return t0i.minsize(t1i);
     }
-    @Override long op( long l, long r ) { throw unimpl(); }
+    @Override long op( long l, long r ) { throw TODO(); }
   }
 
   public static class OrI64 extends Prim2OpI64 {
@@ -603,14 +603,14 @@ public abstract class PrimNode extends Node {
       //if( t2==Type.NIL || t2==Type.NIL ) return vs_nil(t1,TypeInt.TRUE,TypeInt.FALSE);
       //if( t1.above_center() || t2.above_center() ) return TypeInt.BOOL.dual();
       //return TypeInt.BOOL;
-      throw unimpl();
+      throw TODO();
     }
-    @Override public TypeNil apply( TypeNil[] args ) { throw AA.unimpl(); }
+    @Override public TypeNil apply( TypeNil[] args ) { throw AA.TODO(); }
     static Type vs_nil( Type tx, Type t, Type f ) {
       if( tx==TypeNil.NIL ) return t;
       //if( tx.above_center() ) return tx.isa(TypeNil.NIL) ? TypeInt.BOOL.dual() : f;
       //return tx.must_nil() ? TypeInt.BOOL : f;
-      throw unimpl();
+      throw TODO();
     }
   }
 
@@ -638,15 +638,15 @@ public abstract class PrimNode extends Node {
       //if( t2==Type.NIL || t2==Type.NIL ) return EQ_OOP.vs_nil(t1,TypeInt.FALSE,TypeInt.TRUE);
       //if( t1.above_center() || t2.above_center() ) return TypeInt.BOOL.dual();
       //return TypeInt.BOOL;
-      throw unimpl();
+      throw TODO();
     }
-    @Override public TypeNil apply( TypeNil[] args ) { throw AA.unimpl(); }
+    @Override public TypeNil apply( TypeNil[] args ) { throw AA.TODO(); }
   }
 
 
   public static class StrLen extends PrimNode {
     public StrLen() { super("#_",TypeTuple.STR,TypeInt.INT64); }
-    @Override public TypeNil apply( TypeNil[] args ) { throw unimpl(); }
+    @Override public TypeNil apply( TypeNil[] args ) { throw TODO(); }
     @Override public Type value() {
       if( !(val(1) instanceof TypeMemPtr tmp) ||
           !tmp.is_str() )
@@ -685,7 +685,7 @@ public abstract class PrimNode extends Node {
     private static final TypeTuple ANDTHEN = TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, TypeInt.INT64, TypeFunPtr.THUNK); // {val tfp -> val }
     // Takes a value on the LHS, and a THUNK on the RHS.
     public AndThen() { super("_&&_",true/*lazy*/,ANDTHEN,TypeNil.SCALAR); _live = TypeMem.ALLMEM; }
-    @Override public TypeNil apply(TypeNil[] ts) { throw unimpl(); }
+    @Override public TypeNil apply(TypeNil[] ts) { throw TODO(); }
     @Override FunPtrNode as_fun() {
       Oper.make(_name,_is_lazy);
       FunNode fun = new FunNode(this,_name).init();
@@ -724,7 +724,7 @@ public abstract class PrimNode extends Node {
     // Takes a value on the LHS, and a THUNK on the RHS.
     public OrElse() { super("_||_",true/*lazy*/,ORELSE,TypeNil.SCALAR); _live = TypeMem.ALLMEM; }
     //@Override public boolean is_mem() { return true; }
-    @Override public TypeNil apply(TypeNil[] ts) { throw unimpl(); }
+    @Override public TypeNil apply(TypeNil[] ts) { throw TODO(); }
     @Override FunPtrNode as_fun() {
       Oper.make(_name,_is_lazy);
       FunNode fun = new FunNode(this,_name).init();

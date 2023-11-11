@@ -8,7 +8,7 @@ import com.cliffc.aa.tvar.TVPtr;
 import com.cliffc.aa.tvar.TVStruct;
 import com.cliffc.aa.type.*;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 
 // Store a whole struct into memory.
 public class StoreXNode extends StoreAbs {
@@ -26,7 +26,7 @@ public class StoreXNode extends StoreAbs {
   @Override Type _live_use( TypeMem live0, TypeMemPtr tmp, int i ) {
     TypeMem live1;
     if( tmp.above_center() ) {
-      throw unimpl();
+      throw TODO();
     } else if( tmp.is_con() ) { // Constant ptr, so precise update
       TypeStruct ts = rez()._val instanceof TypeStruct ts0 ? ts0.flatten_live_fields() : rez()._val.oob(TypeStruct.ISUSED);
       live1 = live0.update(tmp,ts);

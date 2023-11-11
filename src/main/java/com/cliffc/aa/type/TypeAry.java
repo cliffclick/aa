@@ -4,7 +4,7 @@ import com.cliffc.aa.util.*;
   
 import java.util.function.*;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 
 // A Cyclic Type where fields are indexed by dynamic integer.  Probably becomes
 // a specialized field type for TypeStruct, allowed only as the last field.
@@ -22,12 +22,12 @@ public class TypeAry extends Type<TypeAry> implements Cyclic {
   }
   @Override public TypeMemPtr walk( TypeStrMap map, BinaryOperator<TypeMemPtr> reduce ) {
     //return map.apply(_t);
-    throw unimpl();
+    throw TODO();
   }
   @Override public long lwalk( LongStringFunc map, LongOp reduce ) { return map.run(_elem,"elem"); }
   @Override public void walk( TypeStrRun map ) { map.run(_elem,"elem"); }
-  @Override public void walk_update( TypeMap map ) { throw unimpl(); }
-  @Override public Cyclic.Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links) { throw unimpl(); }
+  @Override public void walk_update( TypeMap map ) { throw TODO(); }
+  @Override public Cyclic.Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links) { throw TODO(); }
 
   @Override long static_hash() { return Util.mix_hash(super.static_hash(),_len._hash,_elem._type,_stor._type); }
   @Override public boolean equals( Object o ) {
@@ -74,7 +74,7 @@ public class TypeAry extends Type<TypeAry> implements Cyclic {
   // Type at a specific index
   public Type ld(TypeInt idx) { return _elem; }
   public TypeAry update(TypeInt idx, Type val) {
-    throw unimpl();
+    throw TODO();
   }
   @Override BitsFun _all_reaching_fidxs( TypeMem tmem ) {
     return _elem._all_reaching_fidxs(tmem);

@@ -5,7 +5,7 @@ import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 
 // Bind a 'this' into an unbound function pointer.  Inverse of FP2DSP.  The
 // function input can also be a struct (overload) of function pointers.
@@ -113,7 +113,7 @@ public class BindFPNode extends Node {
     // Unbound Lambda becomes bound 1st time only
     if( dsp0 == null ) {
       TV3 dsp1 = dsp.tvar();
-      throw unimpl();
+      throw TODO();
     }
     // Already bound, do not bind again
     return false; // dsp0.unify(dsp1,test);
@@ -123,7 +123,7 @@ public class BindFPNode extends Node {
   @Override public ErrMsg err( boolean fast ) {
     if( fp()._val instanceof TypeFunPtr tfp && tfp.has_dsp() &&
         dsp()._val != Type.ANY )
-      throw unimpl();
+      throw TODO();
     return null;
   }  
  

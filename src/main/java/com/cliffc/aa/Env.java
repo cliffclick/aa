@@ -124,7 +124,7 @@ public class Env implements AutoCloseable {
       //String fname = fref._ts._name;
       //assert !PROTOS.containsKey(fname); // All top-level type names are globally unique
       //PROTOS.put(fname,dsp);
-      throw unimpl();
+      throw TODO();
     }
     _scope = new ScopeNode(new HashMap<>(),ctrl,mem,XNIL,ptr,dsp).init();
     KEEP_ALIVE.add_def(_scope);
@@ -176,7 +176,7 @@ public class Env implements AutoCloseable {
       TypeNil t = _scope.get_type(tname);
       //if( t.is_forward_type() )
       //  pscope.add_type(tname,t);
-      throw unimpl();
+      throw TODO();
     }
 
     Node xscope = KEEP_ALIVE.pop();// Unhook scope

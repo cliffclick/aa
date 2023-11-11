@@ -53,7 +53,7 @@ public class TestNode {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testNode() {
     //Env.file_scope(Env.top_scope());
-    throw AA.unimpl();
+    throw AA.TODO();
   }
 
   // A sparse list of all subtypes.  The outer array is the index into
@@ -251,7 +251,7 @@ public class TestNode {
     test1monotonic(new AssertNode(_ins[1],_ins[2],TypeFlt.FLT64  ,null));
 
     //assertEquals(0,_errs);
-    throw com.cliffc.aa.AA.unimpl();
+    throw com.cliffc.aa.AA.TODO();
   }
 
   @SuppressWarnings("unchecked")

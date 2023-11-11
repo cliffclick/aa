@@ -6,7 +6,7 @@ import java.util.HashMap;
 import java.util.function.BinaryOperator;
 import java.util.function.IntSupplier;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.TODO;
 
 /** an implementation of language AA
  */
@@ -813,9 +813,9 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
 
       return switch( skipWS() ) {
       case '0','1','2','3','4','5','6','7','8','9','-' -> num();
-      case '"'  -> throw unimpl(); // parse string
+      case '"'  -> throw TODO(); // parse string
       case '~' -> type(dup,-1 < _x++,fld_num);
-      case ':' -> throw unimpl();
+      case ':' -> throw TODO();
       case '#' -> TypeRPC   .valueOf(this,dup,any) ;
       case '{' -> TypeTuple .valueOf(this,dup,any) ;
       case '*' -> TypeMemPtr.valueOf(this,dup,any,false);
@@ -862,7 +862,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
           yield any ? t.dual() : t;
 
         // Failed to parse 'id'
-        throw unimpl();
+        throw TODO();
       }
     };
     }
@@ -990,7 +990,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       for( int i = 0; i< _x; i++ ) System.err.print(' ');
       System.err.println('^');
       System.err.println("Expected '"+c+"' but found '"+at(_x)+"', unable to parse a Type");
-      throw unimpl();
+      throw TODO();
     }
     @Override public String toString() { return _str.substring(_x); }
   }

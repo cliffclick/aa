@@ -1,8 +1,6 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
-import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.*;
@@ -43,7 +41,7 @@ public abstract class MemPrimNode extends PrimNode {
     //}
     //
     //return null;
-    throw unimpl();
+    throw TODO();
   }
 
   // ------------------------------------------------------------
@@ -59,7 +57,7 @@ public abstract class MemPrimNode extends PrimNode {
       //if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
       //if( !(tptr instanceof TypeMemPtr) ) return tptr.oob(TypeMem.ALLMEM); // Not a pointer?
       //return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,"", Type.SCALAR);
-      throw unimpl();
+      throw TODO();
     }
 
   }
@@ -104,10 +102,10 @@ public abstract class MemPrimNode extends PrimNode {
   //    //Type ptr = val(ARG_IDX);
   //    //tptr.unify(TV2.make("Ary",this,ptr,"array_len",new NonBlockingHashMap<>()),test);
   //    //return true;
-  //    throw unimpl();
+  //    throw TODO();
   //  }
   //
-  //  @Override public TypeInt apply( Type[] args ) { throw unimpl(); }
+  //  @Override public TypeInt apply( Type[] args ) { throw TODO(); }
   //}
 
   //// Produces a binop LValue, where the leading TMP is a non-zero array
@@ -134,7 +132,7 @@ public abstract class MemPrimNode extends PrimNode {
   //    return StoreNode.unify("Ary",this,adr().tvar(),adr()._val,tvar(),"elem",test);
   //  }
   //
-  //  @Override public TypeInt apply( Type[] args ) { throw unimpl(); }
+  //  @Override public TypeInt apply( Type[] args ) { throw TODO(); }
   //}
   //
   //// ------------------------------------------------------------
@@ -150,7 +148,7 @@ public abstract class MemPrimNode extends PrimNode {
   //    if( def==rez() ) return TypeMem.ALIVE; // Value escapes
   //    if( def==adr() ) return TypeMem.ALIVE; // Basic aliveness
   //    if( def==idx() ) return TypeMem.ALIVE; // Basic aliveness
-  //    throw unimpl();                        // Should not reach here
+  //    throw TODO();                        // Should not reach here
   //  }
   //  @Override BitsAlias escapees() {
   //    Type adr = adr()._val;
@@ -189,7 +187,7 @@ public abstract class MemPrimNode extends PrimNode {
   //    }
   //    return StoreNode.unify("Ary",this,adr().tvar(),adr()._val,rez().tvar(),"elem",test) | progress;
   //  }
-  //  @Override public TypeInt apply( Type[] args ) { throw unimpl(); }
+  //  @Override public TypeInt apply( Type[] args ) { throw TODO(); }
   //}
   //
   //// Produces a triop LValue, where the leading TMP is a non-zero array
@@ -224,7 +222,7 @@ public abstract class MemPrimNode extends PrimNode {
   //    }
   //    return StoreNode.unify("Ary",this,adr().tvar(),adr()._val,rez().tvar(),"elem",test) | progress;
   //  }
-  //  @Override public TypeInt apply( Type[] args ) { throw unimpl(); }
+  //  @Override public TypeInt apply( Type[] args ) { throw TODO(); }
   //  @Override public ErrMsg err(boolean fast) {
   //    ErrMsg msg = super.err(fast);
   //    if( msg != null ) return msg;

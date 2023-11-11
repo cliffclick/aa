@@ -100,9 +100,9 @@ public class TVLambda extends TV3 {
     // Compatible escaped fidxs
     BitsFun fidxs = Env.ROOT==null ? BitsFun.EMPTY : Env.ROOT.matching_escaped_fidxs(this,dep);
     if( _may_nil ) fidxs = fidxs.set(0);
-    if( _use_nil ) throw unimpl();
+    if( _use_nil ) throw TODO();
     Type tfun = ADUPS.get(_uid);
-    if( tfun != null ) throw unimpl(); // return tfun;  // TODO: Returning recursive flow-type functions
+    if( tfun != null ) throw TODO(); // return tfun;  // TODO: Returning recursive flow-type functions
     ADUPS.put(_uid, TypeNil.XSCALAR);
     Type dsp = nargs() > DSP_IDX ? dsp()._as_flow(dep) : Type.ALL;
     Type rez = ret()._as_flow(dep);

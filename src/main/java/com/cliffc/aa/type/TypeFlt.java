@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.util.*;
 
 import java.util.HashMap;
@@ -136,6 +135,6 @@ public class TypeFlt extends TypeNil<TypeFlt> {
   // Deep wrap
   public TypeMemPtr wrap_deep(TypeMemPtr clz) {
     if( clz == null ) clz = TypeMemPtr.FLTPTR;
-    return TypeMemPtr.make(false,false,false,true,BitsAlias.EMPTY,TypeStruct.make_prim(TypeFld.make_clz(clz),TypeFld.make_prim(this))); // Wrapped primitive 
+    return TypeMemPtr.make(false,false,false,true,BitsAlias.EMPTY,TypeStruct.make_prim(TypeFld.make_clz(clz),TypeFld.make_prim(this))); // Wrapped primitive
   }
 }

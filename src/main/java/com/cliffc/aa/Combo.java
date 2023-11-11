@@ -1,7 +1,6 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
-import com.cliffc.aa.tvar.Resolvable;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.NonBlockingHashMapLong;
 
@@ -217,9 +216,9 @@ public abstract class Combo {
         if( n instanceof RootNode root ) root.CG_wire();
       }
 
-      if( Env.GVN.flow_len()==0 && !Resolvable.RESOLVINGS.isEmpty() )
-        for( Resolvable r : Resolvable.RESOLVINGS.values() )
-          r.trial_resolve(false); // Do delayed resolve
+      //if( Env.GVN.flow_len()==0 && !Resolvable.RESOLVINGS.isEmpty() )
+      //  for( Resolvable r : Resolvable.RESOLVINGS.values() )
+      //    r.trial_resolve(false); // Do delayed resolve
 
       // Very expensive assert: everything that can make progress is on worklist
       assert Env.KEEP_ALIVE.more_work()==0;
@@ -230,7 +229,7 @@ public abstract class Combo {
   private static void add_new_leaf_work() { }
   private static void add_ambi_work() {
     //for( Resolvable r : Resolvable.RESOLVINGS.values() )
-    //  throw AA.unimpl();
+    //  throw AA.TODO();
   }
 
   private static final NonBlockingHashMapLong<Node> FREEZE_WORK = new NonBlockingHashMapLong<>();
