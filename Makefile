@@ -152,6 +152,18 @@ check:	sandbox/timing.txt sandbox/out.0
 hm_tests:	$(test_classes) build/aa.jar
 	$(JVM) org.junit.runner.JUnitCore com.cliffc.aa.HM.TestHM
 
+
+
+exec_javas   := $(wildcard $(SRC)/$(AA)/exe/*java)
+etst_javas   := $(wildcard $(TST)/$(AA)/exe/*java)
+exec_classes := $(patsubst $(SRC)/%java,$(CLZDIR)/main/%class,$(exec_javas))
+etst_classes := $(patsubst $(TST)/%java,$(CLZDIR)/test/%class,$(etst_javas))
+
+exe:	$(main_classes) $(etst_classes)
+	@echo Running exe test program
+	java -Xms1g -Xms1g -ea -cp "${CLZDIR}/main" com.cliffc.aa.exe.EXE $(prog)
+
+
 .PHONY: clean
 clean:
 	rm -rf build

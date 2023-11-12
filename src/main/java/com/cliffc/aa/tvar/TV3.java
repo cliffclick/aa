@@ -541,6 +541,7 @@ abstract public class TV3 implements Cloneable {
   }
   public void deps_add(Node n ) {
     // no progress during bulk testing*
+    if( n==null ) return;
     if( Node.mid_work_assert() ) return;
     if( _deps==null ) _deps = UQNodes.make(n);
     _deps = _deps.add(n);

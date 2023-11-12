@@ -234,7 +234,8 @@ public abstract class Combo {
 
   private static final NonBlockingHashMapLong<Node> FREEZE_WORK = new NonBlockingHashMapLong<>();
   public static void add_freeze_dep( Node dep ) {
-    FREEZE_WORK.put(dep._uid,dep);
+    if( dep != null )
+      FREEZE_WORK.put(dep._uid,dep);
   }
   private static void add_freeze_work()   {
     for( Node dep : FREEZE_WORK.values() )

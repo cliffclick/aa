@@ -51,6 +51,13 @@ public class Ary<E> implements Iterable<E> {
     return _es[--_len];
   }
 
+  /** @return remove and return last element */
+  public void pop( int n ) {
+    if( n < 0 || n>_len )
+      throw new ArrayIndexOutOfBoundsException(""+n+" > "+_len);
+    _len -= n;
+  }
+
   /** Add element in amortized constant time
    *  @param e Element to add at end of list
    *  @return 'this' for flow-coding */

@@ -104,7 +104,7 @@ public class TVLambda extends TV3 {
     Type tfun = ADUPS.get(_uid);
     if( tfun != null ) throw TODO(); // return tfun;  // TODO: Returning recursive flow-type functions
     ADUPS.put(_uid, TypeNil.XSCALAR);
-    Type dsp = nargs() > DSP_IDX ? dsp()._as_flow(dep) : Type.ALL;
+    Type dsp = dsp()!=null && nargs() > DSP_IDX ? dsp()._as_flow(dep) : Type.ALL;
     Type rez = ret()._as_flow(dep);
     return TypeFunPtr.malloc(false,fidxs,nargs(),dsp,rez);
   }
