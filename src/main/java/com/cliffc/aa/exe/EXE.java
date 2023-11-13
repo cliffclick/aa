@@ -11,7 +11,6 @@ import java.util.function.Function;
 import java.util.function.IntSupplier;
 
 import static com.cliffc.aa.AA.TODO;
-import static com.cliffc.aa.type.TypeInt.INT64;
 
 public class EXE {
   public static void main( String[] args ) {
@@ -30,6 +29,7 @@ public class EXE {
 
   static final HashMap<String,PrimSyn> PRIMSYNS = new HashMap<>(){{
       put("+",new Add());
+      put("-",new Sub());
       put("*",new Mul());
     }};
   
@@ -68,15 +68,20 @@ public class EXE {
       while( !peek(')') ) args.push(fterm());
       return new Apply(fun, args.asAry());
     }
-    
+
+    if( peek("if") ) {          // Parse an If
+      Syntax pred = require(fterm(),'?');
+      Syntax t    = require(fterm(),':');
+      Syntax f    =         fterm();
+      return new If(pred,t,f);
+    }
+
     // Let or Id
     if( isAlpha0(BUF[X]) ) {
       String id = id();
-      if( peek('=') ) {
+      if( peek('=') )
         // Let expression; "id = fterm(); term..."
-        //return new Let(id,require(fterm(),';'),fterm());
-        throw AA.TODO();
-      }
+        return new Let(id,require(fterm(),';'),fterm());
       PrimSyn prim = PRIMSYNS.get(id); // No shadowing primitives or this lookup returns the prim instead of the shadow
       return prim==null ? new Ident(id) : prim.make(); // Make a prim copy with fresh HM variables
     }
@@ -132,46 +137,22 @@ public class EXE {
   }
   private static boolean isWS    (byte c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
   private static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }
-  private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_') || (c=='*') || (c=='?') || (c=='+'); }
+  private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_') || (c=='*') || (c=='?') || (c=='+') || (c=='-'); }
   private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9') || (c=='/'); }
   private static boolean peek(char c) { if( skipWS()!=c ) return false; X++; return true; }
+  private static boolean peek(String s) {
+    skipWS();
+    for( int i=0; i<s.length(); i++ )
+      if( BUF[X+i]!=(byte)s.charAt(i) )
+        return false;
+    X += s.length();
+    return true;
+  }
 
   private static void require(char c) { if( skipWS()!=c ) throw AA.TODO("Missing '"+c+"'"); X++; }
   private static Syntax require(Syntax t, char c) { require(c); return t; }
   private static Syntax require(String s, Syntax t) { for( byte c : s.getBytes() ) require((char)c); return t; }
   
-  // ---------------------------------------------------------------------
-  // Small classic tree of TV3s, immutable, with sharing at the root parts.
-  static class VStack implements Iterable<TV3> {
-    final VStack _par;
-    private TV3 _nongen;
-    VStack( VStack par, TV3 nongen ) { _par=par; _nongen=nongen; }
-    TV3 nongen() {
-      TV3 n = _nongen.find();
-      return n==_nongen ? n : (_nongen=n);
-    }
-    @Override public String toString() {
-      // Collect dups across the forest of types
-      VBitSet dups = new VBitSet();
-      for( VStack vs = this; vs!=null; vs = vs._par )
-        vs._nongen._get_dups(new VBitSet(),dups,true,true);
-      // Now recursively print
-      return str(new SB(),dups).toString();
-    }
-    SB str(SB sb, VBitSet dups) {
-      _nongen.str(sb,new VBitSet(),dups,true,true);
-      if( _par!=null ) _par.str(sb.p(" , "),dups);
-      return sb;
-    }
-    @Override public Iterator<TV3> iterator() { return new Iter(); }
-    private class Iter implements Iterator<TV3> {
-      private VStack _vstk;
-      Iter() { _vstk=VStack.this; }
-      @Override public boolean hasNext() { return _vstk!=null; }
-      @Override public TV3 next() { TV3 v = _vstk.nongen(); _vstk = _vstk._par;  return v; }
-    }
-  }
-
   // ----------------- Syntax ---------------------
   static abstract class Syntax implements IntSupplier {
     private static int CNT=1;
@@ -179,7 +160,6 @@ public class EXE {
     @Override public int getAsInt() { return _uid; }
     
     Syntax _par;                // Parent in the AST
-    VStack _nongen;             // Non-generative type variables
 
     TV3 _tvar;                  // Current HM type
     TV3 tvar() {                // U-F find
@@ -200,14 +180,18 @@ public class EXE {
     abstract SB str(SB sb);
 
     // First pass
-    abstract void prep_tree(VStack nongen);
+    abstract void prep_tree(Ary<TV3> nongen);
 
     // Compute HM type
     void do_hm() {
-      prep_tree(null);
+      prep_tree(new Ary<TV3>(TV3.class));
       visit( syn -> {
-          if( tvar() instanceof TVErr terr ) {
+          if( syn.tvar() instanceof TVErr terr ) {
             System.err.println(terr);
+            System.exit(1);
+          }
+          if( syn.tvar() instanceof TVBase base && base._t instanceof TypeNil tn && tn.getClass()==TypeNil.class ) {
+            System.err.println("Mixing int and float");
             System.exit(1);
           }
           return null;
@@ -225,7 +209,7 @@ public class EXE {
     final Type _con;
     Con( Type con ) { _con = con; }
     @Override SB str(SB sb) { return _con.str(sb,false,false); }
-    @Override void prep_tree(VStack nongen) { _tvar = TV3.from_flow(_con); }
+    @Override void prep_tree(Ary<TV3> nongen) { _tvar = TV3.from_flow(_con); }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
     @Override Type eval( Ary<Type> stk) { return _con; }
   }
@@ -234,36 +218,57 @@ public class EXE {
   // Lambda argument or Let def
   static class Ident extends Syntax {
     private final String _name;       // The identifier name
-    
-    private Syntax _def;        // Either Lambda, and _argn is the argument number OR Let, and fresh===(_argn!=0)
+
+    private TV3[] _nongen;
+    private Syntax _def; // Either Lambda, and _argn is the argument number OR Let, and fresh===(_argn!=0)
     private int _argn;
+    
     Ident( String name ) { _name=name; }
     @Override SB str(SB sb) { return sb.p(_name); }
-    @Override void prep_tree(VStack nongen) {
-      for( Syntax syn = _par; syn!=null; syn = syn._par ) {
+    @Override void prep_tree(Ary<TV3> nongen) {
+      for( Syntax syn = _par, prior=this; syn!=null; prior=syn, syn = syn._par ) {
         _def = syn;
         switch( syn ) {
         case Lambda lam:
           _argn = Util.find(lam._args,_name);
-          if( _argn != -1 )
-            { _tvar = lam.arg(_argn); return; }
+          if( _argn != -1 ) {
+            _tvar = lam.arg(_argn); // Take TVar from the lambda directly
+            return;
+          }
           break;
-        //case Let let -> throw AA.TODO();
+        case Let let:
+          if( let._arg.equals(_name) ) {
+            _argn = prior==let._body ? 1 : 0;
+            _tvar = new TVLeaf();
+            _nongen = nongen.asAry();
+            TV3 def = let._def .tvar();
+            if( _argn==1 ) def.fresh_unify(null,_tvar,_nongen,false);
+            else           def.      unify(     _tvar        ,false);
+            return;
+          }
         default: break;
         }
       }
       throw AA.TODO("'"+_name+"' not found");
     }
+    boolean fresh() { return _def instanceof Let && _argn==1; }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
     @Override Type eval( Ary<Type> stk) {
       // Walk the eval stack, looking for our definition.
       int i=stk._len-1;
       while( true ) {
-        TypeFunPtr tfp = (TypeFunPtr)stk.at(i);
-        Lambda lam = Lambda.FUNS.at(tfp.fidx());
-        if( lam==_def )
-          return stk.at(i-1-(_argn-AA.ARG_IDX));
-        throw AA.TODO();
+        if( stk.at(i) instanceof TypeFunPtr tfp ) {
+          Lambda lam = Lambda.FUNS.at(tfp.fidx());
+          if( lam==_def )       // Correct lambda
+            return stk.at(i-1-(_argn-AA.ARG_IDX)); // All args got pushed, get the correct one
+          i -= lam.nargs()-AA.ARG_IDX+1;
+        } else {
+          int lidx = (int)stk.at(i).getl();
+          Let let = Let.LETS.at(lidx);
+          if( let==_def )       // Correct Let
+            return stk.at(i-1); // Pushed the one def, so its just behind
+          i = i-2;
+        }
       }
     }
   }
@@ -274,7 +279,7 @@ public class EXE {
     final Syntax _ptr;
     Field( String id, Syntax ptr ) { _ptr = ptr; ptr._par = this; _id=id; }
     @Override SB str(SB sb) { return _ptr.str(sb).p(".").p(_id); }
-    @Override void prep_tree(VStack nongen) {
+    @Override void prep_tree(Ary<TV3> nongen) {
       _tvar = new TVLeaf();
       _ptr.prep_tree(nongen);
       throw AA.TODO();
@@ -306,13 +311,14 @@ public class EXE {
     }
     int nargs() { return _args.length; }
     TV3 arg(int i) { return tvar().arg(i); }
-    @Override void prep_tree(VStack nongen) {
+    @Override void prep_tree(Ary<TV3> nongen) {
       _tvar = new TVLambda(nargs(),new TVLeaf(),new TVLeaf());
       // Extend the nongen set by the new variables
-      VStack vs = nongen;
-      for( int i=0; i<nargs(); i++ ) vs = new VStack(vs, arg(i));
+      for( int i=0; i<nargs(); i++ ) nongen.push(arg(i));
       // Prep the body
-      _body.prep_tree(vs);
+      _body.prep_tree(nongen);
+      // Pop nongen stack
+      nongen.pop(nargs());
       // TVLambda ret is made early, unify with body now
       tvar().as_lambda().ret().unify(_body.tvar(),false);
     }
@@ -330,7 +336,11 @@ public class EXE {
   static class Apply extends Syntax {
     final Syntax _fun;
     final Syntax[] _args;
-    Apply( Syntax fun, Syntax[] args ) { _fun = fun; _args=args; }
+    Apply( Syntax fun, Syntax[] args ) {
+      _fun = fun;  fun._par = this;
+      _args=args;
+      for( Syntax arg : args ) arg._par = this;
+    }
     @Override SB str(SB sb) {
       _fun.str(sb.p("(")).p(" ");
       for( Syntax arg : _args )
@@ -339,13 +349,13 @@ public class EXE {
     }
     int nargs() { return _args.length; }
     TVLambda fun() { return (TVLambda)_fun.tvar(); }
-    @Override void prep_tree(VStack nongen) {
+    @Override void prep_tree(Ary<TV3> nongen) {
       _tvar = new TVLeaf();
       _fun.prep_tree(nongen);
       for( Syntax arg : _args ) arg.prep_tree(nongen);
 
       TVLambda lam = fun();
-      if( lam.nargs() != nargs()+AA.ARG_IDX ) throw AA.TODO("Expected "+lam.nargs()+" args, found "+nargs()+" args");
+      if( lam.nargs() != nargs()+AA.ARG_IDX ) throw AA.TODO("Expected "+(lam.nargs()-AA.ARG_IDX)+" args, found "+nargs()+" args");
       for( int i=0; i<nargs(); i++ )
         lam.arg(i+AA.ARG_IDX).unify(_args[i].tvar(),false);
       tvar().unify(lam.ret(),false);      
@@ -376,13 +386,86 @@ public class EXE {
     }
   }
 
+  // --- If ------------------------
+  static class If extends Syntax {
+    final Syntax _pred,_t,_f;
+    If( Syntax pred, Syntax t, Syntax f ) {
+      _pred = pred; pred._par = this;
+      _t = t; t._par = this;
+      _f = f; f._par = this;
+    }
+    @Override SB str(SB sb) {
+      sb.p("if ");
+      _pred.str(sb).p(" ? ");
+      _t.str(sb).p(" : ");
+      return _f.str(sb);
+    }
+    @Override void prep_tree(Ary<TV3> nongen) {
+      _tvar = new TVLeaf();
+      _pred.prep_tree(nongen);
+      _t.prep_tree(nongen);
+      _f.prep_tree(nongen);
+      tvar().unify(_t.tvar(),false);
+      tvar().unify(_f.tvar(),false);
+    }
+    @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
+      T slf = map.apply(this), rez;
+      rez = reduce.apply(slf,_pred.visit(map,reduce));
+      rez = reduce.apply(rez,_t   .visit(map,reduce));
+      rez = reduce.apply(rez,_f   .visit(map,reduce));
+      return rez;
+    }
+    @Override Type eval( Ary<Type> stk) {
+      Type pred = _pred.eval(stk);
+      Syntax syn = pred==TypeNil.NIL || pred==TypeInt.ZERO ? _f : _t;
+      return syn.eval(stk);
+    }
+  }
+  
+  // --- Let ------------------------
+  static class Let extends Syntax {
+    final Syntax _def, _body;
+    final String _arg;       // Argument name
+    static final Ary<Let> LETS = new Ary<Let>(Let.class);
+    
+    Let(String arg, Syntax def, Syntax body ) {
+      _def  = def;  def ._par = this;
+      _body = body; body._par = this;
+      _arg  = arg;
+      LETS.setX(_uid,this);
+    }
+    @Override SB str(SB sb) { return _body.str(_def.str(sb.p(_arg).p(" = ")).p("; ")); }
+    @Override void prep_tree(Ary<TV3> nongen) {
+      _tvar = new TVLeaf();
+      TVLeaf def = new TVLeaf();
+      nongen.push(def);
+      _def  .prep_tree(nongen);
+      nongen.pop(1);
+      def   .unify(_def .tvar(),false); // Unify def with _def._tvar
+      _body .prep_tree(nongen);
+      tvar().unify(_body.tvar(),false); // Unify 'Let._tvar' with the '_body._tvar'
+    }
+    @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
+      T rez = map.apply(this);
+      T def = reduce.apply(rez,_def .visit(map,reduce));
+      return  reduce.apply(def,_body.visit(map,reduce));
+    }
+    @Override Type eval( Ary<Type> stk) {
+      stk.push(_def.eval(stk));
+      stk.push(TypeInt.con(_uid));
+      Type rez = _body.eval(stk);
+      stk.pop();
+      return rez;
+    }    
+  }
+
 
   // --- Root ------------------------
   static class Root extends Syntax {
     final Syntax _prog;
     Root( Syntax prog ) { _prog=prog;  prog._par = this; }
     @Override SB str( SB sb ) { return _prog.str(sb.p("Root ")); }
-    @Override void prep_tree(VStack nongen) {
+    @Override void prep_tree(Ary<TV3> nongen) {
       _prog.prep_tree(nongen);
       _tvar = _prog.tvar();
     }
@@ -401,26 +484,28 @@ public class EXE {
       {"x","y","z"},
     };
     static final Type[] TS = new Type[10];
-    final Type[] _ts;
-    PrimSyn(Type... ts) {
-      super(IDS[ts.length-1],null);
-      _ts = ts;
+    static TV3 INT64() { return TVBase.make(TypeInt.INT64); }
+    
+    final TV3[] _tvs;
+    PrimSyn(TV3... tvs) {
+      super(IDS[tvs.length-1],null);
+      _tvs = tvs;
     }
     abstract PrimSyn make();
-    Type tret() { return _ts[_ts.length-1]; }
-    @Override void prep_tree(VStack nongen) {
-      TVLambda lam = new TVLambda(nargs()+AA.ARG_IDX,null,TVBase.make(tret()));
+    TV3 tret() { return _tvs[_tvs.length-1]; }
+    @Override void prep_tree(Ary<TV3> nongen) {
+      TVLambda lam = new TVLambda(nargs()+AA.ARG_IDX,null,tret());
       for( int i=0; i<nargs(); i++ )
-        lam.arg(AA.ARG_IDX+i).unify(TVBase.make(_ts[i]),false);
+        lam.arg(AA.ARG_IDX+i).unify(_tvs[i],false);
       _tvar = lam;
     }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this);  }
     @Override Type eval( Ary<Type> stk) {
-      return TypeFunPtr.make(_fidx,nargs(),Type.ALL,tret());
+      return TypeFunPtr.make(_fidx,nargs(),Type.ALL,Type.ALL);
     }    
     @Override Type apply( Ary<Type> stk ) {
       for( int i=0; i<nargs(); i++ )
-        TS[i] = stk.at(stk._len-1-nargs()+i);
+        TS[i] = stk.at(stk._len-2-i);
       return op();
     }
     abstract Type op();
@@ -428,15 +513,23 @@ public class EXE {
 
   // add integers
   static class Add extends PrimSyn {
-    public Add() { super(INT64, INT64, INT64); }
+    public Add() { super(INT64(), INT64(), INT64()); }
     @Override PrimSyn make() { return new Add(); }
     @Override SB str(SB sb) { return sb.p("+"); }
     @Override Type op() { return TypeInt.con(TS[0].getl()+TS[1].getl()); }
   }
 
+  // sub integers
+  static class Sub extends PrimSyn {
+    public Sub() { super(INT64(), INT64(), INT64()); }
+    @Override PrimSyn make() { return new Sub(); }
+    @Override SB str(SB sb) { return sb.p("-"); }
+    @Override Type op() { return TypeInt.con(TS[0].getl()-TS[1].getl()); }
+  }
+
   // mul integers
   static class Mul extends PrimSyn {
-    public Mul() { super(INT64, INT64, INT64); }
+    public Mul() { super(INT64(), INT64(), INT64()); }
     @Override PrimSyn make() { return new Mul(); }
     @Override SB str(SB sb) { return sb.p("*"); }
     @Override Type op() { return TypeInt.con(TS[0].getl()*TS[1].getl()); }
