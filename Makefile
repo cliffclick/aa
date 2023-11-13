@@ -161,7 +161,7 @@ etst_classes := $(patsubst $(TST)/%java,$(CLZDIR)/test/%class,$(etst_javas))
 
 exe:	$(main_classes) $(etst_classes)
 	@echo Running exe test program
-	java -Xms1g -Xms1g -ea -cp "${CLZDIR}/main" com.cliffc.aa.exe.EXE $(prog)
+	@java -Xms1g -Xms1g -ea -cp "${CLZDIR}/main" com.cliffc.aa.exe.EXE $(prog)
 
 
 .PHONY: clean

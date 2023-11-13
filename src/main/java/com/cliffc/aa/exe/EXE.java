@@ -24,7 +24,7 @@ public class EXE {
     Syntax root = parse(prog);
     root.do_hm();
     System.out.println("Type: "+root.tvar().str(new SB(),null,null,false,false));
-    System.out.println("Eval: "+root.eval(new Ary<Type>(Type.class)));
+    System.out.println("Eval: "+root.eval(new Ary<>(Type.class)));
   }
 
   static final HashMap<String,PrimSyn> PRIMSYNS = new HashMap<>(){{
@@ -62,23 +62,34 @@ public class EXE {
       return new Lambda(args.asAry(), require(fterm(),'}'));
     }
 
-    if( peek('(') ) {           // Parse an Apply
+    // Parse an Apply
+    if( peek('(') ) {
       Syntax fun = fterm();
       Ary<Syntax> args = new Ary<>(new Syntax[1],0);
       while( !peek(')') ) args.push(fterm());
       return new Apply(fun, args.asAry());
     }
 
-    if( peek("if") ) {          // Parse an If
+    // Parse an If
+    if( peek("if") ) {
       Syntax pred = require(fterm(),'?');
       Syntax t    = require(fterm(),':');
       Syntax f    =         fterm();
       return new If(pred,t,f);
     }
 
+    // Parse a strict
+    if( peek("@{") ) {
+      Struct str = new Struct();
+      Ary<String> labs = new Ary<>(new String[1],0);
+      Ary<Syntax> flds = new Ary<>(new Syntax[1],0);
+      while( !peek("}") ) str.add(require(id(),'='),require(fterm(),';'));
+      return str;      
+    }
+    
     // Let or Id
-    if( isAlpha0(BUF[X]) ) {
-      String id = id();
+    if( isAlpha0(BUF[X]) || isOp(BUF[X]) ) {
+      String id = id(isOp(BUF[X]));
       if( peek('=') )
         // Let expression; "id = fterm(); term..."
         return new Let(id,require(fterm(),';'),fterm());
@@ -93,16 +104,16 @@ public class EXE {
   private static Syntax fterm() {
     Syntax term = term();
     while( true ) {
-      if( term==null || skipWS()!='.' ) return term;
-      X++;
+      if( term==null || !peek('.') ) return term;
       term = new Field(id(),term);
     }
   }
   
   private static final SB ID = new SB();
-  private static String id() {
+  private static String id() { return id(false); }
+  private static String id( boolean op ) {
     ID.clear();
-    while( X<BUF.length && isAlpha1(BUF[X]) )
+    while( X<BUF.length && (op ? isOp(BUF[X]) : isAlpha1(BUF[X])) )
       ID.p((char)BUF[X++]);
     String s = ID.toString().intern();
     if( s.isEmpty() ) throw AA.TODO("Missing id");
@@ -110,8 +121,6 @@ public class EXE {
     return s;
   }
   private static Syntax number() {
-    if( BUF[X]=='0' && (BUF[X+1]!='.' || !isDigit(BUF[X+2])) )
-      { X++; return new Con(TypeNil.NIL); }
     int sum=0;
     while( X<BUF.length && isDigit(BUF[X]) )
       sum = sum*10+BUF[X++]-'0';
@@ -137,7 +146,8 @@ public class EXE {
   }
   private static boolean isWS    (byte c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
   private static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }
-  private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_') || (c=='*') || (c=='?') || (c=='+') || (c=='-'); }
+  private static boolean isOp    (byte c) { return "*?+-".indexOf(c)>=0; }
+  private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_'); }
   private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9') || (c=='/'); }
   private static boolean peek(char c) { if( skipWS()!=c ) return false; X++; return true; }
   private static boolean peek(String s) {
@@ -151,6 +161,7 @@ public class EXE {
 
   private static void require(char c) { if( skipWS()!=c ) throw AA.TODO("Missing '"+c+"'"); X++; }
   private static Syntax require(Syntax t, char c) { require(c); return t; }
+  private static String require(String s, char c) { require(c); return s; }
   private static Syntax require(String s, Syntax t) { for( byte c : s.getBytes() ) require((char)c); return t; }
   
   // ----------------- Syntax ---------------------
@@ -273,23 +284,6 @@ public class EXE {
     }
   }
 
-  // --- Field ------------------------
-  static class Field extends Syntax {
-    final String _id;
-    final Syntax _ptr;
-    Field( String id, Syntax ptr ) { _ptr = ptr; ptr._par = this; _id=id; }
-    @Override SB str(SB sb) { return _ptr.str(sb).p(".").p(_id); }
-    @Override void prep_tree(Ary<TV3> nongen) {
-      _tvar = new TVLeaf();
-      _ptr.prep_tree(nongen);
-      throw AA.TODO();
-    }
-    @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
-      return reduce.apply(map.apply(this),_ptr.visit(map,reduce));
-    }
-    @Override Type eval( Ary<Type> stk) { throw AA.TODO(); }
-  }
-
   // --- Lambda ------------------------
   static class Lambda extends Syntax {
     static final Ary<Lambda> FUNS = new Ary<>(Lambda.class);
@@ -312,13 +306,13 @@ public class EXE {
     int nargs() { return _args.length; }
     TV3 arg(int i) { return tvar().arg(i); }
     @Override void prep_tree(Ary<TV3> nongen) {
-      _tvar = new TVLambda(nargs(),new TVLeaf(),new TVLeaf());
+      _tvar = new TVLambda(nargs(),null,new TVLeaf());
       // Extend the nongen set by the new variables
-      for( int i=0; i<nargs(); i++ ) nongen.push(arg(i));
+      for( int i=AA.ARG_IDX; i<nargs(); i++ ) nongen.push(arg(i));
       // Prep the body
       _body.prep_tree(nongen);
       // Pop nongen stack
-      nongen.pop(nargs());
+      nongen.pop(nargs()-AA.ARG_IDX);
       // TVLambda ret is made early, unify with body now
       tvar().as_lambda().ret().unify(_body.tvar(),false);
     }
@@ -348,13 +342,14 @@ public class EXE {
       return sb.unchar().p(")");
     }
     int nargs() { return _args.length; }
-    TVLambda fun() { return (TVLambda)_fun.tvar(); }
     @Override void prep_tree(Ary<TV3> nongen) {
       _tvar = new TVLeaf();
       _fun.prep_tree(nongen);
       for( Syntax arg : _args ) arg.prep_tree(nongen);
 
-      TVLambda lam = fun();
+      TVLambda lam = new TVLambda(nargs()+AA.ARG_IDX,null,tvar());
+      _fun.tvar().unify(lam,false);
+      lam = lam.find().as_lambda();
       if( lam.nargs() != nargs()+AA.ARG_IDX ) throw AA.TODO("Expected "+(lam.nargs()-AA.ARG_IDX)+" args, found "+nargs()+" args");
       for( int i=0; i<nargs(); i++ )
         lam.arg(i+AA.ARG_IDX).unify(_args[i].tvar(),false);
@@ -454,9 +449,65 @@ public class EXE {
       stk.push(_def.eval(stk));
       stk.push(TypeInt.con(_uid));
       Type rez = _body.eval(stk);
-      stk.pop();
+      stk.pop(2);
       return rez;
     }    
+  }
+
+  // --- Struct ------------------------
+  static class Struct extends Syntax {
+    final Ary<String> _labels;
+    final Ary<Syntax> _flds;
+    Struct( ) { _labels = new Ary<>(String.class); _flds = new Ary<>(Syntax.class); }
+    void add( String label, Syntax fld ) { _labels.push(label); _flds.push(fld); }
+    @Override SB str(SB sb) {
+      sb.p("@{ ");
+      for( int i=0; i<_flds._len; i++ )
+        _flds.at(i).str(sb.p(_labels.at(i)).p(" = ")).p("; ");
+      return sb.unchar(1).p("}");
+    }
+    @Override void prep_tree(Ary<TV3> nongen) {
+      TVStruct str = new TVStruct(_labels);
+      _tvar = str;
+      for( int i=0; i<_flds._len; i++ ) {
+        _flds.at(i).prep_tree(nongen);
+        str.arg(i).unify(_flds.at(i).tvar(),false);
+      }
+    }
+    @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
+      T rez = map.apply(this);
+      for( Syntax fld : _flds )
+        rez = reduce.apply(rez,fld.visit(map,reduce));
+      return rez;
+    }
+    @Override Type eval( Ary<Type> stk) {
+      TypeFld[] flds = TypeFlds.get(_flds._len);
+      for( int i=0; i<_flds._len; i++ )
+        flds[i] = TypeFld.make(_labels.at(i),_flds.at(i).eval(stk));
+      return TypeStruct.make_flds(Type.ANY,flds);
+    }
+  }
+
+  // --- Field ------------------------
+  static class Field extends Syntax {
+    final String _lab;
+    final Syntax _ptr;
+    Field( String id, Syntax ptr ) { _ptr = ptr; ptr._par = this; _lab=id; }
+    @Override SB str(SB sb) { return _ptr.str(sb).p(".").p(_lab); }
+    @Override void prep_tree(Ary<TV3> nongen) {
+      _tvar = new TVLeaf();
+      _ptr.prep_tree(nongen);
+      _ptr.tvar().unify(new TVStruct(new String[]{_lab},new TV3[]{_tvar},true),false);
+      if( !(_ptr.tvar() instanceof TVStruct str && str.idx(_lab)>=0) )
+        throw AA.TODO("Missing field '"+_lab+"'");
+    }
+    @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
+      return reduce.apply(map.apply(this),_ptr.visit(map,reduce));
+    }
+    @Override Type eval( Ary<Type> stk) {
+      TypeStruct ts = (TypeStruct)_ptr.eval(stk);
+      return ts.at(_lab);
+    }
   }
 
 

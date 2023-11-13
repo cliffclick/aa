@@ -261,7 +261,7 @@ public class TVStruct extends TVExpanding {
         if( that.is_open() ) {
           that.add_fld(key,fthis,pin); // Add to RHS
         } else {
-          that.del_fld(key);    // Remove from RHS
+          //that.del_fld(key);    // Remove from RHS but its already gone
         }
       } else {
         fthis._unify(that.arg(ti),false); // Unify fields
@@ -284,8 +284,10 @@ public class TVStruct extends TVExpanding {
       }
       int idx = thsi.idx(key);
       if( idx== -1 ) {                               // Missing field in this
-        if( !is_open() )
-          thsi.del_fld(key); // Drop from RHS to match LHS
+        if( !is_open() ) {
+          that.del_fld( key ); // Drop from RHS to match LHS
+          i--;
+        }
         assert !that.unified(); // Missing a find
       }                      // Else, since field already in RHS do nothing
     }
@@ -553,7 +555,7 @@ public class TVStruct extends TVExpanding {
     for( int idx : sorted_flds() ) {
       if( !is_tup ) {                         // Skip tuple field names
         sb.p(_flds[idx]);
-        sb.p("= ");
+        sb.p("=");
       }
       if( _args[idx] == null ) sb.p("___");
       else _args[idx]._str(sb,visit,dups,debug,prims);

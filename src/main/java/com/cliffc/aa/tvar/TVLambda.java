@@ -121,14 +121,16 @@ public class TVLambda extends TV3 {
     // Skip memory contents when printing non-debug
     _args[0]._get_dups(visit,dups,debug,prims); // Return
     for( int i=DSP_IDX; i<nargs(); i++ )        // All arguments
-      _args[i]._get_dups(visit,dups,debug,prims);
+      if( _args[i] != null )
+        _args[i]._get_dups(visit,dups,debug,prims);
     return dups;
   }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     sb.p("{ ");
     for( int i=DSP_IDX; i<nargs(); i++ )
-      _args[i]._str(sb,visit,dups,debug,prims).p(' ');
+      if( _args[i]!=null )
+        _args[i]._str(sb,visit,dups,debug,prims).p(' ');
     sb.p("-> ");
     // Return
     _args[0]._str(sb,visit,dups,debug,prims).p(' ');    
