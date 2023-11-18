@@ -1,0 +1,4 @@
+// Simple field lookup
+// Type: 4
+// Eval: 4
+(pair 3 4).1

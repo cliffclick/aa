@@ -1,0 +1,4 @@
+// Simple id fcn, applied
+// Type: 3
+// Eval: 3
+( { x -> x } 3 )

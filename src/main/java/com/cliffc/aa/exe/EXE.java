@@ -3,20 +3,24 @@ package com.cliffc.aa.exe;
 import com.cliffc.aa.AA;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.*;
+import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.Util;
 
-import java.util.*;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
 
-import static com.cliffc.aa.AA.TODO;
-
 public class EXE {
-  public static void main( String[] args ) {
-    if( args.length != 1 )
-      throw TODO("More args?");
-    run(args[0],0,true,true);
+  public static void main( String[] args ) throws IOException {
+    for( String arg : args ) {
+      String prog = new String( Files.readAllBytes( Paths.get(arg)));
+      run(prog,0,true,true);
+    }
   }
 
   // Parse; Type; Run
@@ -31,6 +35,7 @@ public class EXE {
       put("+",new Add());
       put("-",new Sub());
       put("*",new Mul());
+      put("pair",new Pair());
     }};
   
 
@@ -113,6 +118,7 @@ public class EXE {
   private static String id() { return id(false); }
   private static String id( boolean op ) {
     ID.clear();
+    skipWS();
     while( X<BUF.length && (op ? isOp(BUF[X]) : isAlpha1(BUF[X])) )
       ID.p((char)BUF[X++]);
     String s = ID.toString().intern();
@@ -211,6 +217,10 @@ public class EXE {
       // TODO: Worklist based HM typing
     }
 
+
+
+
+    
     abstract Type eval( Ary<Type> stk);
   }
 
@@ -372,6 +382,7 @@ public class EXE {
       // Push args and function on the eval stack
       for( int i=nargs()-1; i>=0; i-- )
         stk.push(args[i]);
+      Types.free(args);
       stk.push(tfp);
       // Eval the body, in the context of the args
       Type rez = Lambda.FUNS.at(tfp.fidx()).apply(stk);
@@ -505,8 +516,8 @@ public class EXE {
       return reduce.apply(map.apply(this),_ptr.visit(map,reduce));
     }
     @Override Type eval( Ary<Type> stk) {
-      TypeStruct ts = (TypeStruct)_ptr.eval(stk);
-      return ts.at(_lab);
+      var tmp = (TypeMemPtr)_ptr.eval(stk);
+      return tmp._obj.at(_lab);
     }
   }
 
@@ -530,9 +541,9 @@ public class EXE {
   abstract static class PrimSyn extends Lambda {
     static final String[][] IDS = new String[][] {
       {},
-      {"x"},
-      {"x","y"},
-      {"x","y","z"},
+      {"0"},
+      {"0","1"},
+      {"0","1","2"},
     };
     static final Type[] TS = new Type[10];
     static TV3 INT64() { return TVBase.make(TypeInt.INT64); }
@@ -584,6 +595,21 @@ public class EXE {
     @Override PrimSyn make() { return new Mul(); }
     @Override SB str(SB sb) { return sb.p("*"); }
     @Override Type op() { return TypeInt.con(TS[0].getl()*TS[1].getl()); }
+  }
+
+  // Pair results
+  static class Pair extends PrimSyn {
+    final int _alias;
+    private static TVLeaf x,y;
+    public Pair() {
+      super(x=new TVLeaf(),y=new TVLeaf(),new TVStruct(IDS[2],new TV3[]{x,y}));
+      _alias = BitsAlias.new_alias(BitsAlias.LOCX);
+    }
+    @Override PrimSyn make() { return new Pair(); }
+    @Override SB str(SB sb) { return sb.p("pair"); }
+    @Override Type op() {
+      return TypeMemPtr.make(_alias,TypeStruct.make_test(TypeFld.make(IDS[2][0],TS[0]),TypeFld.make(IDS[2][1],TS[1])));
+    }
   }
 
 }

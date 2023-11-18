@@ -1,0 +1,4 @@
+// Prim math, apply
+// Type: int64
+// Eval: 7
+(+ 3 4)

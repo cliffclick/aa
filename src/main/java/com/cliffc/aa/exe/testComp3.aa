@@ -1,0 +1,4 @@
+// y is the self-recursive function, so never returns
+// Type: { A:{ A -> A } -> B }
+// Eval: [8]{all,4 -> ~Scalar }
+x = { y -> (x (y y))}; x

@@ -1,0 +1,10 @@
+// More complicated nested application
+// Type: { A -> (5, 5) }
+// Eval: [12]{all,4 -> (5, 5) }
+// fcn ignores p and returns a fcn to make a pair
+fcn = { p -> { a -> (pair a a) }};
+// map fun over x
+map = { fun x -> (fun x)};
+// fcn to pass q to fcn (which ignores it and returns a pair-maker)
+// which map then applies to 5 to make a pair of 5s.
+{ q -> (map (fcn q) 5)}

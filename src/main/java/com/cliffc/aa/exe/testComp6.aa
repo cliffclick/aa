@@ -1,0 +1,10 @@
+// Looking at when tvars are duplicated ("fresh" copies made).
+// This is the "map" problem with a scalar instead of a collection.
+// Takes a '{a->b}' and a 'a' for a couple of different prims.
+map = { fun ->
+  { x -> (fun x)}
+};
+(pair
+  ((map {x -> (+ 1 x)}) 5         )
+  ((map {p -> p.0    }) (pair 3 4))
+)

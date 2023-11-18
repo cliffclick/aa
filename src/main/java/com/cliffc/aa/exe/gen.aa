@@ -1,0 +1,9 @@
+// Gen counters
+// Simple test of captured environment
+gen = { ->
+  inc = { cnt ->
+   (pair cnt { -> (inc (+ cnt 1))} )
+  };
+  (inc 0)
+};
+((gen).1)

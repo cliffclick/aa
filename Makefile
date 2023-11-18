@@ -153,15 +153,15 @@ hm_tests:	$(test_classes) build/aa.jar
 	$(JVM) org.junit.runner.JUnitCore com.cliffc.aa.HM.TestHM
 
 
-
+# EXE, a standalone lambda calc interpreter
 exec_javas   := $(wildcard $(SRC)/$(AA)/exe/*java)
 etst_javas   := $(wildcard $(TST)/$(AA)/exe/*java)
 exec_classes := $(patsubst $(SRC)/%java,$(CLZDIR)/main/%class,$(exec_javas))
 etst_classes := $(patsubst $(TST)/%java,$(CLZDIR)/test/%class,$(etst_javas))
 
-exe:	$(main_classes) $(etst_classes)
-	@echo Running exe test program
-	@java -Xms1g -Xms1g -ea -cp "${CLZDIR}/main" com.cliffc.aa.exe.EXE $(prog)
+%.exe : %.aa $(main_javas) $(exec_classes)
+	@echo Running $<
+	@java -Xms1g -Xms1g -ea -cp "${CLZDIR}/main" com.cliffc.aa.exe.EXE $<
 
 
 .PHONY: clean
@@ -194,6 +194,6 @@ lib/annotations-16.0.2.jar:
 	@(cd lib; wget https://repo1.maven.org/maven2/org/jetbrains/annotations/16.0.2/annotations-16.0.2.jar)
 
 # Build emacs tags (part of a tasty emacs ide experience)
-tags:	$(main_javas) $(test_javas)
+tags:	$(main_javas) $(test_javas) $(exec_javas)
 	@rm -f TAGS
 	@$(CTAGS) -e --recurse=yes --extra=+q --fields=+fksaiS $(SRC) $(TST)

@@ -1,0 +1,9 @@
+// factorial-like, but arbitrary op-by-2
+// Type: (int64,int64)
+// Eval: *[10](16, 9, ...)
+fun = { fx x ->
+  if x
+  ? (fx (fun fx (- x 1)) 2)
+  : 1
+};
+(pair (fun * 4) (fun + 4))

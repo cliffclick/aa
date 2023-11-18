@@ -1,0 +1,4 @@
+// Simple id fcn 
+// Type: { A -> A }
+// Eval: [8]{all,4 -> ~Scalar }
+{ x -> x }

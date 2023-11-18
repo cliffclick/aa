@@ -1,0 +1,3 @@
+// Ignore f and make a pair of 5s
+g = {f -> 5};
+(g g)

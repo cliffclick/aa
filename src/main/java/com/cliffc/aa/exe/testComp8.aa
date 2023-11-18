@@ -1,0 +1,5 @@
+// Map to make a pair
+// Type: (5, 5)
+// Eval: *[10](5, 5, ...)
+map = { fun x -> (fun x)};
+(map { a-> (pair a a)} 5)

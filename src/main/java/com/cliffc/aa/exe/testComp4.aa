@@ -1,0 +1,7 @@
+// Stacked functions ignoring all function arguments
+// Type: 2
+// Eval: 2
+map = { fun ->
+  { x -> 2 }
+};
+((map 3) 5)

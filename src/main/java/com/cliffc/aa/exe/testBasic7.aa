@@ -1,0 +1,5 @@
+// Simple if
+// Type: nint8
+// Eval: 4
+if 1 ? 4 : 5
+

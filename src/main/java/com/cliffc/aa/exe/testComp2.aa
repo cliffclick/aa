@@ -1,0 +1,6 @@
+// Function composition
+// Type: { { A -> B } { B -> C } -> { A -> C } }
+// Eval: [9]{all,5 -> []{all,4 -> ~Scalar } }
+{ f g -> {
+  arg -> (g (f arg))}
+}

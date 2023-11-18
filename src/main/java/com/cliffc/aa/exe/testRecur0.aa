@@ -1,0 +1,5 @@
+// factorial
+// Type: { int64 -> int64 }
+// Eval: [10]{all,4 -> int64 }
+fact = { n -> if n ? (* n (fact (- n 1))) : 1 };
+fact
