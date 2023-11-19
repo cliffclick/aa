@@ -29,7 +29,7 @@ abstract public class TVExpanding extends TV3 {
     TV3 _lhs, _rhs;
     FreshNode _frsh;
     DelayUpdate(TV3 lhs, TV3 rhs, FreshNode frsh) {
-      assert !lhs.unified() && !rhs.unified();
+      assert !lhs.unified() && (rhs==null || !rhs.unified());
       _lhs=lhs;
       _rhs=rhs;
       _frsh = frsh;
@@ -37,10 +37,11 @@ abstract public class TVExpanding extends TV3 {
     TV3 lhs() { return _lhs.unified() ? (_lhs=_lhs.find()) : _lhs; }
     TV3 rhs() { return _rhs.unified() ? (_rhs=_rhs.find()) : _rhs; }
     boolean update() {
-      if( !_lhs.unified() && ! _rhs.unified() ) return false;
-      _lhs = _lhs.find();
-      _rhs = _rhs.find();
-      return true;              // Requires dup-check
+      boolean progress = false;
+      if( _lhs.unified() ) { _lhs = _lhs.find(); progress = true; }
+      if( _rhs==null ) return progress;
+      if( _rhs.unified() ) { _rhs = _rhs.find(); progress = true; }
+      return progress;          // Requires dup-check
     }
     boolean eq( DelayUpdate du ) {
       if( this==du ) return true;
@@ -61,8 +62,7 @@ abstract public class TVExpanding extends TV3 {
     }
     boolean eq( DelayFresh df ) {
       if( !super.eq(df) ) return false;
-      assert eq_nongen(df);
-      return true;
+      return eq_nongen(df);
     }
     // Deep equality check nongen
     private boolean eq_nongen( DelayFresh df ) {

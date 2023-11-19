@@ -1,0 +1,6 @@
+// Self-recursive fcn
+// Type: A:{ -> A }
+// Eval: CRASH, uses 'q' before def
+x = 1;
+q = (q);
+q

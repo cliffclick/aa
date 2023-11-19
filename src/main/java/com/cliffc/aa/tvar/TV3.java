@@ -431,6 +431,16 @@ abstract public class TV3 implements Cloneable {
     return rez;
   }
 
+  public TV3 fresh(TV3[] nongen) {
+    assert VARS.isEmpty();
+    assert FRESH_ROOT ==null;
+    FRESH_ROOT = new TVExpanding.DelayFresh(this,null,null,nongen);
+    TV3 rez = _fresh();
+    VARS.clear();
+    FRESH_ROOT = null;
+    return rez;
+  }
+  
   TV3 _fresh() {
     assert !unified();
     TV3 rez = VARS.get(this);

@@ -3,9 +3,7 @@ package com.cliffc.aa.exe;
 import com.cliffc.aa.AA;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.Util;
+import com.cliffc.aa.util.*;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -28,7 +26,7 @@ public class EXE {
     Syntax root = parse(prog);
     root.do_hm();
     System.out.println("Type: "+root.tvar().str(new SB(),null,null,false,false));
-    System.out.println("Eval: "+root.eval(new Ary<>(Type.class)));
+    System.out.println("Eval: "+root.eval(null));
   }
 
   static final HashMap<String,PrimSyn> PRIMSYNS = new HashMap<>(){{
@@ -131,15 +129,16 @@ public class EXE {
     while( X<BUF.length && isDigit(BUF[X]) )
       sum = sum*10+BUF[X++]-'0';
     if( X>= BUF.length || BUF[X]!='.' )
-      return new Con(TypeInt.con(sum));
+      return new Con(sum);
     // Ambiguous '.' in: 2.3 vs 2.x (field load from a number)
     if( X+1<BUF.length && isAlpha0(BUF[X+1]) )
-      return new Con(TypeInt.con(sum));
+      return new Con(sum);
     X++;
     float f = (float)sum;
     f = f + (BUF[X++]-'0')/10.0f;
     require('f');
-    return new Con(TypeFlt.con(f));
+    //return new Con(TypeFlt.con(f));
+    throw AA.TODO();
   }
   private static byte skipWS() {
     while(true) {
@@ -201,7 +200,7 @@ public class EXE {
 
     // Compute HM type
     void do_hm() {
-      prep_tree(new Ary<TV3>(TV3.class));
+      prep_tree(new Ary<>(TV3.class));
       visit( syn -> {
           if( syn.tvar() instanceof TVErr terr ) {
             System.err.println(terr);
@@ -217,22 +216,21 @@ public class EXE {
       // TODO: Worklist based HM typing
     }
 
-
-
-
-    
-    abstract Type eval( Ary<Type> stk);
+    // SEK style evaluation machine.
+    // Env is a linked list, with a Val (for Let) or a set of Vals (for Lambda).
+    // A Val is either an Int, or a Kontinuation; K has a Lambda and an Env.
+    abstract Val eval( Env e );
   }
 
   
   // --- Constant ------------------------
   static class Con extends Syntax {
-    final Type _con;
-    Con( Type con ) { _con = con; }
-    @Override SB str(SB sb) { return _con.str(sb,false,false); }
-    @Override void prep_tree(Ary<TV3> nongen) { _tvar = TV3.from_flow(_con); }
+    final IntVal _con;
+    Con( int con ) { _con = new IntVal(con); }
+    @Override SB str(SB sb) { return _con.str(sb,null); }
+    @Override void prep_tree(Ary<TV3> nongen) { _tvar = TV3.from_flow(TypeInt.con(_con._con)); }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
-    @Override Type eval( Ary<Type> stk) { return _con; }
+    @Override IntVal eval( Env e ) { return _con; }
   }
 
   // --- Ident ------------------------
@@ -240,57 +238,38 @@ public class EXE {
   static class Ident extends Syntax {
     private final String _name;       // The identifier name
 
-    private TV3[] _nongen;
-    private Syntax _def; // Either Lambda, and _argn is the argument number OR Let, and fresh===(_argn!=0)
-    private int _argn;
+    private int _dbidx;  // deBrujin index
+    private int _argn;   // Arg index for Lambda, 0 for Let
     
     Ident( String name ) { _name=name; }
     @Override SB str(SB sb) { return sb.p(_name); }
     @Override void prep_tree(Ary<TV3> nongen) {
+      int dbx = 0;
       for( Syntax syn = _par, prior=this; syn!=null; prior=syn, syn = syn._par ) {
-        _def = syn;
-        switch( syn ) {
-        case Lambda lam:
-          _argn = Util.find(lam._args,_name);
-          if( _argn != -1 ) {
-            _tvar = lam.arg(_argn); // Take TVar from the lambda directly
-            return;
-          }
-          break;
-        case Let let:
-          if( let._arg.equals(_name) ) {
-            _argn = prior==let._body ? 1 : 0;
-            _tvar = new TVLeaf();
-            _nongen = nongen.asAry();
-            TV3 def = let._def .tvar();
-            if( _argn==1 ) def.fresh_unify(null,_tvar,_nongen,false);
-            else           def.      unify(     _tvar        ,false);
-            return;
-          }
-        default: break;
+        if( syn instanceof Lambda lam ) {
+          if( (_argn=Util.find(lam._args,_name)) != -1 )
+            // Take TVar from the lambda directly; and zero-bias the arg index
+            {  init(lam.arg(_argn),dbx, _argn-AA.ARG_IDX);  return; }
+          dbx++;                // Bump deBrujin index
+        } else if( syn instanceof Let let ) {
+          if( let._arg.equals(_name) )
+            { init(prior==let._body ? let._def.tvar().fresh(nongen.asAry()) : let._def.tvar(),dbx,0);  return;  }
+          dbx++;                // Bump deBrujin index
         }
       }
       throw AA.TODO("'"+_name+"' not found");
     }
-    boolean fresh() { return _def instanceof Let && _argn==1; }
+    private void init( TV3 tv, int dbx, int argn ) { _tvar=tv; _dbidx=dbx; _argn=argn; }
+    
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
-    @Override Type eval( Ary<Type> stk) {
-      // Walk the eval stack, looking for our definition.
-      int i=stk._len-1;
-      while( true ) {
-        if( stk.at(i) instanceof TypeFunPtr tfp ) {
-          Lambda lam = Lambda.FUNS.at(tfp.fidx());
-          if( lam==_def )       // Correct lambda
-            return stk.at(i-1-(_argn-AA.ARG_IDX)); // All args got pushed, get the correct one
-          i -= lam.nargs()-AA.ARG_IDX+1;
-        } else {
-          int lidx = (int)stk.at(i).getl();
-          Let let = Let.LETS.at(lidx);
-          if( let==_def )       // Correct Let
-            return stk.at(i-1); // Pushed the one def, so its just behind
-          i = i-2;
-        }
-      }
+    @Override Val eval( Env e ) {
+      Env e0=e;
+      for( int i=0; i<_dbidx; i++ )
+        e0 = e0._e;               // Index env via deBrujin index
+      if( _argn==0 ) return e0._v0;
+      if( _argn==1 ) return e0._v1;
+      if( _argn==2 ) return e0._v2;
+      throw AA.TODO();
     }
   }
 
@@ -329,11 +308,8 @@ public class EXE {
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       return reduce.apply(map.apply(this),_body.visit(map,reduce));
     }
-    @Override Type eval( Ary<Type> stk) {
-      Type rez = _body.tvar().as_flow(null);
-      return TypeFunPtr.make(_fidx,nargs(),Type.ALL,rez);
-    }    
-    Type apply( Ary<Type> stk) { return _body.eval(stk); }
+    @Override KontVal eval( Env e ) { return new KontVal(e,this);  }    
+    Val apply( Env e ) { return _body.eval(e); }
   }
 
   // --- Apply ------------------------
@@ -372,23 +348,22 @@ public class EXE {
         rez = reduce.apply(rez,arg.visit(map,reduce));
       return rez;
     }
-    @Override Type eval( Ary<Type> stk) {
+    @Override Val eval( Env e ) {
       // Eval the function
-      TypeFunPtr tfp = (TypeFunPtr)_fun.eval(stk);
-      // Eval and record the arguments
-      Type[] args = Types.get(nargs());
-      for( int i=0; i<nargs(); i++ )
-        args[i] = _args[i].eval(stk);
-      // Push args and function on the eval stack
-      for( int i=nargs()-1; i>=0; i-- )
-        stk.push(args[i]);
-      Types.free(args);
-      stk.push(tfp);
-      // Eval the body, in the context of the args
-      Type rez = Lambda.FUNS.at(tfp.fidx()).apply(stk);
-      // Pop the eval stack
-      stk.pop(nargs()+1);
-      return rez;
+      KontVal fun = _fun.eval(e).as_kont();
+      Val a0=null, a1=null, a2=null;
+      if( nargs() > 0 ) {
+        a0 = _args[0].eval(e);
+        if( nargs() > 1 ) {
+          a1 = _args[1].eval(e);
+          if( nargs() > 2 ) {
+            throw AA.TODO();
+          }
+        }
+      }
+      e = new Env(fun._e,a0,a1,a2);
+      // Eval the body, in the context the closure, extended by the args
+      return fun._lam.apply(e);
     }
   }
 
@@ -421,10 +396,10 @@ public class EXE {
       rez = reduce.apply(rez,_f   .visit(map,reduce));
       return rez;
     }
-    @Override Type eval( Ary<Type> stk) {
-      Type pred = _pred.eval(stk);
-      Syntax syn = pred==TypeNil.NIL || pred==TypeInt.ZERO ? _f : _t;
-      return syn.eval(stk);
+    @Override Val eval( Env e ) {
+      IntVal pred = _pred.eval(e).as_int();
+      Syntax syn = pred._con==0 ? _f : _t;
+      return syn.eval(e);
     }
   }
   
@@ -456,12 +431,13 @@ public class EXE {
       T def = reduce.apply(rez,_def .visit(map,reduce));
       return  reduce.apply(def,_body.visit(map,reduce));
     }
-    @Override Type eval( Ary<Type> stk) {
-      stk.push(_def.eval(stk));
-      stk.push(TypeInt.con(_uid));
-      Type rez = _body.eval(stk);
-      stk.pop(2);
-      return rez;
+    @Override Val eval( Env e ) {
+      Env e0 = new Env(e,null); // Premature push: no def yet, so null
+      Val def = _def.eval(e0);  // Eval def
+      e0._v0 = def;             // Close the cycle
+      if( def instanceof KontVal k ) 
+        k._e = e0;              // Let Rec
+      return _body.eval(e0);
     }    
   }
 
@@ -491,11 +467,12 @@ public class EXE {
         rez = reduce.apply(rez,fld.visit(map,reduce));
       return rez;
     }
-    @Override Type eval( Ary<Type> stk) {
-      TypeFld[] flds = TypeFlds.get(_flds._len);
-      for( int i=0; i<_flds._len; i++ )
-        flds[i] = TypeFld.make(_labels.at(i),_flds.at(i).eval(stk));
-      return TypeStruct.make_flds(Type.ANY,flds);
+    @Override Val eval( Env e ) {
+      //TypeFld[] flds = TypeFlds.get(_flds._len);
+      //for( int i=0; i<_flds._len; i++ )
+      //  flds[i] = TypeFld.make(_labels.at(i),_flds.at(i).eval(stk));
+      //return TypeStruct.make_flds(Type.ANY,flds);
+      throw AA.TODO();
     }
   }
 
@@ -515,10 +492,7 @@ public class EXE {
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       return reduce.apply(map.apply(this),_ptr.visit(map,reduce));
     }
-    @Override Type eval( Ary<Type> stk) {
-      var tmp = (TypeMemPtr)_ptr.eval(stk);
-      return tmp._obj.at(_lab);
-    }
+    @Override Val eval( Env e ) { return _ptr.eval(e).as_struct().at(_lab); }
   }
 
 
@@ -534,7 +508,7 @@ public class EXE {
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       return reduce.apply(map.apply(this),_prog.visit(map,reduce));
     }
-    @Override Type eval(Ary<Type> stk) { return _prog.eval(stk); }
+    @Override Val eval( Env e ) { return _prog.eval(e); }
   }
 
   // --- PrimSyn ------------------------
@@ -562,15 +536,8 @@ public class EXE {
       _tvar = lam;
     }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this);  }
-    @Override Type eval( Ary<Type> stk) {
-      return TypeFunPtr.make(_fidx,nargs(),Type.ALL,Type.ALL);
-    }    
-    @Override Type apply( Ary<Type> stk ) {
-      for( int i=0; i<nargs(); i++ )
-        TS[i] = stk.at(stk._len-2-i);
-      return op();
-    }
-    abstract Type op();
+    @Override Val apply( Env e ) { return new IntVal(iop(e._v0.as_int()._con,e._v1.as_int()._con)); }
+    abstract int iop(int x, int y);
   }
 
   // add integers
@@ -578,7 +545,7 @@ public class EXE {
     public Add() { super(INT64(), INT64(), INT64()); }
     @Override PrimSyn make() { return new Add(); }
     @Override SB str(SB sb) { return sb.p("+"); }
-    @Override Type op() { return TypeInt.con(TS[0].getl()+TS[1].getl()); }
+    @Override int iop(int x, int y) { return x+y; }
   }
 
   // sub integers
@@ -586,7 +553,7 @@ public class EXE {
     public Sub() { super(INT64(), INT64(), INT64()); }
     @Override PrimSyn make() { return new Sub(); }
     @Override SB str(SB sb) { return sb.p("-"); }
-    @Override Type op() { return TypeInt.con(TS[0].getl()-TS[1].getl()); }
+    @Override int iop(int x, int y) { return x-y; }
   }
 
   // mul integers
@@ -594,7 +561,7 @@ public class EXE {
     public Mul() { super(INT64(), INT64(), INT64()); }
     @Override PrimSyn make() { return new Mul(); }
     @Override SB str(SB sb) { return sb.p("*"); }
-    @Override Type op() { return TypeInt.con(TS[0].getl()*TS[1].getl()); }
+    @Override int iop(int x, int y) { return x*y; }
   }
 
   // Pair results
@@ -607,9 +574,80 @@ public class EXE {
     }
     @Override PrimSyn make() { return new Pair(); }
     @Override SB str(SB sb) { return sb.p("pair"); }
-    @Override Type op() {
-      return TypeMemPtr.make(_alias,TypeStruct.make_test(TypeFld.make(IDS[2][0],TS[0]),TypeFld.make(IDS[2][1],TS[1])));
+    @Override StructVal apply( Env e ) { return new StructVal().add("0",e._v0).add("1",e._v1); }
+    @Override int iop(int x, int y) { throw AA.TODO(); }
+  }
+
+
+  // --- Env ---------------------------------------------------
+  private static class Env {
+    final Env _e;               // Linked list
+    Val _v0, _v1, _v2;    // Values; referenced via deBrujin
+    Env(Env e, Val v0, Val v1, Val v2) { _e=e; _v0=v0; _v1=v1; _v2=v2; }
+    Env(Env e, Val v0, Val v1) { this(e,v0,v1,null); }
+    Env(Env e, Val v0) { this(e,v0,null,null); }
+    @Override public String toString() { return str(new SB(), new VBitSet()).toString(); }
+    SB str(SB sb, VBitSet visit) {
+      sb.p('(');
+      if( _v0!=null ) _v0.str(sb       ,visit);
+      if( _v1!=null ) _v1.str(sb.p(','),visit);
+      if( _v2!=null ) _v2.str(sb.p(','),visit);
+      sb.p(')');
+      if( _e==null ) return sb;
+      return _e.str(sb.p(','),visit);
     }
   }
 
+  // --- Val -----------------------------------------------------
+  // Either an integer (and _e==null) or a Continuation (_e!=null)
+  private static abstract class Val {
+    IntVal    as_int   () { return null; }
+    KontVal   as_kont  () { return null; }    
+    StructVal as_struct() { return null; }    
+    @Override public String toString() { return str(new SB(), new VBitSet()).toString(); }
+    abstract SB str(SB sb, VBitSet visit);
+  }
+  
+  private static class IntVal extends Val {
+    final int _con;
+    IntVal(int con) { _con=con; }
+    IntVal as_int() { return this; }
+    SB str(SB sb, VBitSet visit) { return sb.p(_con); }
+  }
+  
+  private static class KontVal extends Val {
+    private static int UID=1;
+    private int _uid=UID++;
+    Env _e;
+    final Lambda _lam;
+    KontVal(Env e, Lambda lam) { _e=e; _lam=lam; }
+    KontVal as_kont() { return this; }
+    SB str(SB sb, VBitSet visit) {
+      sb.p("K").p(_uid);
+      if( visit.tset(_uid) ) return sb;
+      _lam.str(sb.p("[")).p(",");
+      if( _e!=null ) _e.str(sb,visit);
+      return sb.p("]");
+    }
+  }
+  
+  private static class StructVal extends Val {
+    int _len;
+    String[] _labels = new String[2];
+    Val[] _vals = new Val[2];
+    StructVal add(String label, Val val) {
+      if( _len == _vals.length )  throw AA.TODO();
+      _labels[_len  ] = label;
+      _vals  [_len++] = val;
+      return this;
+    }
+    StructVal as_struct() { return this; }
+    Val at(String label) { return _vals[Util.find(_labels,label)]; }
+    SB str(SB sb, VBitSet visit) {
+      sb.p("@{ ");
+      for( int i=0; i<_len; i++ )
+        _vals[i].str(sb.p(_labels[i]).p("="),visit).p("; ");
+      return sb.unchar(_len==0?0:2).p(" }");
+    }
+  }
 }

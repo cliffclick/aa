@@ -1,0 +1,20 @@
+// Gen counters
+// Simple test of captured environment
+// Type: A:(int64, { -> A })
+// Eval: @{ 0=2; 1=1 }
+gen = { ->
+  inc = { cnt ->
+   (pair cnt { -> (inc (+ cnt 1))} )
+  };
+  (inc 0)
+};
+// Make 2 hidden countes
+cntX0=(gen);
+cntY0=(gen);
+// Increment both to 1
+cntX1=(cntX0.1);
+cntY1=(cntY0.1);
+// Increment cnt0 to 2
+cntX2=(cntX1.1);
+// Report (2, 1)
+(pair cntX2.0 cntY1.0)

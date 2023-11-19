@@ -1,6 +1,6 @@
 // Test of deBrujin indices
-// Type: 1
-// Eval: 1
+// Type: (3, 4)
+// Eval: @{ 0=3; 1=4 }
 x = 1;
 y = 2;
 x = 3;

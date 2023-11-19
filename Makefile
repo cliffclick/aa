@@ -159,7 +159,7 @@ etst_javas   := $(wildcard $(TST)/$(AA)/exe/*java)
 exec_classes := $(patsubst $(SRC)/%java,$(CLZDIR)/main/%class,$(exec_javas))
 etst_classes := $(patsubst $(TST)/%java,$(CLZDIR)/test/%class,$(etst_javas))
 
-%.exe : %.aa $(main_javas) $(exec_classes)
+%.exe : %.aa $(main_classes) $(exec_classes)
 	@echo Running $<
 	@java -Xms1g -Xms1g -ea -cp "${CLZDIR}/main" com.cliffc.aa.exe.EXE $<
 
