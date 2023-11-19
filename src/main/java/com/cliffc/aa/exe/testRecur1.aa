@@ -1,5 +1,5 @@
 // factorial
-// Type: 
+// Type: int64
 // Eval: 6
 fact = { n -> if n ? (* n (fact (- n 1))) : 1 };
 (fact 3)

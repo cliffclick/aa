@@ -1,0 +1,7 @@
+// Test of deBrujin indices
+// Type: 1
+// Eval: 1
+x = 1;
+y = x;
+z = y;
+z

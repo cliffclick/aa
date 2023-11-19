@@ -1,4 +1,4 @@
 // Simple pair
 // Type: (3, 4)
-// Eval: *[10](3, 4, ...)
+// Eval: @{ 0=3; 1=4 }
 (pair 3 4)

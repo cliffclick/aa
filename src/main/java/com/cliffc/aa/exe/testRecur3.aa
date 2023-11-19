@@ -1,6 +1,6 @@
 // factorial-like, but arbitrary op-by-2
 // Type: (int64,int64)
-// Eval: *[10](16, 9, ...)
+// Eval: @{ 0=16; 1=9 }
 fun = { fx x ->
   if x
   ? (fx (fun fx (- x 1)) 2)

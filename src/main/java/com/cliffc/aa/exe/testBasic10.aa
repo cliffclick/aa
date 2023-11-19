@@ -1,0 +1,8 @@
+// Test of deBrujin indices
+// Type: (3, (2, 1))
+// Eval: @{ 0=3; 1=@{ 0=2; 1=1 } }
+x = 1;
+y = 2;
+z = 3;
+(pair z (pair y x))
+

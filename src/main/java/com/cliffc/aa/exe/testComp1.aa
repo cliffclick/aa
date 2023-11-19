@@ -1,4 +1,4 @@
 // Function composition
 // Type: { { A -> B } A -> B }
-// Eval: [8]{all,5 -> ~Scalar }
+// Eval: K[{ f g -> (f g) },]
 { f g -> (f g)}

@@ -1,5 +1,5 @@
 // Combo of simple
 // Type: (nint8, { A -> nint8 })
-// Eval: *[10](5, [8]{all,4 -> nint8 }, ...)
+// Eval: @{ 0=5; 1=K[{ p -> if p ? 4 : 5 },] }
 fun = { p -> if p ? 4 : 5 };
 (pair (fun 0) fun)
