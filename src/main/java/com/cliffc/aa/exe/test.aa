@@ -1,7 +1,0 @@
-map = { fun ->
-  { x -> (fun x)}
-};
-(pair
-  ((map {x -> (+ 1 x)}) 5         )
-  ((map {p -> p.0    }) (pair 3 4))
-)

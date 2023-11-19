@@ -14,6 +14,7 @@ import java.util.function.Function;
 import java.util.function.IntSupplier;
 
 public class EXE {
+  public static void reset() { KontVal.reset(); }
   public static void main( String[] args ) throws IOException {
     for( String arg : args ) {
       String prog = new String( Files.readAllBytes( Paths.get(arg)));
@@ -21,10 +22,14 @@ public class EXE {
     }
   }
 
+  public static Root compile( String prog, int rseed, boolean do_hm, boolean do_gcp ) {
+    reset();
+    return parse(prog).do_hm();
+  }
+
   // Parse; Type; Run
   public static void run( String prog, int rseed, boolean do_hm, boolean do_gcp ) {
-    Syntax root = parse(prog);
-    root.do_hm();
+    Root root = compile(prog,rseed,do_hm,do_gcp);
     System.out.println("Type: "+root.tvar().str(new SB(),null,null,false,false));
     System.out.println("Eval: "+root.eval(null));
   }
@@ -43,7 +48,7 @@ public class EXE {
   private static byte[] BUF;
   @Override public String toString() { return str(); }
   static String str() { return new String(BUF,X,BUF.length-X); }
-  static Syntax parse( String sprog ) {
+  static Root parse( String sprog ) {
     X = 0;
     BUF = sprog.getBytes();
     Syntax prog = fterm();
@@ -198,24 +203,6 @@ public class EXE {
     // First pass
     abstract void prep_tree(Ary<TV3> nongen);
 
-    // Compute HM type
-    void do_hm() {
-      prep_tree(new Ary<>(TV3.class));
-      visit( syn -> {
-          if( syn.tvar() instanceof TVErr terr ) {
-            System.err.println(terr);
-            System.exit(1);
-          }
-          if( syn.tvar() instanceof TVBase base && base._t instanceof TypeNil tn && tn.getClass()==TypeNil.class ) {
-            System.err.println("Mixing int and float");
-            System.exit(1);
-          }
-          return null;
-        },
-        (a,b)->null);
-      // TODO: Worklist based HM typing
-    }
-
     // SEK style evaluation machine.
     // Env is a linked list, with a Val (for Let) or a set of Vals (for Lambda).
     // A Val is either an Int, or a Kontinuation; K has a Lambda and an Env.
@@ -245,16 +232,25 @@ public class EXE {
     @Override SB str(SB sb) { return sb.p(_name); }
     @Override void prep_tree(Ary<TV3> nongen) {
       int dbx = 0;
+      boolean was_apply=false;
       for( Syntax syn = _par, prior=this; syn!=null; prior=syn, syn = syn._par ) {
         if( syn instanceof Lambda lam ) {
           if( (_argn=Util.find(lam._args,_name)) != -1 )
             // Take TVar from the lambda directly; and zero-bias the arg index
             {  init(lam.arg(_argn),dbx, _argn-AA.ARG_IDX);  return; }
           dbx++;                // Bump deBrujin index
+          was_apply = false;
         } else if( syn instanceof Let let ) {
-          if( let._arg.equals(_name) )
-            { init(prior==let._body ? let._def.tvar().fresh(nongen.asAry()) : let._def.tvar(),dbx,0);  return;  }
+          if( let._arg.equals(_name) ) {
+            boolean fresh = prior==let._body;
+            if( was_apply && !fresh )
+              throw new IllegalArgumentException("Cyclic reference to "+_name);
+            init(fresh ? let._def.tvar().fresh(nongen.asAry()) : let._def.tvar(),dbx,0);
+            return;
+          }
           dbx++;                // Bump deBrujin index
+        } else if( syn instanceof Apply apl ) {
+          was_apply = true;
         }
       }
       throw AA.TODO("'"+_name+"' not found");
@@ -509,6 +505,26 @@ public class EXE {
       return reduce.apply(map.apply(this),_prog.visit(map,reduce));
     }
     @Override Val eval( Env e ) { return _prog.eval(e); }
+
+    // Compute HM type
+    Root do_hm() {
+      prep_tree(new Ary<>(TV3.class));
+      // Check for simple type errors
+      visit( syn -> {
+          if( syn.tvar() instanceof TVErr terr ) {
+            System.err.println(terr);
+            System.exit(1);
+          }
+          if( syn.tvar() instanceof TVBase base && base._t instanceof TypeNil tn && tn.getClass()==TypeNil.class ) {
+            System.err.println("Mixing int and float");
+            System.exit(1);
+          }
+          return null;
+        },
+        (a,b)->null);
+      // TODO: Worklist based HM typing
+      return this;
+    }
   }
 
   // --- PrimSyn ------------------------
@@ -600,11 +616,11 @@ public class EXE {
 
   // --- Val -----------------------------------------------------
   // Either an integer (and _e==null) or a Continuation (_e!=null)
-  private static abstract class Val {
+  public static abstract class Val {
     IntVal    as_int   () { return null; }
     KontVal   as_kont  () { return null; }    
     StructVal as_struct() { return null; }    
-    @Override public String toString() { return str(new SB(), new VBitSet()).toString(); }
+    @Override final public String toString() { return str(new SB(), new VBitSet()).toString(); }
     abstract SB str(SB sb, VBitSet visit);
   }
   
@@ -629,6 +645,7 @@ public class EXE {
       if( _e!=null ) _e.str(sb,visit);
       return sb.p("]");
     }
+    public static void reset() { UID=1; }
   }
   
   private static class StructVal extends Val {

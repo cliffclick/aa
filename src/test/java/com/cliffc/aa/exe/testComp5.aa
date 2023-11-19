@@ -1,4 +1,4 @@
 // Defines map, ignores it
 // Type: { A -> 5 }
-// Eval: K[{ p -> 5 },(K[{ fun -> { x -> (fun x) } },])]
+// Eval: K2[{ p -> 5 },(K1[{ fun -> { x -> (fun x) } },(K1)])]
 map = { fun -> { x -> (fun x)}}; { p -> 5 }

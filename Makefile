@@ -76,7 +76,7 @@ $(main_classes): build/classes/main/%class: $(SRC)/%java
 $(test_classes): $(CLZDIR)/test/%class: $(TST)/%java $(main_classes)
 	@echo "compiling " $@ " because " $?
 	@[ -d $(CLZDIR)/test ] || mkdir -p $(CLZDIR)/test
-	@javac $(JAVAC_ARGS) -cp "$(CLZDIR)/test$(SEP)$(CLZDIR)/main$(SEP)$(jars)" -sourcepath $(TST) -d $(CLZDIR)/test $(test_javas)
+	javac $(JAVAC_ARGS) -cp "$(CLZDIR)/test$(SEP)$(CLZDIR)/main$(SEP)$(jars)" -sourcepath $(TST) -d $(CLZDIR)/test $(test_javas)
 
 # Note the tabs - not spaces - in the grep and cut commands
 PROJECT_VERSION=0.0.1
@@ -130,7 +130,7 @@ sandbox/tests.txt:	$(test_classes)
 	@(cd ${TST}; /usr/bin/find . -name '*.java' | cut -c3- | sed "s/.....$$//" | sed -e 's/\//./g') | grep -v TestUtil | /usr/bin/sort > sandbox/tests.txt
 
 # Base launch line for JVM tests
-JVM=nice java -Xms1g -Xms1g -XX:+PrintGC -ea -cp "build/aa.jar${SEP}${jars}${SEP}$(CLZDIR)/test"
+JVM=nice java -Xms1g -Xms1g -ea -cp "build/aa.jar${SEP}${jars}${SEP}$(CLZDIR)/test"
 
 # Build the AA-test jar and run the junit tests.
 # Actually makes jvm_cmd.txt and status.0 along with out.0
@@ -159,9 +159,16 @@ etst_javas   := $(wildcard $(TST)/$(AA)/exe/*java)
 exec_classes := $(patsubst $(SRC)/%java,$(CLZDIR)/main/%class,$(exec_javas))
 etst_classes := $(patsubst $(TST)/%java,$(CLZDIR)/test/%class,$(etst_javas))
 
-%.exe : %.aa $(main_classes) $(exec_classes)
+%.exe : %.aa $(main_classes) $(exec_classes) $(etst_classes)
 	@echo Running $<
 	@java -Xms1g -Xms1g -ea -cp "${CLZDIR}/main" com.cliffc.aa.exe.EXE $<
+
+test_aas   := $(wildcard $(TST)/$(AA)/exe/*aa)
+
+exe:	$(main_classes) $(exec_classes) $(etst_classes) build/aa.jar
+	echo testing EXE
+	$(JVM) org.junit.runner.JUnitCore com.cliffc.aa.exe.TestEXE
+
 
 
 .PHONY: clean

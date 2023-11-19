@@ -1,6 +1,6 @@
 // Gen counters
 // Simple test of captured environment
-// Type: A:(int64, { -> A })
+// Type: (int64, int64)
 // Eval: @{ 0=2; 1=1 }
 gen = { ->
   inc = { cnt ->

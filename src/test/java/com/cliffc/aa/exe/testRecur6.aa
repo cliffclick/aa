@@ -1,0 +1,6 @@
+// Self-recursive fcn
+// Type: Cyclic reference to q
+// Eval: CRASH
+x = 1;
+q = (q);
+q

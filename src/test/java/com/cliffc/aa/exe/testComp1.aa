@@ -1,4 +1,4 @@
 // Function composition
 // Type: { { A -> B } A -> B }
-// Eval: K[{ f g -> (f g) },]
+// Eval: K1[{ f g -> (f g) },]
 { f g -> (f g)}

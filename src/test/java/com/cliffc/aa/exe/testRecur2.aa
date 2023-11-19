@@ -1,5 +1,5 @@
 // Recursive data structure
-// Type: A:(3, A)
+// Type: Cyclic reference to x
 // Eval: CRASH
 // To not crash, I need the pair to evaluate to a struct *first*, before
 // evaluation arguments, and have that result ready for the 'x' lookup

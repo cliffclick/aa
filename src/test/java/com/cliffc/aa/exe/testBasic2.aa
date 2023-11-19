@@ -1,4 +1,4 @@
 // Simple id fcn 
 // Type: { A -> A }
-// Eval: K[{ x -> x },]
+// Eval: K1[{ x -> x },]
 { x -> x }
