@@ -8,6 +8,7 @@ import com.cliffc.aa.util.*;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -144,8 +145,7 @@ public class EXE {
     float f = (float)sum;
     f = f + (BUF[X++]-'0')/10.0f;
     require('f');
-    //return new Con(TypeFlt.con(f));
-    throw AA.TODO();
+    return new Con(f);
   }
   private static byte skipWS() {
     while(true) {
@@ -214,12 +214,13 @@ public class EXE {
   
   // --- Constant ------------------------
   static class Con extends Syntax {
-    final IntVal _con;
-    Con( int con ) { _con = new IntVal(con); }
+    final Val _con;
+    Con( int   con ) { _con = new IntVal(con); }
+    Con( float con ) { _con = new FltVal(con); }
     @Override SB str(SB sb) { return _con.str(sb,null); }
-    @Override void prep_tree(Ary<TV3> nongen) { _tvar = TV3.from_flow(TypeInt.con(_con._con)); }
+    @Override void prep_tree(Ary<TV3> nongen) { _tvar = TV3.from_flow(_con.as_flow()); }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
-    @Override IntVal eval( Env e ) { return _con; }
+    @Override Val eval( Env e ) { return _con; }
   }
 
   // --- Nil ------------------------
@@ -392,8 +393,25 @@ public class EXE {
       _pred.prep_tree(nongen);
       _t.prep_tree(nongen);
       _f.prep_tree(nongen);
-      tvar().unify(_t.tvar(),false);
-      tvar().unify(_f.tvar(),false);
+
+      // pred is a simple constant?  Unify one side
+      int cmp=0;
+      if( _pred.tvar() instanceof TVBase base && base._t instanceof TypeNil tn ) {
+        if( tn._nil ) { cmp= -1; assert !tn._sub; }
+        if( tn._sub )   cmp=  1;
+        if( tn==TypeInt.ZERO || tn==TypeFlt.ZERO ) cmp = -1;
+      }
+      // TODO: Cannot do NIL mixing withup up-cast of not-nil after IF
+      //// Structs are ptrs in EXE for now
+      //if( _pred.tvar() instanceof TVStruct s ) {
+      //  // TVStruct version of a nil-TVPtr
+      //  if(  s.may_nil() && s.len()==0 && s.is_open()  ) cmp= -1;
+      //  // Not-nil struct is always true
+      //  if( !s.may_nil() ) cmp=1;
+      //}
+      // Unify both sides
+      if( cmp >= 0 ) tvar().unify(_t.tvar(),false);
+      if( cmp <= 0 ) tvar().unify(_f.tvar(),false);
     }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       T slf = map.apply(this), rez;
@@ -406,6 +424,7 @@ public class EXE {
       Val pred = _pred.eval(e);
       boolean t = switch( pred ) {
       case IntVal II -> II._con!=0;
+      case FltVal FF -> FF._con!=0;
       case StructVal s -> true;
       case NilVal n -> false;
       default -> throw AA.TODO();
@@ -496,9 +515,12 @@ public class EXE {
     @Override void prep_tree(Ary<TV3> nongen) {
       _tvar = new TVLeaf();
       _ptr.prep_tree(nongen);
-      _ptr.tvar().unify(new TVStruct(new String[]{_lab},new TV3[]{_tvar},true),false);
+      TVStruct s = new TVStruct(new String[]{_lab},new TV3[]{_tvar},true);
+      // TODO: Cannot add use_nil without the full up-cast of not-nil after IF
+      //s.add_use_nil();
+      _ptr.tvar().unify(s,false);
       if( !(_ptr.tvar() instanceof TVStruct str && str.idx(_lab)>=0) )
-        throw AA.TODO("Missing field '"+_lab+"'");
+        throw new IllegalArgumentException("Missing field '"+_lab+"'");
     }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       return reduce.apply(map.apply(this),_ptr.visit(map,reduce));
@@ -526,10 +548,8 @@ public class EXE {
       prep_tree(new Ary<>(TV3.class));
       // Check for simple type errors
       visit( syn -> {
-          if( syn.tvar() instanceof TVErr terr ) {
-            System.err.println(terr);
-            System.exit(1);
-          }
+          if( syn.tvar() instanceof TVErr terr )
+            throw new IllegalArgumentException(terr.toString());
           if( syn.tvar() instanceof TVBase base && base._t instanceof TypeNil tn && tn.getClass()==TypeNil.class ) {
             System.err.println("Mixing int and float");
             System.exit(1);
@@ -642,7 +662,8 @@ public class EXE {
   public static abstract class Val {
     IntVal    as_int   () { return null; }
     KontVal   as_kont  () { return null; }    
-    StructVal as_struct() { return null; }    
+    StructVal as_struct() { return null; }
+    TypeNil as_flow() { throw AA.TODO(); }
     @Override final public String toString() { return str(new SB(), new VBitSet()).toString(); }
     abstract SB str(SB sb, VBitSet visit);
   }
@@ -652,6 +673,15 @@ public class EXE {
     IntVal(int con) { _con=con; }
     IntVal as_int() { return this; }
     SB str(SB sb, VBitSet visit) { return sb.p(_con); }
+    TypeNil as_flow() { return TypeInt.con(_con); }
+  }
+  
+  private static class FltVal extends Val {
+    final float _con;
+    FltVal(float con) { _con=con; }
+    FltVal as_flt() { return this; }
+    SB str(SB sb, VBitSet visit) { return sb.p(_con).p("f"); }
+    TypeNil as_flow() { return TypeFlt.con(_con); }
   }
   
   private static class NilVal extends Val {
@@ -679,9 +709,12 @@ public class EXE {
   private static class StructVal extends Val {
     int _len;
     String[] _labels = new String[2];
-    Val[] _vals = new Val[2];
+    Val   [] _vals   = new Val   [2];
     StructVal add(String label, Val val) {
-      if( _len == _vals.length )  throw AA.TODO();
+      if( _len == _vals.length )  {
+        _labels = Arrays.copyOf(_labels,_len<<1);
+        _vals   = Arrays.copyOf(_vals  ,_len<<1);
+      }
       _labels[_len  ] = label;
       _vals  [_len++] = val;
       return this;

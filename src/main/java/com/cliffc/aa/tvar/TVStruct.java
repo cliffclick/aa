@@ -209,7 +209,7 @@ public class TVStruct extends TVExpanding {
 
   // -------------------------------------------------------------
   @Override public void _union_impl( TV3 tv3 ) {
-    TVStruct ts = (TVStruct)tv3; // Invariant when called
+    TVStruct ts = tv3.as_struct(); // Invariant when called
     ts._open = ts._open & _open;
     assert _dynmap==null || _dynmap==ts._dynmap;
   }

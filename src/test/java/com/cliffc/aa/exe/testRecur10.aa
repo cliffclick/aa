@@ -1,0 +1,11 @@
+// Polymorphic records; see testRecur11.aa
+// Type: ( ( @{ x=3; y=4; }, 3), ( @{ x=4; z=@{ q=1; }; }, 4))
+// Eval: ( ( @{ x=3; y=4; }, 3), ( @{ x=4; z=@{ q=1; }; }, 4))
+fun = { rec ->
+  (pair rec rec.x)
+};
+(pair
+  (fun @{x=3  ; y=4      ; })
+  (fun @{x=4  ; z=@{q=1;}; })
+)
+

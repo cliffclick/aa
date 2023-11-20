@@ -1,0 +1,7 @@
+// Mutual recursion
+// Type: int64
+// Eval: 1
+is_even =
+  is_odd = { n -> if n ? (- 1 (is_even (- n 1))) : 0 };
+           { n -> if n ? (- 1 (is_odd  (- n 1))) : 1 };
+(is_even 2)

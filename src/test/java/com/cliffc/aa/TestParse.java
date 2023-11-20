@@ -389,8 +389,8 @@ bar()
     //test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(1),fact(2.5),fact(0))","*[14](1,2,6)","*[14](int64,int64,int64)", null, null, "[14]", null);
 
     // Co-recursion requires parallel assignment & type inference across a lexical scope
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", "int1", "int1" );
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", "int1", "int1" );
+    test("is_even = { n -> n ? !is_odd(n-1) : 1}; is_odd = {n -> n ? !is_even(n-1) : 0}; is_even(4)", "int1", "int1" );
+    test("is_even = { n -> n ? !is_odd(n-1) : 1}; is_odd = {n -> n ? !is_even(n-1) : 0}; is_even(99)", "int1", "int1" );
 
     // This test merges 2 TypeFunPtrs in a Phi, and then fails to resolve.
     test("(math.rand(1) ? 2._+_ : 2._*_) ._ (3)","nint8","int64"); // either 2+3 or 2*3, or {5,6} which is NINT8.

@@ -1,0 +1,8 @@
+// GCP helps HMT, but just simple const-folding here
+// Type: 3.4f
+// Eval: 3.4f
+pred = 0;
+s1 = @{ x=3; };
+s2 = @{ y=3.4f; };
+s = if pred ? s1 : s2;
+s.y

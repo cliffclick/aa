@@ -148,11 +148,12 @@ abstract public class TV3 implements Cloneable {
   public boolean add_may_nil(boolean test) {
     if( _may_nil ) return false;   // No change
     if( test ) return ptrue();     // Will be progress
-    if( _use_nil ) throw TODO(); // unify_errs("May be nil",work);
+    if( _use_nil )
+      _unify_err("May be nil",null,null,test);
     return (_may_nil=ptrue());     // Progress
   }
   // Set use_nil flag. Set an error if both may_nil and use-nil.
-  void add_use_nil() {
+  public void add_use_nil() {
     if( !_use_nil ) {
       _use_nil=true;                 // Progress
       if( _may_nil ) throw TODO(); // unify_errs("May be nil",work);
@@ -175,7 +176,8 @@ abstract public class TV3 implements Cloneable {
     assert !unified() && !that.unified(); // Cannot union twice
     if( _may_nil ) that.add_may_nil(false);
     if( _use_nil ) that.add_use_nil();
-    if( that._may_nil && that._use_nil ) throw TODO();
+    if( that._may_nil && that._use_nil )
+      { that=that.find(); }
     _union_impl(that); // Merge subclass specific bits into that
     that.widen(_widen,false);
 
