@@ -40,6 +40,7 @@ public class EXE {
       put("-",new Sub());
       put("*",new Mul());
       put("/",new Div());
+      put("f+",new FAdd());
       put("pair",new Pair());
     }};
   
@@ -116,7 +117,8 @@ public class EXE {
     Syntax term = term();
     while( true ) {
       if( term==null || !peek('.') ) return term;
-      term = new Field(id(),term);
+      String id = id();
+      term = id==null ? new DynField(term) : new Field(id(),term);
     }
   }
   
@@ -125,7 +127,7 @@ public class EXE {
   private static String id( boolean op ) {
     ID.clear();
     skipWS();
-    while( X<BUF.length && (op ? isOp(BUF[X]) : isAlpha1(BUF[X])) )
+    while( X<BUF.length && ( isOp(BUF[X]) || isAlpha1(BUF[X])) )
       ID.p((char)BUF[X++]);
     String s = ID.toString().intern();
     if( s.isEmpty() ) throw AA.TODO("Missing id");
@@ -142,7 +144,7 @@ public class EXE {
     if( X+1<BUF.length && isAlpha0(BUF[X+1]) )
       return new Con(sum);
     X++;
-    float f = (float)sum;
+    double f = (double)sum;
     f = f + (BUF[X++]-'0')/10.0f;
     require('f');
     return new Con(f);
@@ -160,7 +162,7 @@ public class EXE {
   private static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }
   private static boolean isOp    (byte c) { return "*?+-/".indexOf(c)>=0; }
   private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_'); }
-  private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9') || (c=='/'); }
+  private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9'); }
   private static boolean peek(char c) { if( skipWS()!=c ) return false; X++; return true; }
   private static boolean peek(String s) {
     skipWS();
@@ -216,7 +218,7 @@ public class EXE {
   static class Con extends Syntax {
     final Val _con;
     Con( int   con ) { _con = new IntVal(con); }
-    Con( float con ) { _con = new FltVal(con); }
+    Con( double con ) { _con = new FltVal(con); }
     @Override SB str(SB sb) { return _con.str(sb,null); }
     @Override void prep_tree(Ary<TV3> nongen) { _tvar = TV3.from_flow(_con.as_flow()); }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
@@ -529,6 +531,27 @@ public class EXE {
   }
 
 
+  // --- DynField ------------------------
+  static class DynField extends Syntax {
+    final Syntax _ptr;
+    DynField(Syntax ptr ) { _ptr = ptr; ptr._par = this; }
+    @Override SB str(SB sb) { return _ptr.str(sb).p("._"); }
+    @Override void prep_tree(Ary<TV3> nongen) {
+      _tvar = new TVLeaf();
+      _ptr.prep_tree(nongen);
+      TVStruct s = new TVStruct(new String[]{},new TV3[]{},true);
+      _ptr.tvar().unify(s,false);
+    }
+    @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
+      return reduce.apply(map.apply(this),_ptr.visit(map,reduce));
+    }
+    @Override Val eval( Env e ) {
+      //return _ptr.eval(e).as_struct().at(_lab);
+      throw AA.TODO();
+    }
+  }
+
+
   // --- Root ------------------------
   static class Root extends Syntax {
     final Syntax _prog;
@@ -551,7 +574,7 @@ public class EXE {
           if( syn.tvar() instanceof TVErr terr )
             throw new IllegalArgumentException(terr.toString());
           if( syn.tvar() instanceof TVBase base && base._t instanceof TypeNil tn && tn.getClass()==TypeNil.class ) {
-            System.err.println("Mixing int and float");
+            System.err.println("Mixing int and double");
             System.exit(1);
           }
           return null;
@@ -572,6 +595,7 @@ public class EXE {
     };
     static final Type[] TS = new Type[10];
     static TV3 INT64() { return TVBase.make(TypeInt.INT64); }
+    static TV3 FLT64() { return TVBase.make(TypeFlt.FLT64); }
     
     final TV3[] _tvs;
     PrimSyn(TV3... tvs) {
@@ -587,8 +611,15 @@ public class EXE {
       _tvar = lam;
     }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this);  }
-    @Override Val apply( Env e ) { return new IntVal(iop(e._v0.as_int()._con,e._v1.as_int()._con)); }
-    abstract int iop(int x, int y);
+    @Override Val apply( Env e ) {
+      if( e._v0.as_int()!=null ) 
+        return new IntVal(iop(e._v0.as_int()._con,e._v1.as_int()._con));
+      if( e._v0.as_flt()!=null ) 
+        return new FltVal(dop(e._v0.as_flt()._con,e._v1.as_flt()._con));
+      throw AA.TODO();
+    }
+    int    iop(int    x, int    y) { throw AA.TODO(); }
+    double dop(double x, double y) { throw AA.TODO(); }
   }
 
   // add integers
@@ -621,6 +652,14 @@ public class EXE {
     @Override PrimSyn make() { return new Div(); }
     @Override SB str(SB sb) { return sb.p("/"); }
     @Override int iop(int x, int y) { return x/y; }
+  }
+
+  // add doubles
+  static class FAdd extends PrimSyn {
+    public FAdd() { super(FLT64(), FLT64(), FLT64()); }
+    @Override PrimSyn make() { return new FAdd(); }
+    @Override SB str(SB sb) { return sb.p("f+"); }
+    @Override double dop(double x, double y) { return x+y; }
   }
 
   // Pair results
@@ -661,6 +700,7 @@ public class EXE {
   // Either an integer (and _e==null) or a Continuation (_e!=null)
   public static abstract class Val {
     IntVal    as_int   () { return null; }
+    FltVal    as_flt   () { return null; }
     KontVal   as_kont  () { return null; }    
     StructVal as_struct() { return null; }
     TypeNil as_flow() { throw AA.TODO(); }
@@ -677,8 +717,8 @@ public class EXE {
   }
   
   private static class FltVal extends Val {
-    final float _con;
-    FltVal(float con) { _con=con; }
+    final double _con;
+    FltVal(double con) { _con=con; }
     FltVal as_flt() { return this; }
     SB str(SB sb, VBitSet visit) { return sb.p(_con).p("f"); }
     TypeNil as_flow() { return TypeFlt.con(_con); }

@@ -2,4 +2,4 @@
 // Type: 3
 // Eval: 3
 map = { fun x -> (fun x)};
-(map {a->3} 5)
+(map {a -> 3} 5)

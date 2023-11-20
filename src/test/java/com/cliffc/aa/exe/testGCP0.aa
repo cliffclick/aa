@@ -1,6 +1,6 @@
 // GCP helps HMT, but just simple const-folding here
-// Type: 3.4f
-// Eval: 3.4f
+// Type: 3.4000000059604645
+// Eval: 3.4000000059604645f
 pred = 0;
 s1 = @{ x=3; };
 s2 = @{ y=3.4f; };

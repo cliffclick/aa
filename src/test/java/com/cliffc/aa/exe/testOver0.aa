@@ -1,0 +1,4 @@
+// One DynLoad, no Fresh, resolves local
+// Type: int64
+// Eval: 3
+(+ @{ i=1; f=2.3f; }._ 2)
