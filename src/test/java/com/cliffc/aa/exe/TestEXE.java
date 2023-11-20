@@ -16,7 +16,7 @@ public class TestEXE {
     File[] tests = folder.listFiles(file -> file.getName().endsWith("aa"));
     Arrays.sort(tests);
     for( File f : tests ) {
-      //System.out.println(f);
+      System.out.println(f);
       String prog = Files.readString( f.toPath());
       String extype = get_expected(prog,"// Type: ");
       String exeval = get_expected(prog,"// Eval: ");

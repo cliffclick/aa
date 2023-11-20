@@ -1,7 +1,7 @@
 // Gen counters
 // Simple test of captured environment
-// Type: A:(int64, { -> A })
-// Eval: @{ 0=1; 1=K7[{ -> (inc (+ cnt 1)) },(1),(K2[{ cnt -> (pair cnt { -> (inc (+ cnt 1)) }) },(K2),(),(K1[{ -> inc = { cnt -> (pair cnt { -> (inc (+ cnt 1)) }) }; (inc 0) },(K1)])]),(),(K1)] }
+// Type: A:( int64, { -> A })
+// Eval: ( 1, K7[{ -> (inc (+ cnt 1)) },(1),(K2[{ cnt -> (pair cnt { -> (inc (+ cnt 1)) }) },(K2),(),(K1[{ -> inc = { cnt -> (pair cnt { -> (inc (+ cnt 1)) }) }; (inc 0) },(K1)])]),(),(K1)])
 gen = { ->
   inc = { cnt ->
    (pair cnt { -> (inc (+ cnt 1))} )

@@ -551,7 +551,7 @@ public class TVStruct extends TVExpanding {
     }
     // Print clazz field up front.
     boolean is_tup = is_tup(debug), once=_open;
-    sb.p(is_tup ? "(" : "@{");
+    sb.p(is_tup ? "( " : "@{ ");
     for( int idx : sorted_flds() ) {
       if( !is_tup ) {                         // Skip tuple field names
         sb.p(_flds[idx]);
@@ -563,7 +563,7 @@ public class TVStruct extends TVExpanding {
       once=true;
     }
     if( _open ) sb.p(" ..., ");
-    if( once ) sb.unchar(2);
+    if( once && is_tup ) sb.unchar(2);
     sb.p(!is_tup ? "}" : ")");
     return sb;
   }

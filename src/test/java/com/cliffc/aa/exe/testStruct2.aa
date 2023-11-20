@@ -1,0 +1,8 @@
+// Simple struct test
+// Type: { A -> nint8 }
+// Eval: K1[{ pred -> tmp = if pred ? @{ x = 2; y = 3;} : @{ x = 3; z = 4;}; tmp.x },]
+{ pred ->
+  tmp = if pred ? @{x=2; y=3;} : @{x=3; z=4;};
+  tmp.x
+}
+

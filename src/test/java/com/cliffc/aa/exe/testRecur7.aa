@@ -1,0 +1,9 @@
+// Newtons method, solving for some square roots
+// Type: ( int64, int64)
+// Eval: ( 4, 6)
+solve = { guess n ->
+  new = (/ (+ ( / n guess) guess) 2);
+  if (- new guess) ? (solve new n) : new
+};
+sqr = { x -> (solve x x) };
+(pair (sqr 16) (sqr 38))

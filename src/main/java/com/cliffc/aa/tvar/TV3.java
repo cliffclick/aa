@@ -145,7 +145,7 @@ abstract public class TV3 implements Cloneable {
 
   // Set may_nil flag.  Return progress flag.
   // Set an error if both may_nil and use-nil.
-  boolean add_may_nil(boolean test) {
+  public boolean add_may_nil(boolean test) {
     if( _may_nil ) return false;   // No change
     if( test ) return ptrue();     // Will be progress
     if( _use_nil ) throw TODO(); // unify_errs("May be nil",work);

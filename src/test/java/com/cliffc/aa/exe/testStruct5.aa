@@ -1,0 +1,10 @@
+// Evil old regression test.
+// Could still work if I allow self-cycles in structs
+// Type: Cyclic reference to self0
+// Eval: CRASH
+sx = { ignore ->
+  self0=@{ succ = (sx self0); };
+  self0
+};
+self1=@{ nope=7; succ = self1; };
+(sx self1)

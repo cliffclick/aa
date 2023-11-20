@@ -38,6 +38,7 @@ public class EXE {
       put("+",new Add());
       put("-",new Sub());
       put("*",new Mul());
+      put("/",new Div());
       put("pair",new Pair());
     }};
   
@@ -86,7 +87,7 @@ public class EXE {
       return new If(pred,t,f);
     }
 
-    // Parse a strict
+    // Parse a struct
     if( peek("@{") ) {
       Struct str = new Struct();
       Ary<String> labs = new Ary<>(new String[1],0);
@@ -101,6 +102,7 @@ public class EXE {
       if( peek('=') )
         // Let expression; "id = fterm(); term..."
         return new Let(id,require(fterm(),';'),fterm());
+      if( id.equals("nil") ) return new Nil();
       PrimSyn prim = PRIMSYNS.get(id); // No shadowing primitives or this lookup returns the prim instead of the shadow
       return prim==null ? new Ident(id) : prim.make(); // Make a prim copy with fresh HM variables
     }
@@ -156,7 +158,7 @@ public class EXE {
   }
   private static boolean isWS    (byte c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
   private static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }
-  private static boolean isOp    (byte c) { return "*?+-".indexOf(c)>=0; }
+  private static boolean isOp    (byte c) { return "*?+-/".indexOf(c)>=0; }
   private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_'); }
   private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9') || (c=='/'); }
   private static boolean peek(char c) { if( skipWS()!=c ) return false; X++; return true; }
@@ -218,6 +220,14 @@ public class EXE {
     @Override void prep_tree(Ary<TV3> nongen) { _tvar = TV3.from_flow(TypeInt.con(_con._con)); }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
     @Override IntVal eval( Env e ) { return _con; }
+  }
+
+  // --- Nil ------------------------
+  static class Nil extends Syntax {
+    @Override SB str(SB sb) { return sb.p("nil"); }
+    @Override void prep_tree(Ary<TV3> nongen) { _tvar = new TVStruct(true); _tvar.add_may_nil(false); }
+    @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
+    @Override NilVal eval( Env e ) { return NilVal.NIL; }
   }
 
   // --- Ident ------------------------
@@ -393,8 +403,14 @@ public class EXE {
       return rez;
     }
     @Override Val eval( Env e ) {
-      IntVal pred = _pred.eval(e).as_int();
-      Syntax syn = pred._con==0 ? _f : _t;
+      Val pred = _pred.eval(e);
+      boolean t = switch( pred ) {
+      case IntVal II -> II._con!=0;
+      case StructVal s -> true;
+      case NilVal n -> false;
+      default -> throw AA.TODO();
+      };
+      Syntax syn = t ? _t : _f;
       return syn.eval(e);
     }
   }
@@ -442,7 +458,7 @@ public class EXE {
     final Ary<String> _labels;
     final Ary<Syntax> _flds;
     Struct( ) { _labels = new Ary<>(String.class); _flds = new Ary<>(Syntax.class); }
-    void add( String label, Syntax fld ) { _labels.push(label); _flds.push(fld); }
+    void add( String label, Syntax fld ) { _labels.push(label); _flds.push(fld); fld._par = this; }
     @Override SB str(SB sb) {
       sb.p("@{ ");
       for( int i=0; i<_flds._len; i++ )
@@ -463,12 +479,11 @@ public class EXE {
         rez = reduce.apply(rez,fld.visit(map,reduce));
       return rez;
     }
-    @Override Val eval( Env e ) {
-      //TypeFld[] flds = TypeFlds.get(_flds._len);
-      //for( int i=0; i<_flds._len; i++ )
-      //  flds[i] = TypeFld.make(_labels.at(i),_flds.at(i).eval(stk));
-      //return TypeStruct.make_flds(Type.ANY,flds);
-      throw AA.TODO();
+    @Override StructVal eval( Env e ) {
+      StructVal s = new StructVal();      
+      for( int i=0; i<_flds._len; i++ )
+        s.add(_labels.at(i),_flds.at(i).eval(e));
+      return s;
     }
   }
 
@@ -580,6 +595,14 @@ public class EXE {
     @Override int iop(int x, int y) { return x*y; }
   }
 
+  // div integers
+  static class Div extends PrimSyn {
+    public Div() { super(INT64(), INT64(), INT64()); }
+    @Override PrimSyn make() { return new Div(); }
+    @Override SB str(SB sb) { return sb.p("/"); }
+    @Override int iop(int x, int y) { return x/y; }
+  }
+
   // Pair results
   static class Pair extends PrimSyn {
     final int _alias;
@@ -631,6 +654,11 @@ public class EXE {
     SB str(SB sb, VBitSet visit) { return sb.p(_con); }
   }
   
+  private static class NilVal extends Val {
+    static final NilVal NIL = new NilVal();
+    SB str(SB sb, VBitSet visit) { return sb.p("nil"); }
+  }
+  
   private static class KontVal extends Val {
     private static int UID=1;
     private int _uid=UID++;
@@ -661,10 +689,17 @@ public class EXE {
     StructVal as_struct() { return this; }
     Val at(String label) { return _vals[Util.find(_labels,label)]; }
     SB str(SB sb, VBitSet visit) {
-      sb.p("@{ ");
-      for( int i=0; i<_len; i++ )
-        _vals[i].str(sb.p(_labels[i]).p("="),visit).p("; ");
-      return sb.unchar(_len==0?0:2).p(" }");
+      if( _labels.length==0 || _labels[0].equals("0") ) {
+        sb.p("( ");
+        for( int i=0; i<_len; i++ )
+          _vals[i].str(sb,visit).p(", ");
+        return sb.unchar(2).p(")");
+      } else {
+        sb.p("@{ ");
+        for( int i=0; i<_len; i++ )
+          _vals[i].str(sb.p(_labels[i]).p("="),visit).p("; ");
+        return sb.p("}");
+      }
     }
   }
 }

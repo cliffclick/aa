@@ -1,0 +1,5 @@
+// Simple OPEN struct test
+// Type: { @{ u=A;  ..., } -> A }
+// Eval: K2[{ y -> y.u },(K1[{ z -> z },(K1)])]
+x = { z -> z}; (x { y -> y.u})
+
