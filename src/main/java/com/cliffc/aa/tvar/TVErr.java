@@ -20,7 +20,8 @@ public class TVErr extends TV3 {
   static final int XINT=4;
   static final int XFLT=5;
   static final int XMEM=6;
-  static final int XMAX=7;
+  static final int XDYN=7;
+  static final int XMAX=8;
   
   // Errors other than structural unify errors.
   public Ary<String> _errs;

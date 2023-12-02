@@ -2,3 +2,29 @@
 // Type: int64
 // Eval: 3
 (+ @{ i=1; f=2.3f; }._ 2)
+
+
+
+/** ok, working theory (missing stuff sure)
+
+    DynLoads called 'Dnnn' in the dyn-label typing
+    Ident    called 'Fnnn' in the dyn-label typing
+    Dyn-Label type are nested tables of the form:
+    Fnnn:[ Fnnn:[ (Dnnn label)*]* ]....
+
+    
+    Lambda have an extra DynLabel input;
+    Apply supplies this input.
+
+    DynLoads take a DynLabel input.
+    It MUST have the matching Dxxx at top-level:
+    [ D123 "name", (Dxxx label)* Other mappings ok; including nesting Fxxx mappings]
+    Lookup the dyn in the table, get the label, load from label.
+    Can be optimized to all constant offsets.
+
+    Ident freshes as normal; fresh of a Lambda freshes any DynLabels.
+    
+    
+
+
+*/

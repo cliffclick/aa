@@ -1,0 +1,32 @@
+// One DynLoad, fcn needs DynTable
+// Type: ( int64, flt64)
+// Eval: ( 3, 3.3f)
+
+// DT: { [D0=A] -> A }
+fcn = { ->
+  @{
+     qii={ x y -> (+ (+1  x) (+1  y)) } // i i -> i
+     qif={ x y -> (+ (+1  x) (f2i y)) } // i f -> i
+     qfi={ x y -> (+ (f2i x) (+1  y)) } // f i -> i
+     qff={ x y -> (+ (f2i x) (f2i y)) } // f f -> i
+  }._    // Which of {w,x,y,z} should be picked?
+};
+
+// DT: [ F0= [D0=qii/qfi]
+//       F1= [D0=qfi/qff] ]
+bar = { x DT
+->
+  if rnd
+  ? ((fcn DTVar.F0) x 2   )  // F0: Picks [D0:qii/qfi]
+  : ((fcn DTVar.F1) x 2.2f)  // F1: Picks [D0:qif/qff]
+}
+
+// Structure of a DynTable after matching
+// DT: [ [F3: [F0:[D0:qii],F1:[D0:qif]]]
+//       [F4: [F0:[D0:qfi],F1:[D0:qff]]] ]
+baz = { ->
+  if rnd
+  ? (bar 3)     // F3: Passing in [F0:[D0:qii],F1:[D0:qif]]
+  : (bar 3.3f)  // F4: Passing in [F0:[D0:qfi],F1:[D0:qff]]
+}
+

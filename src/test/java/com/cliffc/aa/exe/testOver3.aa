@@ -1,0 +1,10 @@
+// One DynLoad, fcn needs DynTable
+// Type: ( int64, flt64)
+// Eval: ( 3, 3.3f)
+
+// DT: [D0: A]
+fcn = { -> @{ i=2; f=2.3f; }._ };
+//       [D0: int]        [D0: flt]
+(pair (+ (fcn    ) 1) (f+ (fcn    ) 1.1f))
+
+
