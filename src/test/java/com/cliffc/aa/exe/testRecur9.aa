@@ -1,6 +1,6 @@
 // Wrapped ints
-// Type: A:@{ add={ B:@{ add={ @{ i=int64;  ..., } @{ i=int64;  ..., } -> B }; i=int64; } C:@{ add={ @{ i=int64;  ..., } @{ i=int64;  ..., } -> C }; i=int64; } -> A }; i=int64; }
-// Eval: @{ add=K5[{ x y -> (int (+ x.i y.i)) },(7),(K1[{ i -> @{ add = { x y -> (int (+ x.i y.i)) }; i = i;} },(K1)])]; i=7; }
+// Type: A:@{ add={ [[]] B:@{ add={ [[]] @{ i=int64;  ..., } @{ i=int64;  ..., } -> B }; i=int64; } C:@{ add={ [[]] @{ i=int64;  ..., } @{ i=int64;  ..., } -> C }; i=int64; } -> A }; i=int64; }
+// Eval: @{ add=K5[{ $dyn x y -> (int $dyn (+ $dyn x.i y.i)) },( $dyn=[[]],e3=7),( e3=K1[{ $dyn i -> @{ add = { $dyn x y -> (int $dyn (+ $dyn x.i y.i)) }; i = i;} },( e3=K1),( e3=[[]])]),( e3=[[]])]; i=7; }
 int = { i ->        // An integer is a struct...
   @{ add = { x y -> // With an 'add' field which is a fcn
        (int (+ x.i y.i)) // ... which unwraps to ints and adds and rewraps

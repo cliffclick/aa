@@ -1,4 +1,4 @@
 // Function composition
-// Type: { { A -> B } A -> B }
-// Eval: K1[{ f g -> (f g) },]
+// Type: { A:[[]] { A B -> C } B -> C }
+// Eval: K1[{ $dyn f g -> (f $dyn g) },( e3=[[]])]
 { f g -> (f g)}

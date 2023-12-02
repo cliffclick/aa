@@ -131,17 +131,17 @@ public class TVDynTable extends TV3 {
   }
   
   // -------------------------------------------------------------
-  public static TVDynTable merge( TVDynTable tab0, TVDynTable tab1 ) {
-    if( tab0==null ) return tab1;
-    if( tab1==null ) return tab0;
-    // Union tab0 into tab1 and return it
-    for( DYN dyn : tab0._tab ) {
-      assert tab1.find0(dyn._uid)==null;
-      tab1._tab.push(dyn);
-    }
-    tab0.union(tab1);
-    return tab1;
-  }
+  //public static TVDynTable merge( TVDynTable tab0, TVDynTable tab1 ) {
+  //  if( tab0==null ) return tab1;
+  //  if( tab1==null ) return tab0;
+  //  // Union tab0 into tab1 and return it
+  //  for( DYN dyn : tab0._tab ) {
+  //    assert tab1.find0(dyn._uid)==null;
+  //    tab1._tab.push(dyn);
+  //  }
+  //  tab0.union(tab1);
+  //  return tab1;
+  //}
   
   // -------------------------------------------------------------
   // Resolve all embedded 
@@ -158,7 +158,12 @@ public class TVDynTable extends TV3 {
   // Unify this into that.  Ultimately "this" will be U-F'd into "that" and so
   // all structure changes go into "that".
   @Override boolean _unify_impl( TV3 tv3 ) {
-    throw TODO();
+    TVDynTable that = (TVDynTable)tv3;
+    boolean progress = false;
+    for( DYN dyn : _tab ) {
+      throw TODO();
+    }
+    return progress;
   }
   
   // -------------------------------------------------------------

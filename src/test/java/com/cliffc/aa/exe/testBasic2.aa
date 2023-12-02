@@ -1,4 +1,4 @@
 // Simple id fcn 
-// Type: { A -> A }
-// Eval: K1[{ x -> x },]
+// Type: { [[]] A -> A }
+// Eval: K1[{ $dyn x -> x },( e3=[[]])]
 { x -> x }

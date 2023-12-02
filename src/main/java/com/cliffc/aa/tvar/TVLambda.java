@@ -85,9 +85,11 @@ public class TVLambda extends TV3 {
     // Check all other arguments
     int cmp = 1;
     for( int i=DSP_IDX; i<nargs(); i++ ) {
-      int acmp = arg(i)._trial_unify_ok(that.arg(i));
-      cmp |= acmp;                // Maybe arg makes trial a maybe
-      if( cmp == 7 ) return 7;    // Arg failed so trial fails
+      if( _args[i] != null ) {
+        int acmp = arg(i)._trial_unify_ok(that.arg(i));
+        cmp |= acmp;                // Maybe arg makes trial a maybe
+        if( cmp == 7 ) return 7;    // Arg failed so trial fails
+      }
     }
     return cmp;                   // Trial result
   }

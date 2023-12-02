@@ -1,5 +1,5 @@
 // Simple OPEN struct test
-// Type: { @{ u=A;  ..., } -> A }
-// Eval: K2[{ y -> y.u },(K1[{ z -> z },(K1)])]
+// Type: { [[]] @{ u=A;  ..., } -> A }
+// Eval: K2[{ $dyn y -> y.u },( e3=K1[{ $dyn z -> z },( e3=K1),( e3=[[]])]),( e3=[[]])]
 x = { z -> z}; (x { y -> y.u})
 

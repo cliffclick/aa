@@ -24,7 +24,8 @@
 
     Ident freshes as normal; fresh of a Lambda freshes any DynLabels.
     
-    
+    $dyn = Root;  // $dyn is [D0: int/i]
+    (+ $dyn @{}._ 2)
 
 
 */

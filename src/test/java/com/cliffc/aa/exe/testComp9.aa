@@ -1,6 +1,6 @@
 // More complicated nested application
-// Type: { A -> ( 5, 5) }
-// Eval: K3[{ q -> (map (fcn q) 5) },(K2[{ fun x -> (fun x) },(K2),(K1[{ p -> { a -> (pair a a) } },(K1)])]),(K1)]
+// Type: { [[]] A -> ( 5, 5) }
+// Eval: K3[{ $dyn q -> (map $dyn (fcn $dyn q) 5) },( e3=K2[{ $dyn fun x -> (fun $dyn x) },( e3=K2),( e3=K1[{ $dyn p -> { $dyn a -> (pair $dyn a a) } },( e3=K1),( e3=[[]])]),( e3=[[]])]),( e3=K1),( e3=[[]])]
 // fcn ignores p and returns a fcn to make a pair
 fcn = { p -> { a -> (pair a a) }};
 // map fun over x

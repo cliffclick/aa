@@ -3,7 +3,7 @@
 // Eval: ( 3, 3.3f)
 
 // DT: { [D0=A] -> A }
-fcn = { ->
+fcn = { $dsp ->
   @{
      qii={ x y -> (+ (+1  x) (+1  y)) } // i i -> i
      qif={ x y -> (+ (+1  x) (f2i y)) } // i f -> i
@@ -14,11 +14,11 @@ fcn = { ->
 
 // DT: [ F0= [D0=qii/qfi]
 //       F1= [D0=qfi/qff] ]
-bar = { x DT
+bar = { $dsp x 
 ->
   if rnd
-  ? ((fcn DTVar.F0) x 2   )  // F0: Picks [D0:qii/qfi]
-  : ((fcn DTVar.F1) x 2.2f)  // F1: Picks [D0:qif/qff]
+  ? ((fcn $dsp.F0) x 2   )  // F0: Picks [D0:qii/qfi]
+  : ((fcn $dsp.F1) x 2.2f)  // F1: Picks [D0:qif/qff]
 }
 
 // Structure of a DynTable after matching
