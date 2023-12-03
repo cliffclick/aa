@@ -85,6 +85,7 @@ public class TVDynTable extends TV3 {
       }
       sb.p(_dyn?'D':'F').p(_uid);
       if( _label!=null ) sb.p(".").p(_label);
+      if( visit.tset(_uid) ) return sb;
       sb.p("=");
       _pat.str(sb,visit,dups,debug,prims);
       TV3 tvar = _tvar.debug_find();
@@ -161,7 +162,10 @@ public class TVDynTable extends TV3 {
     TVDynTable that = (TVDynTable)tv3;
     boolean progress = false;
     for( DYN dyn : _tab ) {
-      throw TODO();
+      DYN dyn2 = that.find0(dyn._uid);
+      if( dyn2 != null ) throw TODO();
+      that._tab.push(dyn);
+      progress = true;
     }
     return progress;
   }
@@ -174,7 +178,9 @@ public class TVDynTable extends TV3 {
   
   // -------------------------------------------------------------
   @Override int _trial_unify_ok_impl( TV3 tv3 ) {
-    throw TODO();
+    for( DYN dyn : _tab )
+      throw TODO();
+    return 1;                   // No conflicts, hard-yes
   }
 
   @Override boolean _exact_unify_impl(TV3 tv3) {

@@ -56,7 +56,7 @@ public class EXE {
   static Root parse( String sprog ) {
     X = 0;
     BUF = sprog.getBytes();
-    Syntax prog = new Let("$dyn",new DefDynTable(),fterm());
+    Let prog = new Let("$dyn",new DefDynTable(),fterm());
     if( skipWS() != -1 ) throw TODO("Junk at end of program: " + str());
     // Inject Root
     return new Root(prog);
@@ -94,8 +94,6 @@ public class EXE {
     // Parse a struct
     if( peek("@{") ) {
       Struct str = new Struct();
-      Ary<String> labs = new Ary<>(new String[1],0);
-      Ary<Syntax> flds = new Ary<>(new Syntax[1],0);
       while( !peek("}") ) str.add(require(id(),'='),require(fterm(),';'));
       return str;      
     }
@@ -260,8 +258,8 @@ public class EXE {
     private final String _name;       // The identifier name
 
     private Syntax _def;
-    private int _dbidx;  // deBrujin index
-    private int _argn;   // Arg index for Lambda, 0 for Let
+    private int _dbx;           // deBrujin index
+    private int _argn;          // Arg index for Lambda, 0 for Let
     
     Ident( String name ) { _name=name; }
     @Override SB str(SB sb) { return sb.p(_name); }
@@ -296,7 +294,7 @@ public class EXE {
     private void init( Syntax def, TV3 tv, int dbx, int argn ) {
       _tvar = tv;
       _def  = def;
-      _dbidx= dbx;
+      _dbx  = dbx;
       _argn = argn;
 
       //if( def instanceof Let let ) {
@@ -316,8 +314,8 @@ public class EXE {
     
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
     @Override Val eval( Env e ) {
-      Env e0=e;
-      for( int i=0; i<_dbidx; i++ )
+      Env e0 = e;
+      for( int i=0; i<_dbx; i++ )
         e0 = e0._e;               // Index env via deBrujin index
       return e0._vs[_argn];
     }
@@ -627,6 +625,8 @@ public class EXE {
   
   static class DynField extends Syntax {
     final Syntax _ptr;
+    private int _dbx;           // deBrujin index
+    private int _argn;          // Arg index for Lambda, 0 for Let
     DynField(Syntax ptr ) { _ptr = ptr; ptr._par = this; }
     @Override SB str(SB sb) { return _ptr.str(sb).p("._"); }
     @Override void prep_tree(Ary<TV3> nongen) {
@@ -634,27 +634,64 @@ public class EXE {
       _ptr.prep_tree(nongen);
       TVStruct s = new TVStruct(new String[]{},new TV3[]{},true);
       _ptr.tvar().unify(s,false);
-      //_dyn = new TVDynTable();
-      //_dyn.add(true,_uid,s,_tvar);
-      // Find the $dyn and force this field
-      throw TODO();
+      TV3 dyn;
+      for( Syntax syn = _par; ; syn = syn._par ) {
+        if( syn instanceof Lambda lam ) {
+          dyn = lam.arg(DSP_IDX);
+          _argn = DSP_IDX;
+          break;
+        } else if( syn instanceof Let let ) {
+          if( let._arg.equals("$dyn") ) {
+            assert let._par instanceof Root; // Root dyntable only
+            dyn = let._def.tvar().fresh(nongen.asAry());
+            _argn = ARG_IDX;
+            break;
+          } else
+            _dbx++;             // Bump deBrujin index
+        }
+      }
+      ((TVDynTable)dyn).add(true,_uid,s,_tvar);
     }
-    @Override boolean hm(boolean test) { return false; }
+
+    // Re-unify with resolved labels
+    @Override boolean hm(boolean test) {
+      for( Syntax syn = _par; ; syn = syn._par ) {
+        if( syn instanceof Lambda lam ) {
+          throw TODO();
+        } else if( syn instanceof Let let && let._arg.equals("$dyn") ) {
+          return unify((TVDynTable)let._def.tvar(),test);
+        }
+      }
+    }
+
+    // Resolved unify
+    private boolean unify(TVDynTable dyn, boolean test) {
+      String label = dyn.find(_uid)._label;
+      if( label==null ) return false; // Not resolved yet
+      TVStruct str = (TVStruct)_ptr.tvar();
+      TV3 fld = str.arg(label);
+      return fld.unify(tvar(),test);
+    }
+
+    
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       return reduce.apply(map.apply(this),_ptr.visit(map,reduce));
     }
     @Override Val eval( Env e ) {
-      //String label = dyn().find(_uid)._label;
-      //return _ptr.eval(e).as_struct().at(label);
-      throw TODO();
+      Env e0 = e;
+      for( int i=0; i<_dbx; i++ )
+        e0 = e0._e;               // Index env via deBrujin index
+      DynVal vdyn = (DynVal)e0._vs[_argn];
+      String label = vdyn._dyn.find(_uid)._label;
+      return _ptr.eval(e).as_struct().at(label);
     }
   }
 
 
   // --- Root ------------------------
   static class Root extends Syntax {
-    final Syntax _prog;
-    Root( Syntax prog ) { _prog=prog;  prog._par = this; }
+    final Let _prog;
+    Root( Let prog ) { _prog=prog;  prog._par = this; }
     @Override SB str( SB sb ) { return _prog.str(sb.p("Root ")); }
     @Override void prep_tree(Ary<TV3> nongen) {
       _prog.prep_tree(nongen);
@@ -670,14 +707,13 @@ public class EXE {
     // Compute HM type
     Root do_hm() {
       prep_tree(new Ary<>(TV3.class));
-      //boolean progress=true;
-      //while( progress ) {
-      //  progress = visit( syn -> syn.hm(false), (a,b) -> a || b );
-      //  progress = false;
-      //  progress |= dyn()!=null && dyn().resolve();
-      //}
-      Let letdyn = (Let)_prog;
-      ((TVDynTable)letdyn._def.tvar()).errors(); // Throw if errors
+      boolean progress=true;
+      while( progress ) {
+        TVDynTable dyn = (TVDynTable)_prog._def.tvar();
+        progress = dyn.resolve();
+        dyn.errors();             // Throw if errors
+        progress |= visit( syn -> syn.hm(false), (a,b) -> a || b );
+      }
       // Check for simple type errors
       visit( syn -> {
           if( syn.tvar() instanceof TVErr terr )

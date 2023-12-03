@@ -1,13 +1,10 @@
 // One DynLoad, no Fresh, resolves local
-// Type: ( 4, 4.4f)
+// Type: ( int64, flt64)
 // Eval: ( 4, 4.400000013411045f)
-inc = @{ iinc ={ x -> (+ x 1) }; finc ={ x -> (f+ x 1.1f)}; };
+inc = @{
+  iinc ={ x -> ( + x 1   ) };
+  finc ={ x -> (f+ x 1.1f) };
+};
 (pair (inc._ 3) (inc._ 3.3f))
 
-
-/*
-$dyn = Root;  // $dyn is [ D0:{$ int -> int}:"iinc", D1:{$ flt -> flt}:"finc" ]
-inc = @{ iinc ={ $dyn x -> (+ x 1) }; finc ={ $dyn x -> (f+ x 1.1f)}; };
-(pair (inc._ $dyn 3) (inc._ $dyn 3.3f))  
- */
 
