@@ -2,45 +2,44 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
+
+import java.util.Arrays;
 
 import static com.cliffc.aa.AA.TODO;
 
 /** A type for offsets to a DynLoad.
  */
 public class TVDynTable extends TV3 {
+
   public static class DYN {
+    final int _idx;      // Index into args array for pair of match and pattern
+    
     // Instead of the Node here - trying to keep a nice split between TV3 and
     // Node - I'm recording the Node unique id, and a flag for DynLoad vs Ident
-    boolean _dyn;              // True for DynLoad, False for Ident
-    int _uid;                  // Unique node id for the DynLoad
-    // If this table entry is for a Ident node, the label is null and
-    // the TVar will turn into a nested DynTable.
-    // Else this entry is for a DynLoad and this is the TVStruct to match.
-    TV3 _tvar;                 // Type to match against; usually a TVStruct
-    // 
-    TV3 _pat;                  // Pattern type
+    final boolean _dyn;         // True for DynLoad, False for Ident
+    final int _uid;             // Unique node id for the DynLoad
+    
     // Resolved to this label
     public String _label;
     
-    DYN( boolean dyn, int uid, TV3 tvar, TV3 pat ) {
+    DYN( int idx, boolean dyn, int uid ) {
+      _idx = idx;
       _dyn = dyn;
       _uid = uid;
-      _tvar = tvar;
-      _pat = pat;
     }
 
     // Try to resolve the label; return true if progress
-    boolean resolve() {
+    boolean resolve(TVDynTable dyn) {
       assert _dyn;
-      if( !(tvar() instanceof TVStruct str) ) return false; // No progress until a TVStruct
+      if( !(match(dyn) instanceof TVStruct str) ) return false; // No progress until a TVStruct
       // Resolve field by field, removing resolved fields.  Should be 1 YES resolve in the end.
       boolean progress = false;
       for( int i=0; i<str.len(); i++ ) {
         // Trial unify
-        int rez = str.arg(i).trial_unify_ok(pat());
+        int rez = str.arg(i).trial_unify_ok(pattern(dyn));
         // 7=NO, 3=MAYBE, 1=YES
         if( rez!=3 ) {          // Either a YES or a NO
           progress = true;      // Progress
@@ -51,44 +50,39 @@ public class TVDynTable extends TV3 {
           // Fields that resolve as either YES or NO are removed from the list,
           // since they can never change their answer.  Make a fresh copy, and
           // remove the field.
-          _tvar = str = (TVStruct)str.fresh();
+          str = (TVStruct)str.fresh();
           str.del_fld0(i--);
+          set_match(dyn,str);
         }
         // Pending MAYBEs remain, and need progress elsewhere
       }
       return progress;
     }
 
-    TV3 tvar() { return _tvar.unified() ? (_tvar = _tvar.find()) : _tvar; }
-    TV3 pat () { return _pat .unified() ? (_pat  = _pat .find()) : _pat ; }
+    TV3 match  (TVDynTable tab) { return tab.arg(_idx+0); }
+    TV3 pattern(TVDynTable tab) { return tab.arg(_idx+1); }
+    void set_match(TVDynTable tab, TVStruct ts) { tab._args[_idx+0]=ts; }
 
     // Report errors
-    public void errors() {
+    public void errors(TVDynTable dyn) {
       if( !_dyn )
         throw TODO();           // Recurse
-      if( !(tvar() instanceof TVStruct str) )
-        throw TODO("Trying to load from "+tvar()+", which is not a struct");
+      if( !(match(dyn) instanceof TVStruct str) )
+        throw TODO("Trying to load from "+match(dyn)+", which is not a struct");
       if( _label==null )
         throw TODO("No choice resolved");
       if( str.len()>0 )
         throw TODO("Have ambiguous choices");
-      
     }
 
-    @Override public String toString() { return str(new SB(),null,null,true,false).toString(); }
-    SB str(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
-      if( visit==null ) {
-        assert dups==null;
-        _tvar._get_dups(visit=new VBitSet(),dups=new VBitSet(),debug,prims);
-        _pat ._get_dups(visit              ,dups              ,debug,prims);
-        visit.clear();
-      }
+    @Override public String toString() { return str(null,new SB(),null,null,true,false).toString(); }
+    SB str(TVDynTable tab, SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
       sb.p(_dyn?'D':'F').p(_uid);
       if( _label!=null ) sb.p(".").p(_label);
-      if( visit.tset(_uid) ) return sb;
+      if( tab==null ) return sb;
       sb.p("=");
-      _pat.str(sb,visit,dups,debug,prims);
-      TV3 tvar = _tvar.debug_find();
+      pattern(tab).str(sb,visit,dups,debug,prims);
+      TV3 tvar = match(tab);
       return tvar instanceof TVStruct str && str.len()==0 ? sb
         : tvar.str(sb.p(" in "),visit,dups,debug,prims);
     }
@@ -96,60 +90,48 @@ public class TVDynTable extends TV3 {
 
   // DynLoad table.  Entries are either for a DynLoad/TVStruct/label or a
   // Ident/nested-TVDynTable
-  final Ary<DYN> _tab;
+  private NonBlockingHashMapLong<DYN> _dyns;
 
-  public TVDynTable() {
-    _tab = new Ary<>(DYN.class);
-  }
+  private int _max;
+  
+  public TVDynTable() { _dyns = new NonBlockingHashMapLong<>(); _max=0; }
+
+  @Override public int len() { return _max; }  
 
   // Add a DynField reference to this table
   public void add( boolean dyn, int uid, TV3 tvar, TV3 pat ) {
-    _tab.add(new DYN(dyn,uid,tvar,pat));
+    _dyns.put(uid,new DYN(len(),dyn,uid));
+
+    if( _args==null ) _args = new TV3[2];
+    if( _max == _args.length ) {
+      int len=1;
+      while( len<=_max ) len<<=1;
+      _args = Arrays.copyOf(_args,len);
+    }
+    _args[_max++] = tvar;
+    _args[_max++] = pat ;
   }
 
   // Find a DynField reference at the top level
-  public DYN find(int uid) {
-    for( DYN dyn : _tab )
-      if( dyn._uid==uid ) {
-        assert dyn._dyn;
-        return dyn;  
-      }
-    return null;
-  }
-  DYN find0(int uid) {
-    for( DYN dyn : _tab )
-      if( dyn._uid==uid )
-        return dyn;  
-    return null;
+  public String find_label(int uid) {
+    DYN dyn = _dyns.get(uid);
+    return dyn==null ? null : dyn._label;
   }
   
   @Override int eidx() { return TVErr.XDYN; }
 
   // Report errors
   public void errors() {
-    for( DYN dyn : _tab )
-      dyn.errors();
+    for( DYN dyn : _dyns.values() )
+      dyn.errors(this);
   }
-  
-  // -------------------------------------------------------------
-  //public static TVDynTable merge( TVDynTable tab0, TVDynTable tab1 ) {
-  //  if( tab0==null ) return tab1;
-  //  if( tab1==null ) return tab0;
-  //  // Union tab0 into tab1 and return it
-  //  for( DYN dyn : tab0._tab ) {
-  //    assert tab1.find0(dyn._uid)==null;
-  //    tab1._tab.push(dyn);
-  //  }
-  //  tab0.union(tab1);
-  //  return tab1;
-  //}
   
   // -------------------------------------------------------------
   // Resolve all embedded 
   public boolean resolve( ) {
     boolean progress = false;
-    for( DYN dyn : _tab )
-      progress |= dyn.resolve();
+    for( DYN dyn : _dyns.values() )
+      progress |= dyn.resolve(this);
     return progress;
   }
   
@@ -160,14 +142,18 @@ public class TVDynTable extends TV3 {
   // all structure changes go into "that".
   @Override boolean _unify_impl( TV3 tv3 ) {
     TVDynTable that = (TVDynTable)tv3;
-    boolean progress = false;
-    for( DYN dyn : _tab ) {
-      DYN dyn2 = that.find0(dyn._uid);
-      if( dyn2 != null ) throw TODO();
-      that._tab.push(dyn);
-      progress = true;
+    for( DYN dyn : _dyns.values() ) {
+      DYN dyn2 = that._dyns.get(dyn._uid);
+      if( dyn2 != null ) {
+        if( dyn._label!=dyn2._label && !dyn._label.equals(dyn2._label) )  throw TODO(); // Labels agree
+        // Unify parts
+        dyn.match  (this)._unify(dyn2.match  (that),true);
+        dyn.pattern(this)._unify(dyn2.pattern(that),true);
+      } else {
+        that.add(dyn._dyn,dyn._uid,dyn.match(this),dyn.pattern(this));
+      }
     }
-    return progress;
+    return true;
   }
   
   // -------------------------------------------------------------
@@ -178,7 +164,7 @@ public class TVDynTable extends TV3 {
   
   // -------------------------------------------------------------
   @Override int _trial_unify_ok_impl( TV3 tv3 ) {
-    for( DYN dyn : _tab )
+    for( DYN dyn : _dyns.values() )
       throw TODO();
     return 1;                   // No conflicts, hard-yes
   }
@@ -195,21 +181,19 @@ public class TVDynTable extends TV3 {
     throw TODO();
   }
 
-  @Override public VBitSet _get_dups_impl(VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
-    for( DYN dyn : _tab )
-      dyn._tvar._get_dups(visit,dups,debug,prims);
-    return dups;
+  @Override public TVDynTable copy() {
+    TVDynTable dyn = (TVDynTable)super.copy();
+    dyn._dyns = _dyns.clone();
+    return dyn;
   }
-
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     sb.p("[[  ");
-    for( DYN dyn : _tab )
-      dyn.str(sb,visit,dups,debug,prims).p(", ");
+    for( DYN dyn : _dyns.values() )
+      dyn.str(this,sb,visit,dups,debug,prims).p(", ");
     return sb.unchar(2).p("]]");
   }
   
   public static void reset_to_init0() {
-    //EMPTY._deps = null;
   }
 }

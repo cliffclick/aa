@@ -56,7 +56,7 @@ public class EXE {
   static Root parse( String sprog ) {
     X = 0;
     BUF = sprog.getBytes();
-    Let prog = new Let("$dyn",new DefDynTable(),fterm());
+    Lambda prog = new Lambda(new String[]{null,null,"$dyn"},fterm());
     if( skipWS() != -1 ) throw TODO("Junk at end of program: " + str());
     // Inject Root
     return new Root(prog);
@@ -643,7 +643,7 @@ public class EXE {
         } else if( syn instanceof Let let ) {
           if( let._arg.equals("$dyn") ) {
             assert let._par instanceof Root; // Root dyntable only
-            dyn = let._def.tvar().fresh(nongen.asAry());
+            dyn = let._def.tvar();
             _argn = ARG_IDX;
             break;
           } else
@@ -657,7 +657,7 @@ public class EXE {
     @Override boolean hm(boolean test) {
       for( Syntax syn = _par; ; syn = syn._par ) {
         if( syn instanceof Lambda lam ) {
-          throw TODO();
+          return unify((TVDynTable)lam.tvar().arg(DSP_IDX),test);
         } else if( syn instanceof Let let && let._arg.equals("$dyn") ) {
           return unify((TVDynTable)let._def.tvar(),test);
         }
@@ -666,7 +666,7 @@ public class EXE {
 
     // Resolved unify
     private boolean unify(TVDynTable dyn, boolean test) {
-      String label = dyn.find(_uid)._label;
+      String label = dyn.find_label(_uid);
       if( label==null ) return false; // Not resolved yet
       TVStruct str = (TVStruct)_ptr.tvar();
       TV3 fld = str.arg(label);
@@ -682,7 +682,7 @@ public class EXE {
       for( int i=0; i<_dbx; i++ )
         e0 = e0._e;               // Index env via deBrujin index
       DynVal vdyn = (DynVal)e0._vs[_argn];
-      String label = vdyn._dyn.find(_uid)._label;
+      String label = vdyn._dyn.find_label(_uid);
       return _ptr.eval(e).as_struct().at(label);
     }
   }
@@ -690,26 +690,31 @@ public class EXE {
 
   // --- Root ------------------------
   static class Root extends Syntax {
-    final Let _prog;
-    Root( Let prog ) { _prog=prog;  prog._par = this; }
+    final Lambda _prog;
+    Root( Lambda prog ) { _prog=prog;  prog._par = this; }
     @Override SB str( SB sb ) { return _prog.str(sb.p("Root ")); }
     @Override void prep_tree(Ary<TV3> nongen) {
       _prog.prep_tree(nongen);
-      _tvar = _prog.tvar();
-      //_dyn = _prog.dyn();
+      _tvar = _prog._body.tvar();
     }
     @Override boolean hm(boolean test) { return false; }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       return reduce.apply(map.apply(this),_prog.visit(map,reduce));
     }
-    @Override Val eval( Env e ) { return _prog.eval(e); }
+    @Override Val eval( Env e ) {
+      TVDynTable dyn = (TVDynTable)_prog.tvar().arg(DSP_IDX);
+      e = new Env(null);
+      e._vs[DSP_IDX] = new DynVal(dyn);
+      return _prog.apply(e);
+    }
 
     // Compute HM type
     Root do_hm() {
       prep_tree(new Ary<>(TV3.class));
       boolean progress=true;
       while( progress ) {
-        TVDynTable dyn = (TVDynTable)_prog._def.tvar();
+        TVLambda lam = (TVLambda)_prog.tvar();
+        TVDynTable dyn = (TVDynTable)lam.arg(DSP_IDX);
         progress = dyn.resolve();
         dyn.errors();             // Throw if errors
         progress |= visit( syn -> syn.hm(false), (a,b) -> a || b );
