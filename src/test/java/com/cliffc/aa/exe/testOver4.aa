@@ -1,105 +1,19 @@
 // One DynLoad, fcn needs DynTable
-// Type: ( int64, flt64)
-// Eval: ( 3, 3.3f)
+// Type: nint8
+// Eval: 1
 
-// DT: { [D0=A] -> A }
+// Does not resolve because...
+
+// MAYBE: @{a=V26;... } vs @{a=1; } might fail if V26 becomes e.g. FLOAT.  So this is a MAYBE
+// MAYBE: @{a=V26;... } vs @{b=2; } might succeed if "..." becomes b=V99.  So this is a MAYBE
+
+// [[  D16=@{ a=V26;  ..., } in ( @{ a=1; }, @{ b=2; })]]
+
 fcn = { ->
-  @{
-     qii={ x y -> (+ (+1  x) (+1  y)) }; // i i -> i
-     qif={ x y -> (+ (+1  x) (f2i y)) }; // i f -> i
-     qfi={ x y -> (+ (f2i x) (+1  y)) }; // f i -> i
-     qff={ x y -> (+ (f2i x) (f2i y)) }; // f f -> i
-  }._    // Which of {q*} should be picked?
+  (pair
+    @{ a=1; }
+    @{ b=2; }
+  )._
 };
-
-bar = { x ->
-  if 1
-  ? ((fcn) x 2   )  // Picks [D0:qii/qfi]
-  : ((fcn) x 2.2f)  // Picks [D0:qif/qff]
-};
-
-baz = { ->
-  if 1
-  ? (bar 3   )  // Passing in int
-  : (bar 3.3f)  // Passing in flt
-};
-(bar)
-
-
-
-//    // Simpler test, just return a struct with 1 field, and pick the struct/field
-//    test("""
-//            noinline_foo = {
-//                    ( @{ a=1 },
-//                      @{ b=2 }
-//              )._
-//            };
-//            math.rand(2) ? noinline_foo().a : noinline_foo().b
-//            """,
-//            "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
-//
-//    // Simpler test, just X no Y
-//    test("""
-//            noinline_foo = { x ->
-//                    ( { x -> !x },
-//                      { x -> x.sin() }
-//              )._(x)
-//            };
-//            math.rand(2) ? noinline_foo(3) : noinline_foo(3.3)
-//            """,
-//            "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
-//
-//    // open bugs: return from foo is int:%[][5,6] - a mix of int & float
-//    // but the clazz is INT not a blend of INT/FLT
-//
-//    // bug store of noinline_foo does not replace the prior store of ANY in
-//    // the new field slot
-//    test("""
-//            noinline_foo = { x y ->
-//                    ( { x y -> !x * !y },
-//                      { x y -> x.sin() * !y }
-//              )._(x,y)
-//            };
-//            math.rand(2) ? noinline_foo(3,5) : noinline_foo(3.3,5)
-//            """,
-//            "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
-//
-//    // Open bug: foo inlines here but not in the next case below.
-//    // Surprised foo inlines.
-//    test("""
-//            foo = { x y ->
-//                    ( { x y -> !x * !y },
-//                      { x y -> x.sin() * !y }
-//              )._(x,y)
-//            };
-//            math.rand(2) ? foo(3,5) : foo(3.3,5)
-//            """,
-//            "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
-//
-//    test("""
-//            foo = { x y ->
-//                    ( { x y -> !x * !y },
-//                      { x y -> x.sin() * !y }
-//              )._(x,y)
-//            };
-//            baz = { x -> foo(x,5) };
-//            math.rand(2) ? baz(3) : baz(3.3)
-//            """,
-//            "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
-//
-//
-//    test(
-//"""
-//foo = { x y ->
-//        ( { x y -> !x * !y },
-//          { x y -> !x *  y.sin(3.14) },
-//          { x y -> x.sin(3.14) * !y },
-//          { x y -> x.sin(3.14) *  y.sin(3.14) }
-//  )._(x,y)
-//};
-//baz = { x -> math.rand(2) ? foo(x,2) : foo(x,2.2) };
-//bar = {   -> math.rand(2) ? baz(  3) : baz  (3.3) };
-//bar()
-//""",
-//         "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
-
+     
+if 1 ? (fcn).a : (fcn).b
