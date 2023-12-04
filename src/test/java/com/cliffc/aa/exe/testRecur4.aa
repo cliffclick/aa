@@ -1,7 +1,7 @@
 // Gen counters
 // Simple test of captured environment
 // Type: A:( int64, { [[]] -> A })
-// Eval: ( 1, K7[{ $dyn -> (inc $dyn (+ $dyn cnt 1)) },( $dyn=[[]],e3=1),( e3=K2[{ $dyn cnt -> (pair $dyn cnt { $dyn -> (inc $dyn (+ $dyn cnt 1)) }) },( e3=K2),( $dyn=[[]]),( e3=K1[{ $dyn -> inc = { $dyn cnt -> (pair $dyn cnt { $dyn -> (inc $dyn (+ $dyn cnt 1)) }) }; (inc $dyn 0) },( e3=K1),( e3=[[]])]),( e3=[[]])]),( $dyn=[[]]),( e3=K1),( e3=[[]])])
+// Eval: ( 1, K7[{ $dyn -> (inc def$dyn (+ def$dyn cnt 1)) },( $dyn=[[]],e3=1),( e3=K2[{ $dyn cnt -> (pair def$dyn cnt { $dyn -> (inc def$dyn (+ def$dyn cnt 1)) }) },( e3=K2),( $dyn=[[]]),( e3=K1[{ $dyn -> inc = { $dyn cnt -> (pair def$dyn cnt { $dyn -> (inc def$dyn (+ def$dyn cnt 1)) }) }; (inc def$dyn 0) },( e3=K1)])]),( $dyn=[[]]),( e3=K1)])
 gen = { ->
   inc = { cnt ->
    (pair cnt { -> (inc (+ cnt 1))} )

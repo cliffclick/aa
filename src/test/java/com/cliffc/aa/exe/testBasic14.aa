@@ -1,0 +1,4 @@
+// Test of unary int prim
+// Type: int64
+// Eval: 2
+(f2i 2.2f)

@@ -1,6 +1,6 @@
 // Simple struct test
 // Type: { [[]] A -> nint8 }
-// Eval: K1[{ $dyn pred -> tmp = if pred ? @{ x = 2; y = 3;} : @{ x = 3; z = 4;}; tmp.x },( e3=[[]])]
+// Eval: K1[{ $dyn pred -> tmp = if pred ? @{ x = 2; y = 3;} : @{ x = 3; z = 4;}; tmp.x },]
 { pred ->
   tmp = if pred ? @{x=2; y=3;} : @{x=3; z=4;};
   tmp.x

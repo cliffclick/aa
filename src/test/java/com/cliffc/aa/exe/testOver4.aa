@@ -3,51 +3,30 @@
 // Eval: ( 3, 3.3f)
 
 // DT: { [D0=A] -> A }
-fcn = { $dsp ->
+fcn = { ->
   @{
-     qii={ x y -> (+ (+1  x) (+1  y)) } // i i -> i
-     qif={ x y -> (+ (+1  x) (f2i y)) } // i f -> i
-     qfi={ x y -> (+ (f2i x) (+1  y)) } // f i -> i
-     qff={ x y -> (+ (f2i x) (f2i y)) } // f f -> i
-  }._    // Which of {w,x,y,z} should be picked?
+     qii={ x y -> (+ (+1  x) (+1  y)) }; // i i -> i
+     qif={ x y -> (+ (+1  x) (f2i y)) }; // i f -> i
+     qfi={ x y -> (+ (f2i x) (+1  y)) }; // f i -> i
+     qff={ x y -> (+ (f2i x) (f2i y)) }; // f f -> i
+  }._    // Which of {q*} should be picked?
 };
 
-// DT: [ F0= [D0=qii/qfi]
-//       F1= [D0=qfi/qff] ]
-bar = { $dsp x 
-->
-  if rnd
-  ? ((fcn $dsp.F0) x 2   )  // F0: Picks [D0:qii/qfi]
-  : ((fcn $dsp.F1) x 2.2f)  // F1: Picks [D0:qif/qff]
-}
+bar = { x ->
+  if 1
+  ? ((fcn) x 2   )  // Picks [D0:qii/qfi]
+  : ((fcn) x 2.2f)  // Picks [D0:qif/qff]
+};
 
-// Structure of a DynTable after matching
-// DT: [ [F3: [F0:[D0:qii],F1:[D0:qif]]]
-//       [F4: [F0:[D0:qfi],F1:[D0:qff]]] ]
 baz = { ->
-  if rnd
-  ? (bar 3)     // F3: Passing in [F0:[D0:qii],F1:[D0:qif]]
-  : (bar 3.3f)  // F4: Passing in [F0:[D0:qfi],F1:[D0:qff]]
-}
+  if 1
+  ? (bar 3   )  // Passing in int
+  : (bar 3.3f)  // Passing in flt
+};
+(bar)
 
 
 
-
-
-
-
-//    // Simpler overload tests
-//    test("!(2,3.14)._","nil","int:int1", null, null, null, null);
-//    test("(2,3.14)._.sin()","flt:0.0015926529164868282","flt:flt64", null, null, null, null);
-//    // Two DynLoads, two Fresh
-//    test("q=(2,3.14); (!q._,q._.sin())","*[16](_, nil, flt:0.0015926529164868282)","*[16](_,int:int1,flt:flt64)", null, null, "[16]", null);
-//    // One DynLoad, one Fresh, Function in-between
-//    test("noinline_f={(2,3.14)._}; noinline_f().sin()","flt:0.0015926529164868282","flt:flt64", null, null, null, null);
-//    // One DynLoad, one Fresh, Function in-between, plus 2nd DynLoad on Bang
-//    test("noinline_f={(2,3.14)._}; !noinline_f()","nil","int:int1", null, null, null, null);
-//    // One DynLoad but Freshed twice plus 2nd DynLoad on Bang
-//    test("noinline_f={(2,3.14)._}; (!noinline_f(),noinline_f().sin())","*[16](_, nil, flt:0.0015926529164868282)","*[16](_,int:int1,flt:flt64)", null, null, "[16]", null);
-//
 //    // Simpler test, just return a struct with 1 field, and pick the struct/field
 //    test("""
 //            noinline_foo = {

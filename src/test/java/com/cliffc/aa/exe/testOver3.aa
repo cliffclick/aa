@@ -1,18 +1,9 @@
 // One DynLoad, fcn needs DynTable
 // Type: ( int64, flt64)
-// Eval: ( 3, 3.3f)
+// Eval: ( 3, 3.400000013411045f)
 
-// DT: [D0: A]
+// fcn returns the Right Thing in each context
 fcn = { -> @{ i=2; f=2.3f; }._ };
-//       [D0: int]        [D0: flt]
-(pair (+ (fcn    ) 1) (f+ (fcn    ) 1.1f))
-
-
-
-
-/*
-$dyn = Root;  // $dyn is [ F0:D0:int:"i", F1:D0:flt:"f" ]
-fcn = { $dyn -> @{ i=2; f=2.3f; }._ };
-(pair (+ (fcn[$dyn]) 1) (f+ (fcn[$dyn]) 1.1f))
- */
+// In these two contexts it returns either int or flt, as needed
+(pair (+ (fcn) 1) (f+ (fcn) 1.1f))
 

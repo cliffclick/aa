@@ -25,6 +25,7 @@ public class TVDynTable extends TV3 {
     // Resolved to this label
     public String _label;
     
+    DYN( DYN dyn ) { this(dyn._idx,dyn._dyn,dyn._uid); }
     DYN( int idx, boolean dyn, int uid ) {
       _idx = idx;
       _dyn = dyn;
@@ -32,7 +33,7 @@ public class TVDynTable extends TV3 {
     }
 
     // Try to resolve the label; return true if progress
-    boolean resolve(TVDynTable dyn) {
+    boolean resolve(TVDynTable dyn, boolean test) {
       assert _dyn;
       if( !(match(dyn) instanceof TVStruct str) ) return false; // No progress until a TVStruct
       // Resolve field by field, removing resolved fields.  Should be 1 YES resolve in the end.
@@ -42,6 +43,7 @@ public class TVDynTable extends TV3 {
         int rez = str.arg(i).trial_unify_ok(pattern(dyn));
         // 7=NO, 3=MAYBE, 1=YES
         if( rez!=3 ) {          // Either a YES or a NO
+          if( test ) return true; // Always progress from here
           progress = true;      // Progress
           if( rez==1 ) {        // YES: record the resolved field label
             if( _label != null ) throw TODO("Two valid choices: "+_label+" and "+str.fld(i));
@@ -128,10 +130,10 @@ public class TVDynTable extends TV3 {
   
   // -------------------------------------------------------------
   // Resolve all embedded 
-  public boolean resolve( ) {
+  public boolean resolve( boolean test ) {
     boolean progress = false;
     for( DYN dyn : _dyns.values() )
-      progress |= dyn.resolve(this);
+      progress |= dyn.resolve(this, test);
     return progress;
   }
   
@@ -182,9 +184,11 @@ public class TVDynTable extends TV3 {
   }
 
   @Override public TVDynTable copy() {
-    TVDynTable dyn = (TVDynTable)super.copy();
-    dyn._dyns = _dyns.clone();
-    return dyn;
+    TVDynTable tab = (TVDynTable)super.copy();
+    tab._dyns = new NonBlockingHashMapLong<>();
+    for( DYN dyn : _dyns.values() )
+      tab._dyns.put(dyn._uid,new DYN(dyn));
+    return tab;
   }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {

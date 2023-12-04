@@ -42,7 +42,9 @@ public class EXE {
       put("-",new Sub());
       put("*",new Mul());
       put("/",new Div());
+      put("+1",new Inc());
       put("f+",new FAdd());
+      put("f2i",new F2I());
       put("pair",new Pair());
     }};
   
@@ -56,7 +58,7 @@ public class EXE {
   static Root parse( String sprog ) {
     X = 0;
     BUF = sprog.getBytes();
-    Lambda prog = new Lambda(new String[]{null,null,"$dyn"},fterm());
+    Syntax prog = fterm();
     if( skipWS() != -1 ) throw TODO("Junk at end of program: " + str());
     // Inject Root
     return new Root(prog);
@@ -78,7 +80,7 @@ public class EXE {
     // Parse an Apply
     if( peek('(') ) {
       Syntax fun = fterm();
-      Ary<Syntax> args = new Ary<>(new Syntax[]{null,null,new Ident("$dyn")});
+      Ary<Syntax> args = new Ary<>(new Syntax[]{null,null,new DefDynTable()});
       while( !peek(')') ) args.push(fterm());
       return new Apply(fun, args.asAry());
     }
@@ -247,7 +249,9 @@ public class EXE {
   static class DefDynTable extends Syntax {
     @Override SB str(SB sb) { return sb.p("def$dyn"); }
     @Override void prep_tree(Ary<TV3> nongen) { _tvar = new TVDynTable(); }
-    @Override boolean hm(boolean test) { return false; }
+    @Override boolean hm(boolean test) {
+      return ((TVDynTable)tvar()).resolve(test);
+    }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
     @Override Val eval( Env e ) { return new DynVal((TVDynTable)tvar()); }
   }
@@ -282,6 +286,9 @@ public class EXE {
             return;
           }
           dbx++;                // Bump deBrujin index
+        } else if( syn instanceof Root root ) {
+          if( _name.equals("$dyn") )
+            throw TODO();
         } else if( syn instanceof Apply apl ) {
           was_apply = true;
         }
@@ -296,20 +303,6 @@ public class EXE {
       _def  = def;
       _dbx  = dbx;
       _argn = argn;
-
-      //if( def instanceof Let let ) {
-      //  TVDynTable dyn = let._def.dyn();
-      //  if( dyn == null )  _dyn = dyn;
-      //  else {
-      //    // Need to wrap in a Fresh
-      //    throw TODO();
-      //  }
-      //} else {
-      //  // curry any lambda: unify $dyn from lambda arg
-      //  // if self is a lambda now we can do it now.
-      //  // if self is a non-lambda now, nothing to do .
-      //  // if self is a TVLeaf, we have a delayed problem.
-      //}
     }
     
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
@@ -353,8 +346,6 @@ public class EXE {
       nongen.pop(nargs()-AA.DSP_IDX);
       // TVLambda ret is made early, unify with body now
       ((TVLambda)tvar()).ret().unify(_body.tvar(),false);
-      // Dyn from body
-      //_dyn = _body._dyn;
     }
     
     @Override boolean hm(boolean test) {return false; }
@@ -641,13 +632,12 @@ public class EXE {
           _argn = DSP_IDX;
           break;
         } else if( syn instanceof Let let ) {
-          if( let._arg.equals("$dyn") ) {
-            assert let._par instanceof Root; // Root dyntable only
-            dyn = let._def.tvar();
-            _argn = ARG_IDX;
-            break;
-          } else
-            _dbx++;             // Bump deBrujin index
+          _dbx++;               // Bump deBrujin index
+        } else if( syn instanceof Root root ) {
+          if( root._dyn==null ) root._dyn = new TVDynTable();
+          dyn = root._dyn;
+          _argn = 0;
+          break;
         }
       }
       ((TVDynTable)dyn).add(true,_uid,s,_tvar);
@@ -658,8 +648,8 @@ public class EXE {
       for( Syntax syn = _par; ; syn = syn._par ) {
         if( syn instanceof Lambda lam ) {
           return unify((TVDynTable)lam.tvar().arg(DSP_IDX),test);
-        } else if( syn instanceof Let let && let._arg.equals("$dyn") ) {
-          return unify((TVDynTable)let._def.tvar(),test);
+        } else if( syn instanceof Root root ) {
+          return unify(root._dyn,test);
         }
       }
     }
@@ -690,22 +680,27 @@ public class EXE {
 
   // --- Root ------------------------
   static class Root extends Syntax {
-    final Lambda _prog;
-    Root( Lambda prog ) { _prog=prog;  prog._par = this; }
+    final Syntax  _prog;
+    TVDynTable _dyn;
+    Root( Syntax prog ) { _prog=prog;  prog._par = this; }
     @Override SB str( SB sb ) { return _prog.str(sb.p("Root ")); }
     @Override void prep_tree(Ary<TV3> nongen) {
       _prog.prep_tree(nongen);
-      _tvar = _prog._body.tvar();
+      _tvar = _prog.tvar();
+      if( _dyn!=null ) _dyn.resolve(false);
     }
-    @Override boolean hm(boolean test) { return false; }
+    @Override boolean hm(boolean test) {
+      return _dyn!=null && _dyn.resolve(test);
+    }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       return reduce.apply(map.apply(this),_prog.visit(map,reduce));
     }
     @Override Val eval( Env e ) {
-      TVDynTable dyn = (TVDynTable)_prog.tvar().arg(DSP_IDX);
-      e = new Env(null);
-      e._vs[DSP_IDX] = new DynVal(dyn);
-      return _prog.apply(e);
+      if( _dyn!= null ) {
+        e = new Env(null);
+        e._vs[0] = new DynVal(_dyn);
+      }
+      return _prog.eval(e);
     }
 
     // Compute HM type
@@ -713,11 +708,7 @@ public class EXE {
       prep_tree(new Ary<>(TV3.class));
       boolean progress=true;
       while( progress ) {
-        TVLambda lam = (TVLambda)_prog.tvar();
-        TVDynTable dyn = (TVDynTable)lam.arg(DSP_IDX);
-        progress = dyn.resolve();
-        dyn.errors();             // Throw if errors
-        progress |= visit( syn -> syn.hm(false), (a,b) -> a || b );
+        progress = visit( syn -> syn.hm(false), (a,b) -> a || b );
       }
       // Check for simple type errors
       visit( syn -> {
@@ -766,12 +757,17 @@ public class EXE {
     
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this);  }
     @Override Val apply( Env e ) {
-      if( e._vs[ARG_IDX].as_int()!=null ) 
-        return new IntVal(iop(e._vs[ARG_IDX].as_int()._con,e._vs[ARG_IDX+1].as_int()._con));
-      if( e._vs[ARG_IDX].as_flt()!=null ) 
-        return new FltVal(dop(e._vs[ARG_IDX].as_flt()._con,e._vs[ARG_IDX+1].as_flt()._con));
+      IntVal i0 = e._vs[ARG_IDX].as_int();
+      if( i0!=null )
+        return new IntVal(e._vs[ARG_IDX+1]==null
+                          ? iop(i0._con)
+                          : iop(i0._con,e._vs[ARG_IDX+1].as_int()._con));
+      FltVal f0 = e._vs[ARG_IDX].as_flt();
+      if( f0!=null )
+        return new FltVal(dop(f0._con,e._vs[ARG_IDX+1].as_flt()._con));
       throw TODO();
     }
+    int    iop(int    x          ) { throw TODO(); }
     int    iop(int    x, int    y) { throw TODO(); }
     double dop(double x, double y) { throw TODO(); }
   }
@@ -808,12 +804,31 @@ public class EXE {
     @Override int iop(int x, int y) { return x/y; }
   }
 
+  // inc integers
+  static class Inc extends PrimSyn {
+    public Inc() { super(INT64(), INT64()); }
+    @Override PrimSyn make() { return new Inc(); }
+    @Override SB str(SB sb) { return sb.p("+1"); }
+    @Override int iop(int x) { return x+1; }
+  }
+
   // add doubles
   static class FAdd extends PrimSyn {
     public FAdd() { super(FLT64(), FLT64(), FLT64()); }
     @Override PrimSyn make() { return new FAdd(); }
     @Override SB str(SB sb) { return sb.p("f+"); }
     @Override double dop(double x, double y) { return x+y; }
+  }
+
+  // convert doubles
+  static class F2I extends PrimSyn {
+    public F2I() { super(FLT64(), INT64()); }
+    @Override PrimSyn make() { return new F2I(); }
+    @Override SB str(SB sb) { return sb.p("f2i"); }
+    @Override Val apply( Env e ) {
+      FltVal f0 = e._vs[ARG_IDX].as_flt();
+      return new IntVal((int)f0._con);
+    }
   }
 
   // Pair results
