@@ -66,8 +66,8 @@ public class TVBase extends TVExpanding {
 
 
   // -------------------------------------------------------------
-  @Override int _trial_unify_ok_impl( TV3 tv3 ) {
-    TVBase that = (TVBase)tv3; // Invariant when called
+  @Override int _trial_unify_ok_impl( TV3 pat ) {
+    TVBase that = (TVBase) pat; // Invariant when called
     // Unifies OK if bases will unify, e.g. both ints or both floats
     return _t.getClass() == that._t.getClass() ? 1 : 7;
   }

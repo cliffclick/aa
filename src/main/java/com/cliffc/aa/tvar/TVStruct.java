@@ -429,35 +429,26 @@ public class TVStruct extends TVExpanding {
   // -------------------------------------------------------------
 
   @Override int _trial_unify_ok_impl( TV3 tv3 ) {
-    TVStruct that = tv3.as_struct(); // Invariant when called
+    TVStruct pat = tv3.as_struct(); // Invariant when called
+    if( pat.is_open() )
+      return 3;                // More fields may add, which need to be unified
     int cmp = 1;                     // Assume trial is a YES
-    for( int i=0; i<_max; i++ ) {
-      TV3 lhs = arg(i);
-      TV3 rhs = that.arg_clz(_flds[i]); // RHS lookup by field name, searching superclass
+    for( int i=0; i<pat._max; i++ ) {
+      TV3 lhs = arg_clz(pat._flds[i]);// LHS lookup by field name, searching superclass
+      TV3 rhs = pat.arg(i);
       if( lhs==rhs ) continue;          // Fast path
       if( rhs==null ) {                 // Missing in RHS
-        cmp |= that.is_open() ? 3 : 7;  // If RHS is open, may appear later so maybe, else fail
+        cmp |= pat.is_open() ? 3 : 7;  // If RHS is open, may appear later so maybe, else fail
       } else {
         cmp |= lhs._trial_unify_ok(rhs); // Trial unify recursively
       }
       if( cmp == 7 ) return cmp;  // Arg failed so trial fails
     }
 
-    // Allow unification with extra fields.  The normal unification path
-    // will not declare an error, it will just remove the extra fields.
-    // CNC : BUG HUMM???
-
-    if( this.is_open() || that.is_open() ) {
-      return 3;                 // More fields may add, which need to be unified
-    } else {
-      for( int i=0; i<_max; i++ ) {
-        if( that.arg_clz(_flds[i])==null ) // Missing key in RHS
-          return 7;
-      }
-      return 1;
-    }
-   
-    
+    for( int i=0; i<_max; i++ )
+      if( pat.arg_clz(_flds[i])==null ) // Missing key in RHS
+        return 7;                        // Fails, no match for label in pattern
+    return 1;                            // Match; all labels in pattern match (and the match is allowed extra fields)
   }
 
   private int mismatched_child(TVStruct that ) {

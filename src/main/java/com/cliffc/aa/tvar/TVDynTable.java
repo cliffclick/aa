@@ -40,7 +40,9 @@ public class TVDynTable extends TV3 {
       boolean progress = false;
       for( int i=0; i<str.len(); i++ ) {
         // Trial unify
-        int rez = str.arg(i).trial_unify_ok(pattern(dyn));
+        TV3 match = str.arg(i);
+        TV3 pat   = pattern(dyn);
+        int rez = match.trial_unify_ok(pat);
         // 7=NO, 3=MAYBE, 1=YES
         if( rez!=3 ) {          // Either a YES or a NO
           if( test ) return true; // Always progress from here
@@ -48,6 +50,8 @@ public class TVDynTable extends TV3 {
           if( rez==1 ) {        // YES: record the resolved field label
             if( _label != null ) throw TODO("Two valid choices: "+_label+" and "+str.fld(i));
             _label = str.fld(i);
+            // We got the One True Match, unify
+            match.unify(pat,test);
           }
           // Fields that resolve as either YES or NO are removed from the list,
           // since they can never change their answer.  Make a fresh copy, and
@@ -77,6 +81,9 @@ public class TVDynTable extends TV3 {
         throw TODO("Have ambiguous choices");
     }
 
+    // True if resolved
+    public boolean resolved() { return _label!=null; }
+    
     @Override public String toString() { return str(null,new SB(),null,null,true,false).toString(); }
     SB str(TVDynTable tab, SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
       sb.p(_dyn?'D':'F').p(_uid);
@@ -97,6 +104,8 @@ public class TVDynTable extends TV3 {
   private int _max;
   
   public TVDynTable() { _dyns = new NonBlockingHashMapLong<>(); _max=0; }
+
+  @Override public TVDynTable as_dyn() { return this; }
 
   @Override public int len() { return _max; }  
 
@@ -136,6 +145,13 @@ public class TVDynTable extends TV3 {
       progress |= dyn.resolve(this, test);
     return progress;
   }
+  // True if ALL resolved
+  public boolean all_resolved() {
+    boolean resolved = true;
+    for( DYN dyn : _dyns.values() )
+      resolved &= dyn.resolved();
+    return resolved;
+  }
   
   // -------------------------------------------------------------
   @Override public void _union_impl( TV3 tv3 ) { }
@@ -165,7 +181,7 @@ public class TVDynTable extends TV3 {
   
   
   // -------------------------------------------------------------
-  @Override int _trial_unify_ok_impl( TV3 tv3 ) {
+  @Override int _trial_unify_ok_impl( TV3 pat ) {
     for( DYN dyn : _dyns.values() )
       throw TODO();
     return 1;                   // No conflicts, hard-yes

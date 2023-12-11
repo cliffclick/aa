@@ -45,7 +45,7 @@ public class TVLeaf extends TVExpanding {
   }
 
   // Always maybe unifies
-  @Override int _trial_unify_ok_impl( TV3 tv3 ) { return 3; }
+  @Override int _trial_unify_ok_impl( TV3 pat ) { return 3; }
 
   // Never unifies
   @Override boolean _exact_unify_impl( TV3 tv3 ) { return false; }

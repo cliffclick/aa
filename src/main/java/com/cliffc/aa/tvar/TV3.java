@@ -136,6 +136,7 @@ abstract public class TV3 implements Cloneable {
   public TVLambda as_lambda() { throw TODO(); }
   //public TVNil    as_nil   () { throw TODO(); }
   public TVPtr    as_ptr   () { throw TODO(); }
+  public TVDynTable as_dyn () { throw TODO(); }
 
   public  long dbl_uid( TV3 t ) { assert !t.unified(); return dbl_uid(t._uid); }
   private long dbl_uid(long uid) {  assert !unified(); return ((long)_uid<<32)|uid; }
@@ -509,28 +510,28 @@ abstract public class TV3 implements Cloneable {
   // No change to either side, this is a trial only.
   // Collect leafs and bases and open structs on the pattern (this).
   private static final NonBlockingHashMapLong<TV3> TDUPS = new NonBlockingHashMapLong<>();
-  public int trial_unify_ok(TV3 that) {
+  public int trial_unify_ok(TV3 pat) {
     TDUPS.clear();
-    return _trial_unify_ok(that);
+    return _trial_unify_ok(pat);
   }
-  int _trial_unify_ok(TV3 that) {
-    if( this==that ) return 1; // hard-yes
-    assert !unified() && !that.unified();
-    long duid = dbl_uid(that._uid);
+  int _trial_unify_ok(TV3 pat) {
+    if( this==pat ) return 1; // hard-yes
+    assert !unified() && !pat.unified();
+    long duid = dbl_uid(pat._uid);
     if( TDUPS.putIfAbsent(duid,this)!=null )
       return 1;                 // Visit only once, and assume will resolve
     // Leafs never fail
-    if( this instanceof TVLeaf leaf && !(that instanceof TVErr) ) return 3; // Maybe
-    if( that instanceof TVLeaf leaf && !(this instanceof TVErr) ) return 3; // Maybe
+    if( this instanceof TVLeaf leaf && !(pat  instanceof TVErr) ) return 3; // Maybe
+    if( pat  instanceof TVLeaf leaf && !(this instanceof TVErr) ) return 3; // Maybe
     // Different classes will also fail
-    if( getClass() != that.getClass() )
+    if( getClass() != pat.getClass() )
       return 7;
     // Subclasses check sub-parts
-    return _trial_unify_ok_impl(that);
+    return _trial_unify_ok_impl(pat);
   }
 
   // Subclasses specify on sub-parts
-  int _trial_unify_ok_impl( TV3 that ) { throw TODO(); }
+  int _trial_unify_ok_impl( TV3 pat ) { throw TODO(); }
 
   // -----------------
 

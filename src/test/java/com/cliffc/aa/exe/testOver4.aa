@@ -1,13 +1,6 @@
 // One DynLoad, fcn needs DynTable
-// Type: nint8
-// Eval: 1
-
-// Does not resolve because...
-
-// MAYBE: @{a=V26;... } vs @{a=1; } might fail if V26 becomes e.g. FLOAT.  So this is a MAYBE
-// MAYBE: @{a=V26;... } vs @{b=2; } might succeed if "..." becomes b=V99.  So this is a MAYBE
-
-// [[  D16=@{ a=V26;  ..., } in ( @{ a=1; }, @{ b=2; })]]
+// Type: int64
+// Eval: 2
 
 fcn = { ->
   (pair
@@ -15,5 +8,5 @@ fcn = { ->
     @{ b=2; }
   )._
 };
-     
-if 1 ? (fcn).a : (fcn).b
+// Force field 'a' to be integer, then this resolves
+if 1 ? (+1 (fcn).a) : (fcn).b

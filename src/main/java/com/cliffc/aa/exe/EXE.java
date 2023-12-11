@@ -120,7 +120,7 @@ public class EXE {
     while( true ) {
       if( term==null || !peek('.') ) return term;
       String id = id(false,true);
-      term = id.equals("_") ? new DynField(term) : new Field(id,term);
+      term = id.equals("_") ? new DynField(term,new Ident("$dyn")) : new Field(id,term);
     }
   }
   
@@ -215,12 +215,15 @@ public class EXE {
     abstract void prep_tree(Ary<TV3> nongen);
 
     // Later passes, true for progress
-    abstract boolean hm(boolean test);
+    boolean hm(boolean test) { return false; }
 
     // SEK style evaluation machine.
     // Env is a linked list, with a Val (for Let) or a set of Vals (for Lambda).
     // A Val is either an Int, or a Kontinuation; K has a Lambda and an Env.
     abstract Val eval( Env e );
+
+    boolean _resolvedDyn;
+    boolean resolvedDyn() { return false; }
   }
 
   
@@ -231,7 +234,6 @@ public class EXE {
     Con( double con ) { _con = new FltVal(con); }
     @Override SB str(SB sb) { return _con.str(sb,null); }
     @Override void prep_tree(Ary<TV3> nongen) { _tvar = TV3.from_flow(_con.as_flow()); }
-    @Override boolean hm(boolean test) { return false; }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
     @Override Val eval( Env e ) { return _con; }
   }
@@ -240,7 +242,6 @@ public class EXE {
   static class Nil extends Syntax {
     @Override SB str(SB sb) { return sb.p("nil"); }
     @Override void prep_tree(Ary<TV3> nongen) { _tvar = new TVStruct(true); _tvar.add_may_nil(false); }
-    @Override boolean hm(boolean test) { return false; }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
     @Override NilVal eval( Env e ) { return NilVal.NIL; }
   }
@@ -274,7 +275,7 @@ public class EXE {
         if( syn instanceof Lambda lam ) {
           if( (_argn=Util.find(lam._args,_name)) != -1 )
             // Take TVar from the lambda directly; and zero-bias the arg index
-            {  init(lam,lam.arg(_argn), dbx, _argn);  return; }
+            {  init(lam,lam.arg(_argn), dbx, _argn);  lam._backLinks.push(this); return; }
           dbx++;                // Bump deBrujin index
           was_apply = false;
         } else if( syn instanceof Let let ) {
@@ -283,20 +284,21 @@ public class EXE {
             if( was_apply && !fresh )
               throw new IllegalArgumentException("Cyclic reference to "+_name);
             init(let,fresh ? let._def.tvar().fresh(nongen.asAry()) : let._def.tvar(),dbx,ARG_IDX);
+            let._backLinks.push(this);
             return;
           }
           dbx++;                // Bump deBrujin index
         } else if( syn instanceof Root root ) {
-          if( _name.equals("$dyn") )
-            throw TODO();
-        } else if( syn instanceof Apply apl ) {
+          if( _name.equals("$dyn") ) {
+            init(root, root._dyn, dbx, 0);
+            return;
+          }
+        } else if( syn instanceof Apply ) {
           was_apply = true;
         }
       }
       throw TODO("'"+_name+"' not found");
     }
-    
-    @Override boolean hm(boolean test) { return false;  }
     
     private void init( Syntax def, TV3 tv, int dbx, int argn ) {
       _tvar = tv;
@@ -317,15 +319,17 @@ public class EXE {
   // --- Lambda ------------------------
   static class Lambda extends Syntax {
     static final Ary<Lambda> FUNS = new Ary<>(Lambda.class);
-    final Syntax _body;
+    final Syntax _body;         // Function body
     final String[] _args;       // Argument names
-    final int _fidx;
+    final int _fidx;            // Unique ID
+    final Ary<Ident> _backLinks;
     
     Lambda(String[] args, Syntax body ) {
       _body = body;  if( body!=null ) body._par = this;
       _args = args;
       _fidx = BitsFun.new_fidx();
       FUNS.setX(_fidx,this);
+      _backLinks = new Ary<>(Ident.class);
     }
     @Override SB str(SB sb) {
       sb.p("{ ");
@@ -348,11 +352,18 @@ public class EXE {
       ((TVLambda)tvar()).ret().unify(_body.tvar(),false);
     }
     
-    @Override boolean hm(boolean test) {return false; }
-    
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       return reduce.apply(map.apply(this),_body.visit(map,reduce));
     }
+    boolean resolvedDyn() {
+      TVLambda lam = (TVLambda)tvar();
+      TVDynTable dynt = (TVDynTable)(lam.arg(DSP_IDX));
+      boolean all = dynt.all_resolved();
+      if( all && !_resolvedDyn ) return (_resolvedDyn=true);
+      // Also true if all inputs are resolved, recursively
+      return false;
+    }
+
     @Override KontVal eval( Env e ) { return new KontVal(e,this);  }    
     Val apply( Env e ) { return _body.eval(e); }
   }
@@ -395,8 +406,6 @@ public class EXE {
       }
       tvar().unify(lam.ret(),false);
     }
-    
-    @Override boolean hm(boolean test) { return false; }
     
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       T slf = map.apply(this);
@@ -456,10 +465,7 @@ public class EXE {
       if( cmp >= 0 ) tvar().unify(_t.tvar(),false);
       if( cmp <= 0 ) tvar().unify(_f.tvar(),false);
     }
-    @Override boolean hm(boolean test) {
-      return false;
-      //throw TODO();
-    }
+    
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       T slf = map.apply(this), rez;
       rez = reduce.apply(slf,_pred.visit(map,reduce));
@@ -485,6 +491,7 @@ public class EXE {
   static class Let extends Syntax {
     final Syntax _def, _body;
     final String _arg;       // Argument name
+    final Ary<Ident> _backLinks;
     static final Ary<Let> LETS = new Ary<Let>(Let.class);
     
     Let(String arg, Syntax def, Syntax body ) {
@@ -492,6 +499,7 @@ public class EXE {
       _body = body; body._par = this;
       _arg  = arg;
       LETS.setX(_uid,this);
+      _backLinks = new Ary<>(Ident.class);
     }
     @Override SB str(SB sb) { return _body.str(_def.str(sb.p(_arg).p(" = ")).p("; ")); }
     @Override void prep_tree(Ary<TV3> nongen) {
@@ -505,8 +513,6 @@ public class EXE {
       tvar().unify(_body.tvar(),false); // Unify 'Let._tvar' with the '_body._tvar'
       //_dyn = _body.dyn();
     }
-    
-    @Override boolean hm(boolean test) { return false; }
     
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       T rez = map.apply(this);
@@ -544,10 +550,6 @@ public class EXE {
       }
     }
     
-    @Override boolean hm(boolean test) {
-      return false;
-    }
-    
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       T rez = map.apply(this);
       for( Syntax fld : _flds )
@@ -578,8 +580,6 @@ public class EXE {
       if( !(_ptr.tvar() instanceof TVStruct str && str.idx(_lab)>=0) )
         throw new IllegalArgumentException("Missing field '"+_lab+"'");
     }
-    
-    @Override boolean hm(boolean test) { return false; }
     
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       return reduce.apply(map.apply(this),_ptr.visit(map,reduce));
@@ -616,44 +616,39 @@ public class EXE {
   
   static class DynField extends Syntax {
     final Syntax _ptr;
-    private int _dbx;           // deBrujin index
-    private int _argn;          // Arg index for Lambda, 0 for Let
-    DynField(Syntax ptr ) { _ptr = ptr; ptr._par = this; }
+    final Syntax _dyn;          // 
+    DynField(Syntax ptr, Syntax dyn ) {
+      _ptr = ptr;
+      _dyn = dyn;
+      ptr._par = this;
+      dyn._par = this;
+    }
     @Override SB str(SB sb) { return _ptr.str(sb).p("._"); }
     @Override void prep_tree(Ary<TV3> nongen) {
       _tvar = new TVLeaf();
       _ptr.prep_tree(nongen);
+      _dyn.prep_tree(nongen);
       TVStruct s = new TVStruct(new String[]{},new TV3[]{},true);
       _ptr.tvar().unify(s,false);
-      TV3 dyn;
-      for( Syntax syn = _par; ; syn = syn._par ) {
-        if( syn instanceof Lambda lam ) {
-          dyn = lam.arg(DSP_IDX);
-          _argn = DSP_IDX;
-          break;
-        } else if( syn instanceof Let let ) {
-          _dbx++;               // Bump deBrujin index
-        } else if( syn instanceof Root root ) {
-          if( root._dyn==null ) root._dyn = new TVDynTable();
-          dyn = root._dyn;
-          _argn = 0;
-          break;
-        }
-      }
-      ((TVDynTable)dyn).add(true,_uid,s,_tvar);
+      TVDynTable dyn = new TVDynTable();
+      _dyn.tvar().unify(dyn,false);
+      dyn = (TVDynTable)dyn.find();
+      dyn.add(true,_uid,s,_tvar);
     }
 
     // Re-unify with resolved labels
     @Override boolean hm(boolean test) {
-      for( Syntax syn = _par; ; syn = syn._par ) {
-        if( syn instanceof Lambda lam ) {
-          return unify((TVDynTable)lam.tvar().arg(DSP_IDX),test);
-        } else if( syn instanceof Root root ) {
-          return unify(root._dyn,test);
-        }
-      }
+      TVDynTable tab = (TVDynTable)_dyn.tvar();
+      return tab.resolve(test);
     }
 
+    @Override boolean resolvedDyn() {
+      if( _resolvedDyn ) return false;
+      if( ((TVDynTable)_dyn.tvar()).all_resolved() )
+        return (_resolvedDyn = true);
+      return false;
+    }
+    
     // Resolved unify
     private boolean unify(TVDynTable dyn, boolean test) {
       String label = dyn.find_label(_uid);
@@ -665,14 +660,13 @@ public class EXE {
 
     
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
-      return reduce.apply(map.apply(this),_ptr.visit(map,reduce));
+      T rez = map.apply(this);
+      T ptr = reduce.apply(rez,_ptr.visit(map,reduce));
+      return  reduce.apply(ptr,_dyn.visit(map,reduce));
     }
     @Override Val eval( Env e ) {
-      Env e0 = e;
-      for( int i=0; i<_dbx; i++ )
-        e0 = e0._e;               // Index env via deBrujin index
-      DynVal vdyn = (DynVal)e0._vs[_argn];
-      String label = vdyn._dyn.find_label(_uid);
+      DynVal dyn = _dyn.eval(e).as_dyn();
+      String label = dyn._dyn.find_label(_uid);
       return _ptr.eval(e).as_struct().at(label);
     }
   }
@@ -682,7 +676,11 @@ public class EXE {
   static class Root extends Syntax {
     final Syntax  _prog;
     TVDynTable _dyn;
-    Root( Syntax prog ) { _prog=prog;  prog._par = this; }
+    Root( Syntax prog ) {
+      _prog=prog;
+      prog._par = this;
+      _dyn = new TVDynTable();
+    }
     @Override SB str( SB sb ) { return _prog.str(sb.p("Root ")); }
     @Override void prep_tree(Ary<TV3> nongen) {
       _prog.prep_tree(nongen);
@@ -721,6 +719,15 @@ public class EXE {
           return null;
         },
         (a,b)->null);
+
+      progress = true;
+      while( progress ) {
+        progress = visit( Syntax::resolvedDyn, ( a, b) -> a || b );
+      }
+      visit( syn -> { if( syn instanceof DynField dyn && !dyn._resolvedDyn )
+            throw new IllegalArgumentException("Unresolved dynamic field");
+          else return null;
+        }, (a,b) -> null );
       // TODO: Worklist based HM typing
       return this;
     }
@@ -752,8 +759,6 @@ public class EXE {
         lam.arg(AA.ARG_IDX+i).unify(_tvs[i],false);
       _tvar = lam;
     }
-    
-    @Override boolean hm(boolean test) { return false; }
     
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this);  }
     @Override Val apply( Env e ) {
@@ -841,9 +846,7 @@ public class EXE {
     }
     @Override PrimSyn make() { return new Pair(); }
     @Override SB str(SB sb) { return sb.p("pair"); }
-    @Override StructVal apply( Env e ) { return new StructVal().add("0",e._vs[ARG_IDX]).add("1",e._vs[ARG_IDX+1]); }
-    
-    @Override boolean hm(boolean test) { return false; }
+    @Override StructVal apply( Env e ) { return new StructVal().add("0",e._vs[ARG_IDX]).add("1",e._vs[ARG_IDX+1]); }    
   }
 
 
@@ -873,6 +876,7 @@ public class EXE {
     KontVal   as_kont  () { return null; }    
     StructVal as_struct() { return null; }
     TypeNil   as_flow  () { throw TODO(); }
+    DynVal    as_dyn   () { return null; }
     @Override final public String toString() { return str(new SB(), new VBitSet()).toString(); }
     abstract SB str(SB sb, VBitSet visit);
   }
@@ -928,7 +932,7 @@ public class EXE {
       _vals  [_len++] = val;
       return this;
     }
-    StructVal as_struct() { return this; }
+    @Override StructVal as_struct() { return this; }
     Val at(String label) { return _vals[Util.find(_labels,label)]; }
     SB str(SB sb, VBitSet visit) {
       if( _labels.length==0 || _labels[0].equals("0") ) {
@@ -949,6 +953,7 @@ public class EXE {
   private static class DynVal extends Val {
     final TVDynTable _dyn;
     DynVal(TVDynTable dyn) {_dyn=dyn; }
+    @Override DynVal as_dyn() { return this; }
     SB str(SB sb, VBitSet visit) { return _dyn.str(sb,visit,new VBitSet(),false,true); }
   }
 }
