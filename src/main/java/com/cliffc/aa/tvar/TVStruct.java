@@ -430,14 +430,12 @@ public class TVStruct extends TVExpanding {
 
   @Override int _trial_unify_ok_impl( TV3 tv3 ) {
     TVStruct pat = tv3.as_struct(); // Invariant when called
-    if( pat.is_open() )
-      return 3;                // More fields may add, which need to be unified
     int cmp = 1;                     // Assume trial is a YES
     for( int i=0; i<pat._max; i++ ) {
       TV3 lhs = arg_clz(pat._flds[i]);// LHS lookup by field name, searching superclass
       TV3 rhs = pat.arg(i);
       if( lhs==rhs ) continue;          // Fast path
-      if( rhs==null ) {                 // Missing in RHS
+      if( lhs==null ) {                 // Missing in match
         cmp |= pat.is_open() ? 3 : 7;  // If RHS is open, may appear later so maybe, else fail
       } else {
         cmp |= lhs._trial_unify_ok(rhs); // Trial unify recursively
@@ -447,8 +445,8 @@ public class TVStruct extends TVExpanding {
 
     for( int i=0; i<_max; i++ )
       if( pat.arg_clz(_flds[i])==null ) // Missing key in RHS
-        return 7;                        // Fails, no match for label in pattern
-    return 1;                            // Match; all labels in pattern match (and the match is allowed extra fields)
+        return 7;                       // Fails, no match for label in pattern
+    return pat.is_open() ? 3 : 1;       // If pattern is open, it may yet fail; if closed all fields matched
   }
 
   private int mismatched_child(TVStruct that ) {

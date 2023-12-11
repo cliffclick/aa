@@ -7,3 +7,11 @@ fcn = { -> @{ i=2; f=2.3f; }._ };
 // In these two contexts it returns either int or flt, as needed
 (pair (+ (fcn) 1) (f+ (fcn) 1.1f))
 
+
+// Root fcn = { $dyn ->
+//   @{ i = 2; f = 2.300000011920929f;}._
+// };
+// (pair def$dyn
+//   ( + def$dyn (fcn def$dyn) 1   )
+//   (f+ def$dyn (fcn def$dyn) 1.1f)
+// )

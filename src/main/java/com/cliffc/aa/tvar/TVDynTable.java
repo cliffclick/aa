@@ -36,35 +36,52 @@ public class TVDynTable extends TV3 {
     boolean resolve(TVDynTable dyn, boolean test) {
       assert _dyn;
       if( !(match(dyn) instanceof TVStruct str) ) return false; // No progress until a TVStruct
+      TV3 pat = pattern(dyn);
       // Resolve field by field, removing resolved fields.  Should be 1 YES resolve in the end.
       boolean progress = false;
       for( int i=0; i<str.len(); i++ ) {
         // Trial unify
         TV3 match = str.arg(i);
-        TV3 pat   = pattern(dyn);
         int rez = match.trial_unify_ok(pat);
         // 7=NO, 3=MAYBE, 1=YES
         if( rez!=3 ) {          // Either a YES or a NO
           if( test ) return true; // Always progress from here
-          progress = true;      // Progress
-          if( rez==1 ) {        // YES: record the resolved field label
-            if( _label != null ) throw TODO("Two valid choices: "+_label+" and "+str.fld(i));
-            _label = str.fld(i);
-            // We got the One True Match, unify
-            match.unify(pat,test);
-          }
-          // Fields that resolve as either YES or NO are removed from the list,
-          // since they can never change their answer.  Make a fresh copy, and
-          // remove the field.
-          str = (TVStruct)str.fresh();
-          str.del_fld0(i--);
-          set_match(dyn,str);
+          progress = true;
+          str = handle_match(dyn,rez,match,pat,str,i--);
+          pat = pat.find();
         }
         // Pending MAYBEs remain, and need progress elsewhere
       }
+      // TODO: Resolving with a single Maybe.
+      // If, later this maybe turns into a Yes, we're just making a Yes sooner.
+      // If, later this maybe turns into a No, then we're in an error situation already.
+      // To get consistent errors, we need to always have the sane field be the Last Maybe
+      if( str.len()==1 && _label==null ) {
+        if( test ) return true; // Gonna match the Last Maybe
+        progress = true;
+        handle_match(dyn,1,str.arg(0),pat,str,0);
+      }
+
       return progress;
     }
 
+    private TVStruct handle_match( TVDynTable dyn, int rez, TV3 match, TV3 pat, TVStruct str, int i ) {
+      if( rez==1 ) {        // YES: record the resolved field label
+        if( _label != null ) throw TODO("Two valid choices: "+_label+" and "+str.fld(i));
+        _label = str.fld(i);
+        // We got the One True Match, unify
+        match.unify(pat,false);
+      }
+      // Fields that resolve as either YES or NO are removed from the list,
+      // since they can never change their answer.  Make a fresh copy, and
+      // remove the field.
+      str = (TVStruct)str.fresh();
+      str.del_fld0(i);
+      set_match(dyn,str);
+      return str;
+    }
+
+    
     TV3 match  (TVDynTable tab) { return tab.arg(_idx+0); }
     TV3 pattern(TVDynTable tab) { return tab.arg(_idx+1); }
     void set_match(TVDynTable tab, TVStruct ts) { tab._args[_idx+0]=ts; }

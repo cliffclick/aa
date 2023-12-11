@@ -102,7 +102,7 @@ public class EXE {
     
     // Let or Id
     if( isAlpha0(BUF[X]) || isOp(BUF[X]) ) {
-      String id = id(isOp(BUF[X]),false);
+      String id = id(false);
       if( peek('=') )
         // Let expression; "id = fterm(); term..."
         return new Let(id,require(fterm(),';'),fterm());
@@ -119,14 +119,14 @@ public class EXE {
     Syntax term = term();
     while( true ) {
       if( term==null || !peek('.') ) return term;
-      String id = id(false,true);
+      String id = id( true);
       term = id.equals("_") ? new DynField(term,new Ident("$dyn")) : new Field(id,term);
     }
   }
   
   private static final SB ID = new SB();
-  private static String id() { return id(false,false); }
-  private static String id( boolean op, boolean num ) {
+  private static String id() { return id( false); }
+  private static String id( boolean num ) {
     ID.clear();
     skipWS();
     while( X<BUF.length && ( isAlpha1(BUF[X]) || isOp(BUF[X]) || (num && isDigit(BUF[X])) ) )
@@ -154,7 +154,7 @@ public class EXE {
     while(true) {
       if( X == BUF.length ) return -1;
       if( X+1<BUF.length && BUF[X]=='/' && BUF[X+1]=='/' )
-        while( BUF[X]!='\n' ) X++;
+        while( X<BUF.length && BUF[X]!='\n' ) X++;
       if( X+1<BUF.length && BUF[X]=='/' && BUF[X+1]=='*' )
         while( BUF[X-2]!='*' || BUF[X-1]!='/' ) X++;
       if( !isWS(BUF[X]) ) return BUF[X];
@@ -179,8 +179,7 @@ public class EXE {
   private static void require(char c) { if( skipWS()!=c ) throw TODO("Missing '"+c+"'"); X++; }
   private static Syntax require(Syntax t, char c) { require(c); return t; }
   private static String require(String s, char c) { require(c); return s; }
-  private static Syntax require(String s, Syntax t) { for( byte c : s.getBytes() ) require((char)c); return t; }
-  
+
   // ----------------- Syntax ---------------------
   static abstract class Syntax implements IntSupplier {
     private static int CNT=1;
@@ -196,13 +195,6 @@ public class EXE {
     }
     TV3 debug_find() { return _tvar.debug_find(); } // Find, without the roll-up
 
-    // Dataflow types.  Varies during a run of GCP.
-    Type _flow;
-
-    //// DynTable for this lexical scope
-    //TVDynTable _dyn;
-    //TVDynTable dyn() { return _dyn!=null && _dyn.unified() ? _dyn = (TVDynTable)_dyn.find() : _dyn; }
-    
     // Visit whole tree recursively, applying 'map' to self, and reducing that
     // with the recursive value from all children.
     abstract <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce );
@@ -221,9 +213,6 @@ public class EXE {
     // Env is a linked list, with a Val (for Let) or a set of Vals (for Lambda).
     // A Val is either an Int, or a Kontinuation; K has a Lambda and an Env.
     abstract Val eval( Env e );
-
-    boolean _resolvedDyn;
-    boolean resolvedDyn() { return false; }
   }
 
   
@@ -254,6 +243,9 @@ public class EXE {
       return ((TVDynTable)tvar()).resolve(test);
     }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
+    boolean resolvedDyn() {
+      return ((TVDynTable)tvar()).all_resolved();
+    }
     @Override Val eval( Env e ) { return new DynVal((TVDynTable)tvar()); }
   }
 
@@ -275,7 +267,7 @@ public class EXE {
         if( syn instanceof Lambda lam ) {
           if( (_argn=Util.find(lam._args,_name)) != -1 )
             // Take TVar from the lambda directly; and zero-bias the arg index
-            {  init(lam,lam.arg(_argn), dbx, _argn);  lam._backLinks.push(this); return; }
+            {  init(lam,lam.arg(_argn), dbx, _argn);  return; }
           dbx++;                // Bump deBrujin index
           was_apply = false;
         } else if( syn instanceof Let let ) {
@@ -284,7 +276,6 @@ public class EXE {
             if( was_apply && !fresh )
               throw new IllegalArgumentException("Cyclic reference to "+_name);
             init(let,fresh ? let._def.tvar().fresh(nongen.asAry()) : let._def.tvar(),dbx,ARG_IDX);
-            let._backLinks.push(this);
             return;
           }
           dbx++;                // Bump deBrujin index
@@ -322,14 +313,12 @@ public class EXE {
     final Syntax _body;         // Function body
     final String[] _args;       // Argument names
     final int _fidx;            // Unique ID
-    final Ary<Ident> _backLinks;
     
     Lambda(String[] args, Syntax body ) {
       _body = body;  if( body!=null ) body._par = this;
       _args = args;
       _fidx = BitsFun.new_fidx();
       FUNS.setX(_fidx,this);
-      _backLinks = new Ary<>(Ident.class);
     }
     @Override SB str(SB sb) {
       sb.p("{ ");
@@ -355,15 +344,6 @@ public class EXE {
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       return reduce.apply(map.apply(this),_body.visit(map,reduce));
     }
-    boolean resolvedDyn() {
-      TVLambda lam = (TVLambda)tvar();
-      TVDynTable dynt = (TVDynTable)(lam.arg(DSP_IDX));
-      boolean all = dynt.all_resolved();
-      if( all && !_resolvedDyn ) return (_resolvedDyn=true);
-      // Also true if all inputs are resolved, recursively
-      return false;
-    }
-
     @Override KontVal eval( Env e ) { return new KontVal(e,this);  }    
     Val apply( Env e ) { return _body.eval(e); }
   }
@@ -491,7 +471,6 @@ public class EXE {
   static class Let extends Syntax {
     final Syntax _def, _body;
     final String _arg;       // Argument name
-    final Ary<Ident> _backLinks;
     static final Ary<Let> LETS = new Ary<Let>(Let.class);
     
     Let(String arg, Syntax def, Syntax body ) {
@@ -499,7 +478,6 @@ public class EXE {
       _body = body; body._par = this;
       _arg  = arg;
       LETS.setX(_uid,this);
-      _backLinks = new Ary<>(Ident.class);
     }
     @Override SB str(SB sb) { return _body.str(_def.str(sb.p(_arg).p(" = ")).p("; ")); }
     @Override void prep_tree(Ary<TV3> nongen) {
@@ -642,23 +620,6 @@ public class EXE {
       return tab.resolve(test);
     }
 
-    @Override boolean resolvedDyn() {
-      if( _resolvedDyn ) return false;
-      if( ((TVDynTable)_dyn.tvar()).all_resolved() )
-        return (_resolvedDyn = true);
-      return false;
-    }
-    
-    // Resolved unify
-    private boolean unify(TVDynTable dyn, boolean test) {
-      String label = dyn.find_label(_uid);
-      if( label==null ) return false; // Not resolved yet
-      TVStruct str = (TVStruct)_ptr.tvar();
-      TV3 fld = str.arg(label);
-      return fld.unify(tvar(),test);
-    }
-
-    
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       T rez = map.apply(this);
       T ptr = reduce.apply(rez,_ptr.visit(map,reduce));
@@ -720,11 +681,7 @@ public class EXE {
         },
         (a,b)->null);
 
-      progress = true;
-      while( progress ) {
-        progress = visit( Syntax::resolvedDyn, ( a, b) -> a || b );
-      }
-      visit( syn -> { if( syn instanceof DynField dyn && !dyn._resolvedDyn )
+      visit( syn -> { if( syn instanceof DefDynTable dyn && !dyn.resolvedDyn() )
             throw new IllegalArgumentException("Unresolved dynamic field");
           else return null;
         }, (a,b) -> null );
@@ -741,7 +698,6 @@ public class EXE {
       {"0","1"},
       {"0","1","2"},
     };
-    static final Type[] TS = new Type[10];
     static TV3 INT64() { return TVBase.make(TypeInt.INT64); }
     static TV3 FLT64() { return TVBase.make(TypeFlt.FLT64); }
     
@@ -904,7 +860,7 @@ public class EXE {
   
   private static class KontVal extends Val {
     private static int UID=1;
-    private int _uid=UID++;
+    private final int _uid=UID++;
     Env _e;
     final Lambda _lam;
     KontVal(Env e, Lambda lam) { _e=e; _lam=lam; }
