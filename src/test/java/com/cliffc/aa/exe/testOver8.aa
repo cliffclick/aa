@@ -1,0 +1,40 @@
+// One DynLoad, fcn needs DynTable
+// Type: ( int64, flt64)
+// Eval: ( 3, 3.3f)
+
+// DT: { [D0=A] -> A }
+fcn = { ->
+  @{
+     qii={ x y -> (+ (+1  x) (+1  y)) }; // i i -> i
+     qif={ x y -> (+ (+1  x) (f2i y)) }; // i f -> i
+     qfi={ x y -> (+ (f2i x) (+1  y)) }; // f i -> i
+     qff={ x y -> (+ (f2i x) (f2i y)) }; // f f -> i
+  }._    // Which of {q*} should be picked?
+};
+
+bar = { x ->
+  if 1
+  ? ((fcn) x 2   )  // Picks [D0:qii/qfi]
+  : ((fcn) x 2.2f)  // Picks [D0:qif/qff]
+};
+
+baz = { ->
+  if 1
+  ? (bar 3   )  // Passing in int
+  : (bar 3.3f)  // Passing in flt
+};
+(baz)
+//"""
+//foo = { x y ->
+//        ( { x y -> !x * !y },
+//          { x y -> !x *  y.sin(3.14) },
+//          { x y -> x.sin(3.14) * !y },
+//          { x y -> x.sin(3.14) *  y.sin(3.14) }
+//  )._(x,y)
+//};
+//baz = { x -> math.rand(2) ? foo(x,2) : foo(x,2.2) };
+//bar = {   -> math.rand(2) ? baz(  3) : baz  (3.3) };
+//bar()
+//""",
+//         "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
+
