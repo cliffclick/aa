@@ -1,4 +1,4 @@
 // Defines map, ignores it
 // Type: { [[]] A -> 5 }
-// Eval: K2[{ $dyn p -> 5 },( e3=K1[{ $dyn fun -> { $dyn x -> (fun def$dyn x) } },( e3=K1),()]),()]
+// Eval: K2[LAMBDA,( e3=K1[LAMBDA,( e3=K1)])]
 map = { fun -> { x -> (fun x)}}; { p -> 5 }

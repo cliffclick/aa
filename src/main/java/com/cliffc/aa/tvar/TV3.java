@@ -705,7 +705,7 @@ abstract public class TV3 implements Cloneable {
   }
 
   // Fancy print for Debuggers - includes explicit U-F re-direction.
-  // Does NOT roll-up U-F, has no side-effects.
+  // Does NOT roll-up U-F, has no side effects.
   SB _str(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     boolean dup = dups.get(_uid);
     if( !debug && unified() ) return find()._str(sb,visit,dups,debug,prims);

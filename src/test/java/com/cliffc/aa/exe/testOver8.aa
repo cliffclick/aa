@@ -19,9 +19,9 @@ bar = { x ->
 };
 
 baz = { ->
-  if 1
+  if 0
   ? (bar 3   )  // Passing in int
-  : (bar 3.3f)  // Passing in flt
+  : (bar 3.9f)  // Passing in flt
 };
 (baz)
 //"""

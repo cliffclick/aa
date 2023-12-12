@@ -80,7 +80,7 @@ public class EXE {
     // Parse an Apply
     if( peek('(') ) {
       Syntax fun = fterm();
-      Ary<Syntax> args = new Ary<>(new Syntax[]{null,null,new DefDynTable()});
+      Ary<Syntax> args = new Ary<>(new Syntax[]{null,null,new Ident("$dyn")});
       while( !peek(')') ) args.push(fterm());
       return new Apply(fun, args.asAry());
     }
@@ -221,7 +221,7 @@ public class EXE {
     final Val _con;
     Con( int   con ) { _con = new IntVal(con); }
     Con( double con ) { _con = new FltVal(con); }
-    @Override SB str(SB sb) { return _con.str(sb,null); }
+    @Override SB str(SB sb) { return _con.str(sb,null,null); }
     @Override void prep_tree(Ary<TV3> nongen) { _tvar = TV3.from_flow(_con.as_flow()); }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
     @Override Val eval( Env e ) { return _con; }
@@ -281,7 +281,12 @@ public class EXE {
           dbx++;                // Bump deBrujin index
         } else if( syn instanceof Root root ) {
           if( _name.equals("$dyn") ) {
-            init(root, root._dyn, dbx, 0);
+            DefDynTable def = new DefDynTable();
+            def._par = _par;
+            if( _par instanceof DynField dfld ) dfld._dyn = def;
+            else if( _par instanceof Apply aply ) aply._args[DSP_IDX] = def;
+            else TODO();
+            def.prep_tree(nongen);
             return;
           }
         } else if( syn instanceof Apply ) {
@@ -593,8 +598,8 @@ public class EXE {
    */
   
   static class DynField extends Syntax {
-    final Syntax _ptr;
-    final Syntax _dyn;          // 
+    Syntax _ptr;
+    Syntax _dyn;          // 
     DynField(Syntax ptr, Syntax dyn ) {
       _ptr = ptr;
       _dyn = dyn;
@@ -636,29 +641,19 @@ public class EXE {
   // --- Root ------------------------
   static class Root extends Syntax {
     final Syntax  _prog;
-    TVDynTable _dyn;
     Root( Syntax prog ) {
       _prog=prog;
       prog._par = this;
-      _dyn = new TVDynTable();
     }
     @Override SB str( SB sb ) { return _prog.str(sb.p("Root ")); }
     @Override void prep_tree(Ary<TV3> nongen) {
       _prog.prep_tree(nongen);
       _tvar = _prog.tvar();
-      if( _dyn!=null ) _dyn.resolve(false);
-    }
-    @Override boolean hm(boolean test) {
-      return _dyn!=null && _dyn.resolve(test);
     }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       return reduce.apply(map.apply(this),_prog.visit(map,reduce));
     }
     @Override Val eval( Env e ) {
-      if( _dyn!= null ) {
-        e = new Env(null);
-        e._vs[0] = new DynVal(_dyn);
-      }
       return _prog.eval(e);
     }
 
@@ -718,17 +713,13 @@ public class EXE {
     
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this);  }
     @Override Val apply( Env e ) {
+      Val v1 = e._vs[ARG_IDX+1];
       IntVal i0 = e._vs[ARG_IDX].as_int();
-      if( i0!=null )
-        return new IntVal(e._vs[ARG_IDX+1]==null
-                          ? iop(i0._con)
-                          : iop(i0._con,e._vs[ARG_IDX+1].as_int()._con));
       FltVal f0 = e._vs[ARG_IDX].as_flt();
-      if( f0!=null )
-        return new FltVal(dop(f0._con,e._vs[ARG_IDX+1].as_flt()._con));
+      if( i0!=null ) return new IntVal(iop(i0._con,v1==null ? 0   : v1.as_int()._con));
+      if( f0!=null ) return new FltVal(dop(f0._con,v1==null ? 0.0 : v1.as_flt()._con));      
       throw TODO();
     }
-    int    iop(int    x          ) { throw TODO(); }
     int    iop(int    x, int    y) { throw TODO(); }
     double dop(double x, double y) { throw TODO(); }
   }
@@ -770,7 +761,7 @@ public class EXE {
     public Inc() { super(INT64(), INT64()); }
     @Override PrimSyn make() { return new Inc(); }
     @Override SB str(SB sb) { return sb.p("+1"); }
-    @Override int iop(int x) { return x+1; }
+    @Override int iop(int x, int y) { return x+1; }
   }
 
   // add doubles
@@ -807,20 +798,37 @@ public class EXE {
 
 
   // --- Env ---------------------------------------------------
+  static int EVCNT;
   private static class Env {
     final Env _e;               // Linked list
     final Val[] _vs;            // Values; referenced via deBrujin
+    final int _uid = EVCNT++;
     Env(Env e) { _e=e; _vs = new Val[ARG_IDX+2]; }
-    @Override public String toString() { return str(new SB(), new VBitSet()).toString(); }
-    SB str(SB sb, VBitSet visit) {
+    @Override public String toString() { return str(new SB(),null,null).toString(); }
+    public final SB str(SB sb, VBitSet visit, VBitSet dups) {
+      if( visit==null ) {
+        assert dups==null;
+        _get_dups(visit=new VBitSet(),dups=new VBitSet());
+        visit.clear();
+      }
+      return _str(sb,visit,dups);
+    }
+    final SB _str(SB sb, VBitSet visit, VBitSet dups) {
       sb.p("( ");
-      if( _vs[DSP_IDX]!=null ) _vs[DSP_IDX].str(sb.p("$dyn="),visit).p(',');
+      if( _vs[DSP_IDX]!=null ) _vs[DSP_IDX].str(sb.p("$dyn="),visit,dups).p(',');
       for( int i=ARG_IDX; i< _vs.length; i++ )
         if( _vs[i] != null )
-          _vs[i].str(sb.p("e").p(i).p("="),visit).p(',');
+          _vs[i].str(sb.p("e").p(i).p("="),visit,dups).p(',');
       sb.unchar(1).p(")");
       if( _e==null ) return sb;
-      return _e.str(sb.p(','),visit);
+      return _e.str(sb.p(','),visit,dups);
+    }
+    void _get_dups(VBitSet visit, VBitSet dups) {
+      if( visit.tset(_uid) )
+        { dups.set(_uid); return; }
+      for( int i=DSP_IDX; i< _vs.length; i++ )
+        if( _vs[i] != null )
+          _vs[i]._get_dups(visit,dups);      
     }
   }
 
@@ -833,15 +841,29 @@ public class EXE {
     StructVal as_struct() { return null; }
     TypeNil   as_flow  () { throw TODO(); }
     DynVal    as_dyn   () { return null; }
-    @Override final public String toString() { return str(new SB(), new VBitSet()).toString(); }
-    abstract SB str(SB sb, VBitSet visit);
+    final int _uid = EVCNT++;
+    @Override final public String toString() { return str(new SB(),null,null).toString(); }
+    public final SB str(SB sb, VBitSet visit, VBitSet dups) {
+      if( visit==null ) {
+        assert dups==null;
+        _get_dups(visit=new VBitSet(),dups=new VBitSet());
+        visit.clear();
+      }
+      return _str(sb,visit,dups);
+    }
+
+    abstract SB _str(SB sb, VBitSet visit, VBitSet dups);
+    void _get_dups(VBitSet visit, VBitSet dups) {
+      if( visit.tset(_uid) )
+        dups.set(_uid);
+    }
   }
   
   private static class IntVal extends Val {
     final int _con;
     IntVal(int con) { _con=con; }
     IntVal as_int() { return this; }
-    SB str(SB sb, VBitSet visit) { return sb.p(_con); }
+    SB _str(SB sb, VBitSet visit, VBitSet dups) { return sb.p(_con); }
     TypeNil as_flow() { return TypeInt.con(_con); }
   }
   
@@ -849,13 +871,14 @@ public class EXE {
     final double _con;
     FltVal(double con) { _con=con; }
     FltVal as_flt() { return this; }
-    SB str(SB sb, VBitSet visit) { return sb.p(_con).p("f"); }
+    SB _str(SB sb, VBitSet visit, VBitSet dups) { return sb.p(_con).p("f"); }
     TypeNil as_flow() { return TypeFlt.con(_con); }
   }
   
   private static class NilVal extends Val {
     static final NilVal NIL = new NilVal();
     SB str(SB sb, VBitSet visit) { return sb.p("nil"); }
+    SB _str(SB sb, VBitSet visit, VBitSet dups) { return sb.p("nil"); }
   }
   
   private static class KontVal extends Val {
@@ -865,12 +888,20 @@ public class EXE {
     final Lambda _lam;
     KontVal(Env e, Lambda lam) { _e=e; _lam=lam; }
     KontVal as_kont() { return this; }
-    SB str(SB sb, VBitSet visit) {
+    SB _str(SB sb, VBitSet visit, VBitSet dups) {
       sb.p("K").p(_uid);
       if( visit.tset(_uid) ) return sb;
-      _lam.str(sb.p("[")).p(",");
-      if( _e!=null ) _e.str(sb,visit);
+      sb.p("[");
+      //_lam.str();
+      sb.p("LAMBDA");
+      sb.p(",");
+      if( _e!=null ) _e.str(sb,visit,dups);
       return sb.p("]");
+    }
+    @Override void _get_dups(VBitSet visit, VBitSet dups) {
+      if( visit.tset(_uid) )
+        dups.set(_uid);
+      if( _e!=null ) _e._get_dups(visit,dups);
     }
     public static void reset() { UID=1; }
   }
@@ -890,18 +921,24 @@ public class EXE {
     }
     @Override StructVal as_struct() { return this; }
     Val at(String label) { return _vals[Util.find(_labels,label)]; }
-    SB str(SB sb, VBitSet visit) {
+    SB _str(SB sb, VBitSet visit, VBitSet dups) {
       if( _labels.length==0 || _labels[0].equals("0") ) {
         sb.p("( ");
         for( int i=0; i<_len; i++ )
-          _vals[i].str(sb,visit).p(", ");
+          _vals[i].str(sb,visit,dups).p(", ");
         return sb.unchar(2).p(")");
       } else {
         sb.p("@{ ");
         for( int i=0; i<_len; i++ )
-          _vals[i].str(sb.p(_labels[i]).p("="),visit).p("; ");
+          _vals[i].str(sb.p(_labels[i]).p("="),visit,dups).p("; ");
         return sb.p("}");
       }
+    }
+    @Override void _get_dups(VBitSet visit, VBitSet dups) {
+      if( visit.tset(_uid) )
+        dups.set(_uid);
+      for( int i=0; i<_len; i++ )
+        _vals[i]._get_dups(visit,dups);
     }
   }
 
@@ -910,6 +947,11 @@ public class EXE {
     final TVDynTable _dyn;
     DynVal(TVDynTable dyn) {_dyn=dyn; }
     @Override DynVal as_dyn() { return this; }
-    SB str(SB sb, VBitSet visit) { return _dyn.str(sb,visit,new VBitSet(),false,true); }
+    @Override SB _str(SB sb, VBitSet visit, VBitSet dups) { return _dyn.str(sb,visit,dups,false,true); }
+    @Override void _get_dups(VBitSet visit, VBitSet dups) {
+      if( visit.tset(_uid) )
+        dups.set(_uid);
+      _dyn._get_dups(visit,dups,false,false);
+    }
   }
 }

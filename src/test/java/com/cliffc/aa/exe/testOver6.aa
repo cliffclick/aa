@@ -1,5 +1,5 @@
 // One DynLoad, fcn needs DynTable
-// Type: ( flt64)
+// Type: flt64
 // Eval: 5.300000011920929f
 
 fcn = { x ->

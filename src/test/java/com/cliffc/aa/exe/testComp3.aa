@@ -1,4 +1,4 @@
 // y is the self-recursive function, so never returns
-// Type: { [[]] A:{ [[]] A -> A } -> B }
-// Eval: K1[{ $dyn y -> (x def$dyn (y def$dyn y)) },( e3=K1),()]
+// Type: { A:[[]] B:{ A B -> B } -> C }
+// Eval: K1[LAMBDA,( e3=K1)]
 x = { y -> (x (y y))}; x

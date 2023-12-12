@@ -1,5 +1,5 @@
 // factorial
 // Type: { [[]] int64 -> int64 }
-// Eval: K1[{ $dyn n -> if n ? (* def$dyn n (fact def$dyn (- def$dyn n 1))) : 1 },( e3=K1),()]
+// Eval: K1[LAMBDA,( e3=K1)]
 fact = { n -> if n ? (* n (fact (- n 1))) : 1 };
 fact
