@@ -35,7 +35,7 @@ public class TVStruct extends TVExpanding {
   // The set of field labels, 1-to-1 with TV3 field contents.  Most field
   // operations are UNORDERED, so we generally need to search the fields by
   // string - except for the clazz field "." always in slot 0.
-  private String[] _flds;       // Field labels
+  protected String[] _flds;       // Field labels
 
   // Pinned fields do not lift to the super-clazz field.  Unpinned fields, if
   // deleted by unification, instead lift to the next open super-clazz or
@@ -43,9 +43,6 @@ public class TVStruct extends TVExpanding {
   private boolean[] _pins;
   
   private int _max;             // Max set of in-use flds/args
-
-  // Mapping from [dynload,fresh(s)] to a field pattern.
-  HashMap<UQNodes,TV3> _dynmap;
 
   // No fields
   public TVStruct(boolean open) { this(FLDS0,TVS0,open); }
@@ -73,18 +70,6 @@ public class TVStruct extends TVExpanding {
     return new TVStruct(new String[]{TypeFld.CLZ},new TV3[]{ TVBase.make(TypeNil.NIL)});
   }
 
-  // Add/Merge a DynLoad mapping
-  public void add_dynmapping(DynLoadNode dyn, TV3 pat) {
-    assert !pat.unified();
-    if( _dynmap==null ) _dynmap = new HashMap<>();
-    UQNodes key = UQNodes.make(dyn);
-    TV3 oldpat = _dynmap.get(key);
-    if( oldpat != null ) throw TODO();
-    _dynmap.put(key,pat);
-    deps_add(dyn);
-  }
-
-  
   @Override public int len() { return _max; }  
 
   public String fld( int i ) { assert !unified();  return _flds[i]; }
@@ -211,7 +196,6 @@ public class TVStruct extends TVExpanding {
   @Override public void _union_impl( TV3 tv3 ) {
     TVStruct ts = tv3.as_struct(); // Invariant when called
     ts._open = ts._open & _open;
-    assert _dynmap==null || _dynmap==ts._dynmap;
   }
 
   // Unify this into that.  Ultimately "this" will be U-F'd into "that" and so
@@ -290,12 +274,6 @@ public class TVStruct extends TVExpanding {
         }
         assert !that.unified(); // Missing a find
       }                      // Else, since field already in RHS do nothing
-    }
-
-    // Merge DynMaps
-    if( that._dynmap==null ) that._dynmap=_dynmap;
-    else if( _dynmap!=null ) {
-      throw TODO();
     }
 
     assert !that.unified(); // Missing a find
@@ -417,10 +395,6 @@ public class TVStruct extends TVExpanding {
     }
 
     if( _open ) add_delay_fresh(); // If this Struct can add fields, must fresh-unify that Struct
-    
-    // Merge dynmaps
-    if( _dynmap != null )
-      throw TODO();
     
     return progress;
   }

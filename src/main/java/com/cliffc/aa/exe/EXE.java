@@ -238,15 +238,17 @@ public class EXE {
   // --- DefDynTable ------------------------
   static class DefDynTable extends Syntax {
     @Override SB str(SB sb) { return sb.p("def$dyn"); }
-    @Override void prep_tree(Ary<TV3> nongen) { _tvar = new TVDynTable(); }
+    @Override void prep_tree(Ary<TV3> nongen) { _tvar = new TVLeaf(); }
     @Override boolean hm(boolean test) {
-      return ((TVDynTable)tvar()).resolve(test);
+      return tvar() instanceof TVDynTable tdyn ? tdyn.resolve(test) : false;
     }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
     boolean resolvedDyn() {
-      return ((TVDynTable)tvar()).all_resolved();
+      return tvar() instanceof TVDynTable tdyn ? tdyn.all_resolved() : true;
     }
-    @Override Val eval( Env e ) { return new DynVal((TVDynTable)tvar()); }
+    @Override Val eval( Env e ) {
+      return new DynVal(tvar() instanceof TVDynTable tdyn ? tdyn : null);
+    }
   }
 
   // --- Ident ------------------------
@@ -305,6 +307,7 @@ public class EXE {
     
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
     @Override Val eval( Env e ) {
+      // Normal lookup using deBrujin index
       Env e0 = e;
       for( int i=0; i<_dbx; i++ )
         e0 = e0._e;               // Index env via deBrujin index
@@ -335,7 +338,7 @@ public class EXE {
     TV3 arg(int i) { return tvar().arg(i); }
     
     @Override void prep_tree(Ary<TV3> nongen) {
-      _tvar = new TVLambda(nargs(),new TVDynTable(),new TVLeaf());
+      _tvar = new TVLambda(nargs(),new TVLeaf(),new TVLeaf());
       // Extend the nongen set by the new variables
       for( int i=AA.DSP_IDX; i<nargs(); i++ ) nongen.push(arg(i));
       // Prep the body
@@ -379,7 +382,7 @@ public class EXE {
 
       TV3 tfun = _fun.tvar();
       TVLambda lam = tfun instanceof TVLambda lam0 ? lam0
-        : new TVLambda(nargs(),new TVDynTable(),tvar());
+        : new TVLambda(nargs(),new TVLeaf(),tvar());
       if( !(tfun instanceof TVLambda) )
         tfun.unify(lam,false);
       
@@ -616,7 +619,7 @@ public class EXE {
       TVDynTable dyn = new TVDynTable();
       _dyn.tvar().unify(dyn,false);
       dyn = (TVDynTable)dyn.find();
-      dyn.add(true,_uid,s,_tvar);
+      dyn.add_dyn(_uid,s.find(),_tvar);
     }
 
     // Re-unify with resolved labels
@@ -654,6 +657,7 @@ public class EXE {
       return reduce.apply(map.apply(this),_prog.visit(map,reduce));
     }
     @Override Val eval( Env e ) {
+      e = new Env(null);
       return _prog.eval(e);
     }
 
@@ -676,7 +680,8 @@ public class EXE {
         },
         (a,b)->null);
 
-      visit( syn -> { if( syn instanceof DefDynTable dyn && !dyn.resolvedDyn() )
+      visit( syn -> {
+          if( syn instanceof DefDynTable dyn && !dyn.resolvedDyn() )
             throw new IllegalArgumentException("Unresolved dynamic field");
           else return null;
         }, (a,b) -> null );
@@ -945,13 +950,14 @@ public class EXE {
   
   private static class DynVal extends Val {
     final TVDynTable _dyn;
-    DynVal(TVDynTable dyn) {_dyn=dyn; }
+    DynVal(TVDynTable dyn) { _dyn = dyn; }
     @Override DynVal as_dyn() { return this; }
-    @Override SB _str(SB sb, VBitSet visit, VBitSet dups) { return _dyn.str(sb,visit,dups,false,true); }
+    @Override SB _str(SB sb, VBitSet visit, VBitSet dups) { return _dyn==null ? sb.p(0) :_dyn.str(sb,visit,dups,false,true); }
     @Override void _get_dups(VBitSet visit, VBitSet dups) {
       if( visit.tset(_uid) )
         dups.set(_uid);
-      _dyn._get_dups(visit,dups,false,false);
+      if( _dyn!=null )
+        _dyn._get_dups(visit,dups,false,false);
     }
   }
 }

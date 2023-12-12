@@ -1,6 +1,6 @@
 // Simple OPEN struct test
-// Type: { [[]] @{ u=A;  ..., } -> A }
-// Eval: K2[LAMBDA,( e3=K1[LAMBDA,( e3=K1)])]
+// Type: { A @{ u=B;  ..., } -> B }
+// Eval: K2[LAMBDA,( e3=K1[LAMBDA,( e3=K1),()]),()]
 
 x = { z -> z}; (x { y -> y.u})
 

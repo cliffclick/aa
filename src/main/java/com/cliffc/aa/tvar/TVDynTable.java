@@ -10,185 +10,116 @@ import java.util.Arrays;
 
 import static com.cliffc.aa.AA.TODO;
 
-/** A type for offsets to a DynLoad.
+/** A Type for offsets to a DynLoad.
+ *
+ * Layout is in pairs of fields of the TVStruct with interpretation of the
+ * field labels.  Labels always end in a Syntax UID of either a DynField or or
+ * an Apply.
+ * - "Muid" - Match UID of a DynField.  Arg is the MATCH
+ * - "Puid" - Pattern; UID is the same. Arg is the PATTERN
+ * - "Auid" - Apply UID; arg is a nested TVDynTable
+ * - "Buid" - Balanced other half of Apply, to keep the args in pairs.  Arg is null.
  */
-public class TVDynTable extends TV3 {
+public class TVDynTable extends TVStruct {
 
-  public static class DYN {
-    final int _idx;      // Index into args array for pair of match and pattern
-    
-    // Instead of the Node here - trying to keep a nice split between TV3 and
-    // Node - I'm recording the Node unique id, and a flag for DynLoad vs Ident
-    final boolean _dyn;         // True for DynLoad, False for Ident
-    final int _uid;             // Unique node id for the DynLoad
-    
-    // Resolved to this label
-    public String _label;
-    
-    DYN( DYN dyn ) { this(dyn._idx,dyn._dyn,dyn._uid); }
-    DYN( int idx, boolean dyn, int uid ) {
-      _idx = idx;
-      _dyn = dyn;
-      _uid = uid;
-    }
-
-    // Try to resolve the label; return true if progress
-    boolean resolve(TVDynTable dyn, boolean test) {
-      assert _dyn;
-      if( !(match(dyn) instanceof TVStruct str) ) return false; // No progress until a TVStruct
-      TV3 pat = pattern(dyn);
-      // Resolve field by field, removing resolved fields.  Should be 1 YES resolve in the end.
-      boolean progress = false;
-      for( int i=0; i<str.len(); i++ ) {
-        // Trial unify
-        TV3 match = str.arg(i);
-        int rez = match.trial_unify_ok(pat);
-        // 7=NO, 3=MAYBE, 1=YES
-        if( rez!=3 ) {          // Either a YES or a NO
-          if( test ) return true; // Always progress from here
-          progress = true;
-          str = handle_match(dyn,rez,match,pat,str,i--);
-          pat = pat.find();
-        }
-        // Pending MAYBEs remain, and need progress elsewhere
-      }
-      // TODO: Resolving with a single Maybe.
-      // If, later this maybe turns into a Yes, we're just making a Yes sooner.
-      // If, later this maybe turns into a No, then we're in an error situation already.
-      // To get consistent errors, we need to always have the sane field be the Last Maybe
-      if( str.len()==1 && _label==null ) {
-        if( test ) return true; // Gonna match the Last Maybe
-        progress = true;
-        handle_match(dyn,1,str.arg(0),pat,str,0);
-      }
-
-      return progress;
-    }
-
-    private TVStruct handle_match( TVDynTable dyn, int rez, TV3 match, TV3 pat, TVStruct str, int i ) {
-      if( rez==1 ) {        // YES: record the resolved field label
-        if( _label != null ) throw TODO("Two valid choices: "+_label+" and "+str.fld(i));
-        _label = str.fld(i);
-        // We got the One True Match, unify
-        match.unify(pat,false);
-      }
-      // Fields that resolve as either YES or NO are removed from the list,
-      // since they can never change their answer.  Make a fresh copy, and
-      // remove the field.
-      str = (TVStruct)str.fresh();
-      str.del_fld0(i);
-      set_match(dyn,str);
-      return str;
-    }
-
-    
-    TV3 match  (TVDynTable tab) { return tab.arg(_idx+0); }
-    TV3 pattern(TVDynTable tab) { return tab.arg(_idx+1); }
-    void set_match(TVDynTable tab, TVStruct ts) { tab._args[_idx+0]=ts; }
-
-    // Report errors
-    public void errors(TVDynTable dyn) {
-      if( !_dyn )
-        throw TODO();           // Recurse
-      if( !(match(dyn) instanceof TVStruct str) )
-        throw TODO("Trying to load from "+match(dyn)+", which is not a struct");
-      if( _label==null )
-        throw TODO("No choice resolved");
-      if( str.len()>0 )
-        throw TODO("Have ambiguous choices");
-    }
-
-    // True if resolved
-    public boolean resolved() { return _label!=null; }
-    
-    @Override public String toString() { return str(null,new SB(),null,null,true,false).toString(); }
-    SB str(TVDynTable tab, SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
-      sb.p(_dyn?'D':'F').p(_uid);
-      if( _label!=null ) sb.p(".").p(_label);
-      if( tab==null ) return sb;
-      sb.p("=");
-      pattern(tab).str(sb,visit,dups,debug,prims);
-      TV3 tvar = match(tab);
-      return tvar instanceof TVStruct str && str.len()==0 ? sb
-        : tvar.str(sb.p(" in "),visit,dups,debug,prims);
-    }
-  }
-
-  // DynLoad table.  Entries are either for a DynLoad/TVStruct/label or a
-  // Ident/nested-TVDynTable
-  private NonBlockingHashMapLong<DYN> _dyns;
-
-  private int _max;
+  private String[] _labels;
   
-  public TVDynTable() { _dyns = new NonBlockingHashMapLong<>(); _max=0; }
+  public TVDynTable() { super(true); _labels = new String[0]; }
 
   @Override public TVDynTable as_dyn() { return this; }
 
-  @Override public int len() { return _max; }  
-
   // Add a DynField reference to this table
-  public void add( boolean dyn, int uid, TV3 tvar, TV3 pat ) {
-    _dyns.put(uid,new DYN(len(),dyn,uid));
-
-    if( _args==null ) _args = new TV3[2];
-    if( _max == _args.length ) {
-      int len=1;
-      while( len<=_max ) len<<=1;
-      _args = Arrays.copyOf(_args,len);
-    }
-    _args[_max++] = tvar;
-    _args[_max++] = pat ;
+  public void add_dyn( int uid, TV3 match, TV3 pattern ) {
+    String suid = ""+uid;
+    add_fld(("M"+suid).intern(),match  ,true);
+    add_fld(("P"+suid).intern(),pattern,true);
+    if( _labels.length < _flds.length )
+      _labels = Arrays.copyOf(_labels,_flds.length);
   }
 
   // Find a DynField reference at the top level
   public String find_label(int uid) {
-    DYN dyn = _dyns.get(uid);
-    return dyn==null ? null : dyn._label;
+    int idx = idx(("M"+uid).intern());
+    return idx== -1 ? null : _labels[idx];
   }
   
   @Override int eidx() { return TVErr.XDYN; }
 
-  // Report errors
-  public void errors() {
-    for( DYN dyn : _dyns.values() )
-      dyn.errors(this);
-  }
-  
   // -------------------------------------------------------------
-  // Resolve all embedded 
+
+  // Resolve all pairs of inputs as DynTables
   public boolean resolve( boolean test ) {
     boolean progress = false;
-    for( DYN dyn : _dyns.values() )
-      progress |= dyn.resolve(this, test);
+    for( int i=0; i<len(); i += 2 )
+      if( fld(i).charAt(0)=='M' )
+        progress |= resolve(i,arg(i),arg(i+1), test);
+      else
+        throw TODO();           // Apply?
     return progress;
   }
+
+  // Try to resolve the label; return true if progress
+  private boolean resolve(int idx, TV3 matches, TV3 pat, boolean test) {
+    if( !(matches instanceof TVStruct str) ) return false; // No progress until a TVStruct
+    // Resolve field by field, removing resolved fields.  Should be 1 YES resolve in the end.
+    boolean progress = false;
+    for( int i=0; i<str.len(); i++ ) {
+      // Trial unify
+      TV3 match = str.arg(i);   // An individual match
+      int rez = match.trial_unify_ok(pat);
+      // 7=NO, 3=MAYBE, 1=YES
+      if( rez!=3 ) {          // Either a YES or a NO
+        if( test ) return true; // Always progress from here
+        progress = true;
+        str = handle_match(idx,rez,match,pat,str,i--);
+        pat = pat.find();
+      }
+      // Pending MAYBEs remain, and need progress elsewhere
+    }
+    // TODO: Resolving with a single Maybe.
+    // If, later this maybe turns into a Yes, we're just making a Yes sooner.
+    // If, later this maybe turns into a No, then we're in an error situation already.
+    // To get consistent errors, we need to always have the sane field be the Last Maybe
+    if( str.len()==1 && _labels[idx]==null ) {
+      if( test ) return true; // Gonna match the Last Maybe
+      progress = true;
+      handle_match(idx,1,str.arg(0),pat,str,0);
+    }
+
+    return progress;
+  }
+
+  private TVStruct handle_match( int idx, int rez, TV3 match, TV3 pat, TVStruct str, int i ) {
+    if( rez==1 ) {        // YES: record the resolved field label
+      String label = _labels[idx];
+      if( label != null ) throw TODO("Two valid choices: "+label+" and "+str.fld(i));
+      _labels[idx] = str.fld(i);
+      // We got the One True Match, unify
+      match.unify(pat,false);
+    }
+    // Fields that resolve as either YES or NO are removed from the list,
+    // since they can never change their answer.  Make a fresh copy, and
+    // remove the field.
+    str = (TVStruct)str.fresh();
+    str.del_fld0(i);
+    _args[idx] = str;
+    return str;
+  }
+  
   // True if ALL resolved
   public boolean all_resolved() {
     boolean resolved = true;
-    for( DYN dyn : _dyns.values() )
-      resolved &= dyn.resolved();
+    for( int i=0; i<len(); i += 2 )
+      if( fld(i).charAt(0)=='M' )
+        resolved &= _labels[i]!=null;
+      else
+        throw TODO();           // Apply?
     return resolved;
   }
   
   // -------------------------------------------------------------
-  @Override public void _union_impl( TV3 tv3 ) { }
-
-  // Unify this into that.  Ultimately "this" will be U-F'd into "that" and so
-  // all structure changes go into "that".
-  @Override boolean _unify_impl( TV3 tv3 ) {
-    TVDynTable that = (TVDynTable)tv3;
-    for( DYN dyn : _dyns.values() ) {
-      DYN dyn2 = that._dyns.get(dyn._uid);
-      if( dyn2 != null ) {
-        if( dyn._label!=dyn2._label && !dyn._label.equals(dyn2._label) )  throw TODO(); // Labels agree
-        // Unify parts
-        dyn.match  (this)._unify(dyn2.match  (that),true);
-        dyn.pattern(this)._unify(dyn2.pattern(that),true);
-      } else {
-        that.add(dyn._dyn,dyn._uid,dyn.match(this),dyn.pattern(this));
-      }
-    }
-    return true;
+  @Override public void _union_impl( TV3 tv3 ) {
+    throw TODO();
   }
   
   // -------------------------------------------------------------
@@ -199,9 +130,7 @@ public class TVDynTable extends TV3 {
   
   // -------------------------------------------------------------
   @Override int _trial_unify_ok_impl( TV3 pat ) {
-    for( DYN dyn : _dyns.values() )
-      throw TODO();
-    return 1;                   // No conflicts, hard-yes
+    throw TODO();
   }
 
   @Override boolean _exact_unify_impl(TV3 tv3) {
@@ -218,19 +147,8 @@ public class TVDynTable extends TV3 {
 
   @Override public TVDynTable copy() {
     TVDynTable tab = (TVDynTable)super.copy();
-    tab._dyns = new NonBlockingHashMapLong<>();
-    for( DYN dyn : _dyns.values() )
-      tab._dyns.put(dyn._uid,new DYN(dyn));
+    tab._labels = _labels.clone();
     return tab;
   }
   
-  @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
-    sb.p("[[  ");
-    for( DYN dyn : _dyns.values() )
-      dyn.str(this,sb,visit,dups,debug,prims).p(", ");
-    return sb.unchar(2).p("]]");
-  }
-  
-  public static void reset_to_init0() {
-  }
 }

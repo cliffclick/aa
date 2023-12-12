@@ -221,7 +221,6 @@ public class DynLoadNode extends Node {
     if( ptr0 instanceof TVPtr ptr1 ) ptr = ptr1;
     else ptr0.unify(ptr = new TVPtr(BitsAlias.EMPTY, new TVStruct(true) ),false);
     _tvar = new TVLeaf();
-    ptr.load().add_dynmapping(this,_tvar);
     Resolvable r = new Resolvable(this,UQNodes.make(this),ptr.load(),_tvar);
     assert _resolves.isEmpty();
     _resolves.push(r);

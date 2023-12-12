@@ -1,6 +1,6 @@
 // Function composition
-// Type: { [[]] { A:[[]] B -> C } { A C -> D } -> { A B -> D } }
-// Eval: K1[LAMBDA,]
+// Type: { A { B C -> D } { B D -> E } -> { B C -> E } }
+// Eval: K1[LAMBDA,()]
 { f g -> {
   arg -> (g (f arg))}
 }
