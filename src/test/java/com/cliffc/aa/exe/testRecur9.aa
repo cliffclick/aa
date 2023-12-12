@@ -1,5 +1,5 @@
 // Wrapped ints
-// Type: A:@{ add={ B C:@{ add={ D @{ i=int64;  ..., } @{ i=int64;  ..., } -> C }; i=int64; } E:@{ add={ F @{ i=int64;  ..., } @{ i=int64;  ..., } -> E }; i=int64; } -> A }; i=int64; }
+// Type: A:@{ add={ - B:@{ add={ - @{ i=int64;  ..., } @{ i=int64;  ..., } -> B }; i=int64; } C:@{ add={ - @{ i=int64;  ..., } @{ i=int64;  ..., } -> C }; i=int64; } -> A }; i=int64; }
 // Eval: @{ add=K5[LAMBDA,( $dyn=0,e3=7),( e3=K1[LAMBDA,( e3=K1),()]),()]; i=7; }
 int = { i ->        // An integer is a struct...
   @{ add = { x y -> // With an 'add' field which is a fcn

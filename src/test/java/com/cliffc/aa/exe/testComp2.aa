@@ -1,5 +1,5 @@
 // Function composition
-// Type: { A { B C -> D } { B D -> E } -> { B C -> E } }
+// Type: { A { B C -> D } { E D -> F } -> { - C -> F } }
 // Eval: K1[LAMBDA,()]
 { f g -> {
   arg -> (g (f arg))}

@@ -2,13 +2,13 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
 import java.util.Arrays;
 
 import static com.cliffc.aa.AA.TODO;
+import static com.cliffc.aa.util.Util.uid;
 
 /** A Type for offsets to a DynLoad.
  *
@@ -30,16 +30,23 @@ public class TVDynTable extends TVStruct {
 
   // Add a DynField reference to this table
   public void add_dyn( int uid, TV3 match, TV3 pattern ) {
-    String suid = ""+uid;
-    add_fld(("M"+suid).intern(),match  ,true);
-    add_fld(("P"+suid).intern(),pattern,true);
+    add_fld(uid("M",uid),match  ,true);
+    add_fld(uid("P",uid),pattern,true);
+    if( _labels.length < _flds.length )
+      _labels = Arrays.copyOf(_labels,_flds.length);
+  }
+
+  // Add a Apply reference to this table
+  public void add_apy( int uid, TV3 tv ) {
+    add_fld(uid("A",uid),tv,true);
+    add_fld(uid("B",uid),tv,true);
     if( _labels.length < _flds.length )
       _labels = Arrays.copyOf(_labels,_flds.length);
   }
 
   // Find a DynField reference at the top level
   public String find_label(int uid) {
-    int idx = idx(("M"+uid).intern());
+    int idx = idx(uid("M",uid));
     return idx== -1 ? null : _labels[idx];
   }
   
@@ -48,13 +55,19 @@ public class TVDynTable extends TVStruct {
   // -------------------------------------------------------------
 
   // Resolve all pairs of inputs as DynTables
-  public boolean resolve( boolean test ) {
+  private static final VBitSet VBS = new VBitSet();
+  public boolean resolve(boolean test) { VBS.clear(); return _resolve(test); };
+  private boolean _resolve( boolean test ) {
+    if( VBS.tset(_uid) ) return false;
     boolean progress = false;
     for( int i=0; i<len(); i += 2 )
-      if( fld(i).charAt(0)=='M' )
+      if( fld(i).charAt(0)=='M' ) {
         progress |= resolve(i,arg(i),arg(i+1), test);
-      else
-        throw TODO();           // Apply?
+      } else {
+        assert fld(i).charAt(0)=='A';
+        if( arg(i) instanceof TVDynTable nest )
+          progress |= nest._resolve(test);
+      }
     return progress;
   }
 
@@ -107,19 +120,26 @@ public class TVDynTable extends TVStruct {
   }
   
   // True if ALL resolved
-  public boolean all_resolved() {
+  public boolean all_resolved() { VBS.clear(); return _all_resolved(); };
+  private boolean _all_resolved() {
+    if( VBS.tset(_uid) ) return true;
     boolean resolved = true;
     for( int i=0; i<len(); i += 2 )
       if( fld(i).charAt(0)=='M' )
         resolved &= _labels[i]!=null;
-      else
-        throw TODO();           // Apply?
+      else {
+        assert fld(i).charAt(0)=='A';
+        if( arg(i) instanceof TVDynTable nest )
+          resolved &= nest._all_resolved();
+      }
     return resolved;
   }
   
   // -------------------------------------------------------------
   @Override public void _union_impl( TV3 tv3 ) {
-    throw TODO();
+    for( int i=0; i<_labels.length; i+=2 )
+      if( _labels[i]!=null )
+        throw TODO();
   }
   
   // -------------------------------------------------------------
@@ -150,5 +170,45 @@ public class TVDynTable extends TVStruct {
     tab._labels = _labels.clone();
     return tab;
   }
+
+  private static final VBitSet HDVBS = new VBitSet();
+  boolean hasDyn() { HDVBS.clear(); return _hasDyn(); };
+  private boolean _hasDyn() {
+    if( HDVBS.tset(_uid) ) return false;
+    for( int i=0; i<len(); i+=2 )
+      if( _flds[i].charAt(0)=='M' ||
+          (arg(i) instanceof TVDynTable tdyn && tdyn._hasDyn()) )
+        return true;
+    return false;
+  }
   
+  @Override public VBitSet _get_dups_impl(VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
+    if( !hasDyn() ) return dups;
+    for( int i=0; i<len(); i++ )
+      _args[i]._get_dups(visit,dups,debug,prims);
+    return dups;
+  }
+  
+  @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
+    if( !debug && !hasDyn() ) return sb.p("-");
+    sb.p("[[  ");
+    for( int i=0; i<len(); i+=2 ) {
+      sb.p(_flds[i]).p(": ");
+      if( _flds[i].charAt(0)=='M' ) {
+        if( _labels[i]==null ) {
+          _args[i  ]._str(sb,visit,dups,debug,prims);
+          sb.p(" in ");
+          _args[i+1]._str(sb,visit,dups,debug,prims);
+        } else {
+          // Fully resolved
+          sb.p(_labels[i]).p('=');
+          _args[i+1]._str(sb,visit,dups,debug,prims);
+        }
+      } else {
+        _args[i+1]._str(sb,visit,dups,debug,prims);
+      }
+      sb.p(", ");
+    }
+    return sb.unchar(2).p("]]");
+  }
 }

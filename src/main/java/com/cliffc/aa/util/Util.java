@@ -22,7 +22,9 @@ public class Util {
     assert !s0.equals(s1) : "Not interned: "+s0;
     return false;
   }
-
+  
+  public static String uid( String s, int uid ) { return (s+uid).intern(); }
+  
   // Call per every get
   private static int REPROBE_CHK_CNT;
   public static void reprobe_quality_check_per(NonBlockingHashMap map, String msg) {

@@ -1,15 +1,15 @@
 // One DynLoad, fcn needs DynTable
-// Type: ( int64, flt64)
-// Eval: ( 3, 3.3f)
-// TODO: NOT LOOKED AT
+// Type: int64
+// Eval: 12
 
 fcn = { x y ->
-  @{
-     qii={ x y -> (+ (+1  x) (+1  y)) }; // i i -> i
-     qif={ x y -> (+ (+1  x) (f2i y)) }; // i f -> i
-     qfi={ x y -> (+ (f2i x) (+1  y)) }; // f i -> i
-     qff={ x y -> (+ (f2i x) (f2i y)) }; // f f -> i
-  }._(x,y)   // Which of {q*} should be picked?
+  (@{
+     qii={ x y -> (* (+1  x) (+1  y)) }; // i i -> i
+     qif={ x y -> (* (+1  x) (f2i y)) }; // i f -> i
+     qfi={ x y -> (* (f2i x) (+1  y)) }; // f i -> i
+     qff={ x y -> (* (f2i x) (f2i y)) }; // f f -> i
+   }._  // Which of {q*} should be picked?
+   x y )
 };
 
 bar = { x ->

@@ -1,27 +1,6 @@
 // One DynLoad, fcn needs DynTable
-// Type: ( int64, flt64)
-// Eval: ( 3, 3.3f)
-
-
-// Root
-// fcn = { $dyn2 ->  // [[ DYN -> resolved ]]
-//   @{
-//      qii = { ---- x y -> (+ ---- (+1  ---- x) (+1  ---- y)) };
-//      qif = { ---- x y -> (+ ---- (+1  ---- x) (f2i ---- y)) };
-//      qfi = { ---- x y -> (+ ---- (f2i ---- x) (+1  ---- y)) };
-//      qff = { ---- x y -> (+ ---- (f2i ---- x) (f2i ---- y)) };
-//   }._[$dyn2]
-// };
-// bar = { $dyn x ->  // [[ APPLY0: [[ DYN -> resolved]], APPLY1: [[DYN -> resolved]] ]]
-//   if 1 ? ((fcn $dyn.APPLY0) ---- x 2) : ((fcn $dyn.APPLY1) ---- x 2.2f)
-// };
-// baz = { $dyn ->    // [[ APPLY2: [[ APPLY0,APPLY1]], APPLY4: [[ APPLY0,APPLY1]] ]]
-//   if 0 ? (bar $dyn.APPLY2 3) : (bar $dyn.APPLY4 3.9f)
-// };
-// def$dyn should be a nested table
-// [[ APPLY2: [[ APPLY0,APPLY1]], APPLY4: [[ APPLY0,APPLY1]] ]] 
-// (baz def$dyn)
-
+// Type: int64
+// Eval: 7
 
 fcn = { ->
   @{
@@ -45,4 +24,3 @@ baz = { ->
 };
 (baz)
   
-

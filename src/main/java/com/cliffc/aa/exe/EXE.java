@@ -17,7 +17,11 @@ import java.util.function.IntSupplier;
 import static com.cliffc.aa.AA.*;
 
 public class EXE {
-  public static void reset() { KontVal.reset(); }
+  public static void reset() {
+    Syntax.reset();
+    Env.reset();
+    KontVal.reset();
+  }
   public static void main( String[] args ) throws IOException {
     for( String arg : args ) {
       String prog = new String( Files.readAllBytes( Paths.get(arg)));
@@ -33,7 +37,7 @@ public class EXE {
   // Parse; Type; Run
   public static void run( String prog, int rseed, boolean do_hm, boolean do_gcp ) {
     Root root = compile(prog,rseed,do_hm,do_gcp);
-    System.out.println("Type: "+root.tvar().str(new SB(),null,null,false,false));
+    System.out.println("Type: "+root.tvar().p());
     System.out.println("Eval: "+root.eval(null));
   }
 
@@ -120,7 +124,7 @@ public class EXE {
     while( true ) {
       if( term==null || !peek('.') ) return term;
       String id = id( true);
-      term = id.equals("_") ? new DynField(term,new Ident("$dyn")) : new Field(id,term);
+      term = id.equals("_") ? new DynField(term,new Ident("$dyn")) : new Field(false,id,term);
     }
   }
   
@@ -213,6 +217,8 @@ public class EXE {
     // Env is a linked list, with a Val (for Let) or a set of Vals (for Lambda).
     // A Val is either an Int, or a Kontinuation; K has a Lambda and an Env.
     abstract Val eval( Env e );
+
+    static void reset() { CNT=1; }
   }
 
   
@@ -286,7 +292,7 @@ public class EXE {
             DefDynTable def = new DefDynTable();
             def._par = _par;
             if( _par instanceof DynField dfld ) dfld._dyn = def;
-            else if( _par instanceof Apply aply ) aply._args[DSP_IDX] = def;
+            else if( _par instanceof Field fld && fld._par instanceof Apply ) fld._ptr = def;
             else TODO();
             def.prep_tree(nongen);
             return;
@@ -362,6 +368,7 @@ public class EXE {
     final Syntax[] _args;
     Apply( Syntax fun, Syntax[] args ) {
       _fun = fun;  fun._par = this;
+      args[DSP_IDX] = new Field(true,Util.uid("A",_uid),args[DSP_IDX]);
       _args=args;
       for( Syntax arg : args )
         if( arg != null )
@@ -552,16 +559,26 @@ public class EXE {
 
   // --- Field ------------------------
   static class Field extends Syntax {
+    final boolean _dyn;         // True if reading a TVDynTable/DynVal, False is reading a TVStruct/StructVal
     final String _lab;
-    final Syntax _ptr;
-    Field( String id, Syntax ptr ) { _ptr = ptr; ptr._par = this; _lab=id; }
+    Syntax _ptr;
+    Field( boolean dyn, String id, Syntax ptr ) { _dyn = dyn; _ptr = ptr; ptr._par = this; _lab=id; }
     @Override SB str(SB sb) { return _ptr.str(sb).p(".").p(_lab); }
     @Override void prep_tree(Ary<TV3> nongen) {
       _tvar = new TVLeaf();
       _ptr.prep_tree(nongen);
-      TVStruct s = new TVStruct(new String[]{_lab},new TV3[]{_tvar},true);
-      // TODO: Cannot add use_nil without the full up-cast of not-nil after IF
-      //s.add_use_nil();
+
+      TVStruct s;
+      if( _dyn ) {
+        TVDynTable tdyn = new TVDynTable();
+        tdyn.add_apy(_par._uid,_tvar);
+        s = tdyn;
+        
+      } else {
+        s = new TVStruct(new String[]{_lab},new TV3[]{_tvar},true);
+        // TODO: Cannot add use_nil without the full up-cast of not-nil after IF
+        //s.add_use_nil();
+      }
       _ptr.tvar().unify(s,false);
       if( !(_ptr.tvar() instanceof TVStruct str && str.idx(_lab)>=0) )
         throw new IllegalArgumentException("Missing field '"+_lab+"'");
@@ -570,7 +587,10 @@ public class EXE {
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       return reduce.apply(map.apply(this),_ptr.visit(map,reduce));
     }
-    @Override Val eval( Env e ) { return _ptr.eval(e).as_struct().at(_lab); }
+    @Override Val eval( Env e ) {
+      Val val = _ptr.eval(e);
+      return _dyn ? val.as_dyn().at(_lab) : val.as_struct().at(_lab);
+    }
   }
 
 
@@ -784,7 +804,7 @@ public class EXE {
     @Override SB str(SB sb) { return sb.p("f2i"); }
     @Override Val apply( Env e ) {
       FltVal f0 = e._vs[ARG_IDX].as_flt();
-      return new IntVal((int)f0._con);
+      return new IntVal((int)(f0._con+.5));
     }
   }
 
@@ -835,6 +855,7 @@ public class EXE {
         if( _vs[i] != null )
           _vs[i]._get_dups(visit,dups);      
     }
+    public static void reset() { EVCNT=0; }
   }
 
   // --- Val -----------------------------------------------------
@@ -952,6 +973,14 @@ public class EXE {
     final TVDynTable _dyn;
     DynVal(TVDynTable dyn) { _dyn = dyn; }
     @Override DynVal as_dyn() { return this; }
+    
+    Val at(String lab) {
+      assert lab.charAt(0)=='A'; // Only for Applys and nested dyntable
+      if( _dyn==null ) return this;
+      TV3 dyn = _dyn.arg(lab);
+      return new DynVal(dyn instanceof TVDynTable tdyn ? tdyn : null);
+    }
+    
     @Override SB _str(SB sb, VBitSet visit, VBitSet dups) { return _dyn==null ? sb.p(0) :_dyn.str(sb,visit,dups,false,true); }
     @Override void _get_dups(VBitSet visit, VBitSet dups) {
       if( visit.tset(_uid) )

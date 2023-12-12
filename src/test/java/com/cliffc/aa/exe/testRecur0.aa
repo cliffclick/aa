@@ -1,5 +1,5 @@
 // factorial
-// Type: { A int64 -> int64 }
+// Type: { - int64 -> int64 }
 // Eval: K1[LAMBDA,( e3=K1),()]
 fact = { n -> if n ? (* n (fact (- n 1))) : 1 };
 fact

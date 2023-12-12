@@ -36,7 +36,7 @@ public class TestEXE {
       } catch( IllegalArgumentException iae ) {
         // Compile fails as expected
         assertEquals(extype,iae.getMessage());
-      }
+      }      
     }
   }
 
