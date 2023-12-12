@@ -13,7 +13,7 @@ import static org.junit.Assert.assertEquals;
 public class TestEXE {
   @Test public void testAll() throws IOException {
     File folder = new File("src/test/java/com/cliffc/aa/exe");
-    File[] tests = folder.listFiles(file -> file.getName().endsWith("aa") && !file.getName().contains("Over"));
+    File[] tests = folder.listFiles(file -> file.getName().endsWith("aa") /*&& !file.getName().contains("Over")*/);
     Arrays.sort(tests);
     for( File f : tests ) {
       System.out.println(f);

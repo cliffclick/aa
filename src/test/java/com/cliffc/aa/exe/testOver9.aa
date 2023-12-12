@@ -1,6 +1,6 @@
 // One DynLoad, fcn needs DynTable
-// Type: int64
-// Eval: 12
+// Type: @{ a=int64; b=int64; c=int64; d=int64; }
+// Eval: @{ a=4; b=4; c=12; d=5; }
 
 fcn = { x y ->
   (@{
@@ -13,14 +13,19 @@ fcn = { x y ->
 };
 
 bar = { x ->
-  if 1
+  if (rnd)
   ? (fcn x 2   )  // Picks [D0:qii/qfi]
-  : (fcn x 2.2f)  // Picks [D0:qif/qff]
+  : (fcn x 1.3f)  // Picks [D0:qif/qff]
 };
 
 baz = { ->
-  if 0
+  if (rnd)
   ? (bar 3   )  // Passing in int
-  : (bar 3.9f)  // Passing in flt
+  : (bar 4.9f)  // Passing in flt
 };
-(baz)
+@{
+ a = (baz);
+ b = (baz);
+ c = (baz);
+ d = (baz);
+}

@@ -13,12 +13,14 @@ import java.util.HashMap;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
+import java.util.Random;
 
 import static com.cliffc.aa.AA.*;
 
 public class EXE {
   public static void reset() {
     Syntax.reset();
+    Rnd.reset();
     Env.reset();
     KontVal.reset();
   }
@@ -50,6 +52,7 @@ public class EXE {
       put("f+",new FAdd());
       put("f2i",new F2I());
       put("pair",new Pair());
+      put("rnd",new Rnd());
     }};
   
 
@@ -787,6 +790,18 @@ public class EXE {
     @Override PrimSyn make() { return new Inc(); }
     @Override SB str(SB sb) { return sb.p("+1"); }
     @Override int iop(int x, int y) { return x+1; }
+  }
+
+  // random boolean
+  static class Rnd extends PrimSyn {
+    private static final Random R = new Random(0x123456789L);
+    public Rnd() { super(INT64()); }
+    @Override PrimSyn make() { return new Rnd(); }
+    @Override SB str(SB sb) { return sb.p("rnd"); }
+    @Override Val apply(Env e) {
+      return new IntVal(R.nextBoolean() ? 1 : 0);
+    }
+    static void reset() { R.setSeed(0x123456789L); };
   }
 
   // add doubles
