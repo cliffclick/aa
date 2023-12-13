@@ -4,10 +4,10 @@
 
 fcn = { ->
   @{
-     qii={ x y -> (+ (+1  x) (+1  y)) }; // i i -> i
-     qif={ x y -> (+ (+1  x) (f2i y)) }; // i f -> i
-     qfi={ x y -> (+ (f2i x) (+1  y)) }; // f i -> i
-     qff={ x y -> (+ (f2i x) (f2i y)) }; // f f -> i
+     qii ={ x y -> (+ (+1  x) (+1  y)) }; // i i -> i
+     qif ={ x y -> (+ (+1  x) (f2i y)) }; // i f -> i
+     qfi ={ x y -> (+ (f2i x) (+1  y)) }; // f i -> i
+     qff ={ x y -> (+ (f2i x) (f2i y)) }; // f f -> i
   }._    // Which of {q*} should be picked?
 };
 

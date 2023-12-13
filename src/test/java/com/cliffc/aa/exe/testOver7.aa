@@ -4,8 +4,8 @@
 
 fcn = { ->
   @{
-     qi={ x -> (+1  x) }; // i -> i
-     qf={ x -> (f2i x) }; // f -> i
+     qi ={ x -> (+1  x) }; // i -> i
+     qf ={ x -> (f2i x) }; // f -> i
   }._    // Which of {q*} should be picked?
 };
 bar = { x -> ((fcn) x) };

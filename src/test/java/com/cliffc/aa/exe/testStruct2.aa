@@ -2,7 +2,7 @@
 // Type: { A B -> nint8 }
 // Eval: K1[LAMBDA,()]
 { pred ->
-  tmp = if pred ? @{x=2; y=3;} : @{x=3; z=4;};
+  tmp = if pred ? @{x =2; y =3;} : @{x =3; z =4;};
   tmp.x
 }
 

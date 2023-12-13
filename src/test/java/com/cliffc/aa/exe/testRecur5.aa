@@ -9,12 +9,12 @@ gen = { ->
   (inc 0)
 };
 // Make 2 hidden countes
-cntX0=(gen);
-cntY0=(gen);
+cntX0 =(gen);
+cntY0 =(gen);
 // Increment both to 1
-cntX1=(cntX0.1);
-cntY1=(cntY0.1);
+cntX1 =(cntX0.1);
+cntY1 =(cntY0.1);
 // Increment cnt0 to 2
-cntX2=(cntX1.1);
+cntX2 =(cntX1.1);
 // Report (2, 1)
 (pair cntX2.0 cntY1.0)

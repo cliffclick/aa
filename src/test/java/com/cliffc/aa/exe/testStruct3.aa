@@ -1,4 +1,5 @@
 // Simple struct test
 // Type: int64
 // Eval: 6
-( { sq -> (* sq.x sq.y) } @{ x=2; y=3; })
+( { sq -> (* sq.x sq.y) } @{ x =2; y
+=3; })

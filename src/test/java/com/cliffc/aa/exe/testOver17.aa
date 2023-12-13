@@ -1,0 +1,32 @@
+// Check wrapped prims
+// Type: A:@{ i=int64; is0=int64; mul=( { - A -> A }); sub=( { - @{ i=int64;  ..., } -> A }, { - @{ f=flt64;  ..., } -> B:@{ f=flt64; mul=( { - @{ i=int64;  ..., } -> B }, { - @{ f=flt64;  ..., } -> B }); } }); }
+// Eval: @{ i=120; is0=0; mul=( K93[LAMBDA,( $dyn=-,e3=120),( e3=K2[LAMBDA,( e3=K2),( e3=K1[LAMBDA,( e3=K1),()]),()]),( e3=K1),()], K94[LAMBDA,( $dyn=-,e3=120),( e3=K2),( e3=K1),()]); sub=( K96[LAMBDA,( $dyn=-,e3=120),( e3=K2),( e3=K1),()], K97[LAMBDA,( $dyn=-,e3=120),( e3=K2),( e3=K1),()]); }
+fwrap = { ff ->
+  @{ f = ff;
+     mul = (pair
+       { y -> (fwrap (f* ff (i2f y.i))) }
+       { y -> (fwrap (f* ff      y.f )) }
+     );
+   }
+};
+
+iwrap = { ii ->
+  @{ i = ii;
+     is0 = (== ii 0);
+     mul = (pair
+       { y -> (iwrap ( *      ii  y.i)) }
+       { y -> (fwrap (f* (i2f ii) y.f)) }
+     );
+     sub = (pair
+       { y -> (iwrap ( -      ii  y.i)) }
+       { y -> (fwrap (f- (i2f ii) y.f)) }
+     );
+   }
+};
+
+c1 = (iwrap 1);
+c5 = (iwrap 5);
+
+fact = { n -> if n.is0 ? c1 : (n.mul._ (fact (n.sub._ c1))) };
+
+(fact c5)

@@ -3,6 +3,6 @@
 // Type: 3
 // Eval: 3
 ({ x -> (x._ x._.v)}
-  @{ a= { ignore -> 3};
-     b= @{ v="abc"; x=1.2f; }; }
+  @{ a = { ignore -> 3};
+     b = @{ v ="abc"; x =1.2f; }; }
 )

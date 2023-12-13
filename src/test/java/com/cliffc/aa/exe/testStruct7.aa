@@ -4,4 +4,4 @@
 map = { fcn lst ->
   if lst ? @{ n1 = (map fcn lst.n0); v1 = (fcn lst.v0); } : nil 
 };
-(map {dec -> (- dec 1)} @{n0 = nil; v0 = 5; ignore=3; })
+(map {dec -> (- dec 1)} @{n0 = nil; v0 = 5; ignore =3; })

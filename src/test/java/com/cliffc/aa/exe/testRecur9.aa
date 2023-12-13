@@ -8,6 +8,6 @@ int = { i ->        // An integer is a struct...
      i = i;         // And with the wrapped int
   }
 };
-x=(int 3);   // x is 3:int
-y=(int 4);   // y is 4:int
+x =(int 3);   // x is 3:int
+y =(int 4);   // y is 4:int
 (x.add x y)  // Wrapped 7:int

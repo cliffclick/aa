@@ -5,7 +5,7 @@ fun = { rec ->
   (pair rec rec.x)
 };
 (pair
-  (fun @{x=3  ; y=4      ; })
-  (fun @{x=4  ; z=@{q=1;}; })
+  (fun @{x =3  ; y =4       ; })
+  (fun @{x =4  ; z =@{q =1;}; })
 )
 

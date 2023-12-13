@@ -49,6 +49,7 @@ public class EXE {
       put("*"  ,new Mul ());
       put("/"  ,new Div ());
       put(">"  ,new GT  ());
+      put("==" ,new EQ  ());
       put("+1" ,new Inc ());
       put("rnd",new Rnd ());
       put("i2f",new I2F ());
@@ -187,7 +188,7 @@ public class EXE {
   
   private static boolean isWS    (byte c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
   private static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }
-  private static boolean isOp    (byte c) { return "*?+-/>#".indexOf(c)>=0; }
+  private static boolean isOp    (byte c) { return "*?+-/>#=".indexOf(c)>=0; }
   private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_'); }
   private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9'); }
   private static boolean peek(char c) { if( skipWS()!=c ) return false; X++; return true; }
@@ -631,13 +632,13 @@ public class EXE {
       In the Value/concrete domain, the input DynTable maps either DynFields
       (e.g. this field itself) or Idents (Fresh in AA), and can be treated as a
       special kind of TVStruct - with AST elements as field labels.  A DynField
-      label maps to a field label (e.g. string).  A Ident/Fresh label maps to a
+      label maps to a field label (e.g. string).  An Ident/Fresh label maps to a
       nested DynTable, recursively.
 
       In the TVar domain, the DynTable like a TVStruct whose labels are known
       as the name of the DynField/Ident itself, and whose field types need to
       be resolved.  To allow for resolution, the DynTable field type is the
-      DynField input TVStruct type, and has to resolve by unifiying 1 of those
+      DynField input TVStruct type, and has to resolve by unifying 1 of those
       choices (which then fixes the resolved label in the DynTable).
       
    */
@@ -810,6 +811,14 @@ public class EXE {
     @Override int iop(int x, int y) { return x>y ? 1 : 0; }
   }
 
+  // equal integers
+  static class EQ extends PrimSyn {
+    public EQ() { super(INT64(), INT64(), INT64()); }
+    @Override PrimSyn make() { return new EQ(); }
+    @Override SB str(SB sb) { return sb.p("=="); }
+    @Override int iop(int x, int y) { return x==y ? 1 : 0; }
+  }
+
   // inc integers
   static class Inc extends PrimSyn {
     public Inc() { super(INT64(), INT64()); }
@@ -820,7 +829,7 @@ public class EXE {
 
   // convert ints
   static class I2F extends PrimSyn {
-    public I2F() { super(FLT64(), INT64()); }
+    public I2F() { super(INT64(), FLT64()); }
     @Override PrimSyn make() { return new I2F(); }
     @Override SB str(SB sb) { return sb.p("i2f"); }
     @Override Val apply( Env e ) {

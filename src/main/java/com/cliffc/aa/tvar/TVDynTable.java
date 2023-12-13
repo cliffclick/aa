@@ -113,7 +113,7 @@ public class TVDynTable extends TVStruct {
     // Fields that resolve as either YES or NO are removed from the list,
     // since they can never change their answer.  Make a fresh copy, and
     // remove the field.
-    str = (TVStruct)str.fresh();
+    str = (TVStruct)str.find().fresh();
     str.del_fld0(i);
     _args[idx] = str;
     return str;

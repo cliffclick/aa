@@ -4,7 +4,7 @@
 
 // fcn returns the Right Thing in each context
 fcn = { ->
-  @{ i=2; f=2.3f; }._
+  @{ i =2; f =2.3f; }._
 };
 // In these two contexts it returns either int or flt, as needed
 (pair (+ (fcn) 1) (f+ (fcn) 1.1f))

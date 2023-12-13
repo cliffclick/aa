@@ -3,19 +3,19 @@
 // Eval: ( 6, 7.16100001822412f)
 
 mul = { ->
-  @{ imul= *; fmul= f*; }._
+  @{ imul = *; fmul = f*; }._
 };
 
 sub = { ->
-  @{ isub= -; fsub= f-; }._
+  @{ isub = -; fsub = f-; }._
 };
 
 one = { ->
-  @{ ione= 1; fone= 1.0f; }._
+  @{ ione = 1; fone = 1.0f; }._
 };
 
 gt = { ->
-  @{ igt= > ; fgt= f> ; }._
+  @{ igt = > ; fgt = f> ; }._
 };
 
 
