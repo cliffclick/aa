@@ -1,4 +1,26 @@
 =======================================
+12/12/2023
+
+Overloads (finally) appear to be typing/running in the EXE branch.
+General theory:
+
+- Dyn(amic) Loads, or DynLoads, take a dynamic offset instead of using a fixed
+  constant offset.  The offset will come from a DynTable - and thus a dynamic
+  load requires 2 loads instead of 1.
+- The DynTable is strongly typed and derived during normal H-M typing.
+- DynTable entries are either a mapping from a DynLoad to a field label
+  (string, which at compile time turns into a constant) OR the map is from an
+  Apply/Call site to a new DynTable used for this call.
+- All Lambdas are passed an extra DynTable argument.
+- All Apply/Calls pass this argument.
+- All DynLoads load at a fixed offset from the table, getting their offset, which they then load ptr+offset
+- So the runtime cost is a load-per-call, an extra reg argument, and a 2nd load-per-DynLoad.
+
+- The type of a DynTable is the TVDynTable, which is a wrapper over a TVStruct
+- DynTables can be empty, and will be if no DynLoad is involved.
+
+
+=======================================
 10/21/2023
 
 DynLoad has a result TV3, call it TV_dyn.
