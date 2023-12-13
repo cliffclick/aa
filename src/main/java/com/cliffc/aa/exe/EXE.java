@@ -48,8 +48,12 @@ public class EXE {
       put("-",new Sub());
       put("*",new Mul());
       put("/",new Div());
+      put(">",new GT ());
       put("+1",new Inc());
       put("f+",new FAdd());
+      put("f*",new FMul());
+      put("f-",new FSub());
+      put("f>",new FGT ());
       put("f2i",new F2I());
       put("pair",new Pair());
       put("rnd",new Rnd());
@@ -170,7 +174,7 @@ public class EXE {
   }
   private static boolean isWS    (byte c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
   private static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }
-  private static boolean isOp    (byte c) { return "*?+-/".indexOf(c)>=0; }
+  private static boolean isOp    (byte c) { return "*?+-/>".indexOf(c)>=0; }
   private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_'); }
   private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9'); }
   private static boolean peek(char c) { if( skipWS()!=c ) return false; X++; return true; }
@@ -249,11 +253,11 @@ public class EXE {
     @Override SB str(SB sb) { return sb.p("def$dyn"); }
     @Override void prep_tree(Ary<TV3> nongen) { _tvar = new TVLeaf(); }
     @Override boolean hm(boolean test) {
-      return tvar() instanceof TVDynTable tdyn ? tdyn.resolve(test) : false;
+      return tvar() instanceof TVDynTable tdyn && tdyn.resolve( test );
     }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
     boolean resolvedDyn() {
-      return tvar() instanceof TVDynTable tdyn ? tdyn.all_resolved() : true;
+      return !(tvar() instanceof TVDynTable tdyn) || tdyn.all_resolved();
     }
     @Override Val eval( Env e ) {
       return new DynVal(tvar() instanceof TVDynTable tdyn ? tdyn : null);
@@ -784,6 +788,14 @@ public class EXE {
     @Override int iop(int x, int y) { return x/y; }
   }
 
+  // greater integers
+  static class GT extends PrimSyn {
+    public GT() { super(INT64(), INT64(), INT64()); }
+    @Override PrimSyn make() { return new GT(); }
+    @Override SB str(SB sb) { return sb.p(">"); }
+    @Override int iop(int x, int y) { return x>y ? 1 : 0; }
+  }
+
   // inc integers
   static class Inc extends PrimSyn {
     public Inc() { super(INT64(), INT64()); }
@@ -810,6 +822,34 @@ public class EXE {
     @Override PrimSyn make() { return new FAdd(); }
     @Override SB str(SB sb) { return sb.p("f+"); }
     @Override double dop(double x, double y) { return x+y; }
+  }
+
+  // mul doubles
+  static class FMul extends PrimSyn {
+    public FMul() { super(FLT64(), FLT64(), FLT64()); }
+    @Override PrimSyn make() { return new FMul(); }
+    @Override SB str(SB sb) { return sb.p("f*"); }
+    @Override double dop(double x, double y) { return x*y; }
+  }
+
+  // sub doubles
+  static class FSub extends PrimSyn {
+    public FSub() { super(FLT64(), FLT64(), FLT64()); }
+    @Override PrimSyn make() { return new FSub(); }
+    @Override SB str(SB sb) { return sb.p("f-"); }
+    @Override double dop(double x, double y) { return x-y; }
+  }
+  
+  // greater doubles
+  static class FGT extends PrimSyn {
+    public FGT() { super(FLT64(), FLT64(), INT64()); }
+    @Override PrimSyn make() { return new FGT(); }
+    @Override SB str(SB sb) { return sb.p("f>"); }
+    @Override Val apply( Env e ) {
+      FltVal f0 = e._vs[ARG_IDX  ].as_flt();
+      FltVal f1 = e._vs[ARG_IDX+1].as_flt();
+      return new IntVal(f0._con > f1._con ? 1 : 0);
+    }
   }
 
   // convert doubles

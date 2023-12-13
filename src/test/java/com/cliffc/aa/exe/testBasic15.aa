@@ -2,5 +2,3 @@
 // Type: ( int64, int64)
 // Eval: ( 1, 0)
 (pair (rnd) (rnd))
-
-

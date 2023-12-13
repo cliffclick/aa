@@ -1,0 +1,29 @@
+// factorial
+// Type: int64
+// Eval: 6
+
+mul = { ->
+  @{ imul= *; fmul= f*; }._
+};
+
+sub = { ->
+  @{ isub= -; fsub= f-; }._
+};
+
+one = { ->
+  @{ ione= 1; fone= 1.0f; }._
+};
+
+gt = { ->
+  @{ igt= > ; fgt= f> ; }._
+};
+
+
+fact = { n ->
+  z1 = (one);
+  if ( (gt) n z1 )
+    ? ((mul) n (fact ((sub) n z1)))
+    : z1
+};
+
+(pair (fact 3) (fact 3.1f))
