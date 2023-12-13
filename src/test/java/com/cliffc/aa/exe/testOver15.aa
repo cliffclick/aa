@@ -1,0 +1,4 @@
+// Loads same 'x' field from 2 unrelated structs
+// Type: str
+// Eval: "3"
+({ ptr -> (ptr._.x ptr._.x) } (pair @{x=3;} @{x=str;}) )

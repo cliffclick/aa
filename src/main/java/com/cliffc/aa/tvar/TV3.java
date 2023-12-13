@@ -586,6 +586,7 @@ abstract public class TV3 implements Cloneable {
     case TypeFunPtr tfp ->  tfp.is_full() ? new TVLeaf() // Generic Function Ptr
       : new TVLambda(tfp.nargs(),from_flow(tfp.dsp(),d),from_flow(tfp._ret,d));
     case TypeMemPtr tmp -> {
+      if( tmp==TypeMemPtr.STRPTR ) yield new TVBase(tmp);
       TVStruct ts = tmp.is_simple_ptr() ? new TVStruct(true) : (TVStruct)from_flow(tmp._obj,d);
       StoreXNode.unify(tmp._aliases,ts,false);
       yield new TVPtr(tmp._aliases,ts);
@@ -600,8 +601,8 @@ abstract public class TV3 implements Cloneable {
       }
       yield new TVStruct(ss,tvs,ts._def==Type.ALL);
     }
-    case TypeInt ti -> TVBase.make(ti);
-    case TypeFlt tf -> TVBase.make(tf);
+    case TypeInt ti -> new TVBase(ti);
+    case TypeFlt tf -> new TVBase(tf);
 
     case TypeNil tn -> new TVPtr( BitsAlias.make0(0), new TVStruct(true) );
     case Type tt -> {

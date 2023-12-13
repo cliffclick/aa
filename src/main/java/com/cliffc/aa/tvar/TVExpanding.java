@@ -109,7 +109,6 @@ abstract public class TVExpanding extends TV3 {
   // Move delayed-fresh updates onto not-delayed update list.
   void move_delay() {
     _move_delay(DELAY_FRESH,_delay_fresh );
-    // TODO: Clean up, move may_nil,use_nil,widen into can_progress
     if( _may_nil && _use_nil && _widen==2 && !can_progress() ) {
       if( _delay_fresh !=null ) _delay_fresh.clear();
     }

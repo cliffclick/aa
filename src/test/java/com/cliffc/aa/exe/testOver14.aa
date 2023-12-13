@@ -1,0 +1,8 @@
+// 'x' has both a function field and a "struct with v field" field
+// See testOver13.aa
+// Type: 3
+// Eval: 3
+({ x -> (x._ x._.v)}
+  @{ a= { ignore -> 3};
+     b= @{ v="abc"; x=1.2f; }; }
+)

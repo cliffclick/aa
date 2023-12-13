@@ -1,6 +1,6 @@
 // factorial
-// Type: int64
-// Eval: 6
+// Type: ( int64, flt64)
+// Eval: ( 6, 7.16100001822412f)
 
 mul = { ->
   @{ imul= *; fmul= f*; }._

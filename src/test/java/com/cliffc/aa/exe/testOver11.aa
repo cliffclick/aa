@@ -1,0 +1,9 @@
+// The type shows "M32:0=..." is pre-bound to the correct field
+// Type: { [[  A26: A, A44: B, M32: 0={ C:- int64 -> int64 }, A35: C, M39: 1={ D:- flt64 -> flt64 }, A42: D]] E -> ( int64, flt64) }
+// Eval: K1[LAMBDA,()]
+{ pred ->
+  fx = (pair if pred ? { x -> (* x 2)} : { x -> (* x 3)}
+             { x -> (f* x 0.5f) }
+        );
+  (pair (fx._ 2) (fx._ 1.2f))
+}

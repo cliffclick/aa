@@ -9,13 +9,10 @@ import com.cliffc.aa.util.VBitSet;
 import static com.cliffc.aa.AA.TODO;
 
 public class TVBase extends TVExpanding {
-  public Type _t;  
-  private TVBase( Type t ) {
+  public Type _t;
+  public TVBase( Type t ) {
     assert t!=Type.ALL;
     _t = t;
-  }
-  public static TV3 make( Type t) {
-    return t==Type.ALL ? new TVLeaf() : new TVBase(t);
   }
 
   @Override boolean can_progress() {
@@ -88,5 +85,7 @@ public class TVBase extends TVExpanding {
     _t = tw;
     _deps_work_clear();
   }
-  @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) { return sb.p(_t); }  
+  @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
+    return _t==TypeMemPtr.STRPTR ? sb.p("str") : sb.p(_t);
+  }  
 }

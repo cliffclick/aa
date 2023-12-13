@@ -1,0 +1,4 @@
+// Test of mixing int string
+// Type: Mixing basic types
+// Eval: 3
+if rnd ? "abc" : 3

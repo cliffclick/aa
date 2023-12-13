@@ -1,0 +1,7 @@
+// Looking at the DynTables, variable 'x' has a Struct type 'A' which needs
+// some fields; at least: "{ B C -> D }" and "@{ v=C; ...}", and may have more
+// fields.  The field offsets can be resolved once this function is called.
+// See testOver14.aa
+// Type: { [[  M3: A:(  ...) in { B C -> D }, A9: B, M7: A in @{ v=C;  ..., }]] A -> D }
+// Eval: K1[LAMBDA,()]
+{ x -> (x._ x._.v)}

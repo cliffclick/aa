@@ -1,0 +1,4 @@
+// Test of strings
+// Type: str
+// Eval: "17"
+(str 17)

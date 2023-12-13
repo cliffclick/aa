@@ -44,19 +44,23 @@ public class EXE {
   }
 
   static final HashMap<String,PrimSyn> PRIMSYNS = new HashMap<>(){{
-      put("+",new Add());
-      put("-",new Sub());
-      put("*",new Mul());
-      put("/",new Div());
-      put(">",new GT ());
-      put("+1",new Inc());
-      put("f+",new FAdd());
-      put("f*",new FMul());
-      put("f-",new FSub());
-      put("f>",new FGT ());
-      put("f2i",new F2I());
+      put("+"  ,new Add ());
+      put("-"  ,new Sub ());
+      put("*"  ,new Mul ());
+      put("/"  ,new Div ());
+      put(">"  ,new GT  ());
+      put("+1" ,new Inc ());
+      put("rnd",new Rnd ());
+      put("i2f",new I2F ());
+      put("f+" ,new FAdd());
+      put("f*" ,new FMul());
+      put("f-" ,new FSub());
+      put("f>" ,new FGT ());
+      put("f2i",new F2I ());
+      put("#"  ,new Len ());
+      put("s+" ,new SAdd());
+      put("str",new Str ());
       put("pair",new Pair());
-      put("rnd",new Rnd());
     }};
   
 
@@ -79,6 +83,7 @@ public class EXE {
   static Syntax term() {
     if( skipWS()==-1 ) return null;
     if( isDigit(BUF[X]) ) return number();
+    if( peek('"') ) return string();
 
     // Parse a Lambda
     if( peek('{') ) {           // Lambda 
@@ -161,6 +166,13 @@ public class EXE {
     require('f');
     return new Con(f);
   }
+
+  private static Syntax string() {
+    SB sb = new SB();
+    while( !peek('"') ) sb.p((char)BUF[X++]);
+    return new Con(sb.toString());
+  }
+  
   private static byte skipWS() {
     while(true) {
       if( X == BUF.length ) return -1;
@@ -172,9 +184,10 @@ public class EXE {
       X++;
     }
   }
+  
   private static boolean isWS    (byte c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
   private static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }
-  private static boolean isOp    (byte c) { return "*?+-/>".indexOf(c)>=0; }
+  private static boolean isOp    (byte c) { return "*?+-/>#".indexOf(c)>=0; }
   private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_'); }
   private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9'); }
   private static boolean peek(char c) { if( skipWS()!=c ) return false; X++; return true; }
@@ -232,8 +245,9 @@ public class EXE {
   // --- Constant ------------------------
   static class Con extends Syntax {
     final Val _con;
-    Con( int   con ) { _con = new IntVal(con); }
+    Con( int    con ) { _con = new IntVal(con); }
     Con( double con ) { _con = new FltVal(con); }
+    Con( String con ) { _con = new StrVal(con); }
     @Override SB str(SB sb) { return _con.str(sb,null,null); }
     @Override void prep_tree(Ary<TV3> nongen) { _tvar = TV3.from_flow(_con.as_flow()); }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
@@ -480,6 +494,7 @@ public class EXE {
       boolean t = switch( pred ) {
       case IntVal II -> II._con!=0;
       case FltVal FF -> FF._con!=0;
+      case KontVal k -> true;   // Surely a bug
       case StructVal s -> true;
       case NilVal n -> false;
       default -> throw TODO();
@@ -699,10 +714,8 @@ public class EXE {
       visit( syn -> {
           if( syn.tvar() instanceof TVErr terr )
             throw new IllegalArgumentException(terr.toString());
-          if( syn.tvar() instanceof TVBase base && base._t instanceof TypeNil tn && tn.getClass()==TypeNil.class ) {
-            System.err.println("Mixing int and double");
-            System.exit(1);
-          }
+          if( syn.tvar() instanceof TVBase base && base._t instanceof TypeNil tn && tn.getClass()==TypeNil.class )
+            throw new IllegalArgumentException("Mixing basic types");
           return null;
         },
         (a,b)->null);
@@ -725,8 +738,9 @@ public class EXE {
       {"0","1"},
       {"0","1","2"},
     };
-    static TV3 INT64() { return TVBase.make(TypeInt.INT64); }
-    static TV3 FLT64() { return TVBase.make(TypeFlt.FLT64); }
+    static TV3 INT64() { return new TVBase(TypeInt.INT64); }
+    static TV3 FLT64() { return new TVBase(TypeFlt.FLT64); }
+    static TV3 STR  () { return new TVBase(TypeMemPtr.STRPTR); }
     
     final TV3[] _tvs;
     PrimSyn(TV3... tvs) {
@@ -804,6 +818,17 @@ public class EXE {
     @Override int iop(int x, int y) { return x+1; }
   }
 
+  // convert ints
+  static class I2F extends PrimSyn {
+    public I2F() { super(FLT64(), INT64()); }
+    @Override PrimSyn make() { return new I2F(); }
+    @Override SB str(SB sb) { return sb.p("i2f"); }
+    @Override Val apply( Env e ) {
+      IntVal i0 = e._vs[ARG_IDX].as_int();
+      return new FltVal(i0._con);
+    }
+  }
+
   // random boolean
   static class Rnd extends PrimSyn {
     private static final Random R = new Random(0x123456789L);
@@ -863,6 +888,40 @@ public class EXE {
     }
   }
 
+  // String length
+  static class Len extends PrimSyn {
+    public Len() { super(STR(), INT64()); }
+    @Override PrimSyn make() { return new Len(); }
+    @Override SB str(SB sb) { return sb.p("#"); }
+    @Override Val apply( Env e ) {
+      StrVal s0 = e._vs[ARG_IDX].as_str();
+      return new IntVal(s0._con.length());
+    }
+  }
+
+  // concat strings
+  static class SAdd extends PrimSyn {
+    public SAdd() { super(STR(), STR(), STR()); }
+    @Override PrimSyn make() { return new SAdd(); }
+    @Override SB str(SB sb) { return sb.p("s+"); }
+    @Override Val apply( Env e ) {
+      StrVal s0 = e._vs[ARG_IDX  ].as_str();
+      StrVal s1 = e._vs[ARG_IDX+1].as_str();
+      return new StrVal(s0._con + s1._con);
+    }
+  }
+
+  // convert int to string
+  static class Str extends PrimSyn {
+    public Str() { super(INT64(), STR()); }
+    @Override PrimSyn make() { return new Str(); }
+    @Override SB str(SB sb) { return sb.p("str"); }
+    @Override Val apply( Env e ) {
+      IntVal i0 = e._vs[ARG_IDX].as_int();
+      return new StrVal(""+i0._con);
+    }
+  }
+
   // Pair results
   static class Pair extends PrimSyn {
     final int _alias;
@@ -918,6 +977,7 @@ public class EXE {
   public static abstract class Val {
     IntVal    as_int   () { return null; }
     FltVal    as_flt   () { return null; }
+    StrVal    as_str   () { return null; }
     KontVal   as_kont  () { return null; }    
     StructVal as_struct() { return null; }
     TypeNil   as_flow  () { throw TODO(); }
@@ -954,6 +1014,14 @@ public class EXE {
     FltVal as_flt() { return this; }
     SB _str(SB sb, VBitSet visit, VBitSet dups) { return sb.p(_con).p("f"); }
     TypeNil as_flow() { return TypeFlt.con(_con); }
+  }
+  
+  private static class StrVal extends Val {
+    final String _con;
+    StrVal(String con) { _con=con; }
+    StrVal as_str() { return this; }
+    SB _str(SB sb, VBitSet visit, VBitSet dups) { return sb.p('"').p(_con).p('"'); }
+    TypeNil as_flow() { return TypeMemPtr.STRPTR; }
   }
   
   private static class NilVal extends Val {

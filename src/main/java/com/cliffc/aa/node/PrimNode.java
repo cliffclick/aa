@@ -151,10 +151,10 @@ public abstract class PrimNode extends Node {
 
     // TVar for wrapped primitive instance
     String[] ss  = new String[]{TypeFld.CLZ,TypeFld.PRIM};
-    IINT  = new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PINT.set_tvar(),TVBase.make(TypeInt. INT64)},false));
-    IBOOL = new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PINT.set_tvar(),TVBase.make(TypeInt. BOOL )},false));
-    IFLT  = new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.set_tvar(),TVBase.make(TypeFlt. FLT64)},false));
-    INFLT = new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.set_tvar(),TVBase.make(TypeFlt.NFLT64)},false));
+    IINT  = new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PINT.set_tvar(),new TVBase(TypeInt. INT64)},false));
+    IBOOL = new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PINT.set_tvar(),new TVBase(TypeInt. BOOL )},false));
+    IFLT  = new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.set_tvar(),new TVBase(TypeFlt. FLT64)},false));
+    INFLT = new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.set_tvar(),new TVBase(TypeFlt.NFLT64)},false));
 
     // Set all TVars
     Env.KEEP_ALIVE.walk( (n,ignore) -> {

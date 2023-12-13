@@ -105,8 +105,8 @@ public class TestTVar {
     TVStruct[] tvs0 = superchain(new TVStruct[2]);
     TVStruct[] tvs1 = superchain(new TVStruct[2]);
     
-    TV3 vint = TVBase.make(TypeInt.INT64);
-    TV3 vflt = TVBase.make(TypeFlt.FLT64);
+    TV3 vint = new TVBase(TypeInt.INT64);
+    TV3 vflt = new TVBase(TypeFlt.FLT64);
     TVLambda vlam0 = new TVLambda(AA.ARG_IDX, vint, new TVLeaf());
     TVLambda vlam1 = new TVLambda(AA.ARG_IDX, vint, new TVLeaf());
     TVLambda vlam3 = new TVLambda(AA.ARG_IDX, new TVLeaf(), vflt);

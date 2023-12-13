@@ -1,12 +1,10 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.node.Node;
-import com.cliffc.aa.node.DynLoadNode;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 
 import java.util.Arrays;
-import java.util.HashMap;
 
 import static com.cliffc.aa.AA.TODO;
 
@@ -67,7 +65,7 @@ public class TVStruct extends TVExpanding {
   }
 
   public static TVStruct make_clzclz() {
-    return new TVStruct(new String[]{TypeFld.CLZ},new TV3[]{ TVBase.make(TypeNil.NIL)});
+    return new TVStruct(new String[]{TypeFld.CLZ},new TV3[]{ new TVBase(TypeNil.NIL)});
   }
 
   @Override public int len() { return _max; }  
@@ -410,17 +408,20 @@ public class TVStruct extends TVExpanding {
       TV3 rhs = pat.arg(i);
       if( lhs==rhs ) continue;          // Fast path
       if( lhs==null ) {                 // Missing in match
-        cmp |= pat.is_open() ? 3 : 7;  // If RHS is open, may appear later so maybe, else fail
+        cmp |= is_open() ? 3 : 7;       // If match is open, may appear later so maybe, else fail
       } else {
         cmp |= lhs._trial_unify_ok(rhs); // Trial unify recursively
       }
       if( cmp == 7 ) return cmp;  // Arg failed so trial fails
     }
 
+    if( pat.is_open() )   
+      return 3;            // If pattern is open, it may yet fail on new fields
+    // Since pattern is closed, has to have matched all fields
     for( int i=0; i<_max; i++ )
       if( pat.arg_clz(_flds[i])==null ) // Missing key in RHS
         return 7;                       // Fails, no match for label in pattern
-    return pat.is_open() ? 3 : 1;       // If pattern is open, it may yet fail; if closed all fields matched
+    return 1;                   // Since pattern is closed, all fields matched
   }
 
   private int mismatched_child(TVStruct that ) {

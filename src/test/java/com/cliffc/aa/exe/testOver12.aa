@@ -1,0 +1,6 @@
+// Type: ( int64, int64)
+// Eval: ( 124, 3)
+c = if (rnd)
+     ? (pair 123 "red" )
+     : (pair 456 "blue");
+(pair (+1 c._) (# c._))

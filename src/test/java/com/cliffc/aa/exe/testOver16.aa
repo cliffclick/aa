@@ -1,0 +1,7 @@
+// Type: ( ( int64, str), ( int64, str))
+// Eval: ( ( 124, "litered"), ( 457, "liteblue"))
+color = { hex name -> (pair hex name )};
+red  = (color 123 "red" );
+blue = (color 456 "blue");
+lite = { c -> (color (+1 c._) (s+ "lite" c._))};
+(pair (lite red) (lite blue))

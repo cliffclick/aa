@@ -1,0 +1,5 @@
+// Test of strings
+// Type: int64
+// Eval: 5
+ignore = (rnd);
+if (rnd) ? (# "abc") : (# "defgh")
