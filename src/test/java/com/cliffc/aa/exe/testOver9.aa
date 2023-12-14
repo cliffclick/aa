@@ -14,8 +14,8 @@ fcn = { x y ->
 
 bar = { x ->
   if (rnd)
-  ? (fcn x 2   )  // Picks [D0:qii/qfi]
-  : (fcn x 1.3f)  // Picks [D0:qif/qff]
+  ? (fcn x 2   )  // Picks [qii/qfi]
+  : (fcn x 1.3f)  // Picks [qif/qff]
 };
 
 baz = { ->
