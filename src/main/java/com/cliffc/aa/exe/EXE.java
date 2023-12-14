@@ -6,6 +6,8 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.BufferedReader;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -18,29 +20,34 @@ import java.util.Random;
 import static com.cliffc.aa.AA.*;
 
 public class EXE {
-  public static void reset() {
-    Syntax.reset();
-    Rnd.reset();
-    Env.reset();
-    KontVal.reset();
-  }
+  
   public static void main( String[] args ) throws IOException {
     for( String arg : args ) {
-      String prog = new String( Files.readAllBytes( Paths.get(arg)));
-      run(prog,0,true,true);
+      if( arg.equals("-") ) repl();
+      else {
+        String prog = new String( Files.readAllBytes( Paths.get(arg)));
+        run(prog,0,true,true);
+      }
     }
   }
 
+  // Parse; Type; Run
+  private static final String ANSI_RESET = "\u001B[0m"; 
+  private static final String RED  = "\u001B[31m";
+  private static final String GREEN= "\u001B[32m";
+  private static final String BLUE = "\u001B[34m";
+  private static final String GREEN_BACK= "\u001B[42m";
+  public static void run( String prog, int rseed, boolean do_hm, boolean do_gcp ) {
+    Root root = compile(prog,rseed,do_hm,do_gcp);
+    System.out.println(GREEN_BACK+"Type:"+ANSI_RESET+" "+root.tvar().p());
+    System.out.println(GREEN_BACK+"Eval:"+ANSI_RESET+" "+root.eval(null));
+    System.out.flush();
+  }
+
+  // Parse; type
   public static Root compile( String prog, int rseed, boolean do_hm, boolean do_gcp ) {
     reset();
     return parse(prog).do_hm();
-  }
-
-  // Parse; Type; Run
-  public static void run( String prog, int rseed, boolean do_hm, boolean do_gcp ) {
-    Root root = compile(prog,rseed,do_hm,do_gcp);
-    System.out.println("Type: "+root.tvar().p());
-    System.out.println("Eval: "+root.eval(null));
   }
 
   static final HashMap<String,PrimSyn> PRIMSYNS = new HashMap<>(){{
@@ -82,7 +89,7 @@ public class EXE {
 
   // Parse a term
   static Syntax term() {
-    if( skipWS()==-1 ) return null;
+    if( skipWS()==-1 ) throw TODO("Program ended early, missing a term");
     if( isDigit(BUF[X]) ) return number();
     if( peek('"') ) return string();
 
@@ -135,7 +142,7 @@ public class EXE {
   private static Syntax fterm() {
     Syntax term = term();
     while( true ) {
-      if( term==null || !peek('.') ) return term;
+      if( !peek('.') ) return term;
       String id = id( true);
       term = id.equals("_") ? new DynField(term,new Ident("$dyn")) : new Field(false,id,term);
     }
@@ -1120,5 +1127,32 @@ public class EXE {
       if( _dyn!=null )
         _dyn._get_dups(visit,dups,false,false);
     }
+  }
+
+  // REPL
+  private static void repl() throws IOException {
+    BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
+    while( true ) {
+      System.out.print(BLUE+"aa> "+ANSI_RESET);
+      System.out.flush();
+      String str = in.readLine();
+      if( str == null ) break;
+      try {
+        run(str,0,true,true);
+      } catch( Exception e ) {
+        System.err.print(RED);
+        System.err.println(e);
+        System.err.print(ANSI_RESET);
+        System.err.flush();
+      }
+    }
+    in.close();
+  }
+
+  public static void reset() {
+    Syntax.reset();
+    Rnd.reset();
+    Env.reset();
+    KontVal.reset();
   }
 }

@@ -112,7 +112,7 @@ public class TVStruct extends TVExpanding {
 
   // Common accessor not called 'find' which already exists
   public int idx( String fld ) {
-    for( int i=0; i<_max; i++ ) if( _flds[i]==fld ) return i;
+    for( int i=0; i<_max; i++ ) if( Util.eq(_flds[i],fld) ) return i;
     return -1;
   }
   
@@ -160,32 +160,11 @@ public class TVStruct extends TVExpanding {
     return ptrue();
   }
   // Remove field; true if something got removed
-  public boolean del_fld(String fld) {
+  public void del_fld( String fld) {
     int idx = idx(fld);
-    return idx != -1 && del_fld(idx);
-  }
-   
-  // Partial unify two structs.  Unify matching fields in this with that.  If
-  // field is missing in that and that is closed, remove the field from 'this'.
-  // Skip a special field, if null.
-  public boolean half_unify( TVStruct that, String skip, boolean test ) {
-    boolean progress = false;
-    for( int i=0; i<_max; i++ ) {
-      if( test && progress ) return progress;
-      if( Util.eq(skip,_flds[i]) ) continue; // Skip field
-      TV3 lhs = arg(i);
-      TV3 rhs = that.arg(_flds[i]); // Match by field name, not position
-      progress |= rhs==null ? _miss_fld(that,i,lhs,test) : lhs.unify(rhs,test);
-    }
-    return progress;
+    if( idx != -1 ) del_fld( idx );
   }
 
-  private boolean _miss_fld( TVStruct that, int i, TV3 lhs, boolean test ) {
-    if( test ) return ptrue();
-    return that.is_open()
-      ? that.add_fld(_flds[i],lhs,_pins[i])
-      : this.del_fld(i);
-  }
 
   @Override int eidx() { return TVErr.XSTR; }
   @Override public TVStruct as_struct() { return this; }
@@ -424,13 +403,6 @@ public class TVStruct extends TVExpanding {
     return 1;                   // Since pattern is closed, all fields matched
   }
 
-  private int mismatched_child(TVStruct that ) {
-    if( that.is_open() ) return 3; // Missing fields maybe add later
-    for( int i=0; i<_max; i++ )
-      if( that.arg_clz(_flds[i])==null ) // Missing key in RHS
-        return 7;                   // Trial unification failed
-    return 1;                       // OK
-  }
 
   @Override boolean _exact_unify_impl( TV3 tv3 ) {
     TVStruct ts = (TVStruct)tv3;

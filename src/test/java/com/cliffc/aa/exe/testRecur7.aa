@@ -3,7 +3,7 @@
 // Eval: ( 4, 6)
 solve = { guess n ->
   new = (/ (+ ( / n guess) guess) 2);
-  if (- new guess) ? (solve new n) : new
+  if (== new guess) ? new : (solve new n)
 };
 sqr = { x -> (solve x x) };
 (pair (sqr 16) (sqr 38))

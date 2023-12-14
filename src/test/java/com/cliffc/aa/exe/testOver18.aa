@@ -30,11 +30,10 @@ iwrap = { ii ->
 };
 
 c1 = (iwrap 1);
-c5 = (iwrap 5);
 
 // should type error
-fact = { n -> if n.is0 ? c1 : (n.mul._ (fact (n.sub._ c1))) };
+fact = { n -> if n.is0 ? (iwrap 1) : (n.mul._ (fact (n.sub._ c1))) };
 
-f22 = (fwrap 2.2f);
-//(fact c5)
-(fact f22)
+fact0 = { n -> if n.is0 ? (iwrap 1) : (n.mul._ (fact (n.sub._ c1))) };
+
+(fact0 (fwrap 2.2f))
