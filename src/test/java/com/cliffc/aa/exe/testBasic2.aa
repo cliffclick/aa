@@ -1,4 +1,4 @@
 // Simple id fcn 
-// Type: { A B -> B }
+// Type: { - A -> A }
 // Eval: K1[LAMBDA,()]
 { x -> x }

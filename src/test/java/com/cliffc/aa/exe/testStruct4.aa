@@ -1,5 +1,5 @@
 // Simple OPEN struct test
-// Type: { A @{ u=B;  ..., } -> B }
+// Type: { - @{ u=A;  ..., } -> A }
 // Eval: K2[LAMBDA,( e3=K1[LAMBDA,( e3=K1),()]),()]
 
 x = { z -> z}; (x { y -> y.u})

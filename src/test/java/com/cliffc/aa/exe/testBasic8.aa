@@ -1,4 +1,4 @@
 // Simple if
-// Type: { A B -> nint8 }
+// Type: { - A -> nint8 }
 // Eval: K1[LAMBDA,()]
 { p -> if p ? 4 : 5 }

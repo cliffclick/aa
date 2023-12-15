@@ -104,7 +104,7 @@ public class EXE {
     // Parse an Apply
     if( peek('(') ) {
       Syntax fun = fterm();
-      Ary<Syntax> args = new Ary<>(new Syntax[]{null,null,new Ident("$dyn")});
+      Ary<Syntax> args = new Ary<>(new Syntax[]{null,null,new AField(new Ident("$dyn"))});
       while( !peek(')') ) args.push(fterm());
       return new Apply(fun, args.asAry());
     }
@@ -144,7 +144,7 @@ public class EXE {
     while( true ) {
       if( !peek('.') ) return term;
       String id = id( true);
-      term = id.equals("_") ? new DynField(term,new Ident("$dyn")) : new Field(false,id,term);
+      term = id.equals("_") ? new DynField(term,new Ident("$dyn")) : new Field(id,term);
     }
   }
   
@@ -321,7 +321,7 @@ public class EXE {
             DefDynTable def = new DefDynTable();
             def._par = _par;
             if( _par instanceof DynField dfld ) dfld._dyn = def;
-            else if( _par instanceof Field fld && fld._par instanceof Apply ) fld._ptr = def;
+            else if( _par instanceof AField fld ) fld._ptr = def;
             else TODO();
             def.prep_tree(nongen);
             return;
@@ -397,7 +397,6 @@ public class EXE {
     final Syntax[] _args;
     Apply( Syntax fun, Syntax[] args ) {
       _fun = fun;  fun._par = this;
-      args[DSP_IDX] = new Field(true,Util.uid("A",_uid),args[DSP_IDX]);
       _args=args;
       for( Syntax arg : args )
         if( arg != null )
@@ -589,26 +588,17 @@ public class EXE {
 
   // --- Field ------------------------
   static class Field extends Syntax {
-    final boolean _dyn;         // True if reading a TVDynTable/DynVal, False is reading a TVStruct/StructVal
     final String _lab;
     Syntax _ptr;
-    Field( boolean dyn, String id, Syntax ptr ) { _dyn = dyn; _ptr = ptr; ptr._par = this; _lab=id; }
+    Field( String lab, Syntax ptr ) { _ptr = ptr; ptr._par = this; _lab=lab; }
     @Override SB str(SB sb) { return _ptr.str(sb).p(".").p(_lab); }
     @Override void prep_tree(Ary<TV3> nongen) {
       _tvar = new TVLeaf();
       _ptr.prep_tree(nongen);
 
-      TVStruct s;
-      if( _dyn ) {
-        TVDynTable tdyn = new TVDynTable();
-        tdyn.add_apy(_par._uid,_tvar);
-        s = tdyn;
-        
-      } else {
-        s = new TVStruct(new String[]{_lab},new TV3[]{_tvar},true);
-        // TODO: Cannot add use_nil without the full up-cast of not-nil after IF
-        //s.add_use_nil();
-      }
+      TVStruct s = new TVStruct(new String[]{_lab},new TV3[]{_tvar},true);
+      // TODO: Cannot add use_nil without the full up-cast of not-nil after IF
+      //s.add_use_nil();
       _ptr.tvar().unify(s,false);
       if( !(_ptr.tvar() instanceof TVStruct str && str.idx(_lab)>=0) )
         throw new IllegalArgumentException("Missing field '"+_lab+"'");
@@ -618,11 +608,52 @@ public class EXE {
       return reduce.apply(map.apply(this),_ptr.visit(map,reduce));
     }
     @Override Val eval( Env e ) {
-      Val val = _ptr.eval(e);
-      return _dyn ? val.as_dyn().at(_lab) : val.as_struct().at(_lab);
+      return _ptr.eval(e).as_struct().at(_lab);
     }
   }
 
+  // --- AField ------------------------
+  static class AField extends Syntax {
+    Syntax _ptr;
+    AField( Syntax ptr ) { _ptr = ptr; ptr._par = this; }
+    @Override SB str(SB sb) { return _ptr.str(sb).p(".A").p(_par._uid); }
+    @Override void prep_tree(Ary<TV3> nongen) {
+      _tvar = new TVLeaf();
+      _ptr.prep_tree(nongen);
+      
+      // Normally produces a TVDynTable from a TVDynTable.
+      // If an idle Def$Dyn, then both are TVLeaf instance, and leave it idle.
+      TV3 tv3 = tvar();
+      TV3 ptr = _ptr.tvar();
+      //if( tv3 instanceof TVLeaf && ptr instanceof TVLeaf )
+      //  return false;
+      // Inflate ptr to a dyntable
+      TVDynTable ptrdyn;
+      if( ptr instanceof TVDynTable tdyn0 )
+        ptrdyn = tdyn0;
+      else
+        ptr.unify(ptrdyn = new TVDynTable(),false);
+      
+      TV3 self = ptrdyn.find_apy(_par._uid);
+      if( self==null )
+        ptrdyn.add_apy(_par._uid,tv3);
+      else
+        assert self==tv3;
+
+      ptrdyn.resolve(false);
+    }
+    
+    @Override boolean hm(boolean test) {
+      return false;
+    }
+    
+    @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
+      return reduce.apply(map.apply(this),_ptr.visit(map,reduce));
+    }
+    @Override Val eval( Env e ) {
+      return _ptr.eval(e).as_dyn().at((Apply)_par);
+    }
+  }
 
   // --- DynField ------------------------
 
@@ -1113,10 +1144,9 @@ public class EXE {
     DynVal(TVDynTable dyn) { _dyn = dyn; }
     @Override DynVal as_dyn() { return this; }
     
-    Val at(String lab) {
-      assert lab.charAt(0)=='A'; // Only for Applys and nested dyntable
+    Val at(Apply a) {
       if( _dyn==null ) return this;
-      TV3 dyn = _dyn.arg(lab);
+      TV3 dyn = _dyn.find_apy(a._uid);
       return new DynVal(dyn instanceof TVDynTable tdyn ? tdyn : null);
     }
     
