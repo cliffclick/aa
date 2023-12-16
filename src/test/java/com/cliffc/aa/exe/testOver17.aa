@@ -1,6 +1,7 @@
 // Check wrapped prims
-// Type: A:@{ i=int64; is0=int64; mul=( { - A -> A }); sub=( { - @{ i=int64;  ..., } -> A }, { - @{ f=flt64;  ..., } -> B:@{ f=flt64; is0=int64; mul=( { - @{ i=int64;  ..., } -> B }, { - @{ f=flt64;  ..., } -> B }); sub=( { - @{ i=int64;  ..., } -> B }, { - @{ f=flt64;  ..., } -> B }); } }); }
-// Eval: @{ i=120; is0=0; mul=( K93[LAMBDA,( $dyn=-,e3=120),( e3=K2[LAMBDA,( e3=K2),( e3=K1[LAMBDA,( e3=K1),()]),()]),( e3=K1),()], K94[LAMBDA,( $dyn=-,e3=120),( e3=K2),( e3=K1),()]); sub=( K96[LAMBDA,( $dyn=-,e3=120),( e3=K2),( e3=K1),()], K97[LAMBDA,( $dyn=-,e3=120),( e3=K2),( e3=K1),()]); }
+// Type: Unresolved dynamic field
+// Eval: CRASH
+
 fwrap = { ff ->
   @{ f = ff;
      is0 = (f> 1.0f ff);

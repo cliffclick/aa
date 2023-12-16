@@ -84,7 +84,7 @@ public class TVLambda extends TV3 {
     if( nargs() != that.nargs() ) return 7; // Fails to be equal
     // Check all other arguments
     int cmp = 1;
-    for( int i=DSP_IDX; i<nargs(); i++ ) {
+    for( int i=0; i<nargs(); i++ ) {
       if( _args[i] != null ) {
         int acmp = arg(i)._trial_unify_ok(that.arg(i));
         cmp |= acmp;                // Maybe arg makes trial a maybe

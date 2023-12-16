@@ -1,6 +1,6 @@
 // Check wrapped prims
-// Type: A:@{ i=int64; is0=int64; mul=( { - A -> A }); sub=( { - @{ i=int64;  ..., } -> A }, { - @{ f=flt64;  ..., } -> B:@{ f=flt64; is0=int64; mul=( { - @{ i=int64;  ..., } -> B }, { - @{ f=flt64;  ..., } -> B }); sub=( { - @{ i=int64;  ..., } -> B }, { - @{ f=flt64;  ..., } -> B }); } }); }
-// Eval: @{ i=120; is0=0; mul=( K93[LAMBDA,( $dyn=-,e3=120),( e3=K2[LAMBDA,( e3=K2),( e3=K1[LAMBDA,( e3=K1),()]),()]),( e3=K1),()], K94[LAMBDA,( $dyn=-,e3=120),( e3=K2),( e3=K1),()]); sub=( K96[LAMBDA,( $dyn=-,e3=120),( e3=K2),( e3=K1),()], K97[LAMBDA,( $dyn=-,e3=120),( e3=K2),( e3=K1),()]); }
+// Type: Unresolved dynamic field
+// Eval: CRASH
 fwrap = { ff ->
   @{ f = ff;
      is0 = (f> 1.0f ff);
@@ -29,11 +29,32 @@ iwrap = { ii ->
    }
 };
 
-c1 = (iwrap 1);
+( { n22 ->
+    (n22.mul._ // pattern sees an int, so matches fimul
+      ( { n12 ->
+          // should type as a blend of iwrap,fwrap
+          // types as: @{ is0=int64; mul=( ); }
+           if n12.is0
+           ? (iwrap 1)        // returns iwrap
+           : (n12.mul.fimul @{ i =1; } )  // returns fwrap
+        }  // returns a blend of iwrap,fwrap; { [[]] D:@{ is0=int64; mul=( ); } -> D }
+        // either fwrap.sub.fisub or iwrap.sub.iisub
+        (n22.sub._ @{ i = 1; } )  // matches fisub
+      ) // returns iwrap or fwrap again, so yeah: D:@{ is0=int64; mul=( ); }
+    )
+  }
+  (fwrap 2.2f)
+)
 
-// should type error
-fact = { n -> if n.is0 ? (iwrap 1) : (n.mul._ (fact (n.sub._ c1))) };
 
-fact0 = { n -> if n.is0 ? (iwrap 1) : (n.mul._ (fact (n.sub._ c1))) };
+// --------------------------
+// First time D138 matches:
+// D138 rejects ffmul because PATTERN uses INT64.
+// D138 matches fimul because PATTERN uses INT64.
+// I:@{ ffmul={->}; fimul={->}; }
 
-(fact0 (fwrap 2.2f))
+// Match on "fimul":
+// MATCH:   A:{ [[]]   @{ i=int64;  ...,                                  } -> B:@{FLT_STUFF} }
+// PATTERN:   { [[]] D:@{ i=int64; is0=int64; mul=@{STUFF}; sub=@{STUFF}; } ->   V86          }
+// Unifies MATCH and PATTERN, forcing PATTERN FIELDS INTO MATCH.
+

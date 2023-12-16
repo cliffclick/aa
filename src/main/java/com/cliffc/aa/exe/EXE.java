@@ -1150,12 +1150,10 @@ public class EXE {
       return new DynVal(dyn instanceof TVDynTable tdyn ? tdyn : null);
     }
     
-    @Override SB _str(SB sb, VBitSet visit, VBitSet dups) { return _dyn==null ? sb.p(0) :_dyn.str(sb,visit,dups,false,true); }
+    @Override SB _str(SB sb, VBitSet visit, VBitSet dups) { return _dyn==null ? sb.p(0) : _dyn.str(sb,null,null,false,true); }
     @Override void _get_dups(VBitSet visit, VBitSet dups) {
       if( visit.tset(_uid) )
         dups.set(_uid);
-      if( _dyn!=null )
-        _dyn._get_dups(visit,dups,false,false);
     }
   }
 
