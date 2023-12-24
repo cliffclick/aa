@@ -90,7 +90,8 @@ public class EXE {
   // Parse a term
   static Syntax term() {
     if( skipWS()==-1 ) throw TODO("Program ended early, missing a term");
-    if( isDigit(BUF[X]) ) return number();
+    if( isDigit(BUF[X]) || (BUF[X]=='-' && isDigit(BUF[X+1])) )
+        return number();
     if( peek('"') ) return string();
 
     // Parse a Lambda
@@ -161,18 +162,20 @@ public class EXE {
   }
   private static Syntax number() {
     int sum=0;
+    boolean neg=false;
+    if( peek('-') ) neg=true;
     while( X<BUF.length && isDigit(BUF[X]) )
       sum = sum*10+BUF[X++]-'0';
     if( X>= BUF.length || BUF[X]!='.' )
-      return new Con(sum);
+      return new Con(neg ? -sum : sum);
     // Ambiguous '.' in: 2.3 vs 2.x (field load from a number)
     if( X+1<BUF.length && isAlpha0(BUF[X+1]) )
-      return new Con(sum);
+      return new Con(neg ? -sum : sum);
     X++;
     double f = (double)sum;
     f = f + (BUF[X++]-'0')/10.0f;
     require('f');
-    return new Con(f);
+    return new Con(neg ? -f : f);
   }
 
   private static Syntax string() {
@@ -682,8 +685,8 @@ public class EXE {
    */
   
   static class DynField extends Syntax {
-    Syntax _ptr;
-    Syntax _dyn;          // 
+    Syntax _ptr;                // The struct to select from; a list of labels
+    Syntax _dyn;                // The DynTable, gives a self->label mapping
     DynField(Syntax ptr, Syntax dyn ) {
       _ptr = ptr;
       _dyn = dyn;
@@ -760,8 +763,10 @@ public class EXE {
         (a,b)->null);
 
       visit( syn -> {
-          if( syn instanceof DefDynTable dyn && !dyn.resolvedDyn() )
+          if( syn instanceof DefDynTable dyn && !dyn.resolvedDyn() ) {
+            boolean resolve_progress = dyn.hm(false);
             throw new IllegalArgumentException("Unresolved dynamic field");
+          }
           else return null;
         }, (a,b) -> null );
       // TODO: Worklist based HM typing

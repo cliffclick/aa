@@ -128,6 +128,7 @@ public class TVErr extends TV3 {
   }
   
   // -------------------------------------------------------------
+  @Override int _trial_unify_ok_impl( TV3 pat ) { throw TODO(); }
   @Override boolean _exact_unify_impl( TV3 tv3 ) { throw TODO(); }
 
   // -------------------------------------------------------------

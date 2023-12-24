@@ -78,11 +78,11 @@ public class TVLambda extends TV3 {
 
   // -------------------------------------------------------------
   // Sub-classes specify trial_unify on sub-parts.
-  // Check arguments, not return
+  // Check arguments and return
   @Override int _trial_unify_ok_impl( TV3 pat ) {
     TVLambda that = (TVLambda) pat; // Invariant when called
     if( nargs() != that.nargs() ) return 7; // Fails to be equal
-    // Check all other arguments
+    // Check all arguments, including return
     int cmp = 1;
     for( int i=0; i<nargs(); i++ ) {
       if( _args[i] != null ) {

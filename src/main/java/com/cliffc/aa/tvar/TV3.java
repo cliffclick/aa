@@ -508,21 +508,26 @@ abstract public class TV3 implements Cloneable {
   // Do a trial unification between this and that.
   // Report back 7 for hard-no, 1 for hard-yes, and 3 for maybe.
   // No change to either side, this is a trial only.
-  // Collect leafs and bases and open structs on the pattern (this).
-  private static final NonBlockingHashMapLong<TV3> TDUPS = new NonBlockingHashMapLong<>();
+  private static final NonBlockingHashMapLong<String> TDUPS = new NonBlockingHashMapLong<>();
   public int trial_unify_ok(TV3 pat) {
     TDUPS.clear();
+    LEAFS.clear();
     return _trial_unify_ok(pat);
   }
   int _trial_unify_ok(TV3 pat) {
     if( this==pat ) return 1; // hard-yes
     assert !unified() && !pat.unified();
-    long duid = dbl_uid(pat._uid);
-    if( TDUPS.putIfAbsent(duid,this)!=null )
+    
+    // Symmetric test for trial on a pair; only do the trial once (lest we
+    // endlessly recurse), and assume a YES here and let the fail happen
+    // elsewhere (if any).  Means trials of matching cycles will be a YES.
+    long duid = _uid < pat._uid ? dbl_uid(pat) : pat.dbl_uid(this);
+    if( TDUPS.putIfAbsent(duid,"")!=null )
       return 1;                 // Visit only once, and assume will resolve
+
     // Leafs never fail
-    if( this instanceof TVLeaf leaf && !(pat  instanceof TVErr) ) return 3; // Maybe
-    if( pat  instanceof TVLeaf leaf && !(this instanceof TVErr) ) return 3; // Maybe
+    if( this instanceof TVLeaf leaf && !(pat  instanceof TVErr) ) return leaf._trial_leaf(pat );
+    if( pat  instanceof TVLeaf leaf && !(this instanceof TVErr) ) return leaf._trial_leaf(this);
     // Different classes will also fail
     if( getClass() != pat.getClass() )
       return 7;
@@ -531,8 +536,24 @@ abstract public class TV3 implements Cloneable {
   }
 
   // Subclasses specify on sub-parts
-  int _trial_unify_ok_impl( TV3 pat ) { throw TODO(); }
+  abstract int _trial_unify_ok_impl( TV3 pat );
 
+  // Leafs get a "free pass" against unrelated classes, but if the same leaf
+  // shows up twice, each "free pass" match has to resolve against each other.
+  private static final NonBlockingHashMapLong<Ary<TV3>> LEAFS = new NonBlockingHashMapLong<>();
+  int _trial_leaf(TV3 pat) {
+    Ary<TV3> priors = LEAFS.get(_uid);
+    if( priors == null ) {      // No priors?
+      LEAFS.put(_uid,new Ary<>(new TV3[]{pat}));
+      return 3;                 // Leafs always a maybe
+    }
+    // Also prior and pattern must unify
+    if( priors._len> 1 )
+      throw TODO();             // Really?
+    return priors.at(0)._trial_unify_ok(pat);
+  }
+
+  
   // -----------------
 
   // Recursively add 'n' to 'this' and all children.

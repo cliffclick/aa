@@ -1,17 +1,17 @@
-// Check wrapped prims
-// Type: Unresolved dynamic field
-// Eval: CRASH
+// Check wrapped prims in recursive function
+// Type: ( A:@{ add=@{ fadd={ - @{ f=flt64;  ..., } -> A }; iadd={ - B:@{ add=@{ fadd={ - @{ f=flt64;  ..., } -> C:@{ add=@{ fadd={ - @{ f=flt64;  ..., } -> C }; iadd={ - @{ i=int64;  ..., } -> C }; }; f=flt64; is0=int64; mul=@{ fmul={ - @{ f=flt64;  ..., } -> C }; imul={ - @{ i=int64;  ..., } -> C }; }; } }; iadd={ - @{ i=int64;  ..., } -> B }; }; i=int64; is0=int64; mul=@{ fmul={ - @{ f=flt64;  ..., } -> D:@{ add=@{ fadd={ - @{ f=flt64;  ..., } -> D }; iadd={ - @{ i=int64;  ..., } -> D }; }; f=flt64; is0=int64; mul=@{ fmul={ - @{ f=flt64;  ..., } -> D }; imul={ - @{ i=int64;  ..., } -> D }; }; } }; imul={ - @{ i=int64;  ..., } -> B }; }; } -> A }; }; f=flt64; is0=int64; mul=@{ fmul={ - A -> A }; imul={ - @{ i=int64;  ..., } -> A }; }; }, E:@{ add=@{ fadd={ - @{ f=flt64;  ..., } -> F:@{ add=@{ fadd={ - @{ f=flt64;  ..., } -> F }; iadd={ - @{ i=int64;  ..., } -> F }; }; f=flt64; is0=int64; mul=@{ fmul={ - @{ f=flt64;  ..., } -> F }; imul={ - @{ i=int64;  ..., } -> F }; }; } }; iadd={ - G:@{ add=@{ fadd={ - @{ f=flt64;  ..., } -> H:@{ add=@{ fadd={ - @{ f=flt64;  ..., } -> H }; iadd={ - @{ i=int64;  ..., } -> H }; }; f=flt64; is0=int64; mul=@{ fmul={ - @{ f=flt64;  ..., } -> H }; imul={ - @{ i=int64;  ..., } -> H }; }; } }; iadd={ - @{ i=int64;  ..., } -> G }; }; i=int64; is0=int64; mul=@{ fmul={ - @{ f=flt64;  ..., } -> I:@{ add=@{ fadd={ - @{ f=flt64;  ..., } -> I }; iadd={ - @{ i=int64;  ..., } -> I }; }; f=flt64; is0=int64; mul=@{ fmul={ - @{ f=flt64;  ..., } -> I }; imul={ - @{ i=int64;  ..., } -> I }; }; } }; imul={ - @{ i=int64;  ..., } -> G }; }; } -> E }; }; i=int64; is0=int64; mul=@{ fmul={ - @{ f=flt64;  ..., } -> J:@{ add=@{ fadd={ - @{ f=flt64;  ..., } -> J }; iadd={ - @{ i=int64;  ..., } -> J }; }; f=flt64; is0=int64; mul=@{ fmul={ - @{ f=flt64;  ..., } -> J }; imul={ - @{ i=int64;  ..., } -> J }; }; } }; imul={ - E -> E }; }; })
+// Eval: ( @{ f=3.1680000200271605f; is0=0; mul=@{ imul=K54[LAMBDA,( $dyn=-,e3=3.1680000200271605f),( e3=K1[LAMBDA,( e3=K1),()]),()]; fmul=K55[LAMBDA,( $dyn=-,e3=3.1680000200271605f),( e3=K1),()]; }; add=@{ iadd=K56[LAMBDA,( $dyn=-,e3=3.1680000200271605f),( e3=K1),()]; fadd=K57[LAMBDA,( $dyn=-,e3=3.1680000200271605f),( e3=K1),()]; }; }, @{ i=6; is0=0; mul=@{ imul=K121[LAMBDA,( $dyn=-,e3=6),( e3=K2[LAMBDA,( e3=K2),( e3=K1),()]),( e3=K1),()]; fmul=K122[LAMBDA,( $dyn=-,e3=6),( e3=K2),( e3=K1),()]; }; add=@{ iadd=K123[LAMBDA,( $dyn=-,e3=6),( e3=K2),( e3=K1),()]; fadd=K124[LAMBDA,( $dyn=-,e3=6),( e3=K2),( e3=K1),()]; }; })
 
 fwrap = { ff ->
   @{ f = ff;
      is0 = (f> 1.0f ff);
      mul = @{
-       fimul = { y0 -> (fwrap (f* ff (i2f y0.i))) };
-       ffmul = { y1 -> (fwrap (f* ff      y1.f )) };
+       imul = { y0 -> (fwrap (f* ff (i2f y0.i))) };
+       fmul = { y1 -> (fwrap (f* ff      y1.f )) };
      };
-     sub = @{
-       fisub = { y2 -> (fwrap (f- ff (i2f y2.i))) };
-       ffsub = { y3 -> (fwrap (f- ff      y3.f )) };
+     add = @{
+       iadd = { y0 -> (fwrap (f+ ff (i2f y0.i))) };
+       fadd = { y1 -> (fwrap (f+ ff      y1.f )) };
      };
    }
 };
@@ -20,22 +20,66 @@ iwrap = { ii ->
   @{ i = ii;
      is0 = (== ii 0);
      mul = @{
-       iimul = { y4 -> (iwrap ( *      ii  y4.i)) };
-       ifmul = { y5 -> (fwrap (f* (i2f ii) y5.f)) };
+       imul = { y4 -> (iwrap ( *      ii  y4.i)) };
+       fmul = { y5 -> (fwrap (f* (i2f ii) y5.f)) };
      };
-     sub = @{
-       iisub = { y6 -> (iwrap ( -      ii  y6.i)) };
-       ifsub = { y7 -> (fwrap (f- (i2f ii) y7.f)) };
+     add = @{
+       iadd = { y4 -> (iwrap ( +      ii  y4.i)) };
+       fadd = { y5 -> (fwrap (f+ (i2f ii) y5.f)) };
      };
    }
 };
 
-c1 = (iwrap 1);
-c5 = (iwrap 5);
+// Variations on the computation of '1' are mostly either ambiguous, or
+// force to either int or float.
 
-// should type error
-fact = { n -> if n.is0 ? c1 : (n.mul._ (fact (n.sub._ c1))) };
+// The derived DynTable on a working solution (several fail solutions are given
+// below in comments), and removing the unused/dead Apply table entries looks
+// like:
+// ITAB: [[
+//     n.add._ = iadd,     // integer solution
+//     n.mul._ = imul,     // integer solution
+//     n.add._ = iadd;     // the decrement op with known integer
+//     fact.apply = ITAB;  // recursive table entry
+// ]]
+//
+// FTAB: [[
+//     n.add._ = fadd,     // float solution
+//     n.mul._ = fmul,     // float solution
+//     n.add._ = iadd;     // the decrement op with known integer
+//     fact.apply = FTAB;  // recursive table entry
+// ]]
 
-f22 = (fwrap 2.2f);
-//(fact c5)
-(fact f22)
+fact = { n ->
+   if n.is0
+   // This variation works, as the result is an int-or-flt according to the input.
+   ? (n.add._ (iwrap 1))
+   
+   // This variation is AMBIGUOUS given an iwrap 'n':
+   // ? one._
+   // Requires a definition for "one"
+   //   one = @{ i1=(iwrap 1); f1=(fwrap 1.0f) }
+   // Both { one.i1, n.mul.imul } and { one.f1, n.mul.fmul } work,
+   // basically doing the "fact" computation in all floats or all ints.
+
+   // This variation WORKS, but forces all math as int-math, rounding the floats:
+   // ? (iwrap 1)
+
+   // This variation is FAILS:
+   // ? x1
+   // where x1 is defined as an ambiguous int/flt: x1= @{ i=1; f=1.0f; },
+   // intended to take advantage of the equivalence of integer 1 and IEEE 754
+   // double '1.0f'.
+   //
+   // Fails because the wrappers cannot return an ambiguous int/flt match, so
+   // the fact return does not align with x1.  Still fails if x1 is expanded to
+   // include mul/add fields and functions, because again the recursive fact
+   // wrappers cannot return an ambiguous int/flt number.
+   
+   : (n.mul._ (fact (n.add._ (iwrap -1))))
+};
+
+(pair
+  (fact (fwrap 2.2f))
+  (fact (iwrap 3   ))
+)
