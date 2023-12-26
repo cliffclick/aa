@@ -1,4 +1,67 @@
 =======================================
+12/25/2023
+
+Pondering a "reboot" of AA Node class.
+
+The Type classes seems to be stable; complex but very usable with strong
+theoretical foundations.
+
+The TVar classes seems to be stable; complex but very usable with strong
+theoretical foundations.
+
+Node:
+
+- Needs better IR printing, and moved out of Node (too large).
+  See Simple Node printing for a better 1-line per node print.
+
+- Folding the edge Ary<Node>s back into Node - for easier debugging experience.
+  Its 1-layer less, 1-click less every time I chase node edges.
+
+- Lots of stuff in the Node class proper, I just want a chance to filter it down.
+
+- Drop the opcode as not really helpful.  Just add Yet Another Virtual call.
+
+- Stick with the recursive peepholes during parsing; no worklist.
+
+- Post-parse, pre-combo & post-combo, normal worklist.
+
+- A bunch of Node bits seem suspiscous - not sure I need them, or would be
+  better of if moved to somewhere else.  Also, there's a lot of walkers, makes
+  me wonder if I should use a generic walker more often.
+
+- Looking at the walkers, I have a generic walker but its too hard to use.  I
+  want cheap&easy input/output walkers.  See TypeStruct for such walkers; I
+  pull one from a list, walk, return it.  Have to be careful with leaks on
+  early exit.
+
+- Ponder a NodeUtils for lots of stuff that's only sorta tangential to Node
+
+- Ponder a nicer way for Parse to handle keeping partially built nodes around
+- - addDef(null) use as a in-progress flag; delDef(null) to unwind
+- - But still call keep/unkeep so can assert more.
+- - try/resources/autoclose to wrap assertion that add/del is balanced?
+- - OR: `int bal; assert bal = pushBalancedKeeps();`
+- -     `assert popBalancedKeeps(bal);`
+- - `try(BalanceCheck b = BalanceCheck.get(); ) { ... }`
+
+
+Example for problem walkers; walkerr_def:
+- Passed some "Env" for collecting stuff
+- visit self-check
+- walk just the defs, pre-order
+- - skip if def is null, XCTRL, or a FunPtr
+- - pre-order walk
+- POST WORK:
+- - revisit defs, check no ALL on defs
+- - adderr(Env) collects errors in Env
+- - updates each ErrMsg order
+
+Issues for generic pre-order walker: its not a pre-order walk!  Must have a
+special cutout during walking, which means calling a generic walker with
+specialized per-edge-walk, which makes it much less useful.
+
+
+=======================================
 12/12/2023
 
 Overloads (finally) appear to be typing/running in the EXE branch.
@@ -12,12 +75,15 @@ General theory:
   (string, which at compile time turns into a constant) OR the map is from an
   Apply/Call site to a new DynTable used for this call.
 - All Lambdas are passed an extra DynTable argument.
-- All Apply/Calls pass this argument.
+- All Apply/Calls pass this argument, which they load from the extant DynTable
+  at a call-site specific offset.
 - All DynLoads load at a fixed offset from the table, getting their offset, which they then load ptr+offset
 - So the runtime cost is a load-per-call, an extra reg argument, and a 2nd load-per-DynLoad.
-
-- The type of a DynTable is the TVDynTable, which is a wrapper over a TVStruct
-- DynTables can be empty, and will be if no DynLoad is involved.
+- The type of a DynTable is the TVDynTable, which is similar to a TVStruct, in
+  that it has a variable number of fields, but uses Node IDs instead of labels.  
+- DynTables can be empty, and will be if no DynLoad is involved.  They can have
+  nested DynTables, which can be recursively empty.  For recursive functions
+  (e.g. 'factorial'), the nested DynTable can refer to itself.
 
 
 =======================================

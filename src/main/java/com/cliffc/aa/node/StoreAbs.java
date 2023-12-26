@@ -19,9 +19,9 @@ public abstract class StoreAbs extends Node {
   
   @Override public boolean is_mem() { return true; }
 
-  Node mem() { return in(1); }
-  Node adr() { return in(2); }
-  Node rez() { return in(3); }
+  public Node mem() { return in(1); }
+  public Node adr() { return in(2); }
+  public Node rez() { return in(3); }
 
   @Override public final Type value() {
     if( !(mem()._val instanceof TypeMem    tm ) ) return mem()._val.oob(TypeMem.ALLMEM);

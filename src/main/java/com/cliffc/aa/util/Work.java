@@ -1,5 +1,7 @@
 package com.cliffc.aa.util;
 
+import java.lang.Iterable;
+import java.util.Iterator;
 import java.util.function.IntSupplier;
 
 // Simple worklist.  Filters dups on a add.

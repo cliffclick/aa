@@ -11,8 +11,6 @@ import java.util.BitSet;
 
 // Global Value Numbering, Global Code Motion
 public class GVNGCM {
-  public static final KeepNode KEEP_ALIVE = new KeepNode();
-
   // Iterative worklists.
   private final WorkNode _work_dead   = new WorkNode("dead"  );
   private final WorkNode _work_flow   = new WorkNode("flow"  );
@@ -37,6 +35,8 @@ public class GVNGCM {
   public <N extends Node> N add_reduce( N n ) { return add_work(_work_reduce,n); }
   public <N extends Node> N add_flow  ( N n ) { return add_work(_work_flow  ,n); }
   public <N extends Node> N add_mono  ( N n ) { return add_work(_work_mono  ,n); }
+  public <N extends Node> N add_flow_reduce( N n ) { return add_flow(add_reduce(n)); }
+  
   public void add_grow  ( Node n ) { add_work(_work_grow  ,n); }
   public void add_inline( FunNode n ) { add_work(_work_inline, n); }
   public void add_flow_defs  ( Node n ) { add_work_defs(_work_flow,n); }
@@ -103,19 +103,19 @@ public class GVNGCM {
     return KEEP_ALIVE.del(idx-1);
   }
 
-  // Record a Node, but do not optimize it for value and ideal calls, as it is
-  // mid-construction from the parser.  Any function call with yet-to-be-parsed
-  // call sites, and any loop top with an unparsed backedge needs to use this.
-  public <N extends Node> N init( N n ) {
-    assert n._uses._len==0;     // New to GVN
-    n._val = n.value();
-    if( n.is_mem() ) n._live = RootNode.def_mem(null);
-    // Any new nodes made post-Combo-HM need a TVar
-    if( Combo.HM_FREEZE && n.has_tvar() )
-      n.set_tvar();
-    add_work_new(n);
-    return n;
-  }
+  //// Record a Node, but do not optimize it for value and ideal calls, as it is
+  //// mid-construction from the parser.  Any function call with yet-to-be-parsed
+  //// call sites, and any loop top with an unparsed backedge needs to use this.
+  //public <N extends Node> N init( N n ) {
+  //  assert n._uses._len==0;     // New to GVN
+  //  n._val = n.value();
+  //  if( n.is_mem() ) n._live = RootNode.def_mem(null);
+  //  // Any new nodes made post-Combo-HM need a TVar
+  //  if( Combo.HM_FREEZE && n.has_tvar() )
+  //    n.set_tvar();
+  //  add_work_new(n);
+  //  return n;
+  //}
 
   // Apply graph-rewrite rules on new nodes (those with no users and kept alive
   // for the parser).  Return a node registered with GVN that is possibly "more

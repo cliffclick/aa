@@ -8,13 +8,10 @@ import static com.cliffc.aa.AA.MEM_IDX;
 // Proj data
 public class ProjNode extends Node {
   public int _idx;
-  public ProjNode( Node head, int idx ) { this(OP_PROJ,head,idx); }
-  public ProjNode( int idx, Node... ns ) { super(OP_PROJ,ns); _idx=idx; }
-  ProjNode( byte op, Node ifn, int idx ) {
-    super(op,ifn);
-    _idx=idx;
-  }
-  @Override public String xstr() { return "DProj"+_idx; }
+  //public ProjNode( int idx, Node... ns ) { super(ns); _idx=idx; }
+  ProjNode( Node head, int idx ) { super(head); _idx=idx; }
+  
+  @Override public String label() { return "DProj"+_idx; }
 
   @Override public Type value() {
     Type c = val(0);
@@ -42,7 +39,7 @@ public class ProjNode extends Node {
   }
 
   public static ProjNode proj( Node head, int idx ) {
-    for( Node use : head._uses )
+    for( Node use : head.uses() )
       if( use instanceof ProjNode proj && proj._idx==idx )
         return proj;
     return null;

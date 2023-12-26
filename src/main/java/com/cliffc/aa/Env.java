@@ -41,10 +41,6 @@ public class Env implements AutoCloseable {
   public static CProjNode CTL_0; // Program start value control
   public static MProjNode MEM_0; // Program start value memory
 
-  // KeepNode represents future un-parsed users of a Node.  Removed after parsing.
-  // Semantically, it represents a conservative approximation of ALL uses.
-  public static final KeepNode KEEP_ALIVE;
-
   // Short-cuts for common constants Nodes.
   public static final ConNode ANY;   // Common ANY / used for dead
   public static final ConNode ALL;   // Common ALL / used for errors
@@ -69,30 +65,19 @@ public class Env implements AutoCloseable {
   // to the prototype obj.
   public static final NonBlockingHashMap<String,StructNode> PROTOS;
 
-  // Add a permanent edge use to all these Nodes, keeping them alive forever.
-  @SuppressWarnings("unchecked")
-  private static <N extends Node> N keep(N n) {
-    N xn = GVN.init(n);
-    KEEP_ALIVE.add_def(xn);
-    return xn;
-  }
-
   static {
-    // The Keep-Alive
-    KEEP_ALIVE = new KeepNode();
-    
     // Top-level or common default values
-    ANY   = keep(new ConNode<>(Type.ANY   ));
-    ALL   = keep(new ConNode<>(Type.ALL   ));
-    XCTRL = keep(new ConNode<>(Type.XCTRL ));
-    XNIL  = keep(new ConNode<>(TypeNil.XNIL));
-    NIL   = keep(new ConNode<>(TypeNil. NIL));
-    XSCALAR=keep(new ConNode<>(TypeNil.XSCALAR));
-    THUNK = keep(new ConNode<>(TypeFunPtr.THUNK));
-    UNUSED= keep(new ConNode<>(TypeStruct.UNUSED));
-    ALLMEM= keep(new ConNode<>(TypeMem.ALLMEM));
-    ANYMEM= keep(new ConNode<>(TypeMem.ANYMEM));
-    XMEM  = keep(new ConNode<>(TypeMem.EXTMEM));
+    ANY   = new ConNode<>(Type.ANY         ).keep();
+    ALL   = new ConNode<>(Type.ALL         ).keep();
+    XCTRL = new ConNode<>(Type.XCTRL       ).keep();
+    XNIL  = new ConNode<>(TypeNil.XNIL     ).keep();
+    NIL   = new ConNode<>(TypeNil. NIL     ).keep();
+    XSCALAR=new ConNode<>(TypeNil.XSCALAR  ).keep();
+    THUNK = new ConNode<>(TypeFunPtr.THUNK ).keep();
+    UNUSED= new ConNode<>(TypeStruct.UNUSED).keep();
+    ALLMEM= new ConNode<>(TypeMem.ALLMEM   ).keep();
+    ANYMEM= new ConNode<>(TypeMem.ANYMEM   ).keep();
+    XMEM  = new ConNode<>(TypeMem.EXTMEM   ).keep();
 
     PROTOS = new NonBlockingHashMap<>();
 
@@ -114,9 +99,9 @@ public class Env implements AutoCloseable {
   Env( Env par, FunNode fun, int nargs, Node ctrl, Node mem, Node dsp_ptr, StructNode fref ) {
     _par = par;
     _fun = fun;
-    StructNode dsp = fref==null ? new StructNode(nargs,false,null ).init() : fref;
-    dsp.add_fld("^",TypeFld.Access.Final,dsp_ptr,null);
-    NewNode ptr = new NewNode(BitsAlias.new_alias(),par==null).init();  GVN.add_flow(ptr);
+    StructNode dsp = fref==null ? new StructNode(nargs,false,null) : fref;
+    dsp.add_fld("^",TypeFld.Access.Final,dsp_ptr,null).init();
+    NewNode ptr = new NewNode(BitsAlias.new_alias(),par==null).init();
     mem = new StoreXNode(mem,ptr,dsp,null).init();
     mem.in(1).xliv();
     // Install a top-level prototype mapping
@@ -127,8 +112,6 @@ public class Env implements AutoCloseable {
       throw TODO();
     }
     _scope = new ScopeNode(new HashMap<>(),ctrl,mem,XNIL,ptr,dsp).init();
-    KEEP_ALIVE.add_def(_scope);
-    GVN.iter();
   }
 
   // Top-level Env.  Contains, e.g. the primitives.
@@ -179,10 +162,11 @@ public class Env implements AutoCloseable {
       throw TODO();
     }
 
-    Node xscope = KEEP_ALIVE.pop();// Unhook scope
-    assert _scope==xscope;
-    GVN.add_flow_defs(_scope);  // Recompute liveness of scope inputs
-    GVN.iter();
+    //Node xscope = KEEP_ALIVE.pop();// Unhook scope
+    //assert _scope==xscope;
+    //GVN.add_flow_defs(_scope);  // Recompute liveness of scope inputs
+    //GVN.iter();
+    throw TODO();
   }
 
   // Wire up an early function exit.  Hunts through all scopes until it finds a closure.
@@ -212,10 +196,10 @@ public class Env implements AutoCloseable {
     TV3.reset_to_init0();
     Node.VALS.clear();          // Clean out hashtable
     GVN.reset_to_init0();
-    KEEP_ALIVE.walk(Node::walk_reset); // Clean out any wired prim calls
-    GVNGCM.KEEP_ALIVE.walk(Node::walk_reset);
+    //KEEP_ALIVE.walk(Node::walk_reset); // Clean out any wired prim calls
+    //GVNGCM.KEEP_ALIVE.walk(Node::walk_reset);
     Combo.reset();
-    assert KEEP_ALIVE.more_work() == 0; // Initial conditions are correct
+    //assert KEEP_ALIVE.more_work() == 0; // Initial conditions are correct
     AA.reset();
     Node      .reset_to_init0();
     GVN       .reset_to_init0();

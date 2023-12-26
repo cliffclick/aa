@@ -36,16 +36,11 @@ public class ScopeNode extends Node {
   public void               set_rez ( Node n) { set_def(REZ_IDX,n);           }
   public void               set_ptr ( Node n) { set_def(ARG_IDX,n);           }
 
-  // Set a new deactive GVNd memory, ready for nested Node.ideal() calls.
-  public void set_mem(Node n) {
-    assert n._val instanceof TypeMem || n._val ==Type.ANY || n._val ==Type.ALL;
-    set_def(MEM_IDX,n);
-  }
-  public void replace_mem(Node st) {
+  public void set_mem(Node st) {
     // Remove the scope use of old memory, so the store becomes the ONLY use of
     // old memory, allowing the store to fold immediately.
     set_def(MEM_IDX,null);
-    set_def(MEM_IDX,Env.GVN.xform(st));
+    set_def(MEM_IDX,st.peep());
   }
 
   public Node get(String name) { return stk().in(name); }

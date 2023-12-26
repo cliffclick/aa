@@ -1,6 +1,7 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.Node;
+import com.cliffc.aa.node.NodePrinter;
 
 /** an implementation of language AA
  */
@@ -52,9 +53,8 @@ public abstract class AA {
     System.err.println(s);
     return x;
   }
-  public static String p    () { return Env.KEEP_ALIVE.dumprpo(false,false,false); }  // Debugging hook
-  public static String plive() { return Env.KEEP_ALIVE.dumprpo(false,true ,false); }  // Debugging hook
-  public static Node f(int uid) { return Env.KEEP_ALIVE.find(uid); }        // Debugging hook
+  public static String p() { return NodePrinter.prettyPrint(Env.ROOT,99); }  // Debugging hook
+  public static Node f(int uid) { return Env.ROOT.find(uid); } // Debugging hook
   public static int UID=-1;     // Used to breakpoint on a named Node creation
 
   // assert AA.once_per() || ...expensive;
