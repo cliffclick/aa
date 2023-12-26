@@ -70,7 +70,7 @@ public class StructNode extends Node {
   private final Ary<Parse> _fld_starts;
 
   public StructNode(int nargs, boolean forward_ref, Parse paren_start ) {
-    super(OP_STRUCT);
+    super();
     _nargs = nargs;
     _forward_ref = forward_ref;
     _flds = new Ary<>(new String[1],0);
@@ -80,7 +80,7 @@ public class StructNode extends Node {
     _live = TypeStruct.ISUSED;
   }
 
-  @Override String str() {
+  @Override String label() {
     SB sb = new SB().p("@{");
     for( int i=0; i<_flds._len; i++ ) {
       if( i==_nargs ) sb.p("| ");
@@ -122,8 +122,7 @@ public class StructNode extends Node {
     assert _nargs <= _flds._len;
     unelock();                  // Changes hash
     _closed=true;
-    Env.GVN.add_reduce(this);   // Rehash
-    add_flow();
+    Env.GVN.add_flow_reduce(this);
     return this;
   }
 
@@ -140,11 +139,11 @@ public class StructNode extends Node {
   // Add a field
   public Node add_fld( String fld, TypeFld.Access access, Node val, Parse badt ) {
     assert !_closed;
-    add_def(val);               // Node in node array
+    addDef(val);                // Node in node array
     _flds.push(fld);            // Field name
     _accesses.push(access);     // Access rights to field
     _fld_starts.push(badt);     // Parser offset for errors
-    add_flow();
+    Env.GVN.add_flow(this);
     return this;
   }
 
@@ -153,7 +152,7 @@ public class StructNode extends Node {
   public boolean set_fld(String id, TypeFld.Access access, Node val, boolean force ) {
     int idx = find(id);
     if( !force && _accesses.at(idx) == TypeFld.Access.Final ) return false;
-    set_def(idx,val);
+    setDef(idx,val);
     _accesses.set(idx,access);
     return true;
   }
@@ -164,7 +163,7 @@ public class StructNode extends Node {
   // according to use.
   public void promote_forward( ScopeNode parent ) {
     assert parent != null;
-    for( int i=0; i<_defs._len; i++ ) {
+    for( int i=0; i<len(); i++ ) {
       if( in(i) instanceof ForwardRefNode fref && Util.eq(fref._name,fld(i))) {
         // Is this ForwardRef defined in this scope, or some outer scope?
         if( fref.is_scoped() ) {
@@ -173,12 +172,12 @@ public class StructNode extends Node {
           throw TODO();        // TODO: Access input by field name
         } else {
           // Make field in the parent
-          assert !parent.is_prim();
+          assert !parent.isPrim();
           parent.stk().add_fld(fref._name,TypeFld.Access.RW,fref,_fld_starts.at(i)).xval();
           // Stomp field locally to load from parent
           LoadNode fld = new LoadNode(parent.mem(),parent.ptr(),fref._name,_fld_starts.at(i)).init();
           fld._val = val(i);
-          set_def(i,fld);
+          setDef(i,fld);
           parent.mem().xval();
           Env.GVN.add_work_new(fld);
         }
@@ -189,20 +188,18 @@ public class StructNode extends Node {
   // Remove a non-prim field, preserving order.  For resetting primitives for
   // multi-testing
   @Override void walk_reset0( ) {
-    Node c;
-    if( _defs._len>0 )
-      while( !(c=_defs.last()).is_prim() ) {
+    if( len()>0 )
+      while( !last().isPrim() ) {
         _flds.pop();
         _accesses.pop();
         _fld_starts.pop();
-        _defs.pop();
-        c._uses.del(this);
+        pop();
       }
   }
 
   // Gather inputs into a TypeStruct.
   @Override public Type value() {
-    assert _defs._len==_flds.len();
+    assert len()==_flds.len();
     TypeFld[] flds = TypeFlds.get(_flds.len());
     for( int i=0; i<_flds.len(); i++ )
       flds[i] = TypeFld.make(_flds.at(i),val(i),_accesses.at(i));
@@ -224,7 +221,7 @@ public class StructNode extends Node {
   @Override boolean assert_live(Type live) { return live instanceof TypeStruct; }
 
   @Override public Node ideal_reduce() {
-    if( is_prim() ) return null;
+    if( isPrim() ) return null;
     // Kill dead fields
     if( _live instanceof TypeStruct live ) {
       deps_add(this);           // If self-live lifts, self reduce makes progress
@@ -232,7 +229,7 @@ public class StructNode extends Node {
       for( int i=0; i<_flds._len; i++ )
         if( in(i)!=Env.ANY && live.at_def(_flds.at(i)).above_center() &&
             !Util.eq(_flds.at(i),TypeFld.CLZ) )  // Leave a dead CLZ for error messages
-          progress = set_def(i,Env.ANY);
+          progress = setDef(i,Env.ANY);
       if( progress!=null ) return this;
     }
     return null;

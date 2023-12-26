@@ -24,13 +24,13 @@ public class PhiNode extends Node {
   //    ... here x is an [Err cannot unify 2 and "abcd"]...
   //final boolean _ifresh;        // Defined in an IF, use FRESH_UNIFY not UNIFY
   
-  PhiNode( byte op, Type t, Parse badgc, Node... vals ) {
-    super(op,vals);
+  public PhiNode( Type t, Parse badgc, Node... vals ) {
+    super(vals);
     _t = t;
     _badgc = badgc;
   }
-  public PhiNode( Type t, Parse badgc, Node... vals ) { this(OP_PHI,t,badgc,vals); }
-  @Override public boolean is_mem() { return _t==TypeMem.ALLMEM; }
+  @Override public String label() { return "Phi"; }
+  @Override public boolean isMem() { return _t==TypeMem.ALLMEM; }
   @Override public int hashCode() { return super.hashCode()+_t.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
@@ -40,15 +40,15 @@ public class PhiNode extends Node {
   }
 
   @Override public Node ideal_reduce() {
-    if( is_prim() ) return null;
+    if( isPrim() ) return null;
     if( in(0)==null ) return null; // Mid-construction
     if( val(0) == Type.XCTRL ) return null;
     RegionNode r = (RegionNode) in(0);
-    assert r._defs._len==_defs._len;
+    assert r.len()==len();
     if( r._val == Type.XCTRL ) return null; // All dead, c-prop will fold up
     // If only 1 unique live input, return that
     Node live=null;
-    for( int i=1; i<_defs._len; i++ ) {
+    for( int i=1; i<len(); i++ ) {
       if( r.val(i)==Type.XCTRL ) continue; // Ignore dead path
       Node n = in(i);
       if( n==this || n==live ) continue; // Ignore self or duplicates
@@ -64,9 +64,9 @@ public class PhiNode extends Node {
     Type ctl = val(0);
     if( ctl != Type.CTRL && ctl!= Type.ALL ) return _t.dual(); //ctl.oob();
     RegionNode r = (RegionNode) in(0);
-    assert r._defs._len==_defs._len;
+    assert r.len()==len();
     Type t = _t.dual();
-    for( int i=1; i<_defs._len; i++ ) {
+    for( int i=1; i<len(); i++ ) {
       r.in(i).deps_add(this);
       if( r.val(i)!=Type.XCTRL && r.val(i)!=Type.ANY ) // Only meet alive paths
         t = t.meet(val(i));
@@ -88,7 +88,7 @@ public class PhiNode extends Node {
 
   // Yes for e.g. ints, flts, memptrs, funptrs.  A Phi corresponds to the
   // merging HM value in the core AA If.
-  @Override public boolean has_tvar() { return !is_mem(); }
+  @Override public boolean has_tvar() { return !isMem(); }
   @Override public TV3 _set_tvar() { return new TVLeaf(); }
 
   // All inputs unify
@@ -97,7 +97,7 @@ public class PhiNode extends Node {
     if( val(0) != Type.CTRL && val(0)!= Type.ALL ) return false; // Control is dead
     if( !has_tvar() ) return false; // Memory not part of HM
     boolean progress = false;
-    for( int i=1; i<_defs._len; i++ ) {
+    for( int i=1; i<len(); i++ ) {
       if( r.val(i)!=Type.XCTRL && r.val(i)!=Type.ANY ) { // Only unify alive paths
         progress |= tvar().unify(tvar(i),test);
         if( progress && test ) return true; // Fast cutout
@@ -117,7 +117,7 @@ public class PhiNode extends Node {
     // Cannot mix TFPs with and without displays, because we do not know if we
     // should early-bind or late-bind.
     boolean has_dsp=false, no_dsp=false;
-    for( Node def : _defs )
+    for( Node def : defs() )
       if( def._val instanceof TypeFunPtr tfp )
         if( tfp.has_dsp() ) has_dsp = true;
         else                 no_dsp = true;

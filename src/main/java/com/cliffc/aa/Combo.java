@@ -144,16 +144,16 @@ public abstract class Combo {
     // Set all values to ANY and lives to DEAD, their most optimistic types.
     // Set all type-vars to Leafs.
     RootNode.combo_def_mem();
-    Env.KEEP_ALIVE.walk( (n,ignore) -> {
-        if( n.is_prim() ) return 0;
+    Env.ROOT.walk( (n,ignore) -> {
+        if( n.isPrim() ) return 0;
         n._val = n._live = Type.ANY;  // Highest value
         if( n.has_tvar() ) n.set_tvar();
-        n.add_flow();
+        Env.GVN.add_flow(n);
         if( n instanceof FunNode fun && !n.always_prim() )
           fun.set_unknown_callers();
         return 0;
       });
-    assert Env.KEEP_ALIVE.more_work()==0; // Initial conditions are correct
+    assert Env.ROOT.more_work()==0; // Initial conditions are correct
 
     // Init
     HM_NEW_LEAF = false;
@@ -166,24 +166,24 @@ public abstract class Combo {
 
     // Pass 2: Potential new Leafs quit lifting GCP in Apply
     add_new_leaf_work();
-    assert Env.KEEP_ALIVE.more_work()==0;
+    assert Env.ROOT.more_work()==0;
     work_cnt += main_work_loop(2);
 
     // Pass 3: Unresolved Fields are ambiguous; propagate errors
     HM_AMBI = true;
     add_ambi_work();
-    assert Env.KEEP_ALIVE.more_work()==0;
+    assert Env.ROOT.more_work()==0;
     work_cnt += main_work_loop(3);
 
     // Pass 4: H-M types freeze, escaping function args are assumed called with lowest H-M compatible
     // GCP types continue to run downhill.
     HM_FREEZE = true;
     add_freeze_work();
-    assert Env.KEEP_ALIVE.more_work()==0;
+    assert Env.ROOT.more_work()==0;
     work_cnt += main_work_loop(4);
 
     // Take advantage of results
-    Env.KEEP_ALIVE.walk( (n,ignore) -> {
+    Env.ROOT.walk( (n,ignore) -> {
         Env.GVN.add_work_new(n);
         return 0;
       });
@@ -221,7 +221,7 @@ public abstract class Combo {
       //    r.trial_resolve(false); // Do delayed resolve
 
       // Very expensive assert: everything that can make progress is on worklist
-      assert Env.KEEP_ALIVE.more_work()==0;
+      assert Env.ROOT.more_work()==0;
     }
     return cnt;
   }
@@ -239,7 +239,7 @@ public abstract class Combo {
   }
   private static void add_freeze_work()   {
     for( Node dep : FREEZE_WORK.values() )
-      dep.add_flow();
+      Env.GVN.add_flow(dep);
     FREEZE_WORK.clear();
   }
 

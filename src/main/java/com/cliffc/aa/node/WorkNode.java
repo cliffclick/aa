@@ -15,7 +15,7 @@ public class WorkNode extends Work<Node> {
   @Override public Node pop() {
     while( true ) {
       Node n = super.pop();
-      if( n==null || !n.is_dead() ) return n;
+      if( n==null || !n.isDead() ) return n;
     }
   }
 }

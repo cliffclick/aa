@@ -91,20 +91,18 @@ public class CallNode extends Node {
   Parse[] _badargs;         // Errors for e.g. wrong arg counts or incompatible args; one error point per arg.
 
   public CallNode( boolean unpacked, Parse[] badargs, Node... defs ) {
-    super(OP_CALL,defs);
+    super(defs);
     _rpc = BitsRPC.new_rpc(BitsRPC.ALLX); // Unique call-site index
     _unpacked=unpacked;         // Arguments are typically packed into a tuple and need unpacking, but not always
     _badargs = badargs;
-    _live=RootNode.def_mem(null);
   }
 
-  @Override public String xstr() { return (_is_copy ? "CopyCall" : (is_dead() ? "Xall" : "Call")); } // Self short name
-  String  str() { return xstr(); }       // Inline short name
-  @Override boolean is_CFG() { return !_is_copy; }
-  @Override public boolean is_mem() { return true; }
+  @Override public String label() { return (_is_copy ? "CopyCall" : (isDead() ? "Xall" : "Call")); } // Self short name
+  @Override public boolean isCFG() { return true; }
+  @Override public boolean isMem() { return true; }
 
   // Number of actual arguments, including closure/display at DSP_IDX.
-  int nargs() { return _defs._len-1; }
+  int nargs() { return len()-1; }
   // Call arguments:
   // 0 - Control.  If XCTRL, call is not reached.
   // 1 - Memory.  This is memory into the call and also arg#0
@@ -115,13 +113,13 @@ public class CallNode extends Node {
   public Node mem() { return in(MEM_IDX); }
   public Node dsp() { return in(DSP_IDX); } // Display
   public Node fdx() { return in(nargs()); } // Function
-  Node arg( int x ) { assert x>=0; return _defs.at(x); }
+  Node arg( int x ) { return in(x); }
   // Set arguments
-  void set_xmem() { set_def(MEM_IDX, Env.ANY); }
-  void set_xarg(int idx) { assert idx>=DSP_IDX && idx <nargs();  set_def(idx, Env.ANY); }
+  void set_xmem() { setDef(MEM_IDX, Env.ANY); }
+  void set_xarg(int idx) { assert idx>=DSP_IDX && idx <nargs();  setDef(idx, Env.ANY); }
   CallNode set_fdx(Node fun) {
     assert fun._val instanceof TypeFunPtr;
-    set_def(nargs(), fun);
+    setDef(nargs(), fun);
     xval();                     // Recompute value
     return this;
   }
@@ -152,21 +150,21 @@ public class CallNode extends Node {
   // original RPC may exist in the type system for a little while, until the
   // children propagate everywhere.
   @Override @NotNull public CallNode copy( boolean copy_edges) {
-    assert !is_prim();          // TODO: Never change a prim's type.  Leave the prim RPC alone and grab a new parent RPC
+    assert !isPrim();          // TODO: Never change a prim's type.  Leave the prim RPC alone and grab a new parent RPC
     CallNode call = (CallNode)super.copy(copy_edges);
     Node old_rpc = Node.con(TypeRPC.make(_rpc));
     call._rpc = BitsRPC.new_rpc(_rpc); // Children RPC
     set_rpc(BitsRPC.new_rpc(_rpc)); // New child RPC for 'this' as well.
     // Swap out the existing old rpc users for the new.
     // Might be no users of either.
-    if( old_rpc._uses._len==0 ) old_rpc.kill();
+    if( old_rpc.nUses()==0 ) old_rpc.kill();
     else old_rpc.subsume(Node.con(TypeRPC.make(_rpc)));
     return call;
   }
 
   @Override public Node ideal_reduce() {
-    if( is_prim() ) return null;
-    Node cc = fold_ccopy();
+    if( isPrim() ) return null;
+    Node cc = NodeUtil.fold_ccopy(this);
     if( cc != null ) return cc;
     if( _is_copy) return null;
 
@@ -179,18 +177,18 @@ public class CallNode extends Node {
       Node fun = pop(); // Pop off the function
       Node nnn = pop(); // Pop off the tuple
       if( nnn instanceof StructNode )
-        for( Node n : nnn._defs ) // Push the args; unpacks the tuple
-          add_def(n);
+        for( Node n : nnn.defs() ) // Push the args; unpacks the tuple
+          addDef(n);
       else {
         assert nnn instanceof ConNode;
         for( TypeFld fld : ts )
-          add_def(Node.con(fld._t));
+          addDef(Node.con(fld._t));
       }
-      add_def(fun);             // Function at end
+      addDef(fun);              // Function at end
       _unpacked = true;         // Only do it once
       xval(); // Recompute value, this is not monotonic since replacing tuple with args
-      GVN.add_work_new(this);// Revisit after unpacking
-      fdx().add_flow();      // Also, fcn/dsp liveness changes
+      GVN.add_work_new(this);   // Revisit after unpacking
+      GVN.add_flow(fdx());      // Also, fcn/dsp liveness changes
       return this;
     }
 
@@ -202,17 +200,18 @@ public class CallNode extends Node {
       if( (ctl() instanceof ConNode) ) return null;
       // Kill all inputs with type-safe dead constants
       set_xmem();
-      for( int i=ARG_IDX; i<_defs._len; i++ )
-        set_def(i,Env.ANY);
+      for( int i=ARG_IDX; i<len(); i++ )
+        setDef(i,Env.ANY);
       CallEpiNode cepi = cepi();
       if( cepi==null ) {
-        while( _uses._len>0 ) {
-          Node use = _uses.last();
-          assert use instanceof FunNode;
-          use.remove(use._defs.find(this));
-        }
+        //while( _uses._len>0 ) {
+        //  Node use = _uses.last();
+        //  assert use instanceof FunNode;
+        //  use.remove(use._defs.find(this));
+        //}
+        throw TODO();
       }
-      return set_def(0,Env.XCTRL);
+      return setDef(0,Env.XCTRL);
     }
 
     // Call can skip a direct BindFP to the source of the FP itself
@@ -234,16 +233,16 @@ public class CallNode extends Node {
     // unknown call targets can appear during GCP and use the args.  After GCP,
     // still must verify all called functions have the arg as dead, because
     // alive args still need to resolve.
-    if( cepi!=null && ttfp(tcall)._fidxs != BitsFun.NALL && !is_keep() && err(true)==null && cepi.is_CG(true) ) {
+    if( cepi!=null && ttfp(tcall)._fidxs != BitsFun.NALL && !isKeep() && err(true)==null && cepi.is_CG(true) ) {
       // 1 bit for each argument, used to track arg usage
       int abits = 0;
       for( int i=DSP_IDX; i<nargs(); i++ ) if( in(i)!=Env.ANY ) abits |= (1<<i);
       // Find arg uses
       if( abits!=0 )
-        for( Node use : _uses ) {
+        for( Node use : uses() ) {
           if( use instanceof CallEpiNode ) continue;
           if( use instanceof FunNode fun ) {
-            for( Node fuse : fun._uses )
+            for( Node fuse : fun.uses() )
               if( fuse instanceof ParmNode parm ) {
                 abits &= ~(1<<parm._idx); // Arg is used
                 parm.deps_add(this);      // Arg dies, then this call improves
@@ -301,7 +300,7 @@ public class CallNode extends Node {
     if( val(0)==Type.XCTRL || val(0)==Type.ANY ) return Type.ANY;
 
     // Result type includes a type-per-input, plus one for the function
-    final Type[] ts = Types.get(_defs._len);
+    final Type[] ts = Types.get(len());
     ts[CTL_IDX] = ctl()._val.oob(Type.CTRL);
     // Not a memory to the call?
     Type mem = mem()==null ? TypeMem.ANYMEM : mem()._val;
@@ -327,7 +326,7 @@ public class CallNode extends Node {
     // Also gather all aliases from all args.
     for( int i=DSP_IDX; i<nargs(); i++ )
       ts[i] = arg(i)==null ? TypeNil.XSCALAR : arg(i)._val;
-    ts[_defs._len-1] = tfx;
+    ts[len()-1] = tfx;
 
     return TypeTuple.make(ts);
   }
@@ -340,8 +339,8 @@ public class CallNode extends Node {
   @Override public Type live_use( int i ) {
     Node def = in(i);
     if( _is_copy ) return def._live;
-    boolean is_keep = is_keep();
-    if( i==CTL_IDX ) return def.is_mem() ? TypeMem.ALLMEM : Type.ALL;
+    boolean is_keep = isKeep();
+    if( i==CTL_IDX ) return def.isMem() ? TypeMem.ALLMEM : Type.ALL;
     if( i==MEM_IDX ) return is_keep || _live==Type.ALL ? RootNode.def_mem(def) : _live;
     if( i==nargs() ) return _unpacked ? FP_LIVE : Type.ALL;
     if( !_unpacked ) return TypeStruct.ISUSED;
@@ -376,7 +375,7 @@ public class CallNode extends Node {
 
     // Since wired, we can check all uses to see if this argument is alive.
     Type t = Type.ANY;
-    for( Node use : _uses ) {
+    for( Node use : uses() ) {
       // The 3 allowed types are CallEpi, Root and Fun
       if( use instanceof CallEpiNode ) continue;
       if( use instanceof RootNode ) return Type.ALL;
@@ -436,7 +435,7 @@ public class CallNode extends Node {
         if( BitsFun.EXT.test_recur(fidx) ) continue; // External callers have args forced via H-M types elsewhere
         for( int kid=fidx; kid!=0; kid = tree.next_kid(fidx,kid) ) {
           RetNode ret = RetNode.get(kid);
-          if( ret==null || ret.is_copy() ) continue;
+          if( ret==null || ret.isCopy() ) continue;
           FunNode fun = ret.fun();
           ParmNode parm = fun.parm(j);
           if( parm==null ) continue;   // Formal is dead
@@ -459,18 +458,18 @@ public class CallNode extends Node {
   }
 
   public CallEpiNode cepi() {
-    for( Node xcepi : _uses )    // Find CallEpi for bypass aliases
+    for( Node xcepi : uses() )    // Find CallEpi for bypass aliases
       if( xcepi instanceof CallEpiNode cepi )
         return cepi;
     return null;
   }
 
-  @Override public Node is_copy(int idx) {
+  @Override public Node isCopy(int idx) {
     if( !_is_copy ) return null;
     if( _val==Type.ANY ) return Env.ANY;
     return in(idx);
   }
-  void set_rpc(int rpc) { assert !is_prim(); unelock(); _rpc=rpc; } // Unlock before changing hash
+  void set_rpc(int rpc) { assert !isPrim(); unelock(); _rpc=rpc; } // Unlock before changing hash
   @Override public int hashCode() { return super.hashCode()+_rpc; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

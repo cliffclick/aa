@@ -9,7 +9,7 @@ import static com.cliffc.aa.AA.MEM_IDX;
 public class ProjNode extends Node {
   public int _idx;
   //public ProjNode( int idx, Node... ns ) { super(ns); _idx=idx; }
-  ProjNode( Node head, int idx ) { super(head); _idx=idx; }
+  public ProjNode( Node head, int idx ) { super(head); _idx=idx; }
   
   @Override public String label() { return "DProj"+_idx; }
 
@@ -24,7 +24,7 @@ public class ProjNode extends Node {
   
   // Strictly reducing
   @Override public Node ideal_reduce() {
-    Node c = in(0).is_copy(_idx);
+    Node c = in(0).isCopy(_idx);
     if( c != null )
       return c==this ? Env.ANY : c; // Happens in dying loops
     return null;

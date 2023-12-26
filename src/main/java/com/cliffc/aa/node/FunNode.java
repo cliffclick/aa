@@ -69,6 +69,8 @@ public class FunNode extends Node {
   private boolean _unknown_callers;
 
   @Override String label() { return _name==null ? "Fun["+_fidx+"]" : "Fun_"+_name; }
+  @Override public boolean isMultiHead() { return true; }
+  @Override public boolean isCFG() { return true; }
   
   // Used to make the primitives at boot time.  Note the empty displays: in
   // theory Primitives should get the top-level primitives-display, but in
@@ -148,7 +150,7 @@ public class FunNode extends Node {
 
   private boolean _unknown_callers() {
     if( isKeep() ) return true;          // Still alive
-    if( is_copy(0)!=null ) return false; // Copy collapsing
+    if( isCopy(0)!=null ) return false;  // Copy collapsing
     // Can only track if we can follow all uses of FunPtr
     FunPtrNode fptr = fptr();
     if( fptr == null ) return false; // Need a funptr to have a new unknown caller
@@ -223,7 +225,7 @@ public class FunNode extends Node {
   // already done.
   public Node ideal_inline(boolean check_progress) {
     if( noinline() ) return null;
-    assert is_copy(0)==null; // If a copy, should have already cleaned out before getting here
+    assert isCopy(0)==null; // If a copy, should have already cleaned out before getting here
 
     // Every input path is wired to an output path
     RetNode ret = ret();
@@ -242,7 +244,7 @@ public class FunNode extends Node {
     // Large code-expansion allowed; can inline for other reasons
     if( path==0 ) path = split_size(body,parms()); // Forcible size-splitting first path
     if( path == -1 ) return null;                  // Nobody wants to split
-    if( !is_prim() ) {
+    if( !isPrim() ) {
       if( _cnt_size_inlines >= 6 ) return null;
       _cnt_size_inlines++; // Disallow infinite size-inlining of recursive non-primitives
     }
@@ -565,7 +567,7 @@ public class FunNode extends Node {
     if( isDead() ) return null;
     for( Node use : uses() )
       if( use instanceof RetNode ret ) {
-        assert !ret.is_copy() && ret.len()==5;
+        assert !ret.isCopy() && ret.len()==5;
         return ret;
       }
     return null;
@@ -581,7 +583,7 @@ public class FunNode extends Node {
   }
 
   @Override public boolean equals(Object o) { return this==o; } // Only one
-  @Override public Node is_copy(int idx) {
+  @Override public Node isCopy(int idx) {
     if( len()==1 ) return in(0); // Collapsing
     return in(0)==this ? in(1) : null;
   }

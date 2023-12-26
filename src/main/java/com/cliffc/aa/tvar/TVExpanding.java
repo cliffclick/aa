@@ -1,5 +1,6 @@
 package com.cliffc.aa.tvar;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.node.FreshNode;
 import com.cliffc.aa.util.Ary;
 
@@ -95,7 +96,7 @@ abstract public class TVExpanding extends TV3 {
     while( DELAY_FRESH.len() > 0 ) {
       DelayFresh df = DELAY_FRESH.pop();
       boolean progress = df.lhs().fresh_unify(df._frsh,df.rhs(),df._nongen,false);
-      df._frsh.add_flow();
+      Env.GVN.add_flow(df._frsh);
       assert cnt++ < 20;
     }
   }

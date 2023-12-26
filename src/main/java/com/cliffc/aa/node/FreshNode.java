@@ -13,15 +13,16 @@ public class FreshNode extends Node {
   private TV3[] _nongen;        // Set of visible non-generative type vars
   
   public FreshNode( Node id, Env e ) {
-    super(OP_FRESH, id);
+    super(id);
     // Copy the set of NONGEN variables
     for( ; e!=null; e=e._par ) {
       StructNode stk = e._scope.stk();
       for( int i=0; i<stk._nargs; i++ )
-        add_def(stk.in(i));
+        addDef(stk.in(i));
     }
   }
 
+  @Override public String label() { return "Fresh"; }
   public Node id() { return in(0); } // The HM identifier
   public static Node peek(Node f) { return f instanceof FreshNode fsh ? fsh.id() : f; }
 

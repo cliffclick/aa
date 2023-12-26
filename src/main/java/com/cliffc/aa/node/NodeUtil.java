@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.util.Ary;
 
 import java.lang.Iterable;
@@ -30,6 +31,16 @@ public abstract class NodeUtil {
     @Override public boolean hasNext() {  assert _i>=0; return _i < _len || end(); }
     @Override public Node next() { return _ns[_i++]; }
     @Override public void remove() { throw TODO(); }
+  }
+
+  
+  // Fold control copies
+  public static Node fold_ccopy(Node x) {
+    Node cc = x.in(0).isCopy(0);
+    if( cc == null ) return null;
+    if( cc == x ) return Env.ANY; // Dead self-cycle
+    Env.GVN.add_reduce_uses(x);
+    return Env.GVN.add_reduce(x.setDef(0,cc));
   }
 
 }

@@ -36,7 +36,6 @@ public abstract class PrimNode extends Node {
   Parse[] _badargs;             // Filled in when inlined in CallNode
   public PrimNode( String name, TypeTuple formals, TypeNil ret ) { this(name,false,formals,ret); }
   public PrimNode( String name, boolean is_lazy, TypeTuple formals, TypeNil ret ) {
-    super(OP_PRIM);
     _name = name;
     _is_lazy = is_lazy;
     int fidx = BitsFun.new_fidx(BitsFun.INTX);
@@ -47,6 +46,7 @@ public abstract class PrimNode extends Node {
     _badargs=null;
   }
 
+  @Override public String label() { return _name; }
 
   // Int/Float/String primitives.
   public static final StructNode ZCLZ = new StructNode(0,false,null );
@@ -121,17 +121,17 @@ public abstract class PrimNode extends Node {
       //new MemPrimNode.ReadPrimNode.LValueLength(), // The other array ops are "balanced ops" and use term() for precedence
     };
 
-    Env.KEEP_ALIVE.add_def(ZCLZ);
-    Env.KEEP_ALIVE.add_def(ZINT);
-    Env.KEEP_ALIVE.add_def(ZFLT);
-    Env.KEEP_ALIVE.add_def(ZSTR);
+    ZCLZ.keep();
+    ZINT.keep();
+    ZFLT.keep();
+    ZSTR.keep();
 
     // ClazzClazz
     ZCLZ.close();
     PCLZ.init();
-    StoreXNode mem = new StoreXNode(Env.SCP_0.mem(),PCLZ.add_flow(),ZCLZ,null).init();
+    StoreXNode mem = new StoreXNode(Env.SCP_0.mem(),Env.GVN.add_flow(PCLZ),ZCLZ,null).init();
     mem._live = TypeMem.ALLMEM;
-    Env.SCP_0.set_mem(mem);
+    Env.SCP_0.mem(mem);
     ZCLZ.set_tvar();
 
     // Gather
@@ -157,7 +157,7 @@ public abstract class PrimNode extends Node {
     INFLT = new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.set_tvar(),new TVBase(TypeFlt.NFLT64)},false));
 
     // Set all TVars
-    Env.KEEP_ALIVE.walk( (n,ignore) -> {
+    Env.ROOT.walk( (n,ignore) -> {
         if( n.has_tvar() ) n.set_tvar();
         return 0;
       });
@@ -172,7 +172,7 @@ public abstract class PrimNode extends Node {
         n0.add_flow_uses();
       }
     }
-    assert Env.KEEP_ALIVE.walk((n,x) -> chk(n) ? x : x+1 )==0;
+    assert Env.ROOT.walk((n,x) -> chk(n) ? x : x+1 )==0;
 
     // Used for test cases
     MAX_PRIM_ALIAS = BitsAlias.NALL.tree().next_available_bit();
@@ -207,7 +207,7 @@ public abstract class PrimNode extends Node {
     ParmNode rpc = new ParmNode(0,fun,null,TypeRPC.ALL_CALL).init();
     // Make a Parm for every formal
     for(int i = DSP_IDX; i<_formals.len(); i++ )
-      add_def(_formals.at(i)==Type.ANY ? null : new ParmNode(i,fun,null,wrap(_formals.at(i))).init());
+      addDef(_formals.at(i)==Type.ANY ? null : new ParmNode(i,fun,null,wrap(_formals.at(i))).init());
     // The primitive, working on and producing wrapped prims
     init();
     // Return the result
@@ -226,10 +226,10 @@ public abstract class PrimNode extends Node {
     FunNode fun = new FunNode(this,_name).init();
     ParmNode rpc = new ParmNode(0      ,fun,null,TypeRPC.ALL_CALL).init();
     ParmNode mem = new ParmNode(MEM_IDX,fun,null,TypeMem.STRMEM  ).init();
-    add_def(mem);
+    addDef(mem);
     // Make a Parm for every formal
     for(int i = DSP_IDX; i<_formals.len(); i++ )
-      add_def(new ParmNode(i,fun,null,wrap(_formals.at(i))).init());
+      addDef(new ParmNode(i,fun,null,wrap(_formals.at(i))).init());
     // The primitive, working on and producing wrapped prims
     init();
     // Return the result
@@ -261,13 +261,13 @@ public abstract class PrimNode extends Node {
         over.init();
         over.close();
         ptr0 = new NewNode(BitsAlias.new_alias(BitsAlias.LOCX),true).init();
-        scp.set_mem(new StoreXNode(scp.mem(),ptr0,over,null).init());
+        scp.mem(new StoreXNode(scp.mem(),ptr0,over,null).init());
       }
       clz.add_fld(prims[0]._name,Access.Final,ptr0,null);
     }
     clz.close();
     Env.PROTOS.put(clzname,clz); // global mapping
-    scp.set_mem(new StoreXNode(scp.mem(),ptr.add_flow(),clz,null).init());
+    scp.mem(new StoreXNode(scp.mem(),Env.GVN.add_flow(ptr),clz,null).init());
   }
 
   // Build and install match package
@@ -280,7 +280,7 @@ public abstract class PrimNode extends Node {
     Env.GVN.add_flow(PMATH); // Type depends on uses
     StoreXNode mem = new StoreXNode(Env.SCP_0.mem(),PMATH,ZMATH,null).init();
     mem._live = TypeMem.ALLMEM;
-    Env.SCP_0.set_mem(mem);
+    Env.SCP_0.mem(mem);
     return PMATH;
   }
 
@@ -293,10 +293,9 @@ public abstract class PrimNode extends Node {
   // str:{int     -> str }  ==>>  str:int
   // str:{flt     -> str }  ==>>  str:flt
   // == :{ptr ptr -> int1}  ==>>  == :ptr
-  @Override public String xstr() { return _name; }
   private static final TypeNil[] TS = new TypeNil[ARG_IDX+1];
   @Override public Type value() {
-    if( is_keep() ) return _val;
+    if( isKeep() ) return _val;
     // If all inputs are constants we constant-fold.  If any input is high, we
     // return high otherwise we return low.
     boolean is_con = true, has_high = false;

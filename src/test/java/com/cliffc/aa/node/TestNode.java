@@ -238,11 +238,11 @@ public class TestNode {
     set_type(2,TypeNil.SCALAR);  nnn1.add_fld("y",Access.Final,_ins[2],null);
     test1monotonic(nnn1);
     ((ConNode<Type>)_ins[1])._t = TypeNil.SCALAR; // ParmNode reads this for _alltype
-    test1monotonic(new   ParmNode( 1,(FunNode)_ins[0],null,null).add_def((ConNode)_ins[1]).add_def(_ins[2]));
+    test1monotonic(new   ParmNode( 1,(FunNode)_ins[0],null,null).addDef((ConNode)_ins[1]).addDef(_ins[2]));
     test1monotonic(new    PhiNode(TypeNil.SCALAR,null,_ins[0],_ins[1],_ins[2]));
     for( PrimNode prim : PrimNode.PRIMS() )
       test1monotonic_prim(prim,mem);
-    test1monotonic(new   ProjNode(1, _ins[0]));
+    test1monotonic(new   ProjNode(_ins[0],1));
     test1monotonic(new RegionNode(null,_ins[1],_ins[2]));
     test1monotonic(new    RetNode(_ins[0],mem,_ins[1],_ins[2],fun_plus)); // ctl,mem,val,rpc,fun
     test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],"_",Access.Final,null));
@@ -265,19 +265,19 @@ public class TestNode {
   }
 
   private void test1monotonic(Node n) {
-    assert n._defs._len>0;
+    assert n.len()>0;
     test1monotonic_init(n);
   }
 
   // Fill a Node with {null,edge,edge} and start the search
   private void test1monotonic_prim(PrimNode prim, Node mem) {
     PrimNode n = (PrimNode)prim.copy(false);
-    assert n._defs._len==0;
-    n.add_def( null  );
-    n.add_def(_ins[n._defs._len]);
-    if( n instanceof MemPrimNode ) n.add_def(mem);
-    if( n._formals.len() >= 3 )  n.add_def(_ins[n._defs._len-1]);
-    if( n._formals.len() >= 4 )  n.add_def(_ins[n._defs._len-1]);
+    assert n.len()==0;
+    n.addDef( null  );
+    n.addDef(_ins[n.len()]);
+    if( n instanceof MemPrimNode ) n.addDef(mem);
+    if( n._formals.len() >= 3 )  n.addDef(_ins[n.len()-1]);
+    if( n._formals.len() >= 4 )  n.addDef(_ins[n.len()-1]);
     test1monotonic_init(n);
   }
   //// Fill a Node with {null,edge,edge} and start the search
@@ -294,7 +294,7 @@ public class TestNode {
 
   @SuppressWarnings("unchecked")
   private void test1monotonic_init(final Node n) {
-    System.out.println(n.xstr());
+    System.out.println(n.label());
     _values.clear(true);
 
     put(0,Type.ANY);            // First args are all ANY, so is result
@@ -361,8 +361,8 @@ public class TestNode {
     int y1 = idx==1 ? yx : x1;
     if( vn!= vm && !vn.isa(vm) ) {
       int x0 = xx(xx,0), x2 = xx(xx,2), x3 = xx(xx,3);
-      System.out.println(n.xstr()+"("+all[x0]+","+all[x1]+","+all[x2]+","+all[x3]+") = "+vn);
-      System.out.println(n.xstr()+"("+all[idx==0?yx:x0]+","+all[idx==1?yx:x1]+","+all[idx==2?yx:x2]+","+all[idx==3?yx:x3]+") = "+vm);
+      System.out.println(n.label()+"("+all[x0]+","+all[x1]+","+all[x2]+","+all[x3]+") = "+vn);
+      System.out.println(n.label()+"("+all[idx==0?yx:x0]+","+all[idx==1?yx:x1]+","+all[idx==2?yx:x2]+","+all[idx==3?yx:x3]+") = "+vm);
       _errs++;
       redo_(n,idx, xx(xx,idx),yx,all);
     }
@@ -386,7 +386,7 @@ public class TestNode {
 
   private static final int[] stx_any = new int[]{};
   private int[] stx(final Node n, long xx, int i) {
-    if( i >= n._defs._len || n.in(i) == null ) return stx_any;
+    if( i >= n.len() || n.in(i) == null ) return stx_any;
     return _min_subtypes[xx(xx,i)];
   }
 

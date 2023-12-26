@@ -19,17 +19,18 @@ import java.util.BitSet;
 public class MemSplitNode extends Node {
   Ary<BitsAlias> _escs = new Ary<>(new BitsAlias[]{new BitsAlias()});
   boolean _is_copy;             // Set by MemJoin as last split goes away
-  public MemSplitNode( Node mem ) { super(OP_SPLIT,null,mem); }
-  Node mem() { return in(1); }
+  
+  public MemSplitNode( Node mem ) { super(null,mem); }
   public MemJoinNode join() {
     Node prj = ProjNode.proj(this,0);
     if( prj==null ) return null;
-    Node jn = prj._uses.at(0);
+    Node jn = prj.use0();
     return jn instanceof MemJoinNode ? (MemJoinNode)jn : null;
   }
 
-  @Override public boolean is_mem() { return true; }
-  @Override String str() {
+  @Override public boolean isMem() { return true; }
+  Node mem() { return in(1); }
+  @Override String label() {
     SB sb = new SB();
     sb.p('(').p("base,");
     for( int i=1; i<_escs._len; i++ )
@@ -84,7 +85,7 @@ public class MemSplitNode extends Node {
     _escs.remove(idx);          // Remove the escape set
     xval();                     // Reduce tuple result
     // Renumber all trailing projections to match
-    for( Node use : _uses ) {
+    for( Node use : uses() ) {
       MProjNode mprj = (MProjNode)use;
       if( mprj._idx > idx )
         mprj.set_idx(mprj._idx-1);
@@ -126,7 +127,7 @@ public class MemSplitNode extends Node {
   // Call/CallEpi pairs are: MProj->{CallEpi}->Call.
   static Node insert_split(Node tail1, BitsAlias head1_escs, Node head1, Node tail2, Node head2) {
     assert Env.ROOT.more_work()==0;
-    assert tail1.is_mem() && head1.is_mem() && tail2.is_mem() && head2.is_mem();
+    assert tail1.isMem() && head1.isMem() && tail2.isMem() && head2.isMem();
     //BitsAlias head2_escs = head2.escapees();
     //assert check_split(head1,head1_escs,head1.in(1));
     //// Insert empty split/join above head2
@@ -150,7 +151,7 @@ public class MemSplitNode extends Node {
   }
 
   static boolean check_split( Node head1, BitsAlias head1_escs, Node tail2 ) {
-    if( tail2.is_keep() ) return false; // Still being constructed
+    if( tail2.isKeep() ) return false; // Still being constructed
     // Must have only 1 mem-writer (this can fail if used by different control paths)
     if( !tail2.check_solo_mem_writer(head1) ) return false;
     // No alias overlaps
@@ -171,7 +172,7 @@ public class MemSplitNode extends Node {
     nnn._escs = _escs.deepCopy();
     return nnn;
   }
-  @Override public Node is_copy(int idx) {
+  @Override public Node isCopy(int idx) {
     if( _is_copy ) return mem();
     //if( _uses._len==1 && _keep==0 ) return mem(); // Single user
     return null;

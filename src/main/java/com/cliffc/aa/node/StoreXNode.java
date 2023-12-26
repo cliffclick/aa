@@ -16,6 +16,8 @@ public class StoreXNode extends StoreAbs {
     super(mem,adr,val,bad);
   }
 
+  @Override public String label() { return "Store"; }
+  
   StructNode struct() { return (StructNode)in(3); }
 
   @Override Type _value( TypeMem tm, TypeMemPtr tmp ) {

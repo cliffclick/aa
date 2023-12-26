@@ -122,13 +122,12 @@ public class DynLoadNode extends Node {
   private final Ary<Resolvable> _resolves;
   
   public DynLoadNode( Node mem, Node adr, Parse bad ) {
-    super(OP_DYNLD,null,mem,adr);
+    super(null,mem,adr);
     _bad = bad;
     _resolves = new Ary<>(Resolvable.class);
   }
 
-  @Override public String xstr() { return "._"; }   // Self short name
-  String  str() { return xstr(); } // Inline short name
+  @Override public String label() { return "._"; }   // Self short name
   
   public Node mem() { return in(MEM_IDX); }
   public Node adr() { return in(DSP_IDX); }

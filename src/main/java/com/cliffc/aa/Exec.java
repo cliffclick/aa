@@ -40,12 +40,12 @@ public abstract class Exec {
   public static TypeEnv go( Env top, Node ctrl, Node mem, String src, String str ) { // Execute string
     Env e = Env.FILE = new Env(top,null,1,ctrl,mem,top._scope.ptr(), null);
     // Parse a program
-    ErrMsg err = new Parse(src,false,e,str).prog();
+    ErrMsg err = new Parse(src,e,str).prog();
 
     // Move final results into Root; close out the top scope
-    Env.ROOT.set_def(CTL_IDX,e._scope.ctrl());
-    Env.ROOT.set_def(MEM_IDX,e._scope.mem ());
-    Env.ROOT.set_def(REZ_IDX,e._scope.rez ());
+    Env.ROOT.setDef(CTL_IDX,e._scope.ctrl());
+    Env.ROOT.setDef(MEM_IDX,e._scope.mem ());
+    Env.ROOT.setDef(REZ_IDX,e._scope.rez ());
     Env.GVN.add_flow(Env.ROOT);
     Env.GVN.add_flow_uses(Env.ROOT);
     Env.ROOT.deps_work_clear();
@@ -61,6 +61,4 @@ public abstract class Exec {
     return e.gather_errors(err);  // Gather errors and/or program typing
   }
 
-
-  public static String dump() { return Env.ROOT.dumprpo(false,false,false); } // Debugging hook
 }

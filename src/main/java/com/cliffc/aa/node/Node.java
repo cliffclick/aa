@@ -55,8 +55,28 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Is a primitive
   public boolean always_prim() { return _uid<_PRIM_CNT; }
-  public boolean is_prim() { return always_prim() && PrimNode.post_init(); }
+  public boolean isPrim() { return always_prim() && PrimNode.post_init(); }
 
+  // Overridden in subclasses that return TypeTuple value types.  Such nodes
+  // are always followed by ProjNodes to break out the tuple slices.  If the
+  // node optimizes, each ProjNode becomes a copy of some other value... based
+  // on the ProjNode index
+  public Node isCopy(int idx) { return null; }
+
+  // Only true for Unresolved
+  public boolean is_forward_ref() { return false; }
+  // Only true for a bare StructNode
+  public boolean is_forward_type() { return false; }
+
+  // True if normally (not in-error) produces a TypeMem value or a TypeTuple
+  // with a TypeMem at(MEM_IDX).
+  public boolean isMem() { return false; }
+
+  // Region has Phis, Fun has Parms, If as 2 Controls, Call & CallEpi have many Projs
+  public boolean isMultiHead() { return false; }
+  
+  // Region, Fun, If, Return, Call, CallEpi
+  public boolean isCFG() { return false; }
 
   // --------------------------------------------------------------------------
   // Node pretty-print info
@@ -76,6 +96,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   private int _len;             // The in-use part of defs
   public int len() { return _len; }
   public Node in( int i) { assert i<_len; return _defs[i]; }
+  public Node last() { return _defs[_len-1]; }
 
   // Add a def, making more space as needed.
   private void _addDef( Node n ) {
@@ -95,6 +116,12 @@ public abstract class Node implements Cloneable, IntSupplier {
   }
 
   public NodeUtil.Iter defs() { return NodeUtil.Iter.get(_defs,_len); }
+
+  void swap_last() {
+    Node tmp = _defs[_len-2];
+    _defs[_len-2] = _defs[_len-1];
+    _defs[_len-1] = tmp;
+  }
   
   // Uses.  Generally variable length, unordered, nulls allowed as a "keep
   // alive" flag.
@@ -102,6 +129,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   private int _ulen;            // The in-use part of uses
 
   public int nUses() { return _ulen; }
+  public Node use0() { return _uses[0]; }
   // Add a use, making more space as needed.
   private void _addUse( Node n ) {
     // A NPE here means the _uses are null, which means the Node was killed
@@ -189,7 +217,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   }
 
   // Delete def by index, preserving edges but not order
-  private Node del( int idx ) {
+  Node del( int idx ) {
     unelock();
     Node n = _defs[idx];
     _defs[idx] = _defs[--_len];
@@ -228,15 +256,16 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Kill a node; all inputs are null'd out; this may put more dead Nodes on
   // the dead worklist.  Return this for progress, null for no-progress.
   // Co-recursive with _unuse.
-  public void kill( ) {
-    assert !is_prim();
-    if( isDead() ) return;
+  public Node kill( ) {
+    assert !isPrim();
+    if( isDead() ) return this;
     assert _ulen==0;
     deps_work_clear();          // Put dependents on worklist
     unelock();
     Node[] defs = _defs;
     while( _len > 0 ) _unuse(defs[--_len]);
     _defs = _uses = null;       // Poor-man's indication of a dead node, before killing recursively
+    return this;
   }
 
   // Already nuked the this->old edge, now nuke the old->this edge and
@@ -375,7 +404,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Compute local contribution of use liveness to this def.
   // Overridden in subclasses that do per-def liveness.
   Type live_use( int i ) { return _live; }
-  private boolean assert_live(Type live) { return is_mem()==(live instanceof TypeMem tm && tm.flatten_live_fields()==tm); }
+  boolean assert_live(Type live) { return isMem()==(live instanceof TypeMem tm && tm.flatten_live_fields()==tm); }
 
   // --------------------------------------------------------------------------
   // Hindley-Milner inspired typing, or CNC Thesis based congruence-class
@@ -574,15 +603,6 @@ public abstract class Node implements Cloneable, IntSupplier {
   //  return GVN.add_flow(x);
   //}
 
-  //// Fold control copies
-  //Node fold_ccopy() {
-  //  Node cc = in(0).is_copy(0);
-  //  if( cc==null ) return null;
-  //  if( cc==this ) return Env.ANY;
-  //  add_reduce_uses();
-  //  return GVN.add_reduce(set_def(0,cc));
-  //}
-
   // Change values at this Node directly.
   public Node do_flow() {
     Node progress=null;
@@ -743,7 +763,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // --------------------------------------------------------------------------
   // Reset primitives.  Mostly unwire called and wired primitives.
   public final int walk_reset( int ignore ) {
-    assert is_prim();           // Primitives
+    assert isPrim();           // Primitives
     _elock = false;             // Clear elock if reset_to_init0
     _deps = null;               // No deps
     if( _tvar!=null ) _tvar.reset_deps();
@@ -783,7 +803,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   public static boolean mid_work_assert() { return MORE_WORK_ASSERT; }
   private int more_work( int errs ) {
     if( GVN.on_dead(this) ) return -1; // Do not check dying nodes or reachable from dying
-    if( is_prim() ) return errs;           // Do not check primitives
+    if( isPrim() ) return errs;        // Do not check primitives
     // Check for GCP progress
     Type oval= _val, nval = value(); // Forwards flow
     Type oliv=_live, nliv = live (); // Backwards flow
@@ -895,30 +915,13 @@ public abstract class Node implements Cloneable, IntSupplier {
   }
 
   // --------------------------------------------------------------------------
-  // Overridden in subclasses that return TypeTuple value types.  Such nodes
-  // are always followed by ProjNodes to break out the tuple slices.  If the
-  // node optimizes, each ProjNode becomes a copy of some other value... based
-  // on the ProjNode index
-  public Node is_copy(int idx) { return null; }
-
-  // Only true for Unresolved
-  public boolean is_forward_ref() { return false; }
-  //// Only true for a bare ProjNode
-  //public boolean is_forward_type() { return false; }
-
-  // True if normally (not in-error) produces a TypeMem value or a TypeTuple
-  // with a TypeMem at(MEM_IDX).
-  public boolean is_mem() { return false; }
-
-  // Region has Phis, Fun has Parms, If as 2 Controls, Call & CallEpi have many Projs
-  public boolean isMultiHead() { return false; }
   
   // Easy assertion check
   boolean check_solo_mem_writer(Node memw) {
     boolean found=false;
     for( Node use : _uses )
       if( use == memw ) found=true; // Only memw mem-writer follows
-      else if( use.is_mem() ) return false; // Found a 2nd mem-writer
+      else if( use.isMem()  ) return false; // Found a 2nd mem-writer
       else if( use.isKeep() ) return false; // Being built, might see a store-use yet
     return found;
   }

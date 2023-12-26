@@ -23,18 +23,17 @@ public class LoadNode extends Node {
   private final TypeStruct _live_use;
 
   public LoadNode( Node mem, Node adr, String fld, Parse bad ) {
-    super(OP_LOAD,null,mem,adr);
+    super(null,mem,adr);
     _fld = fld;
     _bad = bad;
     _live_use = TypeStruct.UNUSED.add_fldx(TypeFld.make(_fld,Type.ALL));
   }
   // A plain "_" field is a resolving field
-  @Override public String xstr() { return "."+_fld; }   // Self short name
-  String  str() { return xstr(); } // Inline short name
+  @Override public String label() { return "."+_fld; }   // Self short name
   
   Node mem() { return in(MEM_IDX); }
   Node adr() { return in(DSP_IDX); }
-  private Node set_mem(Node a) { return set_def(MEM_IDX,a); }
+  private Node set_mem(Node a) { return setDef(MEM_IDX,a); }
 
   @Override public Type value() {
     Type tadr = adr()._val;
@@ -170,19 +169,19 @@ public class LoadNode extends Node {
     // TODO: Hoist out of loops.
     if( !_mid_grow && mem() instanceof PhiNode mphi && split_load_profit() ) {
       _mid_grow=true;           // Prevent recursive trigger when calling nested xform
-      Node adr = adr();
-      Node[] ns = new Node[mphi.len()];
-      for( int i=1; i<mphi.len(); i++ ) {
-        ns[i] = Env.GVN.xform(new LoadNode(mphi.in(i),adr,_fld,_bad));
-        ns[i].push();
-      }
-      Node.pops(mphi.len()-1);
-      Node lphi = new PhiNode(TypeStruct.ISUSED,mphi._badgc,mphi.in(0));
-      for( int i=1; i<mphi.len(); i++ )
-        lphi.add_def(ns[i]);
-      lphi._live = _live;
-      lphi.xval();
-      return lphi;
+      //Node adr = adr();
+      //Node[] ns = new Node[mphi.len()];
+      //for( int i=1; i<mphi.len(); i++ ) {
+      //  ns[i] = new LoadNode(mphi.in(i),adr,_fld,_bad).peep();
+      //  ns[i].push();
+      //}
+      //Node.pops(mphi.len()-1);
+      //Node lphi = new PhiNode(TypeStruct.ISUSED,mphi._badgc,mphi.in(0));
+      //for( int i=1; i<mphi.len(); i++ )
+      //  lphi.addDef(ns[i]);
+      //lphi._live = _live;
+      //return lphi.peep();
+      throw TODO();
     }
 
     return null;
@@ -194,7 +193,7 @@ public class LoadNode extends Node {
     // Only split if the address is known directly
     if( !(adr instanceof NewNode) ) return false;
     // Do not split if we think a following store will fold already
-    if( _uses._len==1 && _uses.at(0) instanceof StoreNode st && st.adr()==adr )
+    if( nUses()==1 && use0() instanceof StoreNode st && st.adr()==adr )
       return false;
     return true;
   }
@@ -228,10 +227,10 @@ public class LoadNode extends Node {
         case RootNode     node -> { return null; }
         case PrimNode     prim -> { return null; }
         case CallEpiNode  cepi -> {
-          mem = cepi.is_copy(MEM_IDX); // Skip thru a copy
+          mem = cepi.isCopy(MEM_IDX); // Skip thru a copy
           if( mem == null ) {
             CallNode call = cepi.call();
-            assert call.is_copy(0)==null;
+            assert call.isCopy(0)==null;
             // The load is allowed to bypass the call if the alias is not killed.
             // Conservatively: the alias is not available to any called function,
             // so it's not in the reachable argument alias set and not globally escaped.

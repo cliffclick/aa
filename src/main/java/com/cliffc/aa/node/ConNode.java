@@ -13,16 +13,16 @@ import java.util.function.Predicate;
 public class ConNode<T extends Type> extends Node {
   public T _t;                  // Not final for testing
   public ConNode( T t ) {
-    super(OP_CON,Env.ROOT);
+    super(Env.ROOT);
     _t=t;
-    _live = is_mem() ? TypeMem.ALLMEM : Type.ALL;
+    _live = isMem() ? TypeMem.ALLMEM : Type.ALL;
     if( !Combo.pre() && has_tvar() )
       _tvar = TV3.from_flow(_t);
   }
-  @Override public String xstr() {
+  @Override public String label() {
     return _t==null ? "(null)" : _t.toString();
   }
-  @Override public boolean is_mem() { return _t instanceof TypeMem; }
+  @Override public boolean isMem() { return _t instanceof TypeMem; }
 
   @Override public Type value() { return _t; }
 
@@ -41,8 +41,6 @@ public class ConNode<T extends Type> extends Node {
   }
   
   @Override public boolean unify( boolean test ) { return false; }
-
-  @Override public String toString() { return str(); }
 
   private boolean equals_uses_tvar() {
     return _t==TypeNil.NIL || _t instanceof TypeMemPtr || _t instanceof TypeFunPtr;
@@ -67,5 +65,5 @@ public class ConNode<T extends Type> extends Node {
     return !has_tvar();
   }
   
-  @Override Node walk_dom_last( Predicate<Node> P) { return null; }
+  //@Override Node walk_dom_last( Predicate<Node> P) { return null; }
 }

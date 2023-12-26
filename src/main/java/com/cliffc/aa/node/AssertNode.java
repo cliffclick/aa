@@ -15,12 +15,12 @@ public class AssertNode extends Node {
   final Type _t;                    // Asserted type
   Parse _bad;                       // Used for error messages
   public AssertNode( Node mem, Node arg, Type t, Parse bad ) {
-    super(OP_TYPE,null,mem,arg);
+    super(null,mem,arg);
     assert !(t instanceof TypeFunPtr);
     _t=t;
     _bad = bad;
   }
-  @Override public String xstr() { return "assert:"+_t; }
+  @Override public String label() { return "assert:"+_t; }
   Node mem() { return in(MEM_IDX); }
   Node arg() { return in(REZ_IDX); }
 
@@ -60,7 +60,7 @@ public class AssertNode extends Node {
     if( mem!=null &&
         !(actual instanceof TypeMemPtr) && // No pointer in actual
         !actual.above_center() )           // Cannot fall to a pointer
-      return set_def(1,null);
+      return setDef(1,null);
     // If have a memory, sharpen
     if( mem!=null )
       actual = mem._val.sharptr(actual);
@@ -74,35 +74,36 @@ public class AssertNode extends Node {
     // with a new function which does the right arg-checks.  This happens
     // immediately in the Parser and is here to declutter the Parser.
     if( _t instanceof TypeTuple tt && tt.is_fun_sig() ) {
-      try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
-        int nargs = tt.nargs();
-        FunNode fun = new FunNode(nargs);
-        int fidx = fun.push();  // Hook to keep alive
-        fun = (FunNode)X.xform(fun);
-        Node rpc = X.xform(new ParmNode(0,fun,null,TypeRPC.ALL_CALL));
-        // All the parms; types in the function signature
-        Node[] args = new Node[nargs+1];
-        args[CTL_IDX] = fun;            // Call control
-        args[MEM_IDX] = X.xform(new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM));
-        args[DSP_IDX] = X.xform(new ParmNode(DSP_IDX,fun,null,TypeNil.SCALAR));
-        for( int i=ARG_IDX; i<nargs; i++ ) {
-          Node parm = X.xform(new ParmNode(i,fun,null,TypeNil.SCALAR));
-          args[i] = X.xform(new AssertNode(args[MEM_IDX],parm,tt.at(i),_bad));
-        }
-        args[nargs] = arg();
-          
-        CallNode call = (CallNode)X.xform(new CallNode(true,null,args));
-        Node cepi   = X.xform(new CallEpiNode(call));
-        Node ctl    = X.xform(new CProjNode(cepi));
-        Node postmem= X.xform(new MProjNode(cepi));
-        Node val    = X.xform(new  ProjNode(cepi,AA.REZ_IDX));
-        // Type-check the return also
-        Node chk    = X.xform(new AssertNode(postmem,val,tt.ret(),_bad));
-        RetNode ret = (RetNode)X.xform(new RetNode(ctl,postmem,chk,rpc,fun));
-        // Just the same Closure when we make a new TFP
-        Node.pop(fidx);
-        return (X._ret=X.xform(new FunPtrNode(null,ret)));
-      }
+      //try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
+      //  int nargs = tt.nargs();
+      //  FunNode fun = new FunNode(nargs);
+      //  int fidx = fun.push();  // Hook to keep alive
+      //  fun = (FunNode)X.xform(fun);
+      //  Node rpc = X.xform(new ParmNode(0,fun,null,TypeRPC.ALL_CALL));
+      //  // All the parms; types in the function signature
+      //  Node[] args = new Node[nargs+1];
+      //  args[CTL_IDX] = fun;            // Call control
+      //  args[MEM_IDX] = X.xform(new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM));
+      //  args[DSP_IDX] = X.xform(new ParmNode(DSP_IDX,fun,null,TypeNil.SCALAR));
+      //  for( int i=ARG_IDX; i<nargs; i++ ) {
+      //    Node parm = X.xform(new ParmNode(i,fun,null,TypeNil.SCALAR));
+      //    args[i] = X.xform(new AssertNode(args[MEM_IDX],parm,tt.at(i),_bad));
+      //  }
+      //  args[nargs] = arg();
+      //    
+      //  CallNode call = (CallNode)X.xform(new CallNode(true,null,args));
+      //  Node cepi   = X.xform(new CallEpiNode(call));
+      //  Node ctl    = X.xform(new CProjNode(cepi));
+      //  Node postmem= X.xform(new MProjNode(cepi));
+      //  Node val    = X.xform(new  ProjNode(cepi,AA.REZ_IDX));
+      //  // Type-check the return also
+      //  Node chk    = X.xform(new AssertNode(postmem,val,tt.ret(),_bad));
+      //  RetNode ret = (RetNode)X.xform(new RetNode(ctl,postmem,chk,rpc,fun));
+      //  // Just the same Closure when we make a new TFP
+      //  Node.pop(fidx);
+      //  return (X._ret=X.xform(new FunPtrNode(null,ret)));
+      //}
+      throw TODO();
     }
 
     // Push TypeNodes 'up' to widen the space they apply to, and hopefully push

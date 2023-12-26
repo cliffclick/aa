@@ -29,19 +29,20 @@ public class NewNode extends Node {
   public TypeMemPtr _tptr;
 
   public NewNode( int alias, boolean is_con ) {
-    super(OP_NEW);
+    super();
     _reset0_alias = alias;       // Allow a reset, if this alias splits and then we want to run a new test
     set_alias(alias,is_con);
     NEWS.setX(alias,this);
   }
   public NewNode( ) { this(BitsAlias.new_alias(),false); }
 
+  @Override public String label() { return "New"+"*"+_alias; } // Self short name
+
   private void set_alias(int alias, boolean is_con) {
-    if( _elock ) unelock();    // Unlock before changing hash
+    unelock();                  // Unlock before changing hash
     _alias = alias;
     _tptr = TypeMemPtr.make_con(BitsAlias.make0(alias),is_con,TypeStruct.ISUSED);
   }
-  @Override public String xstr() { return "New"+"*"+_alias; } // Self short name
   @Override void walk_reset0() { set_alias(_reset0_alias,_tptr.is_con()); super.walk_reset0(); }
 
   @Override public Type value() { return _killed ? _tptr.dual() : _tptr; }
@@ -52,11 +53,6 @@ public class NewNode extends Node {
       RootNode.kill_alias(_alias);
       Env.GVN.add_reduce_uses(this);
       Env.GVN.add_flow(this);
-      Env.GVN.add_flow(Env.KEEP_ALIVE);
-      Env.GVN.add_flow(GVNGCM.KEEP_ALIVE);
-      for( Node use : Env.KEEP_ALIVE._defs )
-        if( use instanceof ScopeNode )
-          Env.GVN.add_flow(use);
       return this;
     }
     return null;
@@ -65,8 +61,8 @@ public class NewNode extends Node {
   // If all uses are store addresses only, then this is a write-only memory and
   // is not used.
   private boolean used() {
-    if( is_prim() ) return true;
-    for( Node use : _uses )
+    if( isPrim() ) return true;
+    for( Node use : uses() )
       if( !(use instanceof StoreAbs sta) ||
           ( sta instanceof StoreNode st && st.rez()==this) )
         return true;
@@ -76,8 +72,8 @@ public class NewNode extends Node {
   // If all uses are load/store addresses, then the memory does not escape and
   // loads can bypass calls.
   boolean escaped(Node dep) {
-    if( is_prim() ) return true;
-    for( Node use : _uses )
+    if( isPrim() ) return true;
+    for( Node use : uses() )
       if( !(use instanceof LoadNode ld ||
             (use instanceof StoreNode st && st.rez()!=this) )) {
         use.deps_add(dep);

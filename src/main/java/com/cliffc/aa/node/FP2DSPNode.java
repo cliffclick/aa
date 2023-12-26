@@ -12,8 +12,8 @@ import com.cliffc.aa.type.*;
 // Inverse of BindFP.
 public class FP2DSPNode extends Node {
   final Parse _bad;
-  public FP2DSPNode( Node fp, Parse bad ) { super(OP_FP2DSP,fp); _bad=bad; }
-  @Override public String xstr() {return "FP2DSP"; }
+  public FP2DSPNode( Node fp, Parse bad ) { super(fp); _bad=bad; }
+  @Override public String label() {return "FP2DSP"; }
 
   Node fp() { return in(0); }
   @Override public Type value() {
@@ -36,7 +36,7 @@ public class FP2DSPNode extends Node {
     // Replace FP2DSP/Fresh/Bind/display with Fresh/display
     if( fp instanceof FreshNode frsh ) {
       if( frsh.id() instanceof BindFPNode bind ) {
-        Node frsh2 = frsh.copy(true).set_def(0,bind.dsp());
+        Node frsh2 = frsh.copy(true).setDef(0,bind.dsp());
         frsh2._val = bind.dsp()._val;
         frsh2._live = _live;
         return frsh2;

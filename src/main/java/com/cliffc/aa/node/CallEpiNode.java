@@ -26,32 +26,29 @@ import static com.cliffc.aa.Env.GVN;
 
 public final class CallEpiNode extends Node {
   public boolean _is_copy;
-  public CallEpiNode( Node... nodes ) {
-    super(OP_CALLEPI,nodes);
-    Env.GVN.add_reduce(call());
-    Env.GVN.add_flow_defs(call()); // All call inputs liveness change
-    _live=RootNode.def_mem(this);
-  }
-  @Override public String xstr() {// Self short name
+  public CallEpiNode( Node... nodes ) { super(nodes); }
+  @Override public String label() {// Self short name
     if( _is_copy ) return "CopyEpi";
-    if( is_dead() ) return "XallEpi";
+    if( isDead() ) return "XallEpi";
     return "CallEpi";
   }
-  @Override boolean is_CFG() { return !_is_copy; }
-  @Override public boolean is_mem() { return true; }
+  @Override public boolean isCFG() { return true; }
+  @Override public boolean isMem() { return true; }
+  @Override public Node isCopy(int idx) { return _is_copy ? in(idx) : null; }
+
   public CallNode call() { return (CallNode)in(0); }
 
   @Override public Node ideal_reduce() {
     if( _is_copy )
-      return fold_ccopy();
+      return NodeUtil.fold_ccopy(this);
     CallNode call = call();
     Type tc = call._val;
     if( !(tc instanceof TypeTuple tcall) ) return null;
 
     // Wait until broken things clear out before wiring or inlining
-    int len = _defs._len - (_defs.last() instanceof RootNode ? 1 : 0);
+    int len = len() - (last() instanceof RootNode ? 1 : 0);
     for( int i=1; i<len; i++ )
-      if( ((RetNode)in(i)).is_copy() )
+      if( ((RetNode)in(i)).isCopy() )
         return null;
 
     // Add or remove Call Graph edges according to fidxs
@@ -62,18 +59,18 @@ public final class CallEpiNode extends Node {
     // The one allowed function is already wired?  Then directly inline.
     // Requires this calls 1 target, and the 1 target is only called by this.
     BitsFun fidxs = CallNode.ttfp(tcall).fidxs();
-    if( !unknown_callers() && nwired()==1 && wired(0) instanceof RetNode ret && !ret.is_prim() && !call.is_prim() ) { // Wired to 1 target
+    if( !unknown_callers() && nwired()==1 && wired(0) instanceof RetNode ret && !ret.isPrim() && !call.isPrim() ) { // Wired to 1 target
       assert fidxs.abit() == ret._fidx; // Correct call graph
       FunNode fun = ret.fun();
       if( fun != null && fun.len()==2 && !fun.unknown_callers(this) && // Function is only called by 1 (and not the unknown caller)
           call.err(true)==null &&       // And args are ok
           call.mem().in(0) != call &&   // Dead self-recursive
-          fun.in(1)._uses._len==2 &&    // And only calling fun
+          fun.in(1).nUses()==2 &&       // And only calling fun
           ret._live.isa(_live) &&       // Call and return liveness compatible
           !fun.noinline() ) {           // And not turned off
         assert fun.in(1)==call;         // Just called by us
-        int idx = Env.SCP_0._defs.find(ret);
-        if( idx!=-1 ) Env.SCP_0.del(idx);
+        int idx = Env.SCP_0.findDef(ret);
+        if( idx!=-1 ) Env.SCP_0.del(ret);
         Node rmem = ret.mem();
         if( rmem==null ) rmem = call.mem();  // Pure function memory is a copy of call
         Env.GVN.add_flow(call.fdx());   // FunPtr probably goes dead
@@ -92,13 +89,13 @@ public final class CallEpiNode extends Node {
 
     // Call allows 1 function not yet inlined, sanity check it.
     if( nwired()!=1 ) return null; // More than 1 wired, inline only via FunNode
-    if( is_prim() ) return null; // Only inline via FunNode
+    if( isPrim() ) return null;    // Only inline via FunNode
     int cnargs = call.nargs();
     RetNode ret = RetNode.get(fidx);
     if( ret==null ) return null;
     FunNode fun = ret.fun();
     if( fun._val != Type.CTRL ) return null;
-    assert !fun.is_dead() && fun.nargs() == cnargs; // All checked by call.err
+    assert !fun.isDead() && fun.nargs() == cnargs; // All checked by call.err
 
     // Check for several trivial cases that can be fully inlined immediately.
     Node cctl = call.ctl();
@@ -130,7 +127,7 @@ public final class CallEpiNode extends Node {
 
     // Check for a 1-op body using only constants or parameters and no memory effects.
     boolean can_inline=!(rrez instanceof ParmNode) && rmem==cmem && inline;
-    for( Node parm : rrez._defs )
+    for( Node parm : rrez.defs() )
       if( parm != null && parm != fun &&
           !(parm instanceof ParmNode && parm.in(CTL_IDX) == fun) &&
           !(parm instanceof ConNode)
@@ -140,8 +137,8 @@ public final class CallEpiNode extends Node {
       Node irez = rrez.copy(false); // Copy the entire function body
       ProjNode proj = ProjNode.proj(this,REZ_IDX);
       irez._live = proj==null ? Type.ALL : proj._live; // sharpen liveness to the call-site liveness
-      for( Node in : rrez._defs )
-        irez.add_def((in instanceof ParmNode parm && parm.in(CTL_IDX) == fun) ? call.arg(parm._idx) : in);
+      for( Node in : rrez.defs() )
+        irez.addDef((in instanceof ParmNode parm && parm.in(CTL_IDX) == fun) ? call.arg(parm._idx) : in);
       if( irez instanceof PrimNode prim ) prim._badargs = call._badargs;
       GVN.add_work_new(irez);
       GVN.add_reduce(fun);
@@ -285,19 +282,17 @@ public final class CallEpiNode extends Node {
     throw TODO();
   }
 
-  @Override public Node is_copy(int idx) { return _is_copy ? in(idx) : null; }
-
   CallEpiNode unwire(CallNode call, Node ret, Node fun) {
     assert is_CG(true);
-    remove(_defs.find(ret));
-    fun.remove(fun._defs.find(call));
-    fun.add_flow_uses(); // One less caller of function, parms can lift
-    fun.add_flow();
+    del(ret);
+    fun.del(call);
+    GVN.add_flow_uses(fun); // One less caller of function, parms can lift
+    GVN.add_flow(fun);
     return this;
   }
 
   private CallEpiNode set_is_copy( Node ctl, Node mem, Node rez ) {
-    assert !is_prim();
+    assert !isPrim();
     CallNode call = call();
     if( FunNode._must_inline == call._uid ) // Assert an expected inlining happens
       FunNode._must_inline = 0;
@@ -305,10 +300,10 @@ public final class CallEpiNode extends Node {
     call.pop();                 // Drop call fdx; other args need to be copied-thru
     Env.GVN.add_reduce_uses(call);
     Env.GVN.add_reduce_uses(this);
-    while( _defs._len>0 ) pop();
-    add_def(ctl);
-    add_def(mem);
-    add_def(rez);
+    while( len()>0 ) pop();
+    addDef(ctl);
+    addDef(mem);
+    addDef(rez);
     return this;
   }
 
@@ -323,8 +318,8 @@ public final class CallEpiNode extends Node {
   // - If any CG edge is explicit, all are.
   //
 
-  public int nwired() { return _defs._len-1; }
-  public Node wired(int x) { return _defs.at(x+1); }
+  public int nwired() { return len()-1; }
+  public Node wired(int x) { return in(x+1); }
 
   // True if this CallEpi has virtual CG edges to other unknown callees.
   // If any function is wired, all are.
@@ -347,13 +342,13 @@ public final class CallEpiNode extends Node {
       }
       if( (!LIFTING || precise) && // During Combo or after correcting during Iter,
           !fidxs.test(fidx) ) return false; // wired without matching fidx is an error
-      if( n._defs.find(call) == -1 ) return false; // Wired below but not above
+      if( n.findDef(call) == -1 ) return false; // Wired below but not above
     }
     // Check forward edges from CALL to CEPI
-    for( Node use : call._uses ) {
+    for( Node use : call.uses() ) {
       if( use==this ) continue;
       if( use instanceof FunNode fun ) use = fun.ret();
-      if( _defs.find(use) == -1 ) return false; // Wired above but not below
+      if( findDef(use) == -1 ) return false; // Wired above but not below
     }
     if( fidxs==BitsFun.NALL ) return !precise; // Some kind of error condition
     // If precise, check that every fidx is wired.  If not precise we might
@@ -361,10 +356,10 @@ public final class CallEpiNode extends Node {
     if( precise && !fidxs.above_center() ) {
       for( int fidx : fidxs ) {
         if( fidx == BitsFun.EXTX ) {
-          if( _defs.last()!=Env.ROOT ) return false;
+          if( last()!=Env.ROOT ) return false;
         } else {
           RetNode ret = RetNode.get(fidx);
-          if( !ret.is_copy() && _defs.find(ret)== -1 && ret.fun().nargs()==call.nargs())
+          if( !ret.isCopy() && findDef(ret)== -1 && ret.fun().nargs()==call.nargs())
             return false;
         }
       }
@@ -390,17 +385,18 @@ public final class CallEpiNode extends Node {
       boolean ok_nargs = !(in(i) instanceof RetNode ret) || (call.nargs()== ret.fun().nargs());
       if( fidxs.above_center() || !fidxs.test_recur(fidx) || !ok_nargs ) {
         progress=true;
-        call.add_flow();
+        Env.GVN.add_flow(call);
         if( fidx==BitsFun.EXTX ) {
-          Env.ROOT.remove(call);
+          Env.ROOT.del(call);
           pop();                // Remove wire to Root
         } else {
           FunNode fun = ((RetNode)in(i)).fun();
           fun.add_flow_uses();  // Parms merge fewer
           Env.GVN.add_reduce(in(i)); // Fewer uses of Ret
-          fun.remove(call);     // Remove from Fun
-          remove(in(i));        // Remove from Ret
-          i--;
+          //fun.remove(call);     // Remove from Fun
+          //remove(in(i));        // Remove from Ret
+          //i--;
+          throw TODO();         // Make sure fun parms in-sync
         }
       }
     }
@@ -414,7 +410,7 @@ public final class CallEpiNode extends Node {
           ret = fun = Env.ROOT;
         } else {
           RetNode ret2 = RetNode.get(fidx);
-          if( ret2.is_copy() ) continue;
+          if( ret2.isCopy() ) continue;
           FunNode fun2 = ret2.fun();
           if( fun2==null ) continue; // Broken function
           if( call.nargs() != fun2.nargs() ) continue; // Mismatched
@@ -428,17 +424,18 @@ public final class CallEpiNode extends Node {
           }
           ret = ret2; fun = fun2;
         }
-        if( _defs.find(ret) != -1  ) continue; // Already present
+        if( findDef(ret) != -1  ) continue; // Already present
         assert vCG || !Combo.pre(); // Only add 1 time when going from virtual to concrete Call Graph; during Combo edges are added lazily
         progress = true;
         // Add edge from CallEpi to Ret
-        add_def(ret);
-        fun.add_def(call).add_flow();
-        fun.add_flow_uses();    // Parms have new inputs
+        addDef(ret);
+        fun.addDef(call);
+        Env.GVN.add_flow(fun);
+        Env.GVN.add_flow_uses(fun);    // Parms have new inputs
         Env.GVN.add_reduce(fun); // Last caller wired
         // Swap so ROOT remains last
-        if(     in(    len()-2)==Env.ROOT )     _defs.last(    _defs._len-2);
-        if( fun.in(fun.len()-2)==Env.ROOT ) fun._defs.last(fun._defs._len-2);
+        if(     in(    len()-2)==Env.ROOT )     swap_last();
+        if( fun.in(fun.len()-2)==Env.ROOT ) fun.swap_last();
         if( fun instanceof FunNode fun2 ) Env.GVN.add_inline(fun2);
         assert !unknown_callers(); // Only add 1 time when going from virtual to concrete Call Graph
       }
@@ -446,7 +443,7 @@ public final class CallEpiNode extends Node {
       call.deps_add(this);      // Call type sharpens, can wire
       call.deps_add(call);      // Call type sharpens, can wire
     }
-    if( progress ) call.add_flow().add_flow_defs(); // Call, args may change liveness
+    if( progress ) GVN.add_flow_defs(GVN.add_flow(call)); // Call, args may change liveness
     assert is_CG(true );        // Precise
     return progress;            //
   }
@@ -454,9 +451,10 @@ public final class CallEpiNode extends Node {
 
   @Override public Type live() {
     if( _is_copy ) return _live; // Freeze in place if dying
-    Type live = super.live(false);
-    if( live instanceof TypeMem ) return live;
-    return live.oob(TypeMem.ALLMEM);
+    //Type live = super.live(false); // TODO: Not counting memory????
+    //if( live instanceof TypeMem ) return live;
+    //return live.oob(TypeMem.ALLMEM);
+    throw TODO();
   }
 
   // Compute local contribution of use liveness to this def.  If the call is
@@ -464,7 +462,7 @@ public final class CallEpiNode extends Node {
   @Override public Type live_use( int i ) {
     Node def = in(i);
     if( _is_copy ) {            // A copy
-      if( is_keep() ) return def._live;
+      if( isKeep() ) return def._live;
       ProjNode p = ProjNode.proj(this,i);
       if( p==null ) return Type.ANY;
       p.deps_add(in(i));
@@ -494,9 +492,10 @@ public final class CallEpiNode extends Node {
   @Override public TV3 _set_tvar() {
     // Unwire all; will rewire optimistically during Combo
     while( nwired()>0 ) {
-      Node w = del(1), fun=w;
-      if( w instanceof RetNode ret ) fun = ret.fun();
-      fun.remove(fun._defs.find(call()));
+      //Node w = del(1), fun=w;
+      //if( w instanceof RetNode ret ) fun = ret.fun();
+      //fun.del(call());
+      throw TODO();
     }
     assert is_CG(false);
     return new TVLeaf();
@@ -516,7 +515,7 @@ public final class CallEpiNode extends Node {
     // If not one already, make a lambda term for the function.
     if( !(tv3 instanceof TVLambda tfun) ) {
       if( test ) return true;
-      add_flow();           // Re-unify after forcing a Lambda, to get the args
+      Env.GVN.add_flow(this); // Re-unify after forcing a Lambda, to get the args
       TVLambda lam = new TVLambda(call.nargs(),
                                   new TVLeaf(),// display
                                   tvar());     // Result

@@ -30,11 +30,17 @@ public final class FunPtrNode extends Node {
   // internally in different parts - the copy replicates this structure.  When
   // unified, it forces equivalence in the same places.
   public FunPtrNode( String name, RetNode ret ) {
-    super(OP_FUNPTR,ret);
+    super(ret);
     _name = name;
-    ParmNode pdsp = ret.fun().parm(DSP_IDX);
-    if( pdsp != null ) pdsp.deps_add(this);
   }
+
+  @Override String label() {
+    if( _name != null ) return "*Fun_"+_name;
+    FunNode fun = xfun();
+    if( fun==null ) return "*Fun";
+    return "*"+fun.label();
+  }
+  
   // Display (already fresh-loaded) but no name.
   public  FunPtrNode( RetNode ret ) { this(ret.fun()._name,ret); }
   public RetNode ret() { return in(0)==null ? null : (RetNode)in(0); }
@@ -42,26 +48,9 @@ public final class FunPtrNode extends Node {
   public FunNode xfun() { RetNode ret = ret(); return ret !=null && ret.in(4) instanceof FunNode ? ret.fun() : null; }
   int nargs() { return ret()._nargs; }
   int fidx() { return fun()._fidx; }
-  String name() { return _name; } // Debug name, might be empty string
   // Formals from the function parms.
   // TODO: needs to come from both Combo and _t
   Type formal(int idx) { return ret().formal(idx); }
-
-  // Self short name
-  @Override public String xstr() {
-    if( is_dead() || _defs._len==0 ) return "*fun";
-    RetNode ret = ret();
-    return ret==null ? "*fun" : "*"+_name;
-  }
-  // Inline longer name
-  @Override String str() {
-    if( is_dead() ) return "DEAD";
-    if( _defs._len==0 ) return "MAKING";
-    RetNode ret = ret();
-    if( ret==null || ret.is_copy() ) return "gensym:"+xstr();
-    FunNode fun = ret.fun();
-    return fun==null ? xstr() : fun.str();
-  }
 
   // Debug only: make an attempt to bind name to a function
   public void bind( String tok ) {
@@ -85,7 +74,7 @@ public final class FunPtrNode extends Node {
     // all memory
     FunNode fun = xfun();
     if( fun==null ) return TypeMem.ANYMEM; // Dead, no memory demand
-    if( fun.unknown_callers(this) || fun._defs.last() instanceof RootNode )
+    if( fun.unknown_callers(this) || fun.last() instanceof RootNode )
       return RootNode.def_mem(ret);
     // During/post-combo, Ret is alive only if called or escaped.
     Env.ROOT.deps_add(ret);
@@ -115,7 +104,7 @@ public final class FunPtrNode extends Node {
     RetNode ret = ret();
     Node rez = ret.rez();
     if( rez==null ) return new TVLeaf(); // Happens for broken Lambdas
-    add_flow();
+    Env.GVN.add_flow(this);
     Node dsp  = ret.fun().parm(DSP_IDX);
     TV3 tdsp  = dsp == null ? new TVLeaf() : dsp.set_tvar();
     return new TVLambda(nargs(),tdsp,rez.set_tvar());
@@ -124,7 +113,7 @@ public final class FunPtrNode extends Node {
   // Implements class HM.Lambda unification.
   @Override public boolean unify( boolean test ) {
     RetNode ret = ret();
-    if( ret.is_copy() ) return false; // GENSYM
+    if( ret.isCopy() ) return false; // GENSYM
     FunNode fun = ret.fun();
     ParmNode[] parms = fun.parms();
     TVLambda lam = (TVLambda)tvar();

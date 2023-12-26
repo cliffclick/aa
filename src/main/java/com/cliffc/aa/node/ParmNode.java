@@ -18,15 +18,15 @@ public class ParmNode extends Node {
   public final Parse _bad;
 
   public ParmNode( int idx, FunNode fun, Parse bad, Type t ) {
-    super(OP_PARM,fun);
+    super(fun);
     assert idx>=0;
     _idx=idx;
     _t = t;
     _bad = bad;
   }
-  @Override public boolean is_mem() { return _t instanceof TypeMem; }
+  @Override public String label() { return "Parm:"+_idx; }
+  @Override public boolean isMem() { return _t instanceof TypeMem; }
   public FunNode fun() { return (FunNode) in(0); }
-  @Override public String xstr() { return "Parm:"+_idx; }
 
   @Override public Type value() {
     // Not executing?
@@ -38,7 +38,7 @@ public class ParmNode extends Node {
     // itself is still pending)
     Type t = Type.ANY;
     int len = fun.len();
-    boolean wired_root = fun._defs.last() instanceof RootNode;
+    boolean wired_root = fun.last() instanceof RootNode;
     if( wired_root || fun.unknown_callers(this) ) {
       if( wired_root ) len--;
       // During/after Combo, use the HM type for the GCP type instead of the given default
@@ -75,10 +75,10 @@ public class ParmNode extends Node {
 
   @Override public Node ideal_reduce() {
     if( !(in(0) instanceof FunNode) )
-      return in(0).is_copy(_idx); // Dying, or thunks
+      return in(0).isCopy(_idx); // Dying, or thunks
     FunNode fun = fun();
     if( fun._val == Type.XCTRL ) return null; // All dead, c-prop will fold up
-    Node cp = fun.is_copy(0);
+    Node cp = fun.isCopy(0);
     if( cp!=null ) {            // FunNode is a Copy
       if( _idx==0 ) return null; // RPC vs a CopyCall, is dead, no semantics
       Node xcp = cp.in(_idx);
@@ -91,11 +91,11 @@ public class ParmNode extends Node {
     return null;
   }
 
-  @Override public boolean has_tvar() { return !(_t instanceof TypeRPC) && !is_mem(); }
+  @Override public boolean has_tvar() { return !(_t instanceof TypeRPC) && !isMem(); }
 
   @Override public TV3 _set_tvar() {
-    if( is_prim() && _t==TypeInt.INT64 ) return PrimNode.PINT.tvar();
-    if( is_prim() && _t==TypeFlt.FLT64 ) return PrimNode.PFLT.tvar();
+    if( isPrim() && _t==TypeInt.INT64 ) return PrimNode.PINT.tvar();
+    if( isPrim() && _t==TypeFlt.FLT64 ) return PrimNode.PFLT.tvar();
     TV3 tv = new TVLeaf();
     tv.deps_add(this);          // with Root input, value depends on tvar
     return tv;

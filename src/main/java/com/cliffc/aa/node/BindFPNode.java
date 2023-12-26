@@ -11,8 +11,8 @@ import static com.cliffc.aa.AA.TODO;
 // function input can also be a struct (overload) of function pointers.
 public class BindFPNode extends Node {
   final boolean _over;  // Binds an Overload
-  public BindFPNode( Node fp, Node dsp, boolean over ) { super(OP_BINDFP,fp,dsp); _over = over; }
-  @Override public String xstr() {return "BindFP"; }
+  public BindFPNode( Node fp, Node dsp, boolean over ) { super(fp,dsp); _over = over; }
+  @Override public String label() {return "BindFP"; }
 
   public Node fp () { return in(0); }
   public Node dsp() { return in(1); }
@@ -84,8 +84,8 @@ public class BindFPNode extends Node {
 
   @Override public Node ideal_reduce() {
     if( !_over && _live instanceof TypeStruct live ) {
-      if( in(0)!=null && live.at_def("fp" )==Type.ANY ) return set_def(0,null);
-      if( in(1)!=null && live.at_def("dsp")==Type.ANY ) return set_def(1,null);
+      if( in(0)!=null && live.at_def("fp" )==Type.ANY ) return setDef(0,null);
+      if( in(1)!=null && live.at_def("dsp")==Type.ANY ) return setDef(1,null);
     } else deps_add(this);      // Liveness changes, recheck
     return null;
   }

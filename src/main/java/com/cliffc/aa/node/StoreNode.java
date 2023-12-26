@@ -22,7 +22,7 @@ public class StoreNode extends StoreAbs {
     _fld = fld;
     _fin = fin;
   }
-  @Override public String xstr() { return "."+_fld+"="; }   // Self short name
+  @Override public String label() { return "."+_fld+"="; }   // Self short name
 
   
   @Override Type _value( TypeMem tm, TypeMemPtr tmp ) {
@@ -173,7 +173,7 @@ public class StoreNode extends StoreAbs {
   @Override public boolean unify( boolean test ) {
     TVPtr ptr = (TVPtr)adr().tvar();
     TV3 self_fld = rez().tvar();
-    assert !is_prim();
+    assert !isPrim();
     TVStruct ts = ptr.load();
     TV3 ptr_fld = ts.arg(_fld);
     return self_fld.unify(ptr_fld,test);

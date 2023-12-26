@@ -27,10 +27,12 @@ import static com.cliffc.aa.AA.*;
 // ]
 
 public class RootNode extends Node {
-  public RootNode(Node... defs) { super(OP_ROOT, defs); }
+  public RootNode(Node... defs) { super(defs); }
 
-  @Override boolean is_CFG() { return true; }
-  @Override public boolean is_mem() { return true; }
+  @Override public String label() { return "Root"; }
+  @Override public boolean isCFG() { return true; }
+  @Override public boolean isMem() { return true; }
+  @Override public boolean isMultiHead() { return true; }
 
   TypeMem rmem(Node dep) {
     deps_add(dep);
@@ -207,7 +209,7 @@ public class RootNode extends Node {
     if( KILL_ALIASES.test_recur(alias) ) return;
     KILL_ALIASES = KILL_ALIASES.set(alias);
     CACHE_DEF_MEM = CACHE_DEF_MEM.set(alias,TypeStruct.UNUSED);
-    Env.ROOT.add_flow();
+    Env.GVN.add_flow(Env.ROOT);
     // Re-flow all dependents
     Env.GVN.add_flow(PROGRESS);
     PROGRESS.clear();
@@ -225,22 +227,23 @@ public class RootNode extends Node {
 
 
   @Override public Type live() {
-    // Pre-combo, all memory is alive, except kills
-    // During/post combo, check external Call users
-    Type live = Combo.pre() ? TypeMem.ALLMEM : super.live(false);
-    if( live==Type.ANY ) return TypeMem.ANYMEM;
-    TypeMem mem = (TypeMem)live;
-    // Kill the killables
-    for( int kill : KILL_ALIASES )
-      mem = mem.set(kill,TypeStruct.UNUSED);
-    if( Combo.pre() ) return mem;
-    // Liveness for return value: All reaching aliases plus their escapes are alive.
-    BitsAlias ralias = ralias();
-    if( ralias==BitsAlias.EMPTY ) return mem;
-    if( ralias.above_center() ) return mem;
-    if( ralias.test(BitsAlias.ALLX) ) return TypeMem.ALLMEM;
-    TypeMem rlive = TypeMem.make(ralias,TypeStruct.ISUSED);
-    return mem.meet(rlive);
+    //// Pre-combo, all memory is alive, except kills
+    //// During/post combo, check external Call users
+    //Type live = Combo.pre() ? TypeMem.ALLMEM : super.live(false);
+    //if( live==Type.ANY ) return TypeMem.ANYMEM;
+    //TypeMem mem = (TypeMem)live;
+    //// Kill the killables
+    //for( int kill : KILL_ALIASES )
+    //  mem = mem.set(kill,TypeStruct.UNUSED);
+    //if( Combo.pre() ) return mem;
+    //// Liveness for return value: All reaching aliases plus their escapes are alive.
+    //BitsAlias ralias = ralias();
+    //if( ralias==BitsAlias.EMPTY ) return mem;
+    //if( ralias.above_center() ) return mem;
+    //if( ralias.test(BitsAlias.ALLX) ) return TypeMem.ALLMEM;
+    //TypeMem rlive = TypeMem.make(ralias,TypeStruct.ISUSED);
+    //return mem.meet(rlive);
+    throw TODO(); // TODO: super.live(false)???
   }
 
   @Override public Type live_use( int i ) {
@@ -269,13 +272,13 @@ public class RootNode extends Node {
     // All currently wired Calls and Rets are sensible
     for( int i=ARG_IDX+1; i<len(); i++ ) {
       if( in(i) instanceof RetNode ret ) {
-        if( !ret.is_prim() ) non_prim_rets++;
+        if( !ret.isPrim() ) non_prim_rets++;
         FunNode fun = ret.fun();
-        if( fun._defs.last() != this ) return false;
+        if( fun.last() != this ) return false;
         if( !rfidxs().test_recur(ret._fidx) ) return false;
       } else {
         CallNode call = (CallNode)in(i);
-        if( call.cepi()._defs.last()!=this ) return false;
+        if( call.cepi().last()!=this ) return false;
       }
     }
     // During pre-Combo and lifting, if escapes is NALL then all edges are
@@ -288,7 +291,7 @@ public class RootNode extends Node {
     if( precise )
       for( int fidx : fidxs )
         if( fidx != BitsFun.EXTX && // External fidxs cannot be wired
-            _defs.find(RetNode.get(fidx)) < ARG_IDX )
+            findDef(RetNode.get(fidx)) < ARG_IDX )
           return false;         // Has unwired fidx
     return true;
   }
@@ -303,12 +306,12 @@ public class RootNode extends Node {
       for( int fidx : fidxs ) {
         if( fidx == BitsFun.EXTX ) continue; // No wiring external functions
         RetNode ret = RetNode.get(fidx);
-        if( _defs.find(ret) >= ARG_IDX ) continue; // Already wired
+        if( findDef(ret) >= ARG_IDX ) continue; // Already wired
         // Wire escaping
-        ret.fun().add_def(this).add_flow();
-        add_def(ret);
-        add_flow(); // Recompute root values to include function return memory
-        ret.add_flow();
+        ret.fun().addDef(this);
+        addDef(ret);
+        Env.GVN.add_flow(this); // Recompute root values to include function return memory
+        Env.GVN.add_flow(ret);
         progress = true;
       }
     }
@@ -318,14 +321,14 @@ public class RootNode extends Node {
 
   @Override public Node ideal_reduce() {
     if( in(0)==null ) return null;
-    Node cc = fold_ccopy();
+    Node cc = NodeUtil.fold_ccopy(this);
     if( cc!=null ) return cc;
 
     // See if we can unescape some functions
     for( int i=ARG_IDX; i<len(); i++ )
       if( in(i) instanceof RetNode ret && ret.funptr()==null ) {
         del(i--);
-        if( ret._uses._len==0 ) ret.kill();
+        if( ret.nUses()==0 ) ret.kill();
       }
 
     // Turned off, since int/flt constant returns actually have a TVClz with a
@@ -353,7 +356,7 @@ public class RootNode extends Node {
     return !(t0==mt || t1==mt);
   }
 
-  @Override Node walk_dom_last( Predicate<Node> P) { return null; }
+  //@Override Node walk_dom_last( Predicate<Node> P) { return null; }
 
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {

@@ -12,7 +12,6 @@ public class TestLive {
     Node fullmem = new ConNode<>(TypeMem.ALLMEM);
     fullmem._val = TypeMem.ALLMEM;
     fullmem._live = TypeMem.ANYMEM;
-    Env.KEEP_ALIVE._live = TypeMem.ANYMEM; // Post-combo
     Env.MEM_0._live = TypeMem.ANYMEM;
 
     // Return the number '5' - should be alive with no special memory.
@@ -21,8 +20,8 @@ public class TestLive {
 
     // Liveness is a backwards flow.  Root always demands all return results.
     RootNode root = Env.ROOT;
-    root.set_def(1,fullmem);
-    root.set_def(2,rez    );
+    root.setDef(1,fullmem);
+    root.setDef(2,rez    );
     Combo.HM_FREEZE = true;     // Parsing done, Root gives precise results
     root.xval();
     root.xliv();
@@ -38,10 +37,9 @@ public class TestLive {
 
   @Test public void testNewNode() {
     GVNGCM gvn = Env.GVN;
-    Node._INIT0_CNT = 1; // No prims
+    Node._PRIM_CNT = 1; // No prims
     // Always memory for the NewNode
     Node mmm = new ConNode<>(TypeMem.ANYMEM).init();
-    Env.KEEP_ALIVE._live = TypeMem.ANYMEM; // Post-combo
     Env.MEM_0._live = TypeMem.ANYMEM;
 
     // Fields
@@ -59,8 +57,8 @@ public class TestLive {
 
     // Use the object for scope exit
     RootNode root = Env.ROOT;
-    root.set_def(1,mem);
-    root.set_def(2,ptr);
+    root.setDef(1,mem);
+    root.setDef(2,ptr);
     Combo.HM_FREEZE = true;     // Parsing done, Root gives precise results
     root.xval();
 

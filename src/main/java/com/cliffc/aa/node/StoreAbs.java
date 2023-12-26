@@ -13,11 +13,11 @@ import static com.cliffc.aa.AA.MEM_IDX;
 public abstract class StoreAbs extends Node {
   private final Parse _bad;
   public StoreAbs( Node mem, Node adr, Node val, Parse bad ) {
-    super(OP_STORE,null,mem,adr,val);
+    super(null,mem,adr,val);
     _bad = bad;
   }
   
-  @Override public boolean is_mem() { return true; }
+  @Override public boolean isMem() { return true; }
 
   public Node mem() { return in(1); }
   public Node adr() { return in(2); }
@@ -69,7 +69,7 @@ public abstract class StoreAbs extends Node {
   abstract boolean st_st_check( StoreAbs st );
   
   @Override public Node ideal_reduce() {
-    if( is_prim() ) return null;
+    if( isPrim() ) return null;
     if( _live == Type.ANY ) return null; // Dead from below; nothing fancy just await removal
     
     Node mem = mem();
@@ -129,7 +129,7 @@ public abstract class StoreAbs extends Node {
   // Still until live-ness alives, then kill self
   private Node kill_rez_stall_till_live() {
     // No need for rez
-    if( rez()!=Env.ANY ) Env.GVN.add_reduce(set_def(3,Env.ANY));
+    if( rez()!=Env.ANY ) Env.GVN.add_reduce(setDef(3,Env.ANY));
     // Remove when liveness aligns
     if( _live.isa(mem()._live) ) return mem();
     mem().deps_add(this);

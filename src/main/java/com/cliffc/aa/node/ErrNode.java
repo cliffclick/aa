@@ -12,15 +12,14 @@ public final class ErrNode extends Node {
   final ErrMsg _err;
   public ErrNode( Node ctrl, Parse loc, String msg ) { this(ctrl,new ErrMsg(loc,msg,ErrMsg.Level.ErrNode)); }
   public ErrNode( Node ctrl, ErrMsg err ) {
-    super(OP_ERR,ctrl);
+    super(ctrl);
     _err = err;
   }
-  @Override public String xstr() { return _err._msg; }
-  @Override String str() { return "Err"; }
+  @Override public String label() { return _err._msg; }
   @Override public Node ideal_reduce() {
     if( len()==0 ) return null;
-    Node cc = in(0).is_copy(0);
-    return cc==null ? null : set_def(0,cc);
+    Node cc = in(0).isCopy(0);
+    return cc==null ? null : setDef(0,cc);
   }
   @Override public Type value() {
     if( len()==0 || in(0)==null ) return Type.ALL;
@@ -40,13 +39,13 @@ public final class ErrNode extends Node {
     // means the program is in-error - the program may have other earlier
     // errors we want to report in preference to this one.  If any user
     // has ANOTHER ALL/Err input, return null instead.
-    for( Node use : _uses )
+    for( Node use : uses() )
       if( !use_error(use) )
         return _err;
     return null;
   }
   private boolean use_error(Node use) {
-    for( Node def : use._defs )
+    for( Node def : use.defs() )
       if( def != null && def != this && def._val == Type.ALL )
         return true;
     return false;

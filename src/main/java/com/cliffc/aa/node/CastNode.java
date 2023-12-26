@@ -9,8 +9,8 @@ import org.jetbrains.annotations.NotNull;
 // Gain precision after an If-test.
 public class CastNode extends Node {
   public final Type _t;
-  public CastNode( Node ctrl, Node ret, Type t ) { super(OP_CAST,ctrl,ret); _t=t; }
-  @Override public String xstr() { return "("+_t+")"; }
+  public CastNode( Node ctrl, Node ret, Type t ) { super(ctrl,ret); _t=t; }
+  @Override public String label() { return "("+_t+")"; }
 
   @Override public Type value() {
     Type c = val(0);
@@ -35,8 +35,8 @@ public class CastNode extends Node {
   }
 
   @Override public Node ideal_reduce() {
-    Node cc = in(0).is_copy(0);
-    if( cc!=null ) return set_def(0,cc);
+    Node cc = in(0).isCopy(0);
+    if( cc!=null ) return setDef(0,cc);
     // Cast is useless?  Remove same as a TypeNode
     Node ctrl = in(0), addr = in(1);
     Type c = ctrl._val, t = addr._val;
@@ -60,10 +60,11 @@ public class CastNode extends Node {
     while( baseaddr instanceof FreshNode ) baseaddr = ((FreshNode)baseaddr).id();
     final Node fbaseaddr = baseaddr;
 
-    Node tru = ctrl.walk_dom_last(n -> checked(n,fbaseaddr));
-    if( tru==null || tru==ctrl ) return null;
-    set_def(0,tru);
-    return this;
+    //Node tru = ctrl.walk_dom_last(n -> checked(n,fbaseaddr));
+    //if( tru==null || tru==ctrl ) return null;
+    //set_def(0,tru);
+    //return this;
+    return null; // TODO: Turn back on
   }
 
   @Override public boolean has_tvar() { return true; }

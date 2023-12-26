@@ -13,12 +13,12 @@ public abstract class MemPrimNode extends PrimNode {
   Node idx() { return in(ARG_IDX+1); }
   Node rez() { return in(ARG_IDX+2); }
   abstract String bal_close();
-  @Override public String xstr() { return _name+(bal_close()==null?"":bal_close()); }
+  @Override public String label() { return _name+(bal_close()==null?"":bal_close()); }
 
   @Override public ErrMsg err(boolean fast) {
     Type tmem = mem()._val;
     Type tadr = adr()._val;
-    Type tidx = _defs._len <= ARG_IDX+1 ? TypeNil.NIL : idx()._val;
+    Type tidx = len() <= ARG_IDX+1 ? TypeNil.NIL : idx()._val;
     if( tmem==Type.ANY ) return null; // No error
     if( tadr==Type.ANY ) return null; // No error
     if( tidx==Type.ANY ) return null; // No error

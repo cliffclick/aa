@@ -17,27 +17,32 @@ public final class RetNode extends Node {
   int _fidx;                 // Shortcut to fidx when the FunNode has collapsed
   int _nargs;                // Replicated from FunNode
   public RetNode( Node ctrl, Node mem, Node val, Node rpc, FunNode fun ) {
-    super(OP_RET,ctrl,mem,val,rpc,fun);
+    super(ctrl,mem,val,rpc,fun);
     _nargs=fun.nargs();
     set_fidx(fun._fidx);
     _live = RootNode.def_mem(null);
   }
+  
   // Short self name
-  @Override public String xstr() {
-    if( is_dead() ) return "Ret!";
+  @Override public String label() {
+    if( isDead() ) return "Ret!";
     FunNode fun = in(4) instanceof FunNode fun2 ? fun2 : null;
-    return "Ret"+(is_copy() ? "!copy!" : (fun==null ? "["+_fidx+"]" : fun.name()));
+    return "Ret"+(isCopy() ? "!copy!" : (fun==null ? "["+_fidx+"]" : fun._name));
   }
-  @Override boolean is_CFG() { return !is_copy(); }
+  
+  @Override public boolean isCFG() { return true; }
+  @Override public boolean isMem() { return true; }
+  @Override public Node isCopy(int idx) { return isCopy() ? in(idx) : null; }
+  boolean isCopy() { return len() <= 4 || !(in(4) instanceof FunNode) || fun()._fidx != _fidx; }
+
   public Node ctl() { return in(0); }
   public Node mem() { return in(1); }
   public Node rez() { return in(2); }
   public Node rpc() { return in(3); }
   public FunNode fun() { return (FunNode)in(4); }
-  @Override public boolean is_mem() { return true; }
   
   public FunPtrNode funptr() {
-    for( Node use : _uses )
+    for( Node use : uses() )
       if( use instanceof FunPtrNode fptr )
         return fptr;
     return null;
@@ -80,23 +85,23 @@ public final class RetNode extends Node {
   @Override public boolean has_tvar() { return false; }
 
   @Override public Node ideal_reduce() {
-    if( is_prim() ) return null;
+    if( isPrim() ) return null;
     if( in(0)==null ) return null; // No users inlining; dead gensym
-    Node cc = fold_ccopy();     // Fold control copies
+    Node cc = NodeUtil.fold_ccopy(this); // Fold control copies
     if( cc!=null ) return cc;
     
     // If the fun is a copy, then we are collapsing
     if( in(4) instanceof FunNode fun ) {
-      Node cp = fun.is_copy(0);
-      if( cp!=null ) set_def(4,cp);
+      Node cp = fun.isCopy(0);
+      if( cp!=null ) setDef(4,cp);
     }
 
     // If control is dead, but the Ret is alive, we're probably only using the
     // FunPtr as a 'gensym'.  Nuke the function body.
     Node progress = null;
-    if( !is_copy() ) {
+    if( !isCopy() ) {
       if( ctl()._val == Type.XCTRL && fun()._val ==Type.XCTRL ) {
-        set_def(4,null);          // We're a copy now!
+        setDef(4,null);          // We're a copy now!
         progress=this;
         Env.GVN.add_reduce_uses(this); // Following FunPtrs do not need their displays
       } else
@@ -104,38 +109,38 @@ public final class RetNode extends Node {
     }
 
     // If no users inlining, wipe out all edges
-    if( is_copy() && in(0)!=null ) {
+    if( isCopy() && in(0)!=null ) {
       boolean only_fptr = true;
-      for( Node use : _uses )  if( !(use instanceof FunPtrNode) ) { only_fptr=false; break; }
-      if( only_fptr ) {           // Only funptr uses, make them all gensyms
-        set_def(0,null);          // No ctrl
-        set_def(1,null); if( is_dead() ) return this; // No mem
-        set_def(2,null);          // No val
-        set_def(3,null);          // No rpc
-        set_def(4,null);          // No fun
-        return this;              // Progress
+      for( Node use : uses() )  if( !(use instanceof FunPtrNode) ) { only_fptr=false; break; }
+      if( only_fptr ) {         // Only funptr uses, make them all gensyms
+        setDef(0,null);         // No ctrl
+        setDef(1,null); if( isDead() ) return this; // No mem
+        setDef(2,null);         // No val
+        setDef(3,null);         // No rpc
+        setDef(4,null);         // No fun
+        return this;            // Progress
       }
     }
-    if( is_copy() ) return progress;
+    if( isCopy() ) return progress;
 
     // Function is 'pure', nuke memory edge.
     Node mem = mem();
     if( mem instanceof ParmNode && mem.in(0)==fun() )
-      return set_def(1,null);
-    else if( mem!=null )
+      return setDef(1,null);
+    if( mem!=null )
       mem.deps_add(this);
 
     // Collapsed to a constant?  Remove any control interior.
     Node ctl = ctl();
     if( rez()._val.is_con() && !rez()._val.above_center() && ctl!=fun() && // Profit: can change control and delete function interior
         (mem==null || mem._val ==TypeMem.ANYMEM) ) // Memory has to be trivial also
-      return set_def(0,fun());  // Gut function body
+      return setDef(0,fun());  // Gut function body
 
     return progress;
   }
 
   // Look for a tail recursive call
-  @Override public Node ideal_mono() { return is_copy() ? null : tail_recursive(); }
+  @Override public Node ideal_mono() { return isCopy() ? null : tail_recursive(); }
 
   // Look for a tail-Call.  There should be 1 (collapsed) Region, and maybe a
   // tail Call.  Look no further than 1 Region, since collapsing will fold
@@ -144,22 +149,22 @@ public final class RetNode extends Node {
   // the function ends in an infinite loop, not currently optimized.
   Node tail_recursive() {
     Node ctl = ctl();
-    if( ctl._op!=OP_REGION ) return null;
-    int idx; for( idx=1; idx<ctl._defs._len; idx++ ) {
+    if( !(ctl instanceof RegionNode) ) return null;
+    int idx; for( idx=1; idx<ctl.len(); idx++ ) {
       Node c = ctl.in(idx), cepi0 = c.in(0);
-      if( c._op == OP_CPROJ && cepi0 instanceof CallEpiNode cepi &&
+      if( c instanceof CProjNode && cepi0 instanceof CallEpiNode cepi &&
           cepi.nwired()==1 &&
           cepi.wired(0)== this && // TODO: if in tail position, can be a tail call not self-recursive
-          cepi.call().fdx()._op == OP_FUNPTR ) // And a direct call
+          cepi.call().fdx() instanceof FunPtrNode ) // And a direct call
         break;
     }
-    if( idx == ctl._defs._len ) return null; // No call-epi found
+    if( idx == ctl.len() ) return null; // No call-epi found
     CallEpiNode cepi = (CallEpiNode)ctl.in(idx).in(0);
     CallNode call = cepi.call();
     if( call.ctl()._val != Type.CTRL ) return null; // Dead call
     // Every Phi on the region must come directly from the CallEpi.
-    for( Node phi : ctl._uses )
-      if( phi._op == OP_PHI && phi.in(idx).in(0)!=cepi )
+    for( Node phi : ctl.uses() )
+      if( phi instanceof PhiNode && phi.in(idx).in(0)!=cepi )
         return null;
     FunNode fun = fun();
     // Every Phi must be type compatible
@@ -179,11 +184,11 @@ public final class RetNode extends Node {
 
     // Find the trailing control behind the Fun.
     Node cuse = null;           // Control use behind fun.
-    for( Node use : fun._uses )
-      if( use != this && use.is_CFG() )
+    for( Node use : fun.uses() )
+      if( use != this && use.isCFG() )
         { assert cuse==null; cuse = use; }
     assert cuse!=null;
-    int cidx = cuse._defs.find(fun);
+    int cidx = cuse.findDef(fun);
     //// Insert loop in-the-middle
     //try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
     //  LoopNode loop = new LoopNode();
@@ -221,7 +226,7 @@ public final class RetNode extends Node {
   // Checks for sane Call Graph, similar to CallEpiNode.is_CG
   boolean is_CG( boolean precise ) {
     FunNode fun = fun();
-    for( Node use : _uses ) {
+    for( Node use : uses() ) {
       if( use instanceof CallEpiNode cepi ) {
         throw TODO();
       }
@@ -229,9 +234,6 @@ public final class RetNode extends Node {
 
     return true;
   }
-
-  @Override public Node is_copy(int idx) { return is_copy() ? in(idx) : null; }
-  boolean is_copy() { return _defs.len() <= 4 || !(in(4) instanceof FunNode) || fun()._fidx != _fidx; }
 
   // Find RetNode by fidx
   private static int FLEN;      // Primitives length; reset amount
@@ -242,7 +244,7 @@ public final class RetNode extends Node {
   // Null if not a FunPtr to a Fun.
   public static RetNode get( int fidx ) {
     RetNode ret = FUNS.atX(fidx);
-    if( ret==null || ret.is_dead() ) return null;
+    if( ret==null || ret.isDead() ) return null;
     if( ret.fidx()==fidx ) return ret;
     // Split & renumbered FunNode, fixup in FUNS.
     throw TODO();
