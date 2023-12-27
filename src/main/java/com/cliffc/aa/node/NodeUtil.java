@@ -18,7 +18,8 @@ public abstract class NodeUtil {
 
   // Non-allocating iterator; pulls iterators from a pool.  The hard part is
   // telling when an iterator ends early, to avoid leaking.  This is not
-  // exactly asserted for, so some leaks may happen.
+  // exactly asserted for, so some leaks may happen.  The general rule is:
+  // only use these iterators if they run to the end; early exits leak.
   
   public static class Iter implements Iterator<Node>, Iterable<Node> {
     private static final Ary<Iter> POOL = new Ary<>(Iter.class);
@@ -27,7 +28,8 @@ public abstract class NodeUtil {
     int _len;                 // Number of Nodes actually in ns
     int _i;                   // Iterator index, 0 <= i < len, or -99
     static Iter get(Node[] ns, int len) {
-      if( POOL.isEmpty() ) { assert CNT<100; CNT++; new Iter().end(); }
+      if( POOL.isEmpty() ) {
+        assert CNT<100; CNT++; new Iter().end(); }
       return POOL.pop().init(ns,len);
     }
     @Override public Iter iterator() { return this; }
@@ -52,7 +54,6 @@ public abstract class NodeUtil {
   // --------------------------------------------------------------------------
   // Assert all value and liveness calls only go forwards, and if they can
   // progress they are on the worklist.
-  private static final VBitSet VISIT = new VBitSet();
   private static boolean MORE_WORK_ASSERT;
   public static int more_work(Node root) {
     assert !MORE_WORK_ASSERT;
@@ -87,11 +88,11 @@ public abstract class NodeUtil {
     return errs;
   }
   private static int _report_bug(Node n, String msg) {
-    VISIT.clear(n._uid); // Pop-frame & re-run in debugger
+    Node.WVISIT.clear(n._uid); // Pop-frame & re-run in debugger
     System.err.println(msg);
-    System.err.println(NodePrinter.prettyPrint(n,0));
+    System.err.println(NodePrinter.prettyPrint(n,0,n.isPrim()));
     // BREAKPOINT HERE
-    VISIT.set(n._uid); // Reset if progressing past breakpoint
+    Node.WVISIT.set(n._uid); // Reset if progressing past breakpoint
     return 1;
   }
 
@@ -106,7 +107,7 @@ public abstract class NodeUtil {
     return no_more;
   }
   private static boolean _more_ideal(Node n) {
-    if( n==null ) return false;
+    if( n==null || n.isPrim() ) return false;
     if( IDEAL_VISIT.tset(n._uid) ) return false; // Been there, done that
     if( !n.isKeep() && !GVN.on_dead(n)) { // Only non-keeps, which is just top-level scope and prims
       Node x;
@@ -118,8 +119,8 @@ public abstract class NodeUtil {
                                                          return true; } // Found an ideal call
       if( n instanceof FunNode fun && !GVN.on_inline(fun) && FunNode._must_inline==0 ) fun.ideal_inline(true);
     }
-    for( Node def : n.defs() ) if( _more_ideal(def) ) return true;
-    for( Node use : n.uses() ) if( _more_ideal(use) ) return true;
+    for( int i=0; i<n.len  (); i++ ) if( _more_ideal(n.in (i)) ) return true;
+    for( int i=0; i<n.nUses(); i++ ) if( _more_ideal(n.use(i)) ) return true;
     return false;
   }
 

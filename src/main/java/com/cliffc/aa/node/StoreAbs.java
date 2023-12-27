@@ -128,7 +128,6 @@ public abstract class StoreAbs extends Node {
     if( rez()!=Env.ANY ) Env.GVN.add_reduce(setDef(3,Env.ANY));
     // Remove when liveness aligns
     if( _live.isa(mem()._live) ) return mem();
-    mem().deps_add(this);
     return null;
   }
 

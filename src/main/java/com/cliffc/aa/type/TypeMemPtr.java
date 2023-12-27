@@ -318,9 +318,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     return fidxs;
   }
 
-  @Override public boolean is_con() { return _is_con && _obj.is_con(); }
-
-  @Override public Type widen() { return this; }
+  @Override public boolean is_con() { return _is_con; }
 
   // Used for assertions
   @Override boolean intern_check1() { return _obj.intern_get()!=null; }

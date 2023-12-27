@@ -1,7 +1,6 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
-import com.cliffc.aa.Combo;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVExpanding;
@@ -76,6 +75,8 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Region has Phis, Fun has Parms, If as 2 Controls, Call & CallEpi have many Projs
   public boolean isMultiHead() { return false; }
+  // Phis, Parms, Projs
+  public boolean isMultiTail() { return false; }
   
   // Region, Fun, If, Return, Call, CallEpi
   public boolean isCFG() { return false; }
@@ -118,7 +119,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     return sb.p("\n");
   }
 
-  String p(int d) { return NodePrinter.prettyPrint(this,d); }
+  String p(int d) { return NodePrinter.prettyPrint(this,d,isPrim()); }
   
 
   // TODO: Graphic print e.g. greek letter Phi for PhiNodes
@@ -138,8 +139,8 @@ public abstract class Node implements Cloneable, IntSupplier {
   private void _addDef( Node n ) {
     // A NPE here means the _defs are null, which means the Node was killed
     if( _len == _defs.length ) {
-      int len = Integer.numberOfLeadingZeros(_len);
-      while( len < _len ) len<<=1;
+      int len = 32 - Integer.numberOfLeadingZeros(_len)+1;
+      while( len <= _len ) len<<=1;
       _defs = Arrays.copyOf(_defs,len);
     }
     _defs[_len++] = n;
@@ -166,6 +167,7 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   public int nUses() { return _ulen; }
   public Node use0() { return _uses[0]; }
+  public Node use(int idx) { assert idx < _ulen; return _uses[idx]; }
   // Add a use, making more space as needed.
   private void _addUse( Node n ) {
     // A NPE here means the _uses are null, which means the Node was killed
@@ -219,6 +221,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       _elock=false;             // Unlock
       Node x = VALS.remove(this);
       assert x==this;           // Got the right node out
+      _hash=0;                  // Recompute hash going back
     }
   }
 
@@ -355,10 +358,13 @@ public abstract class Node implements Cloneable, IntSupplier {
   
   // Hash is function+inputs, or opcode+input_uids, and is invariant over edge
   // order (so we can swap edges without rehashing)
+  private int _hash;
   @Override public int hashCode() {
+    if( _hash!=0 ) return _hash;
     int sum = label().hashCode();
     for( Node def : defs() ) if( def != null ) sum ^= def._uid;
-    return sum;
+    if( sum==0 ) sum = 0xDEADBEEF;
+    return (_hash=sum);
   }
   // Equals is function+inputs, or opcode+input_uids.  Uses pointer-equality
   // checks for input equality checks.
@@ -412,8 +418,10 @@ public abstract class Node implements Cloneable, IntSupplier {
   public Type live( ) {
     // Compute meet/union of all use livenesses
     Type live = Type.ANY;           // Start at lattice top
-    for( Node use : _uses ) {       // Computed across all uses
-      if( use==null ) return isMem() ? TypeMem.ALLMEM : Type.ALL; // Keep-alive, so fully alive
+    for( int j=0; j<nUses(); j++ ) {       // Computed across all uses
+      Node use = use(j);
+      if( use==null )
+        return isMem() ? TypeMem.ALLMEM : Type.ALL; // Keep-alive, so fully alive
       if( use._live != Type.ANY ) { // If use is alive, propagate liveness
         // The same def might be used on several inputs, with separate notions
         // of liveness
@@ -539,7 +547,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Initialize a Node, once input edges are completed.  Might have no users
   // (yet), so liveness is meaningless.  Cannot do HM TVs either, until the
   // program is complete.  Only sets value.
-  public final <N extends Node> N init() { _val = value(); return (N)this; }
+  public final <N extends Node> N init() { _val = value(); GVN.add_flow_reduce(this); return (N)this; }
   
   // Graph rewriting.  Strictly reducing Nodes or Edges.  Cannot make a new
   // Node, save that for the expanding ideal calls.
@@ -567,9 +575,16 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Node can be idealized and reduced to other Nodes.
   public final Node peep() {
     assert _val == Type.ALL;    // Otherwise we need to check monotonic
-    assert _ulen==0;            // No uses yet
     _val = value();
-    
+    assert _ulen==0;            // No uses yet, so can use what is returned directly
+    Node x = _do_reduce();      // Find a reduced version, if any
+    return x==null ? this : x;  // Always return a not-null
+  }
+
+  // Compute a new replacement for 'this' that is generally "better" -
+  // uses a constant or an existing node or is somehow reduced.
+  // Returns null if no-progress.
+  private Node _do_reduce() {
     if( shouldCon() )
       return kill(new ConNode(_val).peep());
 
@@ -587,53 +602,27 @@ public abstract class Node implements Cloneable, IntSupplier {
       return GVN.add_flow(x);   // Graph replace with x
     }
 
-    return this;                // No change
+    return null;                // No change
   }
 
   // reducing xforms, strictly fewer Nodes or Edges.  n may be either in or out
   // of VALS.  If a replacement is found, replace.  In any case, put in the
   // VALS table.  Return null if no progress, or this or the replacement.
   public Node do_reduce() {
-    //Node nnn = _do_reduce();
-    //if( nnn!=null ) {           // Something happened
-    //  add_flow_uses();          // Users of change should recheck
-    //  if( nnn!=this ) {         // Replacement
-    //    add_reduce_uses();      // New chances for V-N
-    //    subsume(nnn);           // Replace
-    //  }
-    //  return nnn._elock();      // After putting in VALS
-    //}
-    //// No progress; put in VALS and return no-change
-    //_elock();
-    //return null;
-    throw TODO();
+    Node nnn = _do_reduce();
+    if( nnn!=null ) {           // Something happened
+      GVN.add_flow_uses(this);  // Users of change should recheck
+      if( nnn!=this ) {         // Replacement
+        GVN.add_reduce_uses(this); // New chances for V-N
+        subsume(nnn);           // Replace
+      }
+      return nnn._elock();      // Put progress in VALs and return change
+    }
+    // No progress; put in VALS and return no-change
+    _elock();
+    return null;
   }
 
-
-  //// Check for being not-live, being a constant, CSE in VALS table, and then
-  //// call out to ideal_reduce.  Returns an equivalent replacement (or self).
-  //private Node _do_reduce() {
-  //  // Replace with a constant, if possible
-  //  if( should_con(_val) )
-  //    return merge(con(_val));
-  //
-  //  // Try CSE
-  //  if( !_elock ) {             // Not in VALS and can still replace
-  //    Node x = VALS.get(this);  // Try VALS
-  //    if( x != null )           // Hit
-  //      return merge(x);        // Graph replace with x
-  //  }
-  //
-  //  // Try general ideal call
-  //  Node x = ideal_reduce();    // Try the general reduction
-  //  if( x != null ) {
-  //    assert _live.isa(x._live);
-  //    return x.add_flow();      // Graph replace with x
-  //  }
-  //
-  //  return null;                // No change
-  //}
-  //
   //// At least as alive
   //private Node merge(Node x) {
   //  x._live = x._live.meet(_live);
@@ -787,7 +776,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // --------------------------------------------------------------------------
   // Reset primitives.  Mostly unwire called and wired primitives.
   public final int walk_reset( int ignore ) {
-    assert isPrim();           // Primitives
+    assert isPrim();            // Primitives
     _elock = false;             // Clear elock if reset_to_init0
     _deps = null;               // No deps
     if( _tvar!=null ) _tvar.reset_deps();
@@ -849,7 +838,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Generic Visitor Pattern
   // Map takes and updates/reduces int x.
   // If map returns -1, the walk is stopped and x is not updated.
-  private static final VBitSet WVISIT = new VBitSet();
+  static final VBitSet WVISIT = new VBitSet();
   public interface NodeMap { int map(Node n, int x); }
   final public int walk( NodeMap map ) {
     assert WVISIT.isEmpty();

@@ -10,7 +10,6 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.BitSet;
 import java.util.Map;
-import java.util.function.Predicate;
 
 import static com.cliffc.aa.AA.*;
 
@@ -142,7 +141,6 @@ public class FunNode extends Node {
   // unknown-callers to all-callers-known.
   public boolean set_unknown_callers() {
     if( !_unknown_callers || _unknown_callers() ) return false;
-    assert !always_prim();
     _unknown_callers=false;   // One-shot transition
     deps_work_clear();        // Folks who depend on it get touched
     return true;              // Progress
@@ -160,7 +158,8 @@ public class FunNode extends Node {
   }
 
   private boolean all_uses_are_wired(FunPtrNode fptr) {
-    for( Node use : fptr.uses() ) {
+    for( int i=0; i<fptr.nUses(); i++ ) {
+      Node use = fptr.use(i);
       use.deps_add(this);
       if( !use_is_wired(fptr,use) )
         return false;
@@ -242,7 +241,7 @@ public class FunNode extends Node {
     // Type-splitting
     int path = split_type(body,parms);
     // Large code-expansion allowed; can inline for other reasons
-    if( path==0 ) path = split_size(body,parms()); // Forcible size-splitting first path
+    if( path==0 ) path = split_size(body,parms); // Forcible size-splitting first path
     if( path == -1 ) return null;                  // Nobody wants to split
     if( !isPrim() ) {
       if( _cnt_size_inlines >= 6 ) return null;
@@ -308,12 +307,12 @@ public class FunNode extends Node {
         // Still clone in function body, if only used in function body
         if( n.len() > 0 ) continue;
         boolean external_use=false;
-        for( Node use : n.uses() )
-          if( !freached.get(use._uid) )
+        for( int i=0; i<n.nUses(); i++ ) 
+          if( !freached.get(n.use(i)._uid) )
             { external_use=true; break; }
         if( external_use ) continue;         // Uses from outside function
       }                                      // All uses are function-internal
-      if(  breached.tset(n._uid) ) continue; // Already visited?
+      if( breached.tset(n._uid) ) continue;  // Already visited?
       body.push(n);                          // Part of body
       work.addAll(n.defs());                 // Visit all defs
       if( n.isMultiHead() )                  // Multi-head?
@@ -551,9 +550,9 @@ public class FunNode extends Node {
 
   // True if this is a forward_ref
   public ParmNode parm( int idx ) {
-    for( Node use : uses() )
-      if( use instanceof ParmNode && ((ParmNode)use)._idx==idx )
-        return (ParmNode)use;
+    for( int i=0; i<nUses(); i++ )
+      if( use(i) instanceof ParmNode parm && parm._idx==idx )
+        return parm;
     return null;
   }
   public ParmNode[] parms() {
@@ -565,8 +564,8 @@ public class FunNode extends Node {
   }
   public RetNode ret() {
     if( isDead() ) return null;
-    for( Node use : uses() )
-      if( use instanceof RetNode ret ) {
+    for( int i=0; i<nUses(); i++ )
+      if( use(i) instanceof RetNode ret ) {
         assert !ret.isCopy() && ret.len()==5;
         return ret;
       }
@@ -576,8 +575,8 @@ public class FunNode extends Node {
   public FunPtrNode fptr() {
     RetNode ret = ret();
     if( ret==null ) return null;
-    for( Node ruse : ret.uses() )
-      if( ruse instanceof FunPtrNode fptr )
+    for( int i=0; i<ret.nUses(); i++ )
+      if( ret.use(i) instanceof FunPtrNode fptr )
         return fptr;
     return null;
   }

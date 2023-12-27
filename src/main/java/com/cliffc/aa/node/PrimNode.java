@@ -153,6 +153,11 @@ public abstract class PrimNode extends Node {
     IFLT  = new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.set_tvar(),new TVBase(TypeFlt. FLT64)},false));
     INFLT = new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.set_tvar(),new TVBase(TypeFlt.NFLT64)},false));
 
+    Env.ROOT.setDef(CTL_IDX,Env.CTL_0);
+    Env.ROOT.setDef(MEM_IDX,Env.MEM_0);
+    Env.ROOT.setDef(REZ_IDX,Env.ALL);
+
+
     // Set all TVars
     Env.ROOT.walk( (n,ignore) -> {
         Env.GVN.add_flow(n);

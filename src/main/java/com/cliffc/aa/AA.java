@@ -53,7 +53,7 @@ public abstract class AA {
     System.err.println(s);
     return x;
   }
-  public static String p() { return NodePrinter.prettyPrint(Env.ROOT,99); }  // Debugging hook
+  public static String p() { return NodePrinter.prettyPrint(Env.ROOT,99,false); }  // Debugging hook
   public static Node f(int uid) { return Env.ROOT.find(uid); } // Debugging hook
   public static int UID=-1;     // Used to breakpoint on a named Node creation
 

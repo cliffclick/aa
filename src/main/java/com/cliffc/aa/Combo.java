@@ -145,7 +145,7 @@ public abstract class Combo {
     // Set all type-vars to Leafs.
     RootNode.combo_def_mem();
     Env.ROOT.walk( (n,ignore) -> {
-        if( n.isPrim() ) return 0;
+        if( n.isPrim() && Env.ROOT!=n ) return 0;
         n._val = n._live = Type.ANY;  // Highest value
         if( n.has_tvar() ) n.set_tvar();
         Env.GVN.add_flow(n);

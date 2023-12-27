@@ -1,18 +1,126 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.util.*;
+
 import static com.cliffc.aa.AA.TODO;
 
 // Sea-of-Nodes
 public abstract class NodePrinter {
 
   // Another bulk pretty-printer.  Makes more effort at basic-block grouping.
-  public static String prettyPrint(Node node, int depth) {
-    throw TODO();
-  }
+  public static String prettyPrint(Node node, int depth, boolean prims) { return _pp(node,depth,prims, new SB()).toString(); }
   public static String prettyPrint(Ary<Node> roots) {
     throw TODO();
   }
+
+  // Another bulk pretty-printer.  Uses max depth better.
+  static SB _pp(Node node, int depth, boolean prims, SB sb) {
+
+    // All Nodes within max depth
+    VBitSet visit0 = new VBitSet();
+    Ary<Ary<Node>> nss = new Ary(Ary.class);
+    _pvisit(node, depth, prims, nss, visit0);
+    
+    // Convert just that set to a post-order visit from the roots
+    Ary<Node> rpos = new Ary<>(Node.class);
+    VBitSet visit1 = new VBitSet();
+    // Roots have no visited inputs, but can appear at any depth
+    for( Ary<Node> ns : nss )
+      if( ns != null )
+        for( Node n : ns )
+          if( findNoVisit(n,visit0) )
+            postOrd(n,rpos,visit1,visit0);
+
+    // Reverse the post-order walk, and print.
+    boolean gap=false;
+    for( int i=rpos._len-1; i>=0; i-- ) {
+      Node n = rpos.at(i);
+      if( n.isCFG() || n.isMultiHead() ) {
+        if( !gap ) sb.nl();     // Blank before multihead
+        n._printLine(sb);       // Print head
+        // Print MultiTails in a row
+        while( --i >= 0 ) {
+          Node t = rpos.at(i);
+          if( !t.isMultiTail() ) { i++; break; }
+          t._printLine(sb);
+        }
+        sb.nl(); // Blank after multitail
+        gap = true;
+      } else {
+        n._printLine( sb );
+        gap = false;
+      }
+    }
+    return sb;
+  }
+
+  private static void _pvisit(Node n, int d, boolean prims, Ary<Ary<Node>> nss, VBitSet visit) {
+    // Skip prims unless asked-for
+    if( !prims && n.isPrim() && n!=Env.ROOT ) return;
+    // Already visited at equal or deeper depth
+    if( visit.tset(n._uid) && !findDel(n,d,nss) )
+      return;
+    // Insert n into nss at depth d
+    Ary<Node> ns = nss.atX(d);
+    if( ns==null )              // Lazy make depths
+      nss.setX(d,ns = new Ary<>(Node.class));
+    ns.push(n);                 // Anoter node at depth
+
+    // Go again at the next depth
+    if( d > 0 )
+      for( Node def : n.defs() )
+        if( def!=null )
+          _pvisit(def,d-1,prims,nss,visit);
+  }
+
+  private static boolean findDel(Node n, int d, Ary<Ary<Node>> nss) {
+    // Find it at shallower depth
+    for( int i=0; i<d; i++ ) {
+      Ary<Node> ns = nss.at(i);
+      if( ns!=null && ns.del(n)!=null ) 
+        return true;            // Found at removed
+    }
+    return false;
+  }
+
+  private static boolean findNoVisit(Node n, VBitSet visit0) {
+    for( Node def : n.defs() )
+      if( def!=null && def!=Env.ROOT && visit0.test(def._uid) )
+        return false; // Visited input, so not a root
+    return true;
+  }
+
+  private static void postOrd(Node n, Ary<Node> rpos, VBitSet visit, VBitSet bfs) {
+    if( !bfs.test(n._uid) )  return; // Not in the BFS visit
+    if( visit.tset(n._uid) ) return; // Already post-order walked
+    if( n instanceof RootNode ) { // No uses from Root, always bottom of the piel
+      rpos.add(n);
+      return; 
+    }
+    // First walk the CFG, then everything
+    if( n.isCFG() ) {
+      for( Node use : n.uses() )
+        if( use!=null && use.isCFG() && use.nUses()>=1 /*&& !(use.use0() instanceof LoopNode)*/ )
+          postOrd(use, rpos,visit,bfs);
+      for( Node use : n.uses() )
+        if( use!=null && use.isCFG() )
+          postOrd(use,rpos,visit,bfs);
+    }
+    for( Node use : n.uses() )
+      if( use!=null )
+        postOrd(use, rpos,visit,bfs);
+    // Post-order.  Keep tails with heads.
+    if( n.isMultiTail() ) return; // Don't add tails yet, add with their head
+    // For MultiHeads, add all tails first, then the head
+    if( n.isMultiHead() ) {
+      for( Node use : n.uses() )
+        if( use!=null && bfs.test(n._uid) && use.isMultiTail() )
+          rpos.add(use);
+    }
+    rpos.add(n);
+  }
+
   
   //// Short string name
   //public String xstr() { return STRS[_op]; } // Self short name

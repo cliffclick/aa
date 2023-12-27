@@ -109,7 +109,7 @@ public class TypeTuple extends Type<TypeTuple> {
   // This is the starting state of the program; CTRL is active and memory is empty.
   public  static final TypeTuple  RET = make(CTRL, TypeMem.ALLMEM, ALL); // Type of RetNodes
   public  static final TypeTuple CALLE= make(CTRL, TypeMem.ALLMEM, ALL); // Type of CallEpiNodes
-  public  static final TypeTuple ROOT = make(CTRL, TypeMem.ALLMEM, TypeRPC.ALL_CALL, TypeNil.SCALAR); // Type of Root  
+  public  static final TypeTuple ROOT = make(CTRL, TypeMem.ALLMEM, TypeNil.SCALAR, TypeNil.SCALAR); // Type of Root
   public  static final TypeTuple TEST0= make(CTRL, TypeMem.ALLMEM, TypeFunPtr.GENERIC_FUNPTR, TypeNil.SCALAR); // Call with 1 arg
   public  static final TypeTuple TEST1= make(CTRL, TypeMem.ANYMEM, TypeFunPtr.GENERIC_FUNPTR, TypeNil.SCALAR); // Call with 1 arg
   // Arguments

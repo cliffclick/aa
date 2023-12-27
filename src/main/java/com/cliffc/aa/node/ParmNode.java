@@ -26,6 +26,7 @@ public class ParmNode extends Node {
   }
   @Override public String label() { return "Parm:"+_idx; }
   @Override public boolean isMem() { return _t instanceof TypeMem; }
+  @Override public boolean isMultiTail() { return true; }
   public FunNode fun() { return (FunNode) in(0); }
 
   @Override public Type value() {

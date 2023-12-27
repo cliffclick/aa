@@ -39,14 +39,11 @@ public abstract class Exec {
     Env.ROOT.setDef(CTL_IDX,e._scope.ctrl());
     Env.ROOT.setDef(MEM_IDX,e._scope.mem ());
     Env.ROOT.setDef(REZ_IDX,e._scope.rez ());
-    Env.GVN.add_flow(Env.ROOT);
-    Env.GVN.add_flow_uses(Env.ROOT);
-    Env.ROOT.deps_work_clear();
     e.close();      // No more fields added to the parse scope
 
     // Post-parse pre-Combo iterative peepholes
     Env.GVN.iter();
-    
+
     Combo.opto(); // Global Constant Propagation and Hindley-Milner Typing
 
     Env.GVN.iter(); // Re-check all ideal calls now that types have been maximally lifted

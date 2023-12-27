@@ -62,8 +62,8 @@ public class NewNode extends Node {
   // is not used.
   private boolean used() {
     if( isPrim() ) return true;
-    for( Node use : uses() )
-      if( !(use instanceof StoreAbs sta) ||
+    for( int i=0; i<nUses(); i++ )
+      if( !(use(i) instanceof StoreAbs sta) ||
           ( sta instanceof StoreNode st && st.rez()==this) )
         return true;
     return false;
@@ -73,12 +73,14 @@ public class NewNode extends Node {
   // loads can bypass calls.
   boolean escaped(Node dep) {
     if( isPrim() ) return true;
-    for( Node use : uses() )
+    for( int i=0; i<nUses(); i++ ) {
+      Node use = use(i);
       if( !(use instanceof LoadNode ld ||
             (use instanceof StoreNode st && st.rez()!=this) )) {
         use.deps_add(dep);
         return true;
       }
+    }
     return false;
   }
   

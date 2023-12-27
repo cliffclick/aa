@@ -71,7 +71,7 @@ public class RootNode extends Node {
   // [Ctrl, All_Mem_Minus_Dead, Rezult, global_escaped_[fidxs, aliases]]
   @Override public TypeTuple value() {
     // If computing for primitives, pre- any program, then max conservative value
-    if( in(MEM_IDX) == null ) return TypeTuple.ROOT;
+    if( in(3) == null ) return TypeTuple.ROOT;
     
     //TypeMem tmem = mem._val instanceof TypeMem tmem0 ? tmem0 : mem._val.oob(TypeMem.ALLMEM);
     //// Primitive memory
@@ -240,8 +240,8 @@ public class RootNode extends Node {
         mem = mem.set(kill,TypeStruct.UNUSED);
       return mem;
     }
-    //Type live = super.live(false); // TODO: live(false)
-    //if( live==Type.ANY ) return TypeMem.ANYMEM;
+    Type live = super.live(); // TODO: live(false)
+    if( live==Type.ANY ) return TypeMem.ANYMEM;
     //TypeMem mem = (TypeMem)live;
     //// Kill the killables
     //for( int kill : KILL_ALIASES )
@@ -273,8 +273,8 @@ public class RootNode extends Node {
     }
     // inputs CTL,MEM,REZ are spoken for.
     // input 4 is primitive memory
-    if( i==4 )
-      throw TODO();
+    if( i==3 )
+      return TypeMem.ALLMEM;
     // inputs 5 and up are all global calls and returns
     assert in(i) instanceof CallNode || in(i) instanceof RetNode;
     return _live;               // Global calls take same memory as me

@@ -12,6 +12,7 @@ public class ProjNode extends Node {
   public ProjNode( Node head, int idx ) { super(head); _idx=idx; }
   
   @Override public String label() { return "DProj"+_idx; }
+  @Override public boolean isMultiTail() { return true; }
 
   @Override public Type value() {
     Type c = val(0);
