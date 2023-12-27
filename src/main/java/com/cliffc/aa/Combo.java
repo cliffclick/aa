@@ -153,7 +153,7 @@ public abstract class Combo {
           fun.set_unknown_callers();
         return 0;
       });
-    assert Env.ROOT.more_work()==0; // Initial conditions are correct
+    assert NodeUtil.more_work(Env.ROOT)==0; // Initial conditions are correct
 
     // Init
     HM_NEW_LEAF = false;
@@ -166,20 +166,20 @@ public abstract class Combo {
 
     // Pass 2: Potential new Leafs quit lifting GCP in Apply
     add_new_leaf_work();
-    assert Env.ROOT.more_work()==0;
+    assert NodeUtil.more_work(Env.ROOT)==0;
     work_cnt += main_work_loop(2);
 
     // Pass 3: Unresolved Fields are ambiguous; propagate errors
     HM_AMBI = true;
     add_ambi_work();
-    assert Env.ROOT.more_work()==0;
+    assert NodeUtil.more_work(Env.ROOT)==0;
     work_cnt += main_work_loop(3);
 
     // Pass 4: H-M types freeze, escaping function args are assumed called with lowest H-M compatible
     // GCP types continue to run downhill.
     HM_FREEZE = true;
     add_freeze_work();
-    assert Env.ROOT.more_work()==0;
+    assert NodeUtil.more_work(Env.ROOT)==0;
     work_cnt += main_work_loop(4);
 
     // Take advantage of results
@@ -187,6 +187,8 @@ public abstract class Combo {
         Env.GVN.add_work_new(n);
         return 0;
       });
+
+    AA.LIFTING = true;
   }
 
   static int main_work_loop( int pass ) {
@@ -221,7 +223,7 @@ public abstract class Combo {
       //    r.trial_resolve(false); // Do delayed resolve
 
       // Very expensive assert: everything that can make progress is on worklist
-      assert Env.ROOT.more_work()==0;
+      assert NodeUtil.more_work(Env.ROOT)==0;
     }
     return cnt;
   }

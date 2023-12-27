@@ -1,12 +1,17 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
+import com.cliffc.aa.Combo;
+import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.VBitSet;
 
 import java.lang.Iterable;
 import java.util.Iterator;
 
 import static com.cliffc.aa.AA.TODO;
+import static com.cliffc.aa.Env.GVN;
 
 // Sea-of-Nodes
 public abstract class NodeUtil {
@@ -39,8 +44,83 @@ public abstract class NodeUtil {
     Node cc = x.in(0).isCopy(0);
     if( cc == null ) return null;
     if( cc == x ) return Env.ANY; // Dead self-cycle
-    Env.GVN.add_reduce_uses(x);
-    return Env.GVN.add_reduce(x.setDef(0,cc));
+    GVN.add_reduce_uses(x);
+    return GVN.add_reduce(x.setDef(0,cc));
+  }
+
+  
+  // --------------------------------------------------------------------------
+  // Assert all value and liveness calls only go forwards, and if they can
+  // progress they are on the worklist.
+  private static final VBitSet VISIT = new VBitSet();
+  private static boolean MORE_WORK_ASSERT;
+  public static int more_work(Node root) {
+    assert !MORE_WORK_ASSERT;
+    MORE_WORK_ASSERT = true;
+    int rez = root.walk( Node::more_work );
+    MORE_WORK_ASSERT = false;
+    return rez;
+  }
+  public static boolean mid_work_assert() { return MORE_WORK_ASSERT; }
+  static int more_work( int errs, Node n ) {
+    if( GVN.on_dead(n) ) return -1; // Do not check dying nodes or reachable from dying
+    if( n.isPrim() ) return errs;        // Do not check primitives
+    // Check for GCP progress
+    Type oval= n._val, nval = n.value(); // Forwards flow
+    Type oliv=n._live, nliv = n.live (); // Backwards flow
+    if( oval!=nval || oliv!=nliv ) {
+      if( !(AA.LIFTING
+            ? nval.isa(oval) && nliv.isa(oliv)
+            : oval.isa(nval) && oliv.isa(nliv)) )
+        errs += _report_bug(n,"Monotonicity bug");
+      if( !GVN.on_flow(n) && (AA.LIFTING || AA.DO_GCP) )
+        errs += _report_bug(n,"Progress bug");
+    }
+    // Check for HMT progress
+    if( !AA.LIFTING &&                      // Falling, in Combo, so HM is running
+        oliv!=Type.ANY && oval!=Type.ANY && // Alive in any way
+        n.has_tvar() &&                       // Doing TVar things
+        (!GVN.on_flow(n) || Combo.HM_FREEZE) ) { // Not already on worklist, or past freezing
+      if( n.unify(true) )
+        errs += _report_bug(n,Combo.HM_FREEZE ? "Progress after freezing" : "Progress bug");
+    }
+    return errs;
+  }
+  private static int _report_bug(Node n, String msg) {
+    VISIT.clear(n._uid); // Pop-frame & re-run in debugger
+    System.err.println(msg);
+    System.err.println(NodePrinter.prettyPrint(n,0));
+    // BREAKPOINT HERE
+    VISIT.set(n._uid); // Reset if progressing past breakpoint
+    return 1;
+  }
+
+  // Assert all ideal, value and liveness calls are done
+  private static final VBitSet IDEAL_VISIT = new VBitSet();
+  public static boolean no_more_ideal(Node root) {
+    assert !MORE_WORK_ASSERT;
+    MORE_WORK_ASSERT = true;
+    IDEAL_VISIT.clear();
+    boolean no_more = !_more_ideal(root);
+    MORE_WORK_ASSERT = false;
+    return no_more;
+  }
+  private static boolean _more_ideal(Node n) {
+    if( n==null ) return false;
+    if( IDEAL_VISIT.tset(n._uid) ) return false; // Been there, done that
+    if( !n.isKeep() && !GVN.on_dead(n)) { // Only non-keeps, which is just top-level scope and prims
+      Node x;
+      if( !GVN.on_reduce(n) ) { x = n.do_reduce(); if( x != null )
+                                                         return true; } // Found an ideal call
+      if( !GVN.on_mono  (n) ) { x = n.do_mono  (); if( x != null )
+                                                         return true; } // Found an ideal call
+      if( !GVN.on_grow  (n) ) { x = n.do_grow  (); if( x != null )
+                                                         return true; } // Found an ideal call
+      if( n instanceof FunNode fun && !GVN.on_inline(fun) && FunNode._must_inline==0 ) fun.ideal_inline(true);
+    }
+    for( Node def : n.defs() ) if( _more_ideal(def) ) return true;
+    for( Node use : n.uses() ) if( _more_ideal(use) ) return true;
+    return false;
   }
 
 }

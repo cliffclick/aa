@@ -260,7 +260,7 @@ public class FunNode extends Node {
     FunNode fun = make_new_fun(ret, path);
     split_callers(ret,fun,body,path);
     boolean x = fun.set_unknown_callers(); assert x; // Will be false now, so makes progress
-    assert Env.ROOT.more_work()==0; // Initial conditions are correct
+    assert NodeUtil.more_work(Env.ROOT)==0; // Initial conditions are correct
     return this;
   }
 

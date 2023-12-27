@@ -5,8 +5,6 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.*;
 
-import java.util.function.Predicate;
-
 // Constant value nodes; no computation needed.  Hashconsed for unique
 // constants, except for XNIL.  XNIL allows for a TV3 typevar Nilable-Leaf with
 // each Leaf unifying on its own.
@@ -15,7 +13,6 @@ public class ConNode<T extends Type> extends Node {
   public ConNode( T t ) {
     super(Env.ROOT);
     _t=t;
-    _live = isMem() ? TypeMem.ALLMEM : Type.ALL;
     if( !Combo.pre() && has_tvar() )
       _tvar = TV3.from_flow(_t);
   }
@@ -39,8 +36,6 @@ public class ConNode<T extends Type> extends Node {
     tv.deps_add_deep(this);     // Constant hash depends on tvar      
     return tv;
   }
-  
-  @Override public boolean unify( boolean test ) { return false; }
 
   private boolean equals_uses_tvar() {
     return _t==TypeNil.NIL || _t instanceof TypeMemPtr || _t instanceof TypeFunPtr;

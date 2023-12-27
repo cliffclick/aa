@@ -564,7 +564,7 @@ abstract public class TV3 implements Cloneable {
   public boolean deps_add_deep(Node n ) { DEPS_VISIT.clear(); _deps_add_deep(n); return false; }
   public void _deps_add_deep(Node n ) {
     // no progress during bulk testing
-    if( Node.mid_work_assert() ) return;
+    if( NodeUtil.mid_work_assert() ) return;
     if( DEPS_VISIT.tset(_uid) ) return;
     if( _deps==null ) _deps = UQNodes.make(n);
     _deps = _deps.add(n);
@@ -576,7 +576,7 @@ abstract public class TV3 implements Cloneable {
   public void deps_add(Node n ) {
     // no progress during bulk testing*
     if( n==null ) return;
-    if( Node.mid_work_assert() ) return;
+    if( NodeUtil.mid_work_assert() ) return;
     if( _deps==null ) _deps = UQNodes.make(n);
     _deps = _deps.add(n);
   }

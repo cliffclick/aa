@@ -66,6 +66,12 @@ public class Env implements AutoCloseable {
   public static final NonBlockingHashMap<String,StructNode> PROTOS;
 
   static {
+    // The Universe outside the parse program
+    ROOT  = new RootNode(null,null,null,null);
+    // Initial control & memory
+    CTL_0 = new CProjNode(ROOT,CTL_IDX).init();
+    MEM_0 = new MProjNode(ROOT,MEM_IDX).init();
+    
     // Top-level or common default values
     ANY   = new ConNode<>(Type.ANY         ).keep();
     ALL   = new ConNode<>(Type.ALL         ).keep();
@@ -87,6 +93,7 @@ public class Env implements AutoCloseable {
     STK_0 = SCP_0.stk();
     PrimNode.PRIMS();           // Initialize
     Type.init0(SCP_0._types);
+    ROOT.setPrimMem(PRIM._scope.mem());
     record_for_reset();         // Record for reset between tests
   }
 
@@ -103,7 +110,6 @@ public class Env implements AutoCloseable {
     dsp.add_fld("^",TypeFld.Access.Final,dsp_ptr,null).init();
     NewNode ptr = new NewNode(BitsAlias.new_alias(),par==null).init();
     mem = new StoreXNode(mem,ptr,dsp,null).init();
-    mem.in(1).xliv();
     // Install a top-level prototype mapping
     if( fref!=null ) {          // Forward ref?
       //String fname = fref._ts._name;
@@ -151,9 +157,10 @@ public class Env implements AutoCloseable {
   // active display aliases (which are otherwise available to all function
   // definitions getting parsed).
   @Override public void close() {
-    // Promote forward refs to the next outer scope
+    // Make sure current display us closed
     StructNode stk = _scope.stk();
     assert stk.is_closed();
+    // Promote forward refs to the next outer scope
     stk.promote_forward( _par._scope);
     for( String tname : _scope.typeNames() ) {
       TypeNil t = _scope.get_type(tname);
@@ -162,11 +169,8 @@ public class Env implements AutoCloseable {
       throw TODO();
     }
 
-    //Node xscope = KEEP_ALIVE.pop();// Unhook scope
-    //assert _scope==xscope;
-    //GVN.add_flow_defs(_scope);  // Recompute liveness of scope inputs
-    //GVN.iter();
-    throw TODO();
+    GVN.add_flow_defs(_scope);  // Recompute liveness of scope inputs
+    _scope.kill();
   }
 
   // Wire up an early function exit.  Hunts through all scopes until it finds a closure.
@@ -189,23 +193,17 @@ public class Env implements AutoCloseable {
   // Reset all global statics for the next parse.  Useful during testing when
   // many top-level parses happen in a row.
   public static void top_reset() {
-    if( Env.ROOT!=null ) {
-      while( Env.ROOT.len()>0 ) Env.ROOT.pop();
-      Env.ROOT=null;
-    }
-    TV3.reset_to_init0();
+    RootNode.reset_to_init0();
     Node.VALS.clear();          // Clean out hashtable
     GVN.reset_to_init0();
-    //KEEP_ALIVE.walk(Node::walk_reset); // Clean out any wired prim calls
-    //GVNGCM.KEEP_ALIVE.walk(Node::walk_reset);
+    Env.ROOT.walk(Node::walk_reset); // Clean out any wired prim calls
     Combo.reset();
-    //assert KEEP_ALIVE.more_work() == 0; // Initial conditions are correct
+    assert NodeUtil.more_work(Env.ROOT) == 0; // Initial conditions are correct
     AA.reset();
     Node      .reset_to_init0();
     GVN       .reset_to_init0();
     FunNode   .reset_to_init0();
     NewNode   .reset_to_init0();
-    RootNode  .reset_to_init0();
     BitsAlias .reset_to_init0();
     BitsFun   .reset_to_init0();
     BitsRPC   .reset_to_init0();

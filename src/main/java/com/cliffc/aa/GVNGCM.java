@@ -117,7 +117,7 @@ public class GVNGCM {
   // aggressively checks no-more-progress.
   public void iter() {
     int cnt = ITER_CNT;
-    assert AA.once_per() || Env.ROOT.more_work() == 0; // Initial conditions are correct
+    assert AA.once_per() || NodeUtil.more_work(Env.ROOT) == 0; // Initial conditions are correct
     //assert Env.ROOT.no_more_ideal(); // Has side-effects of putting things on worklist
     while( true ) {
       cnt++; assert cnt < 10000; // Catch infinite ideal-loops
@@ -132,10 +132,10 @@ public class GVNGCM {
       else break;
       if( m == null ) ITER_CNT_NOOP++;     // No progress profiling
       else n.deps_work_clear();            // Progress; deps on worklist
-      assert Env.ROOT.more_work() == 0;
+      assert NodeUtil.more_work(Env.ROOT) == 0;
       //assert Env.ROOT.no_more_ideal();
     }
-    assert AA.once_per() || Env.ROOT.more_work()==0;
+    assert AA.once_per() || NodeUtil.more_work(Env.ROOT)==0;
     //assert Env.ROOT == null || Env.ROOT.no_more_ideal();
     ITER_CNT=cnt;
   }

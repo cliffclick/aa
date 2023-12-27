@@ -4,11 +4,10 @@ import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVLambda;
+import com.cliffc.aa.tvar.TVLeaf;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.AryInt;
-
-import java.util.function.Predicate;
 
 import static com.cliffc.aa.AA.*;
 
@@ -34,6 +33,8 @@ public class RootNode extends Node {
   @Override public boolean isMem() { return true; }
   @Override public boolean isMultiHead() { return true; }
 
+  public void setPrimMem(Node mem) { setDef(3,mem); }
+  
   TypeMem rmem(Node dep) {
     deps_add(dep);
     return _val instanceof TypeTuple tt ? (TypeMem)tt.at(MEM_IDX) : TypeMem.ALLMEM.oob(_val.above_center());
@@ -68,7 +69,10 @@ public class RootNode extends Node {
 
   // Output value is:
   // [Ctrl, All_Mem_Minus_Dead, Rezult, global_escaped_[fidxs, aliases]]
-  @Override public TypeTuple value() {    
+  @Override public TypeTuple value() {
+    // If computing for primitives, pre- any program, then max conservative value
+    if( in(MEM_IDX) == null ) return TypeTuple.ROOT;
+    
     //TypeMem tmem = mem._val instanceof TypeMem tmem0 ? tmem0 : mem._val.oob(TypeMem.ALLMEM);
     //// Primitive memory
     ////tmem = PrimNode.primitive_memory(this,tmem);
@@ -227,9 +231,16 @@ public class RootNode extends Node {
 
 
   @Override public Type live() {
-    //// Pre-combo, all memory is alive, except kills
-    //// During/post combo, check external Call users
-    //Type live = Combo.pre() ? TypeMem.ALLMEM : super.live(false);
+    // Pre-combo, all memory is alive, except kills
+    // During/post combo, check external Call users
+    if( Combo.pre() ) {
+      TypeMem mem = TypeMem.ALLMEM;
+      // Kill the killables
+      for( int kill : KILL_ALIASES )
+        mem = mem.set(kill,TypeStruct.UNUSED);
+      return mem;
+    }
+    //Type live = super.live(false); // TODO: live(false)
     //if( live==Type.ANY ) return TypeMem.ANYMEM;
     //TypeMem mem = (TypeMem)live;
     //// Kill the killables
@@ -258,9 +269,13 @@ public class RootNode extends Node {
             !ralias().overlaps(tmp.aliases()) )
           return CallNode.FP_LIVE;
       }
-      deps_add(in(REZ_IDX));
       return Type.ALL;
     }
+    // inputs CTL,MEM,REZ are spoken for.
+    // input 4 is primitive memory
+    if( i==4 )
+      throw TODO();
+    // inputs 5 and up are all global calls and returns
     assert in(i) instanceof CallNode || in(i) instanceof RetNode;
     return _live;               // Global calls take same memory as me
   }
@@ -360,6 +375,7 @@ public class RootNode extends Node {
 
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
+    if( in(REZ_IDX)==null ) return new TVLeaf(); // Happens on primitives
     TV3 tv3 = in(REZ_IDX).set_tvar().find();
     tv3.widen((byte)1,false);   // Widen result, since escaping
     return tv3;
@@ -376,6 +392,7 @@ public class RootNode extends Node {
 
   // Reset for next test
   public static void reset_to_init0() {
+    while( Env.ROOT.len()>4 ) Env.ROOT.pop();
     KILL_ALIASES = BitsAlias.EMPTY;
     CACHE_DEF_MEM = TypeMem.ALLMEM;
     PROGRESS.clear();

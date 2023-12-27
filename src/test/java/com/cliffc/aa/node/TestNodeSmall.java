@@ -667,8 +667,7 @@ public class TestNodeSmall {
     CallNode call = new CallNode(true, null, ctl, cmem, null/*fidx*/, null/*x*/, null/*y*/).init();
     CallEpiNode cepi = new CallEpiNode(call).init(); // Unwired
     Node    cpj = new CProjNode(call,0).init();
-    ConNode mem =
-      new ConNode<>(tmem ).init();
+    ConNode mem = new ConNode<>(tmem ).init();
     ConNode arg1= new ConNode<>(targ1).init();
     ConNode arg2= new ConNode<>(targ2).init();
 

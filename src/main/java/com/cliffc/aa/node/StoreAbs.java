@@ -79,15 +79,11 @@ public abstract class StoreAbs extends Node {
     // Address is high, nothing is stored
     if( adr._val.above_center() )
       return kill_rez_stall_till_live();
-    adr.deps_add(this);
-
     
     // Is this Store dead from below?
     if( adr._val instanceof TypeMemPtr tmp && _live instanceof TypeMem lmem &&
         !_is_live(lmem.ld(tmp)) )
       return kill_rez_stall_till_live();
-    mem.deps_add(this);   // Input address changes, check reduce
-    deps_add(this);       // Our   address changes, check reduce
 
     // Store of a Store, same address
     if( mem instanceof StoreNode st ) {

@@ -1,20 +1,22 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
-import com.cliffc.aa.tvar.*;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.AA;
+import com.cliffc.aa.Combo;
+import com.cliffc.aa.ErrMsg;
+import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.TVExpanding;
+import com.cliffc.aa.tvar.TVLeaf;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.util.*;
-import org.jetbrains.annotations.NotNull;
 
-import java.util.HashSet;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.IntSupplier;
-import java.util.function.Predicate;
 
-import static com.cliffc.aa.Env.GVN;
 import static com.cliffc.aa.AA.TODO;
-import static com.cliffc.aa.node.FunNode._must_inline;
+import static com.cliffc.aa.Env.GVN;
 
 // Sea-of-Nodes
 public abstract class Node implements Cloneable, IntSupplier {
@@ -39,8 +41,8 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( _uid==uid ) return this;
     if( bs.tset(_uid) || isDead() ) return null;
     Node m;
-    for( Node n : _defs ) if( n!=null && (m=n.find(uid,bs)) !=null ) return m;
-    for( Node n : _uses ) if(            (m=n.find(uid,bs)) !=null ) return m;
+    for( int i=0; i< _len; i++ ) if( (m=_defs[i])!=null && (m=m.find(uid,bs)) !=null ) return m;
+    for( int i=0; i<_ulen; i++ ) if( (m=_uses[i])!=null && (m=m.find(uid,bs)) !=null ) return m;
     return null;
   }
 
@@ -84,6 +86,40 @@ public abstract class Node implements Cloneable, IntSupplier {
   // String label; interned; unique per node class, but might be more refined
   // than just class name.  E.g. "Add" or "Phi_Mem" or "Call_foo"
   abstract String label();
+
+  // Debugger Printing.
+    
+  // {@code toString} is what you get in the debugger.  It has to print 1
+  // line (because this is what a debugger typically displays by default) and
+  // has to be robust with broken graph/nodes.
+  @Override public final String toString() {  return _printLine(new SB()).toString(); }
+
+  // Print a node on 1 line, columnar aligned, as:
+  // NNID NNAME DDEF DDEF  [[  UUSE UUSE  ]]  TYPE
+  // 1234 sssss 1234 1234 1234 1234 1234 1234 tttttt
+  public final SB _printLine( SB sb ) {
+    sb.p("%4d %-7.7s ".formatted(_uid,label()));
+    if( isDead() ) return sb.p("DEAD\n");
+    for( int i=0; i<_len; i++ ) {
+      Node def = _defs[i];
+      sb.p(def==null ? "____ " : "%4d ".formatted(def._uid));
+    }
+    for( int i = _len; i<3; i++ ) sb.p("     ");
+    sb.p(" [[  ");
+    for( int i=0; i<_ulen; i++ ) {
+      Node use = _uses[i];
+      sb.p(use==null ? "____ " : "%4d ".formatted(use._uid));
+    }
+    int lim = 5 - Math.max(_len,3);
+    for( int i = _ulen; i<lim; i++ )
+      sb.p("     ");
+    sb.p(" ]]  ");
+    if( _val!= null ) _val.str(sb,true,false);
+    return sb.p("\n");
+  }
+
+  String p(int d) { return NodePrinter.prettyPrint(this,d); }
+  
 
   // TODO: Graphic print e.g. greek letter Phi for PhiNodes
   
@@ -134,8 +170,8 @@ public abstract class Node implements Cloneable, IntSupplier {
   private void _addUse( Node n ) {
     // A NPE here means the _uses are null, which means the Node was killed
     if( _ulen == _uses.length ) {
-      int len = Integer.numberOfLeadingZeros(_ulen);
-      while( len < _ulen ) len<<=1;
+      int len = 32-Integer.numberOfLeadingZeros(_ulen);
+      while( len <= _ulen ) len<<=1;
       _uses = Arrays.copyOf(_uses,len);
     }
     _uses[_ulen++] = n;
@@ -152,7 +188,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Find use.  Backwards scan, because most recent found was probably also
   // most recently added.
   public int findUse( Node use ) {
-    for( int i=_ulen-1; i<=0; i-- )  if( _uses[i]==use )  return i;
+    for( int i=_ulen-1; i>=0; i-- )  if( _uses[i]==use )  return i;
     return -1;
   }
 
@@ -268,7 +304,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     return this;
   }
 
-  // Already nuked the this->old edge, now nuke the old->this edge and
+  // Already nuked the {this->old} edge, now nuke the {old->this} edge and
   // recursively kill if unused.  Returns this.  Co-recursive with kill.
   private Node _unuse( Node old ) {
     if( old == null ) return this;
@@ -376,7 +412,8 @@ public abstract class Node implements Cloneable, IntSupplier {
   public Type live( ) {
     // Compute meet/union of all use livenesses
     Type live = Type.ANY;           // Start at lattice top
-    for( Node use : _uses )         // Computed across all uses
+    for( Node use : _uses ) {       // Computed across all uses
+      if( use==null ) return isMem() ? TypeMem.ALLMEM : Type.ALL; // Keep-alive, so fully alive
       if( use._live != Type.ANY ) { // If use is alive, propagate liveness
         // The same def might be used on several inputs, with separate notions
         // of liveness
@@ -387,6 +424,7 @@ public abstract class Node implements Cloneable, IntSupplier {
           }
         }
       }
+    }
     assert live==Type.ANY || live==Type.ALL || assert_live(live);
     return live;
   }
@@ -451,7 +489,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   void deps_add( Node dep ) {
     assert findDef(dep) == -1 && findUse(dep) == -1; // Non-local; local dependents already handled
     if( _deps==null ) _deps = new Ary<>(new Node[1],0);
-    if( _deps.find(dep)==-1 && mid_work_assert()) {
+    if( _deps.find(dep)==-1 && NodeUtil.mid_work_assert()) {
       assert dep!=null;
       _deps.push(dep);
     }
@@ -471,6 +509,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   Node( Node... defs ) {
     _uid  = newuid();
     _defs = defs;  _len = defs.length;
+    for( Node def : defs() ) if( def != null ) def._addUse(this);
     _uses = new Node[1]; _ulen = 0;
     _deps = null;
     _val  = _live = Type.ALL;
@@ -479,7 +518,7 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Make a copy of the base node, with no defs nor uses and a new UID.
   // Some variations will use the CallEpi for e.g. better error messages.
-  @NotNull public Node copy( boolean copy_edges) {
+  public Node copy( boolean copy_edges) {
     try {
       Node n = (Node)clone();
       n._uid = newuid();                  // A new UID
@@ -527,7 +566,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Run peepholes are a recently parsed Node; Node has no uses (yet).
   // Node can be idealized and reduced to other Nodes.
   public final Node peep() {
-    assert _val == null;        // Otherwise we need to check monotonic
+    assert _val == Type.ALL;    // Otherwise we need to check monotonic
     assert _ulen==0;            // No uses yet
     _val = value();
     
@@ -548,7 +587,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       return GVN.add_flow(x);   // Graph replace with x
     }
 
-    return null;                // No change
+    return this;                // No change
   }
 
   // reducing xforms, strictly fewer Nodes or Edges.  n may be either in or out
@@ -677,23 +716,22 @@ public abstract class Node implements Cloneable, IntSupplier {
     //return true;
 
   // Make globally shared common ConNode for this type.
-  public static @NotNull Node con( Type t ) {
-    //Node con = new ConNode<>(t);
-    //Node con2 = VALS.get(con);
-    //if( con2 != null ) {        // Found a prior constant
+  public static Node con( Type t ) {
+    Node con = new ConNode<>(t);
+    Node con2 = VALS.get(con);
+    if( con2 != null ) {        // Found a prior constant
     //  if( Combo.HM_FREEZE && con2._tvar != con._tvar )
     //    throw TODO();
     //  con.kill();               // Kill the just-made one
     //  con = con2;
     //  con._live = Type.ALL;     // Adding more liveness
-    //} else {                    // New constant
-    //  con._val = t;             // Typed
+      throw TODO();
+    } else {                    // New constant
     //  con._live = Combo.post() ? Type.ANY : Type.ALL;     // Not live yet
     //  if( Combo.post() && con.has_tvar() ) con.set_tvar();
-    //  con._elock(); // Put in VALS, since if Con appears once, probably appears again in the same XFORM call
-    //}
-    //return GVN.add_flow(con); // Updated live flows
-    throw TODO();
+      con._elock(); // Put in VALS, since if Con appears once, probably appears again shortly
+    }
+    return con;
   }
 
   
@@ -746,20 +784,6 @@ public abstract class Node implements Cloneable, IntSupplier {
   // TODO: rethink this, or make virtual
   private boolean has_call_use() { return this instanceof FunPtrNode; }
 
-  //// Node n is new in Combo (NOT GCP), cannot do most graph-reshape but
-  //// commonly hit in VALS and this is OK.
-  //public Node init1( ) {
-  //  Node x = VALS.get(this);
-  //  if( x!=null ) {             // Hit in GVN table
-  //    kill();                   // Kill just-init'd
-  //    return x;                 // Return old, which will add uses
-  //  }
-  //  _elock();                   // Install in GVN
-  //  _val = _live = Type.ANY;    // Super optimistic types
-  //  if( has_tvar() ) set_tvar();
-  //  return GVN.add_flow(this);
-  //}
-
   // --------------------------------------------------------------------------
   // Reset primitives.  Mostly unwire called and wired primitives.
   public final int walk_reset( int ignore ) {
@@ -769,97 +793,25 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( _tvar!=null ) _tvar.reset_deps();
     walk_reset0();              // Special reset
 
-    //// Remove non-prim inputs to a prim.  Skips all asserts and worklists.
-    //Node c;
-    //while( _defs._len>0 && (c=_defs.last())!=null && !c.is_prim() )
-    //  _defs.pop()._uses.del(this);
-    //// Remove non-prim uses of a prim.
-    //for( int i=0; i<_uses._len; i++ )
-    //  if( !(c = _uses.at(i)).is_prim() ) {
-    //    while( c.len() > 0 ) {
-    //      Node x = c._defs.pop();
-    //      if( x!=null ) x._uses.del(c);
-    //    }
-    //    i--;
-    //  }
-    //return 0;
-    throw TODO();
+    // Remove non-prim inputs to a prim.  Skips all asserts and worklists.
+    Node c;
+    while( _len>0 && (c=last())!=null && !c.isPrim() ) {
+      _len--;
+      c._delUse(this);
+    }
+    // Remove non-prim uses of a prim.
+    for( int i=0; i<_ulen; i++ )
+      if( (c = _uses[i]) != null && !c.isPrim() ) {
+        while( c._len-- > 0 ) {
+          Node x = c._defs[c._len];
+          if( x!=null ) x._delUse(c);
+        }
+        i--;
+      }
+    return 0;
   }
   // Non-recursive specialized version
   void walk_reset0( ) {}
-
-  // --------------------------------------------------------------------------
-  // Assert all value and liveness calls only go forwards, and if they can
-  // progress they are on the worklist.
-  private static final VBitSet VISIT = new VBitSet();
-  private static boolean MORE_WORK_ASSERT;
-  public final int more_work( ) {
-    assert !MORE_WORK_ASSERT;
-    MORE_WORK_ASSERT = true;
-    int rez = walk( Node::more_work );
-    MORE_WORK_ASSERT = false;
-    return rez;
-  }
-  public static boolean mid_work_assert() { return MORE_WORK_ASSERT; }
-  private int more_work( int errs ) {
-    if( GVN.on_dead(this) ) return -1; // Do not check dying nodes or reachable from dying
-    if( isPrim() ) return errs;        // Do not check primitives
-    // Check for GCP progress
-    Type oval= _val, nval = value(); // Forwards flow
-    Type oliv=_live, nliv = live (); // Backwards flow
-    if( oval!=nval || oliv!=nliv ) {
-      if( !(AA.LIFTING
-            ? nval.isa(oval) && nliv.isa(oliv)
-            : oval.isa(nval) && oliv.isa(nliv)) )
-        errs += _report_bug("Monotonicity bug");
-      if( !GVN.on_flow(this) && (AA.LIFTING || AA.DO_GCP) )
-        errs += _report_bug("Progress bug");
-    }
-    // Check for HMT progress
-    if( !AA.LIFTING &&                      // Falling, in Combo, so HM is running
-        oliv!=Type.ANY && oval!=Type.ANY && // Alive in any way
-        has_tvar() &&                       // Doing TVar things
-        (!GVN.on_flow(this) || Combo.HM_FREEZE) ) { // Not already on worklist, or past freezing
-      if( unify(true) )
-        errs += _report_bug(Combo.HM_FREEZE ? "Progress after freezing" : "Progress bug");
-    }
-    return errs;
-  }
-  private int _report_bug(String msg) {
-    VISIT.clear(_uid); // Pop-frame & re-run in debugger
-    System.err.println(msg);
-    System.err.println(NodePrinter.prettyPrint(this,0));
-    // BREAKPOINT HERE
-    VISIT.set(_uid); // Reset if progressing past breakpoint
-    return 1;
-  }
-
-  // Assert all ideal, value and liveness calls are done
-  private static final VBitSet IDEAL_VISIT = new VBitSet();
-  public final boolean no_more_ideal() {
-    assert !MORE_WORK_ASSERT;
-    MORE_WORK_ASSERT = true;
-    IDEAL_VISIT.clear();
-    boolean no_more = !_more_ideal();
-    MORE_WORK_ASSERT = false;
-    return no_more;
-  }
-  private boolean _more_ideal() {
-    if( IDEAL_VISIT.tset(_uid) ) return false; // Been there, done that
-    if( !isKeep() && !GVN.on_dead(this)) { // Only non-keeps, which is just top-level scope and prims
-      Node x;
-      if( !GVN.on_reduce(this) ) { x = do_reduce(); if( x != null )
-                                                         return true; } // Found an ideal call
-      if( !GVN.on_mono  (this) ) { x = do_mono  (); if( x != null )
-                                                         return true; } // Found an ideal call
-      if( !GVN.on_grow  (this) ) { x = do_grow  (); if( x != null )
-                                                         return true; } // Found an ideal call
-      if( this instanceof FunNode fun && !GVN.on_inline(fun) && _must_inline==0 ) fun.ideal_inline(true);
-    }
-    for( Node def : _defs ) if( def != null && def._more_ideal() ) return true;
-    for( Node use : _uses ) if( use != null && use._more_ideal() ) return true;
-    return false;
-  }
 
 
   // --------------------------------------------------------------------------
@@ -897,20 +849,21 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Generic Visitor Pattern
   // Map takes and updates/reduces int x.
   // If map returns -1, the walk is stopped and x is not updated.
+  private static final VBitSet WVISIT = new VBitSet();
   public interface NodeMap { int map(Node n, int x); }
   final public int walk( NodeMap map ) {
-    assert VISIT.isEmpty();
+    assert WVISIT.isEmpty();
     int rez = _walk(map,0);
-    VISIT.clear();
+    WVISIT.clear();
     return rez;
   }
   
   private int _walk( NodeMap map, int x ) {
-    if( VISIT.tset(_uid) ) return x; // Been there, done that
+    if( WVISIT.tset(_uid) ) return x; // Been there, done that
     int x2 = map.map(this,x);
     if( x2 == -1 ) return x;
-    for( Node def : _defs )  if( def != null )  x2 = def._walk(map,x2);
-    for( Node use : _uses )                     x2 = use._walk(map,x2);
+    for( Node def : defs() )  if( def != null )  x2 = def._walk(map,x2);
+    for( Node use : uses() )  if( use != null )  x2 = use._walk(map,x2);
     return x2;
   }
 
@@ -929,6 +882,8 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Shortcut
   public Type sharptr( Node mem ) { return mem._val.sharptr(_val); }
 
+  int more_work(int errs) { return NodeUtil.more_work(errs,this); }
+  
   //// Walk a subset of the dominator tree, looking for the last place (highest
   //// in tree) this predicate passes, or null if it never does.
   //Node walk_dom_last(Predicate<Node> P) {

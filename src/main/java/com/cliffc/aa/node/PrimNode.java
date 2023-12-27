@@ -8,7 +8,6 @@ import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
-import java.lang.Math;
 
 // Primitives are nodes to do primitive operations.  Internally they carry a
 // '_formals' to type their arguments.  Similar to functions and FunNodes and
@@ -129,9 +128,7 @@ public abstract class PrimNode extends Node {
     // ClazzClazz
     ZCLZ.close();
     PCLZ.init();
-    StoreXNode mem = new StoreXNode(Env.SCP_0.mem(),Env.GVN.add_flow(PCLZ),ZCLZ,null).init();
-    mem._live = TypeMem.ALLMEM;
-    Env.SCP_0.mem(mem);
+    Env.SCP_0.mem(new StoreXNode(Env.SCP_0.mem(),Env.GVN.add_flow(PCLZ),ZCLZ,null));
     ZCLZ.set_tvar();
 
     // Gather
@@ -158,10 +155,11 @@ public abstract class PrimNode extends Node {
 
     // Set all TVars
     Env.ROOT.walk( (n,ignore) -> {
+        Env.GVN.add_flow(n);
         if( n.has_tvar() ) n.set_tvar();
         return 0;
       });
-    
+
     // Loop, setting initial types for all primitives
     Node n0;
     while( (n0=Env.GVN.pop_flow())!= null ) {
@@ -261,13 +259,13 @@ public abstract class PrimNode extends Node {
         over.init();
         over.close();
         ptr0 = new NewNode(BitsAlias.new_alias(BitsAlias.LOCX),true).init();
-        scp.mem(new StoreXNode(scp.mem(),ptr0,over,null).init());
+        scp.mem(new StoreXNode(scp.mem(),ptr0,over,null));
       }
       clz.add_fld(prims[0]._name,Access.Final,ptr0,null);
     }
     clz.close();
     Env.PROTOS.put(clzname,clz); // global mapping
-    scp.mem(new StoreXNode(scp.mem(),Env.GVN.add_flow(ptr),clz,null).init());
+    scp.mem(new StoreXNode(scp.mem(),Env.GVN.add_flow(ptr),clz,null));
   }
 
   // Build and install match package
@@ -277,10 +275,7 @@ public abstract class PrimNode extends Node {
     ZMATH.add_fld("pi",Access.Final,pi,null);
     ZMATH.add_fld(rand._name,Access.Final,rand.as_fun(),null);
     ZMATH.close().init();
-    Env.GVN.add_flow(PMATH); // Type depends on uses
-    StoreXNode mem = new StoreXNode(Env.SCP_0.mem(),PMATH,ZMATH,null).init();
-    mem._live = TypeMem.ALLMEM;
-    Env.SCP_0.mem(mem);
+    Env.SCP_0.mem(new StoreXNode(Env.SCP_0.mem(),PMATH,ZMATH,null));
     return PMATH;
   }
 
