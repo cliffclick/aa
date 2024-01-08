@@ -30,6 +30,7 @@ public class ParmNode extends Node {
   public FunNode fun() { return (FunNode) in(0); }
 
   @Override public Type value() {
+    if( isPrim() ) return _t;   // Prims, executed or not, always conservative
     // Not executing?
     Type ctl = val(0);
     if( ctl.above_center() ) return Type.ANY;
@@ -107,7 +108,7 @@ public class ParmNode extends Node {
   // "fresh" TVars for every input path.
   @Override public boolean unify( boolean test ) { return false; }
 
-  @Override public int hashCode() { return super.hashCode()+(int)_t._hash+_idx; }
+  @Override int hash() { return (int)_t._hash+_idx; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;

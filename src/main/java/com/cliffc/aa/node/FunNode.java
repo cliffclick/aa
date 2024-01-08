@@ -133,7 +133,7 @@ public class FunNode extends Node {
   // One-shot transition from having unknown callers to not having.
   // At Combo, all callers are known and stay known: even Root is a known caller.
   public boolean unknown_callers( Node dep ) {
-    if( always_prim() ) return true; // Too early
+    if( isPrim() ) return true; // Too early
     if( _unknown_callers && dep!=null ) deps_add(dep);
     return _unknown_callers;
   }
@@ -201,7 +201,6 @@ public class FunNode extends Node {
     for( int i=1; i<len(); i++ )
       if( in(i)._val.above_center() )
         throw TODO(); // SEEMS INCORRECT, NOT HACKING PARMS //Env.GVN.add_unuse(progress = del(i));
-      else  in(i).deps_add(this);
     return progress==null ? null : this;
   }
 

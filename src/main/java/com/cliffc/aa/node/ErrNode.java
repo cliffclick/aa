@@ -50,7 +50,7 @@ public final class ErrNode extends Node {
         return true;
     return false;
   }
-  @Override public int hashCode() { return super.hashCode()+_err.hashCode(); }
+  @Override int hash() { return _err.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;

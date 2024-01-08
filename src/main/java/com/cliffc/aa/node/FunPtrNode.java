@@ -40,6 +40,8 @@ public final class FunPtrNode extends Node {
     if( fun==null ) return "*Fun";
     return "*"+fun.label();
   }
+  // Already a constant
+  @Override public boolean shouldCon() { return false; }
   
   // Display (already fresh-loaded) but no name.
   public  FunPtrNode( RetNode ret ) { this(ret.fun()._name,ret); }

@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
+import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVExpanding;
@@ -48,15 +49,16 @@ public abstract class Node implements Cloneable, IntSupplier {
   
   public static int _PRIM_CNT = 99999;
   // Initial state after loading e.g. primitives.
-  public static void init0() { _PRIM_CNT=CNT; }
+  public static void initPrim() { _PRIM_CNT=CNT; }
   // Reset is called after a top-level exec exits (e.g. junits) with no parse
   // state left alive.  NOT called after a line in the REPL or a user-call to
   // "eval" as user state carries on.
   public static void reset_to_init0() { CNT = _PRIM_CNT; }
 
   // Is a primitive
-  public boolean always_prim() { return _uid<_PRIM_CNT; }
-  public boolean isPrim() { return always_prim() && PrimNode.post_init(); }
+  public boolean isPrim() { return Env.NODE_LO <= _uid && _uid < _PRIM_CNT; }
+  // Keep all the early nodes for repeated testing
+  public boolean isResetKeep() { return _uid < _PRIM_CNT; }
 
   // Overridden in subclasses that return TypeTuple value types.  Such nodes
   // are always followed by ProjNodes to break out the tuple slices.  If the
@@ -93,12 +95,16 @@ public abstract class Node implements Cloneable, IntSupplier {
   // {@code toString} is what you get in the debugger.  It has to print 1
   // line (because this is what a debugger typically displays by default) and
   // has to be robust with broken graph/nodes.
-  @Override public final String toString() {  return _printLine(new SB()).toString(); }
+  @Override public final String toString() {  return _printLine(new SB(),false).toString(); }
 
   // Print a node on 1 line, columnar aligned, as:
   // NNID NNAME DDEF DDEF  [[  UUSE UUSE  ]]  TYPE
   // 1234 sssss 1234 1234 1234 1234 1234 1234 tttttt
-  public final SB _printLine( SB sb ) {
+  public final SB _printLine( SB sb, boolean live ) {
+    if( live ) {
+      String slive = _live.toString();
+      sb.p("%-7.7s ".formatted(slive));
+    }
     sb.p("%4d %-7.7s ".formatted(_uid,label()));
     if( isDead() ) return sb.p("DEAD\n");
     for( int i=0; i<_len; i++ ) {
@@ -172,7 +178,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   private void _addUse( Node n ) {
     // A NPE here means the _uses are null, which means the Node was killed
     if( _ulen == _uses.length ) {
-      int len = 32-Integer.numberOfLeadingZeros(_ulen);
+      int len = 1<<(32-Integer.numberOfLeadingZeros(_ulen));
       while( len <= _ulen ) len<<=1;
       _uses = Arrays.copyOf(_uses,len);
     }
@@ -359,13 +365,14 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Hash is function+inputs, or opcode+input_uids, and is invariant over edge
   // order (so we can swap edges without rehashing)
   private int _hash;
-  @Override public int hashCode() {
+  @Override public final int hashCode() {
     if( _hash!=0 ) return _hash;
-    int sum = label().hashCode();
+    int sum = label().hashCode() + hash();
     for( Node def : defs() ) if( def != null ) sum ^= def._uid;
     if( sum==0 ) sum = 0xDEADBEEF;
     return (_hash=sum);
   }
+  int hash() { return 0; }      // Override this
   // Equals is function+inputs, or opcode+input_uids.  Uses pointer-equality
   // checks for input equality checks.
   @Override public boolean equals(Object o) {
@@ -418,16 +425,21 @@ public abstract class Node implements Cloneable, IntSupplier {
   public Type live( ) {
     // Compute meet/union of all use livenesses
     Type live = Type.ANY;           // Start at lattice top
+    boolean isMem = isMem();
     for( int j=0; j<nUses(); j++ ) {       // Computed across all uses
       Node use = use(j);
       if( use==null )
-        return isMem() ? TypeMem.ALLMEM : Type.ALL; // Keep-alive, so fully alive
+        return isMem ? TypeMem.ALLMEM : Type.ALL; // Keep-alive, so fully alive
       if( use._live != Type.ANY ) { // If use is alive, propagate liveness
         // The same def might be used on several inputs, with separate notions
         // of liveness
         for( int i=0; i<use.len(); i++ ) {
           if( use.in(i)==this ) {
             Type ulive = use.live_use(i);
+            // Things like CProj or DProj are either all/not alive.  If
+            // 'this.isMem', e.g. a Call or CallEpi, the Projs keep the node
+            // alive but do not add any memory refinements.
+            if( isMem && ulive==Type.ALL ) ulive = TypeMem.ANYMEM;
             live = live.meet(ulive); // Make alive used fields
           }
         }
@@ -447,6 +459,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       deps_work_clear();
     }
   }
+  Node setLive(Type live) { _live=live; return this; }
   // Compute local contribution of use liveness to this def.
   // Overridden in subclasses that do per-def liveness.
   Type live_use( int i ) { return _live; }
@@ -573,11 +586,15 @@ public abstract class Node implements Cloneable, IntSupplier {
   
   // Run peepholes are a recently parsed Node; Node has no uses (yet).
   // Node can be idealized and reduced to other Nodes.
+  private boolean _peeped;      // One-shot assert only
   public final Node peep() {
-    assert _val == Type.ALL;    // Otherwise we need to check monotonic
+    assert !_peeped;
+    _peeped = true;
+    Type old = _val;
     _val = value();
-    assert _ulen==0;            // No uses yet, so can use what is returned directly
-    Node x = _do_reduce();      // Find a reduced version, if any
+    assert _val.isa(old);  // Monotonic
+    assert _ulen==0;       // No uses yet, so can use what is returned directly
+    Node x = _do_reduce(); // Find a reduced version, if any
     return x==null ? this : x;  // Always return a not-null
   }
 
@@ -586,7 +603,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Returns null if no-progress.
   private Node _do_reduce() {
     if( shouldCon() )
-      return kill(new ConNode(_val).peep());
+      return kill(new ConNode(_val).setLive(_live).peep());
 
     // Try CSE
     if( !_elock ) {             // Not in VALS and can still replace
@@ -611,7 +628,8 @@ public abstract class Node implements Cloneable, IntSupplier {
   public Node do_reduce() {
     Node nnn = _do_reduce();
     if( nnn!=null ) {           // Something happened
-      GVN.add_flow_uses(this);  // Users of change should recheck
+      GVN.add_flow_uses(this);  // Users of change should recheck value
+      GVN.add_flow_defs(this);  // Defs  of change should recheck liveness
       if( nnn!=this ) {         // Replacement
         GVN.add_reduce_uses(this); // New chances for V-N
         subsume(nnn);           // Replace
@@ -684,7 +702,9 @@ public abstract class Node implements Cloneable, IntSupplier {
   // - Not already a ConNode AND
   // - Not an ErrNode AND
   // - Type.is_con()
-  public boolean shouldCon() { return false; }
+  public boolean shouldCon() {
+    return !isPrim() && _val.is_con();
+  }
     //if( !t.is_con() || (t.above_center() && t!=TypeNil.NIL)) return false; // Not a constant
     //if( this instanceof ConNode    || // Already a constant
     //    this instanceof FunPtrNode || // Already a constant
@@ -694,11 +714,11 @@ public abstract class Node implements Cloneable, IntSupplier {
     //    this instanceof FreshNode  || // These modify the TVars but not the constant flows
     //    (this instanceof StructNode st && !st.is_closed()) || // Struct is in-progress
     //    is_mem() ||
-    //    is_prim() )                 // Never touch a Primitive
+    //    isPrim() )                 // Never touch a Primitive
     //  return false; // Already a constant, or never touch an ErrNode
     //// External fidxs are never constants, except primitives which are both
     //// external and the same everywhere.
-    //if( !is_prim() &&
+    //if( !isPrim() &&
     //    t instanceof TypeFunPtr tfp &&
     //    BitsFun.EXT.test_recur(tfp.fidx()) )
     //  return false;
@@ -706,21 +726,22 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Make globally shared common ConNode for this type.
   public static Node con( Type t ) {
-    Node con = new ConNode<>(t);
-    Node con2 = VALS.get(con);
-    if( con2 != null ) {        // Found a prior constant
-    //  if( Combo.HM_FREEZE && con2._tvar != con._tvar )
-    //    throw TODO();
-    //  con.kill();               // Kill the just-made one
-    //  con = con2;
-    //  con._live = Type.ALL;     // Adding more liveness
-      throw TODO();
-    } else {                    // New constant
-    //  con._live = Combo.post() ? Type.ANY : Type.ALL;     // Not live yet
-    //  if( Combo.post() && con.has_tvar() ) con.set_tvar();
-      con._elock(); // Put in VALS, since if Con appears once, probably appears again shortly
-    }
-    return con;
+    return new ConNode<>(t).peep();
+    //Node con = new ConNode<>(t);
+    //Node con2 = VALS.get(con);
+    //if( con2 != null ) {        // Found a prior constant
+    ////  if( Combo.HM_FREEZE && con2._tvar != con._tvar )
+    ////    throw TODO();
+    ////  con.kill();               // Kill the just-made one
+    ////  con = con2;
+    ////  con._live = Type.ALL;     // Adding more liveness
+    //  throw TODO();
+    //} else {                    // New constant
+    ////  con._live = Combo.post() ? Type.ANY : Type.ALL;     // Not live yet
+    ////  if( Combo.post() && con.has_tvar() ) con.set_tvar();
+    //  con._elock(); // Put in VALS, since if Con appears once, probably appears again shortly
+    //}
+    //return con;
   }
 
   
@@ -729,6 +750,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Do One Step of forwards-dataflow analysis.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
   public void combo_forwards() {
+    if( isPrim() ) return;
     Type oval = _val;           // Old local type
     Type nval = value();        // New type
     if( oval == nval ) return;  // No progress
@@ -741,6 +763,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Do One Step of backwards-dataflow analysis.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
   public void combo_backwards() {
+    if( isPrim() ) return;
     Type oliv = _live;
     Type nliv = live();
     // TODO: If use._value >= constant, force live-use to ANY.
@@ -765,8 +788,8 @@ public abstract class Node implements Cloneable, IntSupplier {
       assert !_tvar.find().unify(old.find(),true);// monotonic: unifying with the result is no-progress
       TVExpanding.do_delay_fresh();
       // HM changes; push related neighbors
-      for( Node def : _defs ) if( def!=null && def.has_tvar() ) GVN.add_flow(def);
-      for( Node use : _uses ) if(              use.has_tvar() ) GVN.add_flow(use);
+      for( Node def : defs() ) if( def!=null && def.has_tvar() ) GVN.add_flow(def);
+      for( Node use : uses() ) if(              use.has_tvar() ) GVN.add_flow(use);
     }
   }
 
@@ -776,7 +799,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // --------------------------------------------------------------------------
   // Reset primitives.  Mostly unwire called and wired primitives.
   public final int walk_reset( int ignore ) {
-    assert isPrim();            // Primitives
+    if( !isResetKeep() ) return 0;   // Primitives
     _elock = false;             // Clear elock if reset_to_init0
     _deps = null;               // No deps
     if( _tvar!=null ) _tvar.reset_deps();
@@ -784,13 +807,13 @@ public abstract class Node implements Cloneable, IntSupplier {
 
     // Remove non-prim inputs to a prim.  Skips all asserts and worklists.
     Node c;
-    while( _len>0 && (c=last())!=null && !c.isPrim() ) {
+    while( _len>0 && (c=last())!=null && !c.isResetKeep()) {
       _len--;
       c._delUse(this);
     }
     // Remove non-prim uses of a prim.
     for( int i=0; i<_ulen; i++ )
-      if( (c = _uses[i]) != null && !c.isPrim() ) {
+      if( (c = _uses[i]) != null && !c.isResetKeep() ) {
         while( c._len-- > 0 ) {
           Node x = c._defs[c._len];
           if( x!=null ) x._delUse(c);

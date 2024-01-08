@@ -137,7 +137,7 @@ public abstract class Combo {
   public static boolean post  () { return  AA.LIFTING &&  HM_FREEZE; }
 
   public static void opto() {
-    assert !PrimNode.post_init() || Env.GVN.work_is_clear();
+    assert Env.GVN.work_is_clear();
     // This pass LIFTS not FALLs
     AA.LIFTING = false;
 
@@ -145,14 +145,17 @@ public abstract class Combo {
     // Set all type-vars to Leafs.
     RootNode.combo_def_mem();
     Env.ROOT.walk( (n,ignore) -> {
-        if( n.isPrim() && Env.ROOT!=n ) return 0;
+        if( n.isPrim() ) return 0;
         n._val = n._live = Type.ANY;  // Highest value
         if( n.has_tvar() ) n.set_tvar();
         Env.GVN.add_flow(n);
-        if( n instanceof FunNode fun && !n.always_prim() )
+        if( n instanceof FunNode fun && !n.isPrim() )
           fun.set_unknown_callers();
         return 0;
       });
+    Env.ROOT.xval();
+    Env.ROOT.xliv();
+
     assert NodeUtil.more_work(Env.ROOT)==0; // Initial conditions are correct
 
     // Init
@@ -189,6 +192,7 @@ public abstract class Combo {
       });
 
     AA.LIFTING = true;
+    assert !NodeUtil.leak();
   }
 
   static int main_work_loop( int pass ) {

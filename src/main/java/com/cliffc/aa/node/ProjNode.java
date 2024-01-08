@@ -21,7 +21,6 @@ public class ProjNode extends Node {
     if( c!=Type.ANY && c!=Type.ALL ) return c;
     return c.oob(TypeNil.SCALAR);
   }
-  @Override Type live_use( int i ) { return i==MEM_IDX ? TypeMem.ANYMEM : _live; }
   
   // Strictly reducing
   @Override public Node ideal_reduce() {
@@ -40,14 +39,14 @@ public class ProjNode extends Node {
   }
 
   public static ProjNode proj( Node head, int idx ) {
-    for( Node use : head.uses() )
-      if( use instanceof ProjNode proj && proj._idx==idx )
+    for( int i=0; i<head.nUses(); i++ )
+      if( head.use(i) instanceof ProjNode proj && proj._idx==idx )
         return proj;
     return null;
   }
 
   void set_idx( int idx ) { unelock(); _idx=idx; } // Unlock before changing hash
-  @Override public int hashCode() { return super.hashCode()+_idx; }
+  @Override int hash() { return _idx; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;

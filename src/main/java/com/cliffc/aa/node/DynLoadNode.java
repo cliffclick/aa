@@ -180,8 +180,7 @@ public class DynLoadNode extends Node {
     // Since the Load is alive, the address is alive
     if( i!=MEM_IDX ) return Type.ALL;
     // Memory demands
-    Node def=mem();
-    adr().deps_add(def);
+    Node def = mem();
     if( adr.above_center() ) return Type.ANY; // Nothing is demanded
     if( !(adr instanceof TypeNil ptr) )  // Demand everything not killed at this field
       return RootNode.def_mem(def);
@@ -201,7 +200,7 @@ public class DynLoadNode extends Node {
       if( r._path.size()==1 ) {
         assert _resolves._len==1;
         if( r._label!=null )
-          return new LoadNode(mem(),adr(),r._label,_bad);
+          return new LoadNode(mem(),adr(),r._label,_bad).peep().setLive(_live);
       }
     }
     return null;

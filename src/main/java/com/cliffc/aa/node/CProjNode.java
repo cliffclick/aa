@@ -20,7 +20,6 @@ public class CProjNode extends ProjNode {
     // Normal projection, except pinch to CTRL.
     return super.value().oob(Type.CTRL);
   }
-  @Override Type live_use( int i ) { return i==MEM_IDX ? TypeMem.ANYMEM : Type.ALL; }
 
   // Strictly reducing
   @Override public Node ideal_reduce() {

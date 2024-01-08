@@ -41,7 +41,7 @@ public class ScopeNode extends Node {
     // Remove the scope use of old memory, so the store becomes the ONLY use of
     // old memory, allowing the store to fold immediately.
     setDef(MEM_IDX,null);
-    setDef(MEM_IDX,st.peep());
+    setDef(MEM_IDX,st);
   }
 
   public Node get(String name) { return stk().in(name); }
@@ -94,7 +94,7 @@ public class ScopeNode extends Node {
     throw TODO();             // TODO Test me
   }
   
-  @Override public int hashCode() { return 123456789; }
+  @Override int hash() { return 123456789; }
   // ScopeNodes are never equal
   @Override public boolean equals(Object o) { return this==o; }
   // End of dominator tree; do not walk past

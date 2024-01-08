@@ -39,6 +39,7 @@ public abstract class NodeUtil {
     @Override public Node next() { return _ns[_i++]; }
     @Override public void remove() { throw TODO(); }
   }
+  public static boolean leak() { return Iter.POOL._len<Iter.CNT; }
 
   
   // Fold control copies
@@ -66,9 +67,11 @@ public abstract class NodeUtil {
   static int more_work( int errs, Node n ) {
     if( GVN.on_dead(n) ) return -1; // Do not check dying nodes or reachable from dying
     if( n.isPrim() ) return errs;        // Do not check primitives
+    int old = Iter.POOL._len;
     // Check for GCP progress
     Type oval= n._val, nval = n.value(); // Forwards flow
     Type oliv=n._live, nliv = n.live (); // Backwards flow
+    assert Iter.POOL._len==old;          // No leaks
     if( oval!=nval || oliv!=nliv ) {
       if( !(AA.LIFTING
             ? nval.isa(oval) && nliv.isa(oliv)
@@ -110,6 +113,7 @@ public abstract class NodeUtil {
     if( n==null || n.isPrim() ) return false;
     if( IDEAL_VISIT.tset(n._uid) ) return false; // Been there, done that
     if( !n.isKeep() && !GVN.on_dead(n)) { // Only non-keeps, which is just top-level scope and prims
+      assert !NodeUtil.leak();
       Node x;
       if( !GVN.on_reduce(n) ) { x = n.do_reduce(); if( x != null )
                                                          return true; } // Found an ideal call
@@ -118,6 +122,7 @@ public abstract class NodeUtil {
       if( !GVN.on_grow  (n) ) { x = n.do_grow  (); if( x != null )
                                                          return true; } // Found an ideal call
       if( n instanceof FunNode fun && !GVN.on_inline(fun) && FunNode._must_inline==0 ) fun.ideal_inline(true);
+      assert !NodeUtil.leak();
     }
     for( int i=0; i<n.len  (); i++ ) if( _more_ideal(n.in (i)) ) return true;
     for( int i=0; i<n.nUses(); i++ ) if( _more_ideal(n.use(i)) ) return true;

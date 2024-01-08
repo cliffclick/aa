@@ -63,7 +63,7 @@ public class ForwardRefNode extends Node {
 
 
   @Override public Node isCopy(int idx) { return len()==2 ? in(1) : null; }
-  @Override public int hashCode() { return super.hashCode()+(_bad==null ? 0 : _bad.hashCode()); }
+  @Override int hash() { return (_bad==null ? 0 : _bad.hashCode()); }
   @Override public boolean equals(Object o) {
     if( !super.equals(o) ) return false;
     return _bad==((ForwardRefNode)o)._bad;

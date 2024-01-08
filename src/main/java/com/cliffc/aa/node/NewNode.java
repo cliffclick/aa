@@ -104,7 +104,7 @@ public class NewNode extends Node {
     return nnn;
   }
 
-  @Override public int hashCode() { return super.hashCode()+ _alias; }
+  @Override int hash() { return _alias; }
   // Only ever equal to self, because of unique _alias.  We can collapse equal
   // NewNodes and join alias classes, but this is not the normal CSE and so is
   // not done by default.

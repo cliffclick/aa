@@ -98,8 +98,9 @@ public class CallNode extends Node {
   }
 
   @Override public String label() { return (_is_copy ? "CopyCall" : (isDead() ? "Xall" : "Call")); } // Self short name
-  @Override public boolean isCFG() { return true; }
   @Override public boolean isMem() { return true; }
+  @Override public boolean isMultiHead() { return true; }
+  @Override public boolean isCFG() { return true; }
 
   // Number of actual arguments, including closure/display at DSP_IDX.
   int nargs() { return len()-1; }
@@ -239,7 +240,8 @@ public class CallNode extends Node {
       for( int i=DSP_IDX; i<nargs(); i++ ) if( in(i)!=Env.ANY ) abits |= (1<<i);
       // Find arg uses
       if( abits!=0 )
-        for( Node use : uses() ) {
+        for( int i=0; i<nUses(); i++ ) {
+          Node use = use(i);
           if( use instanceof CallEpiNode ) continue;
           if( use instanceof FunNode fun ) {
             for( Node fuse : fun.uses() )
@@ -276,7 +278,7 @@ public class CallNode extends Node {
     if( cepim == null ) return null;
     if( !(cepim._val instanceof TypeMem tmcepi) ) return null;
     if( !mem._val.isa(tmcepi) ) return null; // Call entry stale relative to exit
-    //// Check for prior Join
+    // Check for prior Join
     if( mem instanceof MemJoinNode ) {
       if( !mem.check_solo_mem_writer(this) )
         return null;
@@ -375,7 +377,8 @@ public class CallNode extends Node {
 
     // Since wired, we can check all uses to see if this argument is alive.
     Type t = Type.ANY;
-    for( Node use : uses() ) {
+    for( int j=0; j<nUses(); j++ ) {
+      Node use = use(j);
       // The 3 allowed types are CallEpi, Root and Fun
       if( use instanceof CallEpiNode ) continue;
       if( use instanceof RootNode ) return Type.ALL;
@@ -388,7 +391,6 @@ public class CallNode extends Node {
         if( t == Type.ALL ) return Type.ALL;
       }
     }
-    deps_add(def);
     return t;
   }
 
@@ -458,8 +460,8 @@ public class CallNode extends Node {
   }
 
   public CallEpiNode cepi() {
-    for( Node xcepi : uses() )    // Find CallEpi for bypass aliases
-      if( xcepi instanceof CallEpiNode cepi )
+    for( int i=0; i<nUses(); i++ )
+      if( use(i) instanceof CallEpiNode cepi ) // Find CallEpi
         return cepi;
     return null;
   }
@@ -470,7 +472,7 @@ public class CallNode extends Node {
     return in(idx);
   }
   void set_rpc(int rpc) { assert !isPrim(); unelock(); _rpc=rpc; } // Unlock before changing hash
-  @Override public int hashCode() { return super.hashCode()+_rpc; }
+  @Override int hash() { return _rpc; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;

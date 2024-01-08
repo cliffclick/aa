@@ -32,7 +32,7 @@ public class PhiNode extends Node {
   @Override public String label() { return "Phi"; }
   @Override public boolean isMem() { return _t==TypeMem.ALLMEM; }
   @Override public boolean isMultiTail() { return true; }
-  @Override public int hashCode() { return super.hashCode()+_t.hashCode(); }
+  @Override int hash() { return _t.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;

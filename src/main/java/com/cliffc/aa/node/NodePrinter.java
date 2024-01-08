@@ -9,13 +9,14 @@ import static com.cliffc.aa.AA.TODO;
 public abstract class NodePrinter {
 
   // Another bulk pretty-printer.  Makes more effort at basic-block grouping.
-  public static String prettyPrint(Node node, int depth, boolean prims) { return _pp(node,depth,prims, new SB()).toString(); }
+  public static String prettyPrint(Node node, int depth, boolean prims) { return prettyPrint(node,depth,prims,false); }
+  public static String prettyPrint(Node node, int depth, boolean prims, boolean live) { return _pp(node,depth,prims,live, new SB()).toString(); }
   public static String prettyPrint(Ary<Node> roots) {
     throw TODO();
   }
 
   // Another bulk pretty-printer.  Uses max depth better.
-  static SB _pp(Node node, int depth, boolean prims, SB sb) {
+  static SB _pp(Node node, int depth, boolean prims, boolean live, SB sb) {
 
     // All Nodes within max depth
     VBitSet visit0 = new VBitSet();
@@ -38,17 +39,17 @@ public abstract class NodePrinter {
       Node n = rpos.at(i);
       if( n.isCFG() || n.isMultiHead() ) {
         if( !gap ) sb.nl();     // Blank before multihead
-        n._printLine(sb);       // Print head
+        n._printLine(sb,live);  // Print head
         // Print MultiTails in a row
         while( --i >= 0 ) {
           Node t = rpos.at(i);
           if( !t.isMultiTail() ) { i++; break; }
-          t._printLine(sb);
+          t._printLine(sb,live);
         }
         sb.nl(); // Blank after multitail
         gap = true;
       } else {
-        n._printLine( sb );
+        n._printLine( sb,live );
         gap = false;
       }
     }
@@ -57,7 +58,7 @@ public abstract class NodePrinter {
 
   private static void _pvisit(Node n, int d, boolean prims, Ary<Ary<Node>> nss, VBitSet visit) {
     // Skip prims unless asked-for
-    if( !prims && n.isPrim() && n!=Env.ROOT ) return;
+    if( !prims && n.isPrim() ) return;
     // Already visited at equal or deeper depth
     if( visit.tset(n._uid) && !findDel(n,d,nss) )
       return;
@@ -65,7 +66,7 @@ public abstract class NodePrinter {
     Ary<Node> ns = nss.atX(d);
     if( ns==null )              // Lazy make depths
       nss.setX(d,ns = new Ary<>(Node.class));
-    ns.push(n);                 // Anoter node at depth
+    ns.push(n);                 // Another node at depth
 
     // Go again at the next depth
     if( d > 0 )
@@ -94,22 +95,20 @@ public abstract class NodePrinter {
   private static void postOrd(Node n, Ary<Node> rpos, VBitSet visit, VBitSet bfs) {
     if( !bfs.test(n._uid) )  return; // Not in the BFS visit
     if( visit.tset(n._uid) ) return; // Already post-order walked
-    if( n instanceof RootNode ) { // No uses from Root, always bottom of the piel
-      rpos.add(n);
-      return; 
-    }
-    // First walk the CFG, then everything
-    if( n.isCFG() ) {
+    if( n!=Env.ROOT ) {         // No uses from Root, always bottom of the pile
+      // First walk the CFG, then everything
+      if( n.isCFG() ) {
+        for( Node use : n.uses() )
+          if( use!=null && use.isCFG() && use.nUses()>=1 /*&& !(use.use0() instanceof LoopNode)*/ )
+            postOrd(use, rpos,visit,bfs);
+        for( Node use : n.uses() )
+          if( use!=null && use.isCFG() )
+            postOrd(use,rpos,visit,bfs);
+      }
       for( Node use : n.uses() )
-        if( use!=null && use.isCFG() && use.nUses()>=1 /*&& !(use.use0() instanceof LoopNode)*/ )
+        if( use!=null )
           postOrd(use, rpos,visit,bfs);
-      for( Node use : n.uses() )
-        if( use!=null && use.isCFG() )
-          postOrd(use,rpos,visit,bfs);
     }
-    for( Node use : n.uses() )
-      if( use!=null )
-        postOrd(use, rpos,visit,bfs);
     // Post-order.  Keep tails with heads.
     if( n.isMultiTail() ) return; // Don't add tails yet, add with their head
     // For MultiHeads, add all tails first, then the head

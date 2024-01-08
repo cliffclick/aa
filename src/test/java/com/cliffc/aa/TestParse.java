@@ -31,6 +31,7 @@ public class TestParse {
     DO_HMT=true;
     RSEED=0;
     
+    test("!1", "nil", "nil");
     test("1", "int:1", "int:1");
 
   }

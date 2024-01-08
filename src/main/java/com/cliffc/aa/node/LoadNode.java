@@ -86,7 +86,8 @@ public class LoadNode extends Node {
     if( i!=MEM_IDX ) return Type.ALL;
     // Memory demands
     Node def=mem();
-    adr().deps_add(def);
+    if( adr().len() <= MEM_IDX || adr().in(MEM_IDX) != def )
+      adr().deps_add(def);
     if( adr.above_center() ) return Type.ANY; // Nothing is demanded
     if( !(adr instanceof TypeNil ptr) )  // Demand everything not killed at this field
       return RootNode.def_mem(def);
@@ -149,7 +150,7 @@ public class LoadNode extends Node {
           throw TODO();
         } else adr.deps_add(this);
       }
-    } else mem.deps_add(this);
+    }
 
     // Load can move past a Join if all aliases align.
     if( mem instanceof MemJoinNode && aliases != null ) {
@@ -333,7 +334,7 @@ public class LoadNode extends Node {
     return tvar().unify(fld,test);
   }
 
-  @Override public int hashCode() { return super.hashCode()+_fld.hashCode(); }
+  @Override int hash() { return _fld.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;

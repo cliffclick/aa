@@ -419,6 +419,7 @@ public class TVStruct extends TVExpanding {
     TypeFld[] flds = TypeFlds.get(_max);
     for( int i=0; i<_max; i++ )
       flds[i] = TypeFld.malloc(_flds[i],null,TypeFld.Access.Final);
+    Arrays.sort(flds,( tf0, tf1) -> TypeFld.scmp(tf0._fld,tf1._fld));
     TypeStruct ts = TypeStruct.malloc(false,false,false,Type.ANY.oob(is_open()),flds);
     ADUPS.put(_uid,ts);         // Stop cycles
 

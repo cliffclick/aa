@@ -32,8 +32,9 @@ public final class CallEpiNode extends Node {
     if( isDead() ) return "XallEpi";
     return "CallEpi";
   }
-  @Override public boolean isCFG() { return true; }
   @Override public boolean isMem() { return true; }
+  @Override public boolean isMultiHead() { return true; }
+  @Override public boolean isCFG() { return true; }
   @Override public Node isCopy(int idx) { return _is_copy ? in(idx) : null; }
 
   public CallNode call() { return (CallNode)in(0); }
@@ -300,10 +301,13 @@ public final class CallEpiNode extends Node {
     call.pop();                 // Drop call fdx; other args need to be copied-thru
     Env.GVN.add_reduce_uses(call);
     Env.GVN.add_reduce_uses(this);
+    ctl.keep();
+    mem.keep();
+    rez.keep();
     while( len()>0 ) pop();
-    addDef(ctl);
-    addDef(mem);
-    addDef(rez);
+    addDef(ctl.unkeep());
+    addDef(mem.unkeep());
+    addDef(rez.unkeep());
     return this;
   }
 
@@ -323,7 +327,7 @@ public final class CallEpiNode extends Node {
 
   // True if this CallEpi has virtual CG edges to other unknown callees.
   // If any function is wired, all are.
-  boolean unknown_callers() { return len()==1 || always_prim(); }
+  boolean unknown_callers() { return len()==1 || isPrim(); }
 
   // Checks for sane Call Graph, similar to RetNode.is_CG
   public boolean is_CG(boolean precise) {
@@ -380,7 +384,6 @@ public final class CallEpiNode extends Node {
     if( fidxs==BitsFun.NALL ) return false;
     // Remove extra wires (mostly post-combo)
     for( int i=1; i<len(); i++ ) {
-      call.deps_add(this);      // Call sharpens can remove
       int fidx = in(i) instanceof RetNode ret ? ret._fidx : BitsFun.EXTX;
       boolean ok_nargs = !(in(i) instanceof RetNode ret) || (call.nargs()== ret.fun().nargs());
       if( fidxs.above_center() || !fidxs.test_recur(fidx) || !ok_nargs ) {
@@ -440,7 +443,6 @@ public final class CallEpiNode extends Node {
         assert !unknown_callers(); // Only add 1 time when going from virtual to concrete Call Graph
       }
     } else {
-      call.deps_add(this);      // Call type sharpens, can wire
       call.deps_add(call);      // Call type sharpens, can wire
     }
     if( progress ) GVN.add_flow_defs(GVN.add_flow(call)); // Call, args may change liveness
@@ -450,11 +452,7 @@ public final class CallEpiNode extends Node {
 
 
   @Override public Type live() {
-    if( _is_copy ) return _live; // Freeze in place if dying
-    //Type live = super.live(false); // TODO: Not counting memory????
-    //if( live instanceof TypeMem ) return live;
-    //return live.oob(TypeMem.ALLMEM);
-    throw TODO();
+    return _is_copy ? _live : super.live(); // Freeze in place if dying
   }
 
   // Compute local contribution of use liveness to this def.  If the call is
@@ -492,10 +490,9 @@ public final class CallEpiNode extends Node {
   @Override public TV3 _set_tvar() {
     // Unwire all; will rewire optimistically during Combo
     while( nwired()>0 ) {
-      //Node w = del(1), fun=w;
-      //if( w instanceof RetNode ret ) fun = ret.fun();
-      //fun.del(call());
-      throw TODO();
+      Node w = del(1), fun=w;
+      if( w instanceof RetNode ret ) fun = ret.fun();
+      fun.del(call());
     }
     assert is_CG(false);
     return new TVLeaf();

@@ -71,17 +71,13 @@ public class RootNode extends Node {
   // [Ctrl, All_Mem_Minus_Dead, Rezult, global_escaped_[fidxs, aliases]]
   @Override public TypeTuple value() {
     // If computing for primitives, pre- any program, then max conservative value
-    if( in(3) == null ) return TypeTuple.ROOT;
+    if( Combo.pre() ) return TypeTuple.ROOT;
     
+    // Primitive memory
     //TypeMem tmem = mem._val instanceof TypeMem tmem0 ? tmem0 : mem._val.oob(TypeMem.ALLMEM);
-    //// Primitive memory
     ////tmem = PrimNode.primitive_memory(this,tmem);
     //tmem = (TypeMem)tmem.meet(val(ARG_IDX));
     TypeMem tmem = (TypeMem)val(ARG_IDX);
-    // Conservative final result.  Until Combo external calls can still wire, and escape arguments
-    if( Combo.pre() )
-      return TypeTuple.make(Type.CTRL,tmem.make_from(BitsAlias.EXTX,TypeStruct.ISUSED),TypeNil.SCALAR,TypeNil.SCALAR);
-    
 
     // Walk the 'rez', all Call args (since they call Root, their args escape)
     // and function rets (since called from Root, their return escapes).
@@ -232,7 +228,6 @@ public class RootNode extends Node {
 
   @Override public Type live() {
     // Pre-combo, all memory is alive, except kills
-    // During/post combo, check external Call users
     if( Combo.pre() ) {
       TypeMem mem = TypeMem.ALLMEM;
       // Kill the killables
@@ -240,21 +235,32 @@ public class RootNode extends Node {
         mem = mem.set(kill,TypeStruct.UNUSED);
       return mem;
     }
-    Type live = super.live(); // TODO: live(false)
-    if( live==Type.ANY ) return TypeMem.ANYMEM;
-    //TypeMem mem = (TypeMem)live;
-    //// Kill the killables
-    //for( int kill : KILL_ALIASES )
-    //  mem = mem.set(kill,TypeStruct.UNUSED);
-    //if( Combo.pre() ) return mem;
-    //// Liveness for return value: All reaching aliases plus their escapes are alive.
-    //BitsAlias ralias = ralias();
-    //if( ralias==BitsAlias.EMPTY ) return mem;
-    //if( ralias.above_center() ) return mem;
-    //if( ralias.test(BitsAlias.ALLX) ) return TypeMem.ALLMEM;
-    //TypeMem rlive = TypeMem.make(ralias,TypeStruct.ISUSED);
-    //return mem.meet(rlive);
-    throw TODO(); // TODO: super.live(false)???
+
+    
+    // During/post combo, check external Call users.
+    // There is e.g. a Control user and many Constant users.
+    // We're just trying to track memory flow.
+    TypeMem live = TypeMem.ANYMEM;
+    for( int j=0; j<nUses(); j++ ) {       // Computed across all uses
+      live = switch( use(j) ) {
+      case CProjNode use -> live;   // No implied live memory
+      case   ConNode use -> live;   // No implied live memory
+      case MProjNode use -> (TypeMem)live.meet(use._live);
+      default -> throw TODO();  // Handle escaping calls, rturns.  Also null not expected
+      };
+    }
+    
+    // Killables never become alive
+    for( int kill : KILL_ALIASES )
+      assert live.at(kill)==TypeStruct.UNUSED;
+    
+    // Liveness for return value: All reaching aliases plus their escapes are alive.
+    BitsAlias ralias = ralias();
+    assert ralias!=BitsAlias.EMPTY; // At least external escapes
+    assert !ralias.test(BitsAlias.ALLX); // No escape-all-internals
+    assert !ralias.above_center(); // TODO: Could be too strong?
+    TypeMem rlive = TypeMem.make(ralias,TypeStruct.ISUSED);
+    return live.meet(rlive);
   }
 
   @Override public Type live_use( int i ) {
@@ -387,12 +393,19 @@ public class RootNode extends Node {
   // with anything from Root, all results are independent.
   @Override public boolean unify_proj( ProjNode proj, boolean test ) { return false; }
 
-  @Override public int hashCode() { return 123456789+1; }
+  @Override int hash() { return 123456789+1; }
   @Override public boolean equals(Object o) { return this==o; }
 
   // Reset for next test
   public static void reset_to_init0() {
     while( Env.ROOT.len()>4 ) Env.ROOT.pop();
+    Env.ROOT.setDef(CTL_IDX,Env.CTL_0);
+    Env.ROOT.setDef(MEM_IDX,Env.MEM_0);
+    Env.ROOT.setDef(REZ_IDX,Env.ALL);
+    Env.ROOT._val = TypeTuple.ROOT;
+    Env.ROOT._live = TypeMem.ALLMEM;
+    Env.MEM_0._val = TypeMem.ALLMEM;
+    Env.MEM_0._live= TypeMem.ALLMEM;
     KILL_ALIASES = BitsAlias.EMPTY;
     CACHE_DEF_MEM = TypeMem.ALLMEM;
     PROGRESS.clear();

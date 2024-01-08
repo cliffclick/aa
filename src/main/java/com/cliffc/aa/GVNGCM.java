@@ -3,11 +3,7 @@ package com.cliffc.aa;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.tvar.UQNodes;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeTuple;
 import com.cliffc.aa.util.Ary;
-
-import java.util.BitSet;
 
 // Global Value Numbering, Global Code Motion
 public class GVNGCM {
@@ -27,7 +23,6 @@ public class GVNGCM {
 
   static public <N extends Node> N add_work( WorkNode work, N n ) {
     if( n==null || n.isDead() ) return n;
-    if( n.isPrim() ) return n; // No prims after prim init
     work.add(n);
     return n;
   }
@@ -117,8 +112,9 @@ public class GVNGCM {
   // aggressively checks no-more-progress.
   public void iter() {
     int cnt = ITER_CNT;
-    assert AA.once_per() || NodeUtil.more_work(Env.ROOT) == 0; // Initial conditions are correct
-    //assert Env.ROOT.no_more_ideal(); // Has side-effects of putting things on worklist
+    assert !NodeUtil.leak();
+    assert NodeUtil.more_work(Env.ROOT) == 0; // Initial conditions are correct
+    //assert NodeUtil.no_more_ideal(Env.ROOT);
     while( true ) {
       cnt++; assert cnt < 10000; // Catch infinite ideal-loops
       Node n, m;
@@ -132,11 +128,13 @@ public class GVNGCM {
       else break;
       if( m == null ) ITER_CNT_NOOP++;     // No progress profiling
       else n.deps_work_clear();            // Progress; deps on worklist
-      assert NodeUtil.more_work(Env.ROOT) == 0;
-      //assert Env.ROOT.no_more_ideal();
+      //assert NodeUtil.more_work(Env.ROOT) == 0;
+      //assert NodeUtil.no_more_ideal(Env.ROOT);
+      assert !NodeUtil.leak();
     }
-    assert AA.once_per() || NodeUtil.more_work(Env.ROOT)==0;
-    //assert Env.ROOT == null || Env.ROOT.no_more_ideal();
+    assert NodeUtil.more_work(Env.ROOT)==0;
+    //assert NodeUtil.no_more_ideal(Env.ROOT);
+    assert !NodeUtil.leak();
     ITER_CNT=cnt;
   }
 

@@ -34,8 +34,6 @@ import static com.cliffc.aa.AA.TODO;
 
 // Holds argument-starts for argument tuples, for eventual error reporting.
 
-// Inputs are sorted in the same order as a canonicalizing TypeStruct (alpha
-// within lexical scope; shadowing requires another scope; deBruin numbers).
 public class StructNode extends Node {
 
   // Number of args in the enclosing function scope.  Inputs up to this count
@@ -89,10 +87,14 @@ public class StructNode extends Node {
     if( _flds._len>0 ) sb.unchar(2);
     return sb.p("}").toString();
   }
+  
+  // Only if closed
+  @Override public boolean shouldCon() { return _closed && super.shouldCon(); }
 
+  
   // Structs with the same inputs and same field names are the same.
-  @Override public int hashCode() {
-    return super.hashCode() ^ _flds.hashCode() ^ _accesses.hashCode();
+  @Override int hash() {
+    return _flds.hashCode() ^ _accesses.hashCode();
   }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

@@ -61,7 +61,6 @@ public abstract class PrimNode extends Node {
   public static TV3 IINT, IBOOL, IFLT, INFLT; // Integer, float instances
 
   private static PrimNode[] PRIMS = null; // All primitives
-  public  static boolean post_init() { return PRIMS!=null; }
 
   public static PrimNode[] PRIMS() {
     if( PRIMS!=null ) return PRIMS;
@@ -323,12 +322,12 @@ public abstract class PrimNode extends Node {
   // Wrap the PrimNode basic Type in a TMP->TS(.=ZINT, _=t).
   // Basically convert a `int` to a `Integer`
   public static TypeNil wrap( Type t ) {
-    switch( t ) {
-    case TypeInt ti: return ti.wrap();
-    case TypeFlt tf: return tf.wrap();
-    case TypeNil tn: return tn;
-    default: throw TODO();
-    }
+    return switch( t ) {
+      case TypeInt ti -> ti.wrap();
+      case TypeFlt tf -> tf.wrap();
+      case TypeNil tn -> tn;
+      default -> throw TODO();
+    };
   }
   public static TypeNil unwrap( Type t ) {
     if( !(t instanceof TypeMemPtr tmp) ) return null;
@@ -393,7 +392,7 @@ public abstract class PrimNode extends Node {
   // Prims are equal for same-name-same-signature (and same inputs).
   // E.g. float-minus of x and y is NOT the same as int-minus of x and y
   // despite both names being '-'.
-  @Override public int hashCode() { return super.hashCode()+_name.hashCode()+(int)_formals._hash; }
+  @Override int hash() { return (int)_formals._hash; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;

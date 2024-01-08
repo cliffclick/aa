@@ -20,6 +20,8 @@ public class ConNode<T extends Type> extends Node {
     return _t==null ? "(null)" : _t.toString();
   }
   @Override public boolean isMem() { return _t instanceof TypeMem; }
+  // Already a constant
+  @Override public boolean shouldCon() { return false; }
 
   @Override public Type value() { return _t; }
 
@@ -40,8 +42,8 @@ public class ConNode<T extends Type> extends Node {
   private boolean equals_uses_tvar() {
     return _t==TypeNil.NIL || _t instanceof TypeMemPtr || _t instanceof TypeFunPtr;
   }
-  @Override public int hashCode() {
-    // In theory also slot 0, but slot 0 is always Start.
+  @Override int hash() {
+    // In theory also slot 0, but slot 0 is always Root.
     int hash = _t.hashCode();
     // Two NILs are typically different because their TV3s are different.
     // Also, vary two TMPs or TFPs might vary (but not e.g. Scalar)

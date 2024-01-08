@@ -49,7 +49,7 @@ public final class RetNode extends Node {
   }
   public int fidx() { return _fidx; }
   void set_fidx(int fidx) { unelock(); assert FUNS.at(_fidx)!=this; _fidx = fidx; FUNS.setX(fidx,this); } // Unlock before changing hash
-  @Override public int hashCode() { return super.hashCode()+_fidx; }
+  @Override int hash() { return _fidx; }
   @Override public boolean equals(Object o) {
     if( !super.equals(o) ) return false;
     return _fidx==((RetNode)o)._fidx;

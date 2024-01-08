@@ -65,12 +65,15 @@ public class Env implements AutoCloseable {
   // to the prototype obj.
   public static final NonBlockingHashMap<String,StructNode> PROTOS;
 
+  public static final int NODE_LO;
+  
   static {
     // The Universe outside the parse program
     ROOT  = new RootNode(null,null,null,null);
     // Initial control & memory
     CTL_0 = new CProjNode(ROOT,CTL_IDX).init();
     MEM_0 = new MProjNode(ROOT,MEM_IDX).init();
+    NODE_LO = MEM_0._uid+1;
     
     // Top-level or common default values
     ANY   = new ConNode<>(Type.ANY         ).keep();
@@ -180,10 +183,9 @@ public class Env implements AutoCloseable {
 
   // Record global static state for reset
   private static void record_for_reset() {
-    Node.init0(); // Record end of primitives
+    Node.initPrim(); // Record end of primitives
     TV3.init0();
     GVN.init0();
-    FunNode.init0();
     NewNode.init0();
     BitsAlias.init0();
     BitsFun  .init0();
@@ -207,6 +209,7 @@ public class Env implements AutoCloseable {
     BitsAlias .reset_to_init0();
     BitsFun   .reset_to_init0();
     BitsRPC   .reset_to_init0();
+    Env.ROOT.walk( (n,i) -> { assert n.isResetKeep(); return 0; } );
   }
 
   // Return Scope for a name, so can be used to determine e.g. mutability

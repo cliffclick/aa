@@ -476,7 +476,7 @@ public class Parse implements Comparable<Parse> {
     // Load the display/stack-frame for the defining scope.
     Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
     // Store into the defining scope (not necessarily local scope)
-    mem( new StoreNode(mem(),ptr,ifex,tok,mutable,badf) );
+    mem( new StoreNode(mem(),ptr,ifex,tok,mutable,badf).peep() );
     if( mutable==Access.Final ) Oper.make(tok,false);
     ifex = unkeep(ifex).peep();
     assert bal == _keeps._len;  // Balanced keep-alives
@@ -554,7 +554,7 @@ public class Parse implements Comparable<Parse> {
       scope().stk().add_fld(fld,Access.RW,Env.ANY,null); // Promote name to top level
       if( t_stk.find(fld)== -1 ) {
         Node err = new ErrNode(f_scope.ctrl(),bad,"'"+fld+"' not defined on "+true+" arm of trinary").init();
-        t_scope.mem(new StoreNode(t_scope.mem(),t_scope.ptr(),err,fld,Access.RW,bad).init());        
+        t_scope.mem(new StoreNode(t_scope.mem(),t_scope.ptr(),err,fld,Access.RW,bad).peep());        
       }
     }
 
@@ -563,7 +563,7 @@ public class Parse implements Comparable<Parse> {
       if( t_stk.find(fld)== -1 ) {
         scope().stk().add_fld(fld,Access.RW,Env.ANY,null); // Promote name to top level
         Node err = new ErrNode(t_scope.ctrl(),bad,"'"+fld+"' not defined on "+false+" arm of trinary").init();
-        f_scope.mem(new StoreNode(f_scope.mem(),f_scope.ptr(),err,fld,Access.RW,bad).init());        
+        f_scope.mem(new StoreNode(f_scope.mem(),f_scope.ptr(),err,fld,Access.RW,bad).peep());        
       }
     }
 
@@ -600,7 +600,7 @@ public class Parse implements Comparable<Parse> {
       int old_last = _lastNWS;
       keep(expr);               // Keep alive across argument parse
       Node arg = expr();
-      if( arg==null ) return unkeep(expr).peep();
+      if( arg==null ) return unkeep(expr);
       // To avoid the common bug of forgetting a ';', these must be on the same line.
       int line_last = _lines.binary_search(old_last);
       int line_now  = _lines.binary_search(_x);
@@ -775,7 +775,7 @@ public class Parse implements Comparable<Parse> {
       // Resolve the correct function from the overload choices
       Node fun = new DynLoadNode(mem(),over,err).peep();
       // Call the operator
-      n = do_call(errMsgs(oldx,oldx),args(unkeep(e0).peep(),fun));
+      n = do_call(errMsgs(oldx,oldx),args(unkeep(e0),fun));
       assert bal == _keeps._len; // Balanced keep-alives
     } else {
       // Normal leading term
@@ -808,7 +808,7 @@ public class Parse implements Comparable<Parse> {
           if( val == null )
             return err_ctrl2("Missing stmt after assigning field '."+tok+"'");
           Parse bad = errMsg(fld_start);
-          mem( new StoreNode(mem(),n,keep(val),tok,fin,bad));
+          mem( new StoreNode(mem(),n,keep(val),tok,fin,bad).peep());
           return unkeep(val); // Return the value stored
         } else {
           Parse bad = errMsg(fld_start);          
@@ -918,7 +918,7 @@ public class Parse implements Comparable<Parse> {
     // Add
     Node sum = do_call0(true,errMsgs(_x-2,_x,_x), args(n,inc,plus));
     // Store result back
-    mem(new StoreNode(mem(),ptr,sum,tok,Access.RW,bad));
+    mem(new StoreNode(mem(),ptr,sum,tok,Access.RW,bad).peep());
     return unkeep(n);      // Return pre-increment post-fresh value
   }
 
@@ -1028,7 +1028,7 @@ public class Parse implements Comparable<Parse> {
     _tuple(oldx,s,bad,nn,0);
     Node ptr = new NewNode().peep();
     Node nn0 = unkeep(nn).peep(); assert nn0==nn;
-    mem(new StoreXNode(mem(),keep(ptr),nn0,bad));
+    mem(new StoreXNode(mem(),keep(ptr),nn0,bad).peep());
     return unkeep(ptr);
   }
   private void _tuple(int oldx, Node s, Parse bad, StructNode nn, int fnum) {
@@ -1290,7 +1290,7 @@ public class Parse implements Comparable<Parse> {
     scon.add_fld("0",Access.Final,con(TypeInt.con(str.charAt(0))),bad);
     StructNode scon1 = (StructNode)scon.close().peep();
     Node ptr = keep(new NewNode().init());
-    mem( new StoreXNode(mem(),ptr,scon1,bad) );
+    mem( new StoreXNode(mem(),ptr,scon1,bad).peep() );
     return unkeep(ptr);
   }
 
@@ -1577,12 +1577,15 @@ public class Parse implements Comparable<Parse> {
   // is wired it picks up projections to merge at the Fun & Parm nodes.
   private Node do_call( Parse[] bads, Node... args ) { return do_call0(true,bads,args); }
   private Node do_call0( boolean unpack, Parse[] bads, Node... args ) {
-    int bal = _keeps._len;       // Balanced keep-alives
-    CallNode call = new CallNode(unpack,bads,args).init();
-    CallEpiNode cepi = keep(new CallEpiNode(call).init());
+    int bal = _keeps._len;      // Balanced keep-alives
+    CallNode call = (CallNode)new CallNode(unpack,bads,args).peep();
+    call.add_flow_defs();       // Call inputs no longer used by parser, so liveness depends on Call, not Parser scope
+    Node cepi = keep(new CallEpiNode(call).peep());
+    Env.GVN.add_flow(call);
+    Env.GVN.add_flow(cepi);
     ctrl(new CProjNode(cepi).peep());
     mem (new MProjNode(cepi).peep()); // Return memory from all called functions
-    Node r = new  ProjNode(unkeep(cepi).peep(),REZ_IDX).peep();
+    Node r = new ProjNode(unkeep(cepi),REZ_IDX).peep();
     assert bal == _keeps._len;                // Balanced keep-alives
     return r;
   }
