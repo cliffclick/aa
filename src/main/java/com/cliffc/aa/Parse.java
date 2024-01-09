@@ -659,7 +659,7 @@ public class Parse implements Comparable<Parse> {
         ? _lazy_expr(binop)
         : _expr_higher_require(binop);
       // Emit the call to both terms
-      bind = unkeep(bind).peep();
+      bind = unkeep(bind);
       lhs = unkeep(lhs);
       // LHS in unhooked prior to optimizing/replacing.
       lhs = do_call(errMsgs(opx,lhsx,rhsx), args(lhs,rhs,bind));

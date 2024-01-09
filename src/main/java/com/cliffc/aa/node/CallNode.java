@@ -175,8 +175,8 @@ public class CallNode extends Node {
         val(DSP_IDX) instanceof TypeStruct ts && // An arg collection
         ts.is_tup() ) {                          // A tuple
       // Find a tuple being passed in directly; unpack
-      Node fun = pop(); // Pop off the function
-      Node nnn = pop(); // Pop off the tuple
+      Node fun = popKeep(); // Pop off the function
+      Node nnn = popKeep(); // Pop off the tuple
       if( nnn instanceof StructNode )
         for( Node n : nnn.defs() ) // Push the args; unpacks the tuple
           addDef(n);
@@ -186,6 +186,7 @@ public class CallNode extends Node {
           addDef(Node.con(fld._t));
       }
       addDef(fun);              // Function at end
+      nnn.kill(null);           // Maybe kill
       _unpacked = true;         // Only do it once
       xval(); // Recompute value, this is not monotonic since replacing tuple with args
       GVN.add_work_new(this);   // Revisit after unpacking

@@ -50,7 +50,7 @@ public class LoadNode extends Node {
       ? tmp._obj
       : tm.ld(ta);
 
-    Type t = lookup(ts,ta,tm,_fld);
+    Type t = lookup(ts,tm,_fld);
     if( t!=null ) return t;
 
     // Did not find field
@@ -59,7 +59,7 @@ public class LoadNode extends Node {
 
 
   // Field lookup, might check superclass
-  static Type lookup( TypeStruct ts, TypeNil ptr, TypeMem mem, String fld ) {
+  static Type lookup( TypeStruct ts, TypeMem mem, String fld ) {
     
     // Check for direct field
     int idx = ts.find(fld);
@@ -70,10 +70,10 @@ public class LoadNode extends Node {
       return ts._def.above_center() ? TypeNil.XSCALAR : null;
 
     // Miss on closed structs looks at superclass.
-    ptr = (TypeNil)ts.fld(0)._t; // Load clazz ptr
+    TypeNil ptr = (TypeNil)ts.fld(0)._t; // Load clazz ptr
     // Load the clazz struct type from memory
     ts = mem.ld(ptr);
-    return lookup(ts,ptr,mem,fld);
+    return lookup(ts,mem,fld);
   }
 
   
@@ -91,8 +91,14 @@ public class LoadNode extends Node {
     if( adr.above_center() ) return Type.ANY; // Nothing is demanded
     if( !(adr instanceof TypeNil ptr) )  // Demand everything not killed at this field
       return RootNode.defMem(def);
-  
-    if( ptr._aliases.is_empty() )  return Type.ANY; // Nothing is demanded still
+
+    // TODO: Liveness for generic clazz fields
+    //if( ptr instanceof TypeMemPtr tmp && !tmp.is_simple_ptr() ) {
+    //  tmp._obj.get(TypeFld.CLZ);
+    //}
+    
+    if( ptr._aliases.is_empty() )
+      return Type.ANY; // Nothing is demanded still
 
     // Demand memory produce the desired field from a struct
     if( ptr._aliases==BitsAlias.NALL )

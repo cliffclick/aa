@@ -167,7 +167,7 @@ public class DynLoadNode extends Node {
     Type t = TypeNil.XSCALAR;
     for( Resolvable r : _resolves )
       if( r._label != null )
-        t = t.meet(LoadNode.lookup(ts,tmp,tm,r._label));
+        t = t.meet(LoadNode.lookup(ts,tm,r._label));
     return t;
   }
 
@@ -190,8 +190,13 @@ public class DynLoadNode extends Node {
     // Demand memory produce the desired field from a struct
     if( ptr._aliases==BitsAlias.NALL )
       return RootNode.defMem(def);
-    // All fields are live
-    return TypeMem.make(ptr._aliases,TypeStruct.ISUSED);
+    // TODO: not quite monotonic, if def is high and falls to mem
+    TypeStruct obj = def._val instanceof TypeMem mem
+      // Named fields are live
+      ? mem.ld(ptr).flatten_live_fields()
+      // All fields are live
+      : TypeStruct.ISUSED;
+    return TypeMem.make(ptr._aliases,obj);
   }
 
   @Override public Node ideal_reduce() {

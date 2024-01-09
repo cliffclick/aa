@@ -490,7 +490,7 @@ public final class CallEpiNode extends Node {
   @Override public TV3 _set_tvar() {
     // Unwire all; will rewire optimistically during Combo
     while( nwired()>0 ) {
-      Node w = del(1), fun=w;
+      Node w = popKeep(), fun=w;
       if( w instanceof RetNode ret ) fun = ret.fun();
       fun.del(call());
     }

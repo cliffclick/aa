@@ -1455,7 +1455,7 @@ public class HM {
       Alloc a = ALIASES.at(i);
       if( a!= null ) ts[i] = a.tmp()._obj;
     }
-    ASIG_MEM = TypeMem.make0(false,ts);
+    ASIG_MEM = TypeMem.make0(ts);
     return add_sig(t);
   }
   private static Type add_sig(Type t) {

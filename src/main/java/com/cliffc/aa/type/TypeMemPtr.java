@@ -318,7 +318,9 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     return fidxs;
   }
 
-  @Override public boolean is_con() { return _is_con; }
+  // Only a constant if the pointer AND object is a constant; we might have
+  // dulled a precise constant object and the result is not a constant.
+  @Override public boolean is_con() { return _is_con && _obj.is_con(); }
 
   // Used for assertions
   @Override boolean intern_check1() { return _obj.intern_get()!=null; }

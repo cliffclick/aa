@@ -638,7 +638,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   }
   private static void concat( Ary<Type> ts, Type[] ts1 ) { for( Type t1 : ts1 ) _push(ts,t1); }
   private static void _push( Ary<Type> ts, Type t ) {
-    assert !t.above_center(); // Always below-center or equal, because we will dual anyway
+    assert !t.above_center() || t instanceof TypeMem; // Always below-center or equal, because we will dual anyway
     ts.push(t);
     if( t!=t.dual() ) ts.push(t.dual());
   }
@@ -824,7 +824,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       case '@' -> TypeStruct.valueOf(this,dup,any,false);
       case '%' -> TypeNil   .valueOf(this,dup,any);
       case '[' -> peek("[[")
-        ? TypeMem.valueOf(this,dup,any)
+        ? TypeMem.valueOf(this,dup)
         : TypeFunPtr.valueOf(this,dup,any);
       default -> {
         // These strings all start with an id.

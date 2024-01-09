@@ -1,8 +1,9 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.tvar.*;
+import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.TVPtr;
+import com.cliffc.aa.tvar.TVStruct;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
@@ -43,7 +44,7 @@ public class NewNode extends Node {
     _alias = alias;
     _tptr = TypeMemPtr.make_con(BitsAlias.make0(alias),is_con,TypeStruct.ISUSED);
   }
-  @Override void walk_reset0() { set_alias(_reset0_alias,_tptr.is_con()); super.walk_reset0(); }
+  @Override void walk_reset0() { set_alias(_reset0_alias,_tptr._is_con); super.walk_reset0(); }
 
   @Override public Type value() { return _killed ? _tptr.dual() : _tptr; }
   

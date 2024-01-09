@@ -30,8 +30,10 @@ public class RegionNode extends Node {
       Node cin = in(i);
       if( cin._val==Type.XCTRL ) { // Dead control flow input
         for( Node phi : uses() )
-          if( phi instanceof PhiNode )
-            Env.GVN.add_flow(phi.del(i));
+          if( phi instanceof PhiNode ) {
+            Env.GVN.add_flow(phi.in(i));
+            phi.del(i);
+          }
         del(i);
         return Env.GVN.add_reduce(this); // Progress
       } else

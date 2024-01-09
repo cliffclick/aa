@@ -52,7 +52,6 @@ import static com.cliffc.aa.type.TypeFld.Access;
    being All vs some Constants).
 */
 public class TypeMem extends Type<TypeMem> {
-  private boolean _any;
 
   // Mapping from alias#s to the current known alias state.  TypeMem is never a
   // nil.  Slot#0 is always nil.  Slot#1 is the Parent-Of-All aliases and is
@@ -67,10 +66,9 @@ public class TypeMem extends Type<TypeMem> {
   // not part of the hash/equals checks.  Optional.  Lazily filled in.
   private HashMap<BitsAlias,TypeMemPtr> _sharp_cache;
 
-  private TypeMem init(boolean any, TypeStruct[] objs) {
+  private TypeMem init(TypeStruct[] objs) {
     super.init();
     assert check(objs);    // Caller has canonicalized arrays already
-    _any = any;
     _objs = objs;
     return this;
   }
@@ -94,7 +92,7 @@ public class TypeMem extends Type<TypeMem> {
           }
     return true;
   }
-  @Override public long static_hash( ) { return _objs.length + (_any ? 127 : 0); }
+  @Override public long static_hash( ) { return _objs.length; }
 
   // ----------
   @Override long compute_hash() {
@@ -108,7 +106,7 @@ public class TypeMem extends Type<TypeMem> {
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeMem tf) ) return false;
-    if( _objs.length != tf._objs.length || _any != tf._any ) return false;
+    if( _objs.length != tf._objs.length ) return false;
     for( int i = 0; i< _objs.length; i++ )
       if( _objs[i] != tf._objs[i] ) // note '==' and NOT '.equals()'
         return false;
@@ -126,7 +124,6 @@ public class TypeMem extends Type<TypeMem> {
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     if( this==ALLMEM  ) return sb.p("[[_all_]]");
     if( this==ANYMEM  ) return sb.p("[[_any_]]");
-    if( _any ) sb.p('~');
 
     sb.p("[[");
     if( indent ) sb.ii(1).nl(); // Indent memory
@@ -142,7 +139,7 @@ public class TypeMem extends Type<TypeMem> {
   }
 
 
-  static TypeMem valueOf(Parse P, String cid, boolean any ) {
+  static TypeMem valueOf(Parse P, String cid ) {
     if( P.peek("_all_]]") ) return ALLMEM;
     if( P.peek("_any_]]") ) return ANYMEM;
     Ary<TypeStruct> objs  = new Ary<>( new TypeStruct[1],0);
@@ -154,7 +151,7 @@ public class TypeMem extends Type<TypeMem> {
       objs.setX(alias,obj);
       if( !P.peek(',') ) break;
     }
-    return make0(any,objs.asAry());
+    return make0(objs.asAry());
   }
 
   // Alias-at.  Out of bounds or null uses the parent value.
@@ -175,16 +172,16 @@ public class TypeMem extends Type<TypeMem> {
   public int len() { return _objs.length; }
 
   static { new Pool(TMEM,new TypeMem()); }
-  private static TypeMem make(boolean any, TypeStruct[] objs) {
+  private static TypeMem make(TypeStruct[] objs) {
     Pool P = POOLS[TMEM];
     TypeMem t1 = P.malloc();
-    return t1.init(any,objs).hashcons_free();
+    return t1.init(objs).hashcons_free();
   }
 
   // Canonicalize memory before making.  Unless specified, the default memory is "do not care"
-  public static TypeMem make0( boolean any, TypeStruct[] as ) {
+  public static TypeMem make0( TypeStruct[] as ) {
     if( as[1]==null ) as[1] = TypeStruct.UNUSED;
-    return make(any,dedup(as));
+    return make(dedup(as));
   }
   private static TypeStruct[] dedup( TypeStruct[] as ) {
     int len = as.length;
@@ -209,7 +206,7 @@ public class TypeMem extends Type<TypeMem> {
     TypeStruct[] as = new TypeStruct[alias+1];
     as[1] = TypeStruct.UNUSED;
     as[alias] = oop;
-    return make(oop.above_center(),as);
+    return make(as);
   }
   public static TypeMem make(BitsAlias aliases, TypeStruct oop ) {
     TypeStruct[] as = new TypeStruct[aliases.max()+1];
@@ -217,7 +214,7 @@ public class TypeMem extends Type<TypeMem> {
     for( int alias : aliases )
       if( alias != 0 )
         as[alias] = oop;
-    return make0(false,as);
+    return make0(as);
   }
   // Set 'alias' to 'oop', and all parent aliases to unused in this memory.
   public TypeMem make_from_unused(int alias, TypeStruct oop) {
@@ -225,12 +222,12 @@ public class TypeMem extends Type<TypeMem> {
     as[alias] = oop;
     for( int par = BitsAlias.TREE.parent(alias); par!=1; par = BitsAlias.TREE.parent(par) )
       as[par] = TypeStruct.UNUSED;
-    return make0(_any,as);
+    return make0(as);
   }
   public TypeMem make_from(int alias, TypeStruct oop) {
     TypeStruct[] as = Arrays.copyOf( _objs,Math.max( _objs.length,alias+1));
     as[alias] = oop;
-    return make0(_any,as);    
+    return make0(as);    
   }
 
   public static final TypeMem ANYMEM,ALLMEM,EXTMEM; // Every alias is unused (so above XOBJ or below OBJ)
@@ -238,7 +235,7 @@ public class TypeMem extends Type<TypeMem> {
 
   static {
     // Every alias is used in the worst way
-    ALLMEM = make0(false,new TypeStruct[]{null,TypeStruct.ISUSED});
+    ALLMEM = make0(new TypeStruct[]{null,TypeStruct.ISUSED});
     ANYMEM = ALLMEM.dual();
     EXTMEM = make(BitsAlias.EXTX,TypeStruct.ISUSED);
     STRMEM = make(BitsAlias.STRX,TypeStruct.ISUSED);
@@ -251,7 +248,7 @@ public class TypeMem extends Type<TypeMem> {
     for( int i = 0; i< _objs.length; i++ )
       if( _objs[i] != null )
         objs[i] = _objs[i].dual();
-    return POOLS[TMEM].<TypeMem>malloc().init(!_any,objs);
+    return POOLS[TMEM].<TypeMem>malloc().init(objs);
   }
   @Override protected Type xmeet( Type t ) {
     TypeMem tm = (TypeMem)t;
@@ -262,8 +259,7 @@ public class TypeMem extends Type<TypeMem> {
     for( int i=1; i<len; i++ )
       objs[i] = i<mlen && _objs[i]==null && tm._objs[i]==null // Shortcut null-vs-null
         ? null : (TypeStruct)at(_objs,i).meet(at(tm._objs,i));   // meet element-by-element
-    boolean any = _any & tm._any;
-    return make0(any,objs);
+    return make0(objs);
   }
 
   // Any alias is not UNUSED?
@@ -351,7 +347,7 @@ public class TypeMem extends Type<TypeMem> {
     tos[1] = TypeStruct.UNUSED;
     for( int i=2; i<tos.length; i++ )
       tos[i] = aliases.test_recur(i) ? TypeStruct.ISUSED : null;
-    return make0(_any,tos);
+    return make0(tos);
   }
 
   // --------------------------------------------------------------------------
@@ -478,7 +474,7 @@ public class TypeMem extends Type<TypeMem> {
     for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
       if( kid < max ) tos[kid] = null;
     tos[alias] = obj;
-    return make0(_any,tos);
+    return make0(tos);
   }
   private boolean _set_fast(int alias ) {
     for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
@@ -501,7 +497,7 @@ public class TypeMem extends Type<TypeMem> {
       if( alias != 0 )
         for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
           ss.setX(kid,(TypeStruct)at(kid).meet(tvs));
-    return make0(_any,ss.asAry());
+    return make0(ss.asAry());
   }
 
   // Field store into a conservative set of aliases.
@@ -519,7 +515,7 @@ public class TypeMem extends Type<TypeMem> {
       if( alias != 0 )
         for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
           ss.setX(kid,at(kid).update(fld,tmp.is_con()));
-    return make0(_any,ss.asAry());
+    return make0(ss.asAry());
   }
 
   
@@ -542,7 +538,7 @@ public class TypeMem extends Type<TypeMem> {
         tos = Arrays.copyOf(_objs,alias*2);
       tos[alias] = TypeStruct.UNUSED;
     }
-    return make0(_any,tos);
+    return make0(tos);
   }
 
   // The fld in the alias set is flattened to set to ANY
@@ -564,7 +560,7 @@ public class TypeMem extends Type<TypeMem> {
     for( int alias : escs )
       if( alias < tos.length && tos[alias]!=null )
         tos[alias] = tos[alias].kill(fld);
-    return make0(_any,tos);
+    return make0(tos);
   }
 
   
@@ -586,7 +582,7 @@ public class TypeMem extends Type<TypeMem> {
     TypeStruct[] tos = new TypeStruct[Math.max( _objs.length,escs.max()+1)];
     for( int i=1; i<tos.length; i++ )
       tos[i] = escs.test_recur(i) ? at(i).flatten_live_fields() : TypeStruct.UNUSED;
-    return make0(_any,tos);
+    return make0(tos);
   }
 
 
@@ -606,9 +602,9 @@ public class TypeMem extends Type<TypeMem> {
     for( ; i< _objs.length; i++ )
       if( tos[i] != null )
         tos[i] = tos[i].flatten_live_fields();
-    return make0(_any,tos);
+    return make0(tos);
   }
 
-  @Override public boolean above_center() { return _any; }
+  @Override public boolean above_center() { return _objs[1].above_center(); }
   @Override public boolean is_con()       { return false;}
 }

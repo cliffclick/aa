@@ -451,7 +451,7 @@ public class FunNode extends Node {
     CallNode path_call = (CallNode)in(path);
     Ary<CallEpiNode> unwireds = new Ary<>(new CallEpiNode[1],0);
     while( len() > 1 ) {               // For all paths except Root
-      CallNode call = (CallNode)pop(); // TODO: Root
+      CallNode call = (CallNode)popKeep(); // TODO: Root
       CallEpiNode cepi = call.cepi();
       cepi.del(oldret);
       unwireds.add(cepi);

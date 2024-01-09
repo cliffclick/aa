@@ -261,21 +261,29 @@ public abstract class Node implements Cloneable, IntSupplier {
     return _unuse(old);
   }
 
-  // Delete def by index, preserving edges but not order
-  Node del( int idx ) {
+  // Delete def by index, preserving edges but not order.
+  // Kills if going dead
+  void del( int idx ) {
     unelock();
     Node n = _defs[idx];
     _defs[idx] = _defs[--_len];
     _unuse(n);
-    return n;
   }
 
-  // Remove last def and return it.
-  public Node pop( ) { return del(_len-1); }
+  // Remove last def, and attempt to kill
+  public void pop( ) { del(_len-1); }
 
+  // Remove last def and return it, no kill.
+  public Node popKeep( ) {
+    unelock();
+    Node n = _defs[--_len];
+    if( n != null ) n._delUse(this);
+    return n;
+  }
+  
   // Delete 1st instanceof named def; error if not found.
   // Does not preserve order.
-  public Node del( Node def ) { return del(findDef(def)); }
+  public void del( Node def ) { del(findDef(def)); }
 
   
   // Replace, but do not delete this.  Really used to insert a node in front of
@@ -327,41 +335,11 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Check before killing 'this' and return 'n'.
   public Node kill( Node n ) {
     if( n == this || _ulen>0 ) return n;
-    n.keep();
+    if( n!=null ) n.keep();
     kill();
-    return n.unkeep();
+    return n==null ? null : n.unkeep();
   }
 
-
-  //public Node insert (int idx, Node n) { unelock(); _defs.insert(idx,n); if( n!=null ) n._uses.add(this); return this; }
-  //// Return Node at idx, withOUT auto-deleting it, even if this is the last
-  //// use.  Used by the parser to retrieve final Nodes from tmp holders.  Does
-  //// NOT preserve order.
-  
-  //// Remove Node at idx, auto-delete and preserve order.
-  //public Node remove(int idx) { unelock(); return unuse(_defs.remove(idx)); }
-  //// Remove Node, auto-delete and preserve order.  Error if not found
-  //public Node remove(Node x) { return remove(_defs.find(x)); }
-
-  //public void replace(Node old, Node nnn) { unelock(); _defs.replace(old,nnn); }
-
-
-  
-  // TODO: Yanked as too fancy during parsing
-  //// Keep a Node alive during all optimizations, because future direct uses
-  //// will yet appear.  The Node can otherwise be fully optimized and replaced
-  //// with equivalents.  The push/pop sequences are strongly asserted for stack
-  //// order.
-  //
-  //public int push() { return GVNGCM.push(this); }
-  //public static Node pop (int idx) { assert idx==GVNGCM.KEEP_ALIVE._defs._len;  return GVNGCM.pop(idx); }
-  //public static Node peek(int idx) { assert idx<=GVNGCM.KEEP_ALIVE._defs._len;  return GVNGCM.KEEP_ALIVE.in(idx-1); }
-  //public static void pops(int nargs) { for( int i=0; i<nargs; i++ ) GVNGCM.KEEP_ALIVE.pop(); }
-  //public boolean isKeep() {
-  //  for( Node use : _uses ) if( use instanceof KeepNode )  return true;
-  //  return false;
-  //}
-  
   // Hash is function+inputs, or opcode+input_uids, and is invariant over edge
   // order (so we can swap edges without rehashing)
   private int _hash;
