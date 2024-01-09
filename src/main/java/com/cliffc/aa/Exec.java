@@ -41,6 +41,8 @@ public abstract class Exec {
     Env.ROOT.setDef(REZ_IDX,e._scope.rez ());
     e.close();      // No more fields added to the parse scope
 
+    Env.ROOT.walk( Env.GVN::add_work_new );
+    
     // Post-parse pre-Combo iterative peepholes
     Env.GVN.iter();
 

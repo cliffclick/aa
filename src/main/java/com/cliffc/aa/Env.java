@@ -94,7 +94,7 @@ public class Env implements AutoCloseable {
     PRIM = new Env();
     SCP_0 = PRIM._scope;
     STK_0 = SCP_0.stk();
-    PrimNode.PRIMS();           // Initialize
+    PrimNode.PRIMS();           // Initialize prims
     Type.init0(SCP_0._types);
     ROOT.setPrimMem(PRIM._scope.mem());
     record_for_reset();         // Record for reset between tests
@@ -209,7 +209,7 @@ public class Env implements AutoCloseable {
     BitsAlias .reset_to_init0();
     BitsFun   .reset_to_init0();
     BitsRPC   .reset_to_init0();
-    Env.ROOT.walk( (n,i) -> { assert n.isResetKeep(); return 0; } );
+    Env.ROOT.walk( n -> { assert n.isResetKeep(); } );
   }
 
   // Return Scope for a name, so can be used to determine e.g. mutability

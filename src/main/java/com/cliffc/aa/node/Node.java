@@ -103,7 +103,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   public final SB _printLine( SB sb, boolean live ) {
     if( live ) {
       String slive = _live.toString();
-      sb.p("%-7.7s ".formatted(slive));
+      sb.p("%-20.20s ".formatted(slive));
     }
     sb.p("%4d %-7.7s ".formatted(_uid,label()));
     if( isDead() ) return sb.p("DEAD\n");
@@ -117,7 +117,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       Node use = _uses[i];
       sb.p(use==null ? "____ " : "%4d ".formatted(use._uid));
     }
-    int lim = 5 - Math.max(_len,3);
+    int lim = 6 - Math.max(_len,4);
     for( int i = _ulen; i<lim; i++ )
       sb.p("     ");
     sb.p(" ]]  ");
@@ -595,7 +595,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     assert _val.isa(old);  // Monotonic
     assert _ulen==0;       // No uses yet, so can use what is returned directly
     Node x = _do_reduce(); // Find a reduced version, if any
-    return x==null ? this : x;  // Always return a not-null
+    return x==null ? this : kill(x);  // Always return a not-null
   }
 
   // Compute a new replacement for 'this' that is generally "better" -
@@ -705,23 +705,12 @@ public abstract class Node implements Cloneable, IntSupplier {
   public boolean shouldCon() {
     return !isPrim() && _val.is_con();
   }
-    //if( !t.is_con() || (t.above_center() && t!=TypeNil.NIL)) return false; // Not a constant
-    //if( this instanceof ConNode    || // Already a constant
-    //    this instanceof FunPtrNode || // Already a constant
     //    this instanceof NewNode    || // Can be a constant, but need the alias info
     //    this instanceof ErrNode    || // Never touch an ErrNode
     //    this instanceof AssertNode || // Never touch an AssertNode
     //    this instanceof FreshNode  || // These modify the TVars but not the constant flows
-    //    (this instanceof StructNode st && !st.is_closed()) || // Struct is in-progress
     //    is_mem() ||
-    //    isPrim() )                 // Never touch a Primitive
     //  return false; // Already a constant, or never touch an ErrNode
-    //// External fidxs are never constants, except primitives which are both
-    //// external and the same everywhere.
-    //if( !isPrim() &&
-    //    t instanceof TypeFunPtr tfp &&
-    //    BitsFun.EXT.test_recur(tfp.fidx()) )
-    //  return false;
     //return true;
 
   // Make globally shared common ConNode for this type.
@@ -798,8 +787,8 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // --------------------------------------------------------------------------
   // Reset primitives.  Mostly unwire called and wired primitives.
-  public final int walk_reset( int ignore ) {
-    if( !isResetKeep() ) return 0;   // Primitives
+  public final void walk_reset( ) {
+    if( !isResetKeep() ) return;   // Primitives
     _elock = false;             // Clear elock if reset_to_init0
     _deps = null;               // No deps
     if( _tvar!=null ) _tvar.reset_deps();
@@ -820,7 +809,9 @@ public abstract class Node implements Cloneable, IntSupplier {
         }
         i--;
       }
-    return 0;
+    if( isPrim() )
+      _live = isMem() ? TypeMem.ALLMEM : Type.ALL;
+    return;
   }
   // Non-recursive specialized version
   void walk_reset0( ) {}
@@ -859,23 +850,38 @@ public abstract class Node implements Cloneable, IntSupplier {
   
   // --------------------------------------------------------------------------
   // Generic Visitor Pattern
+
+  public interface NodeMap { void map(Node n); }
+  final public void walk( NodeMap map ) {
+    assert WVISIT.isEmpty();
+    _walk(map);
+    WVISIT.clear();
+  }
+  
+  private void _walk( NodeMap map ) {
+    if( WVISIT.tset(_uid) ) return; // Been there, done that
+    map.map(this);
+    for( Node def : defs() )  if( def != null )  def._walk(map);
+    for( Node use : uses() )  if( use != null )  use._walk(map);
+  }
+
   // Map takes and updates/reduces int x.
   // If map returns -1, the walk is stopped and x is not updated.
   static final VBitSet WVISIT = new VBitSet();
-  public interface NodeMap { int map(Node n, int x); }
-  final public int walk( NodeMap map ) {
+  public interface NodeMapR { int map(Node n, int x); }
+  final public int walkReduce( NodeMapR map ) {
     assert WVISIT.isEmpty();
-    int rez = _walk(map,0);
+    int rez = _walkR(map,0);
     WVISIT.clear();
     return rez;
   }
   
-  private int _walk( NodeMap map, int x ) {
+  private int _walkR( NodeMapR map, int x ) {
     if( WVISIT.tset(_uid) ) return x; // Been there, done that
     int x2 = map.map(this,x);
     if( x2 == -1 ) return x;
-    for( Node def : defs() )  if( def != null )  x2 = def._walk(map,x2);
-    for( Node use : uses() )  if( use != null )  x2 = use._walk(map,x2);
+    for( Node def : defs() )  if( def != null )  x2 = def._walkR(map,x2);
+    for( Node use : uses() )  if( use != null )  x2 = use._walkR(map,x2);
     return x2;
   }
 

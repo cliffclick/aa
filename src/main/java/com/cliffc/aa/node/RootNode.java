@@ -68,17 +68,18 @@ public class RootNode extends Node {
   }
 
   // Output value is:
-  // [Ctrl, All_Mem_Minus_Dead, Rezult, global_escaped_[fidxs, aliases]]
+  // [Ctrl, [EXT memory, escaped locals, minus Dead], Rezult, global_escaped_[fidxs, aliases]]
   @Override public TypeTuple value() {
     // If computing for primitives, pre- any program, then max conservative value
-    if( Combo.pre() ) return TypeTuple.ROOT;
+    if( in(ARG_IDX) == null ) return TypeTuple.ROOT;
     
     // Primitive memory
-    //TypeMem tmem = mem._val instanceof TypeMem tmem0 ? tmem0 : mem._val.oob(TypeMem.ALLMEM);
-    ////tmem = PrimNode.primitive_memory(this,tmem);
-    //tmem = (TypeMem)tmem.meet(val(ARG_IDX));
     TypeMem tmem = (TypeMem)val(ARG_IDX);
 
+    // Conservative final result.  Until Combo external calls can still wire, and escape arguments
+    if( Combo.pre() )
+      return CACHE_DEF;
+    
     // Walk the 'rez', all Call args (since they call Root, their args escape)
     // and function rets (since called from Root, their return escapes).
     AryInt awork = new AryInt();
@@ -202,40 +203,63 @@ public class RootNode extends Node {
   }
 
   // Default memory during initial Iter, before Combo: all memory minus the
-  // kills.  Many things produce def_mem, and in general it has to be used
+  // kills.  Many things produce defMem, and in general it has to be used
   // until Combo finishes the Call Graph.
   static BitsAlias KILL_ALIASES = BitsAlias.EMPTY;
   static void kill_alias( int alias ) {
     if( KILL_ALIASES.test_recur(alias) ) return;
     KILL_ALIASES = KILL_ALIASES.set(alias);
-    CACHE_DEF_MEM = CACHE_DEF_MEM.set(alias,TypeStruct.UNUSED);
+    TypeMem tmem = CACHE_DEF_MEM.set(alias,TypeStruct.UNUSED);
+    setCacheDef(tmem);
     Env.GVN.add_flow(Env.ROOT);
     // Re-flow all dependents
     Env.GVN.add_flow(PROGRESS);
     PROGRESS.clear();
   }
   private static TypeMem CACHE_DEF_MEM = TypeMem.ALLMEM;
+  private static TypeMem CACHE_DEF_MEM_FLAT = TypeMem.ALLMEM;
+  private static TypeTuple CACHE_DEF;
+  
   private static final Ary<Node> PROGRESS = new Ary<>(new Node[1],0);
-  public static TypeMem def_mem(Node n) {
+  public static TypeMem defMem(Node n) {
     if( n!=null && PROGRESS.find(n)==-1 ) PROGRESS.push(n);
     return CACHE_DEF_MEM;
   }
-  // Lift default memory to "nothing except external"
-  public static void combo_def_mem() {
-    CACHE_DEF_MEM = CACHE_DEF_MEM.set(1,TypeStruct.UNUSED);
+  public static TypeMem defMemFlat(Node n) {
+    if( n!=null && PROGRESS.find(n)==-1 ) PROGRESS.push(n);
+    return CACHE_DEF_MEM_FLAT;
+  }
+  // Lift default memory to nothing
+  public static void resetDefMemHigh() {
+    TypeMem tmem = (TypeMem)Env.ROOT.val(ARG_IDX);
+    // Reset memory; all is unused - except externals, primitives.
+    assert tmem.at(BitsAlias.ALLX)==TypeStruct.UNUSED;
+    assert tmem.at(BitsAlias.LOCX)==TypeStruct.UNUSED;
+    tmem = tmem.make_from(BitsAlias.EXTX,TypeStruct.ISUSED); // Externals still unknown
+    // Remove all kills, but none at reset
+    for( int alias : KILL_ALIASES )
+      assert tmem.at(alias)==TypeStruct.UNUSED;
+    setCacheDef(tmem);
   }
 
+  public static void resetDefMemLow() {
+    TypeMem tmem = (TypeMem)Env.ROOT.val(ARG_IDX);
+    tmem = tmem.make_from(BitsAlias.ALLX,TypeStruct.ISUSED); // All aliases not prim mem, both internal and external
+    // Remove all kills, but none at reset
+    assert KILL_ALIASES==BitsAlias.EMPTY;
+    setCacheDef(tmem);
+  }
+
+  private static void setCacheDef(TypeMem tmem) {
+    CACHE_DEF_MEM = tmem;
+    CACHE_DEF_MEM_FLAT = tmem.flatten_live_fields();
+    CACHE_DEF = TypeTuple.make(Type.CTRL,tmem,TypeNil.SCALAR,TypeNil.SCALAR);
+  }
 
   @Override public Type live() {
     // Pre-combo, all memory is alive, except kills
-    if( Combo.pre() ) {
-      TypeMem mem = TypeMem.ALLMEM;
-      // Kill the killables
-      for( int kill : KILL_ALIASES )
-        mem = mem.set(kill,TypeStruct.UNUSED);
-      return mem;
-    }
-
+    if( Combo.pre() )
+      return defMemFlat(null);
     
     // During/post combo, check external Call users.
     // There is e.g. a Control user and many Constant users.
@@ -398,16 +422,19 @@ public class RootNode extends Node {
 
   // Reset for next test
   public static void reset_to_init0() {
+    KILL_ALIASES = BitsAlias.EMPTY;
+    CACHE_DEF_MEM = TypeMem.ALLMEM;
+    CACHE_DEF_MEM_FLAT = TypeMem.ALLMEM;
+    CACHE_DEF = null;
+    PROGRESS.clear();
     while( Env.ROOT.len()>4 ) Env.ROOT.pop();
     Env.ROOT.setDef(CTL_IDX,Env.CTL_0);
     Env.ROOT.setDef(MEM_IDX,Env.MEM_0);
     Env.ROOT.setDef(REZ_IDX,Env.ALL);
-    Env.ROOT._val = TypeTuple.ROOT;
-    Env.ROOT._live = TypeMem.ALLMEM;
-    Env.MEM_0._val = TypeMem.ALLMEM;
-    Env.MEM_0._live= TypeMem.ALLMEM;
-    KILL_ALIASES = BitsAlias.EMPTY;
-    CACHE_DEF_MEM = TypeMem.ALLMEM;
-    PROGRESS.clear();
+    RootNode.resetDefMemLow();
+    Env.ROOT._val  = CACHE_DEF;
+    Env.ROOT._live = CACHE_DEF_MEM_FLAT;
+    Env.MEM_0._val = CACHE_DEF_MEM;
+    Env.MEM_0._live= CACHE_DEF_MEM_FLAT;
   }
 }

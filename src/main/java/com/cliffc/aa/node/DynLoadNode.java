@@ -183,13 +183,13 @@ public class DynLoadNode extends Node {
     Node def = mem();
     if( adr.above_center() ) return Type.ANY; // Nothing is demanded
     if( !(adr instanceof TypeNil ptr) )  // Demand everything not killed at this field
-      return RootNode.def_mem(def);
+      return RootNode.defMem(def);
   
     if( ptr._aliases.is_empty() )  return Type.ANY; // Nothing is demanded still
 
     // Demand memory produce the desired field from a struct
     if( ptr._aliases==BitsAlias.NALL )
-      return RootNode.def_mem(def);
+      return RootNode.defMem(def);
     // All fields are live
     return TypeMem.make(ptr._aliases,TypeStruct.ISUSED);
   }

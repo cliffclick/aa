@@ -472,9 +472,9 @@ public class TypeMem extends Type<TypeMem> {
   public TypeMem set( int alias, TypeStruct obj ) {
     if( at(alias)==obj && _set_fast(alias) )
       return this; // Shortcut
+    assert _objs[0] == null;
     int max = Math.max( _objs.length,alias+1);
     TypeStruct[] tos = Arrays.copyOf( _objs,max);
-    tos[0] = null;
     for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
       if( kid < max ) tos[kid] = null;
     tos[alias] = obj;
@@ -535,14 +535,13 @@ public class TypeMem extends Type<TypeMem> {
         { found=true; break; }
     if( !found ) return this;
 
+    assert _objs[0] == null;
     TypeStruct[] tos = _objs.clone();
-    tos[0] = null;
-    for( int alias : escs )
-      if( alias < tos.length ) {
-        for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
-          if( kid < tos.length ) tos[kid]=null;
-        tos[alias] = TypeStruct.UNUSED;
-      }
+    for( int alias : escs ) {
+      if( alias >= tos.length )
+        tos = Arrays.copyOf(_objs,alias*2);
+      tos[alias] = TypeStruct.UNUSED;
+    }
     return make0(_any,tos);
   }
 

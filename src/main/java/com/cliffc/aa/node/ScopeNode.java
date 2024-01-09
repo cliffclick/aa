@@ -22,7 +22,7 @@ public class ScopeNode extends Node {
   public ScopeNode( HashMap<String,TypeNil> types,  Node ctl, Node mem, Node rez, Node ptr, StructNode dsp) {
     super(ctl,mem,rez,ptr,dsp);
     _types = types;
-    _live = RootNode.def_mem(this);
+    _live = RootNode.defMem(this);
   }
   @Override public String label() { return "Scope"; }
   @Override public boolean isCFG() { return true; }
@@ -76,7 +76,7 @@ public class ScopeNode extends Node {
 
   @Override public TypeMem live() {
     //assert is_keep() || Combo.pre() || is_prim();
-    return RootNode.def_mem(this);
+    return RootNode.defMem(this);
   }
 
   @Override public Type live_use( int i ) {

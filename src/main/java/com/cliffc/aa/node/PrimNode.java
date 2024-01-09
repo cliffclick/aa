@@ -158,10 +158,9 @@ public abstract class PrimNode extends Node {
 
 
     // Set all TVars
-    Env.ROOT.walk( (n,ignore) -> {
+    Env.ROOT.walk( n -> {
         Env.GVN.add_flow(n);
         if( n.has_tvar() ) n.set_tvar();
-        return 0;
       });
 
     // Loop, setting initial types for all primitives
@@ -174,7 +173,7 @@ public abstract class PrimNode extends Node {
         n0.add_flow_uses();
       }
     }
-    assert Env.ROOT.walk((n,x) -> chk(n) ? x : x+1 )==0;
+    assert Env.ROOT.walkReduce((n,x) -> chk(n) ? x : x+1 )==0;
 
     // Used for test cases
     MAX_PRIM_ALIAS = BitsAlias.NALL.tree().next_available_bit();

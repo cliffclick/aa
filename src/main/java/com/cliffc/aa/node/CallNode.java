@@ -343,7 +343,7 @@ public class CallNode extends Node {
     if( _is_copy ) return def._live;
     boolean is_keep = isKeep();
     if( i==CTL_IDX ) return def.isMem() ? TypeMem.ALLMEM : Type.ALL;
-    if( i==MEM_IDX ) return is_keep || _live==Type.ALL ? RootNode.def_mem(def) : _live;
+    if( i==MEM_IDX ) return RootNode.defMemFlat(def).join(_live);
     if( i==nargs() ) return _unpacked ? FP_LIVE : Type.ALL;
     if( !_unpacked ) return TypeStruct.ISUSED;
     if( is_keep  )   return Type.ALL; // Still under construction, all alive

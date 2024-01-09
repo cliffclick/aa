@@ -90,13 +90,13 @@ public class LoadNode extends Node {
       adr().deps_add(def);
     if( adr.above_center() ) return Type.ANY; // Nothing is demanded
     if( !(adr instanceof TypeNil ptr) )  // Demand everything not killed at this field
-      return RootNode.def_mem(def);
+      return RootNode.defMem(def);
   
     if( ptr._aliases.is_empty() )  return Type.ANY; // Nothing is demanded still
 
     // Demand memory produce the desired field from a struct
     if( ptr._aliases==BitsAlias.NALL )
-      return RootNode.def_mem(def);
+      return RootNode.defMem(def);
     // Demand field "_fld" be "ALL", which is the default
     return TypeMem.make(ptr._aliases,_live_use);
   }

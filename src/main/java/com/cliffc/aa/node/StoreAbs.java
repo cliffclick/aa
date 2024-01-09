@@ -59,7 +59,7 @@ public abstract class StoreAbs extends Node {
     
     // Liveness as a TypeMem.  If current liveness is the default ALL, go ahead
     // an upgrade to RootNodes global default - which globally excludes kills.
-    TypeMem live0 = _live== Type.ALL ? RootNode.def_mem(this) : (TypeMem)_live;
+    TypeMem live0 = (TypeMem)RootNode.defMemFlat(this).join(_live);
     // Specific live-use varies from field-vs-struct
     return _live_use(live0,tmp,i);
   }

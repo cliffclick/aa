@@ -143,16 +143,15 @@ public abstract class Combo {
 
     // Set all values to ANY and lives to DEAD, their most optimistic types.
     // Set all type-vars to Leafs.
-    RootNode.combo_def_mem();
-    Env.ROOT.walk( (n,ignore) -> {
-        if( n.isPrim() ) return 0;
+    RootNode.resetDefMemHigh();
+    Env.ROOT.walk( n -> {
+        if( n.isPrim() ) return;
         n._val = n._live = Type.ANY;  // Highest value
         if( n.has_tvar() ) n.set_tvar();
         Env.GVN.add_flow(n);
         if( n instanceof FunNode fun && !n.isPrim() )
           fun.set_unknown_callers();
-        return 0;
-      });
+    });
     Env.ROOT.xval();
     Env.ROOT.xliv();
 
@@ -186,10 +185,7 @@ public abstract class Combo {
     work_cnt += main_work_loop(4);
 
     // Take advantage of results
-    Env.ROOT.walk( (n,ignore) -> {
-        Env.GVN.add_work_new(n);
-        return 0;
-      });
+    Env.ROOT.walk( Env.GVN::add_work_new );
 
     AA.LIFTING = true;
     assert !NodeUtil.leak();

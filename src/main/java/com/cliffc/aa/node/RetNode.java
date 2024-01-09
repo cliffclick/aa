@@ -20,7 +20,7 @@ public final class RetNode extends Node {
     super(ctrl,mem,val,rpc,fun);
     _nargs=fun.nargs();
     set_fidx(fun._fidx);
-    _live = RootNode.def_mem(null);
+    _live = RootNode.defMem(null);
   }
   
   // Short self name

@@ -45,7 +45,7 @@ public class ParmNode extends Node {
       if( wired_root ) len--;
       // During/after Combo, use the HM type for the GCP type instead of the given default
       if( _idx==MEM_IDX ) {
-        t = Combo.pre() ? RootNode.def_mem(this) : Env.ROOT.rmem(this);
+        t = Combo.pre() ? RootNode.defMem(this) : Env.ROOT.rmem(this);
       } else if( Combo.pre() ) {
         t = _t==TypeNil.SCALAR ? Env.ROOT.ext_scalar(this) : _t;
       } else if( has_tvar() ) {

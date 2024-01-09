@@ -203,7 +203,7 @@ public final class CallEpiNode extends Node {
         (fidxs==BitsFun.EMPTY || // Lifted to no functions
          len()==1 ||             // Not wired (wireable?)
          !is_CG(true)) )         // Unknown callers?
-      return TypeTuple.make(Type.CTRL,RootNode.def_mem(this),Type.ALL); // Unknown callers return e.g. error states
+      return TypeTuple.make(Type.CTRL,RootNode.defMem(this),Type.ALL); // Unknown callers return e.g. error states
 
     assert is_CG(false);
 
@@ -218,7 +218,7 @@ public final class CallEpiNode extends Node {
     // - fidxs are optimistic, and may get added, and start above center and may fall to NALL.
     // - Above center ones do not wire, so this loop is empty then.
     // - Might fall through some middle fidxs, then hit NALL.  Middle fidxs wire, and are precise.
-    // - NALL requires mixing in Root def_mem
+    // - NALL requires mixing in Root defMem
     if( !Combo.pre() && fidxs==BitsFun.NALL )
       return TypeTuple.make(Type.CTRL,Env.ROOT.rmem(this).meet(CallNode.emem(tcall)),tfptr._ret); // Error state
 

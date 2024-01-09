@@ -59,7 +59,7 @@ public abstract class NodeUtil {
   public static int more_work(Node root) {
     assert !MORE_WORK_ASSERT;
     MORE_WORK_ASSERT = true;
-    int rez = root.walk( Node::more_work );
+    int rez = root.walkReduce( Node::more_work );
     MORE_WORK_ASSERT = false;
     return rez;
   }
@@ -69,9 +69,9 @@ public abstract class NodeUtil {
     if( n.isPrim() ) return errs;        // Do not check primitives
     int old = Iter.POOL._len;
     // Check for GCP progress
-    Type oval= n._val, nval = n.value(); // Forwards flow
-    Type oliv=n._live, nliv = n.live (); // Backwards flow
-    assert Iter.POOL._len==old;          // No leaks
+    Type oval = n._val , nval = n.value(); // Forwards flow
+    Type oliv = n._live, nliv = n.live (); // Backwards flow
+    assert Iter.POOL._len==old;            // No leaks
     if( oval!=nval || oliv!=nliv ) {
       if( !(AA.LIFTING
             ? nval.isa(oval) && nliv.isa(oliv)

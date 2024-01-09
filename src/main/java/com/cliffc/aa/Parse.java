@@ -320,7 +320,6 @@ public class Parse implements Comparable<Parse> {
     //      //// Build a default constructor, add to the pile of constructors
     //      //construct.add_def(typenode.defalt().fill());
     //      //construct.define();     // Value type is defined
-    //      //Env.GVN.add_flow(construct);
     //      if( true ) throw TODO();
     //    } else
     //      throw TODO();         // Reference type
@@ -1579,10 +1578,7 @@ public class Parse implements Comparable<Parse> {
   private Node do_call0( boolean unpack, Parse[] bads, Node... args ) {
     int bal = _keeps._len;      // Balanced keep-alives
     CallNode call = (CallNode)new CallNode(unpack,bads,args).peep();
-    call.add_flow_defs();       // Call inputs no longer used by parser, so liveness depends on Call, not Parser scope
     Node cepi = keep(new CallEpiNode(call).peep());
-    Env.GVN.add_flow(call);
-    Env.GVN.add_flow(cepi);
     ctrl(new CProjNode(cepi).peep());
     mem (new MProjNode(cepi).peep()); // Return memory from all called functions
     Node r = new ProjNode(unkeep(cepi),REZ_IDX).peep();

@@ -77,7 +77,7 @@ public final class FunPtrNode extends Node {
     FunNode fun = xfun();
     if( fun==null ) return TypeMem.ANYMEM; // Dead, no memory demand
     if( fun.unknown_callers(this) || fun.last() instanceof RootNode )
-      return RootNode.def_mem(ret);
+      return RootNode.defMemFlat(ret);
     // During/post-combo, Ret is alive only if called or escaped.
     Env.ROOT.deps_add(ret);
     if( Env.ROOT.rfidxs().test(fun._fidx) ) // Escaped
