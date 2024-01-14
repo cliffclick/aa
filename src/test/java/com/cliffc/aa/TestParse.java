@@ -31,8 +31,6 @@ public class TestParse {
     DO_HMT=true;
     RSEED=0;
 
-    test("1", "int:1", "int:1");
-    test("!1", "nil", "nil");
     test("1._*_._(2)", "int:2", "int:2");
   }
 

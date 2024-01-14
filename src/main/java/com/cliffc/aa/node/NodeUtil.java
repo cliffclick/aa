@@ -59,12 +59,12 @@ public abstract class NodeUtil {
   public static int more_work(Node root) {
     assert !MORE_WORK_ASSERT;
     MORE_WORK_ASSERT = true;
-    int rez = root.walkReduce( Node::more_work );
+    int rez = root.walkReduce( NodeUtil::more_work );
     MORE_WORK_ASSERT = false;
     return rez;
   }
   public static boolean mid_work_assert() { return MORE_WORK_ASSERT; }
-  static int more_work( int errs, Node n ) {
+  private static int more_work( Node n, int errs ) {
     if( GVN.on_dead(n) ) return -1; // Do not check dying nodes or reachable from dying
     if( n.isPrim() ) return errs;        // Do not check primitives
     int old = Iter.POOL._len;

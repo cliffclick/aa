@@ -19,6 +19,7 @@ import static com.cliffc.aa.AA.TODO;
 import static com.cliffc.aa.Env.GVN;
 
 // Sea-of-Nodes
+@SuppressWarnings("unchecked")
 public abstract class Node implements Cloneable, IntSupplier {
 
   // --------------------------------------------------------------------------
@@ -694,21 +695,6 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Make globally shared common ConNode for this type.
   public static Node con( Type t ) {
     return new ConNode<>(t).peep();
-    //Node con = new ConNode<>(t);
-    //Node con2 = VALS.get(con);
-    //if( con2 != null ) {        // Found a prior constant
-    ////  if( Combo.HM_FREEZE && con2._tvar != con._tvar )
-    ////    throw TODO();
-    ////  con.kill();               // Kill the just-made one
-    ////  con = con2;
-    ////  con._live = Type.ALL;     // Adding more liveness
-    //  throw TODO();
-    //} else {                    // New constant
-    ////  con._live = Combo.post() ? Type.ANY : Type.ALL;     // Not live yet
-    ////  if( Combo.post() && con.has_tvar() ) con.set_tvar();
-    //  con._elock(); // Put in VALS, since if Con appears once, probably appears again shortly
-    //}
-    //return con;
   }
 
   
@@ -877,16 +863,5 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Shortcut
   public Type sharptr( Node mem ) { return mem._val.sharptr(_val); }
-
-  int more_work(int errs) { return NodeUtil.more_work(errs,this); }
-  
-  //// Walk a subset of the dominator tree, looking for the last place (highest
-  //// in tree) this predicate passes, or null if it never does.
-  //Node walk_dom_last(Predicate<Node> P) {
-  //  assert in(0) != null;       // All default control nodes pass ctrl in slot 0
-  //  Node n = in(0).walk_dom_last(P);
-  //  if( n != null ) return n;   // Take last answer first
-  //  return P.test(this) ? this : null;
-  //}
 
 }
