@@ -52,7 +52,7 @@ public class TestLive {
     obj.add_fld("y",TypeFld.Access.Final,fdy,null);
     obj.close().init();
 
-    NewNode ptr = new NewNode().init();
+    NewNode ptr = new NewNode("NEW").init();
     Node mem = new StoreXNode(mmm,ptr,obj,null).init();
 
     // Use the object for scope exit

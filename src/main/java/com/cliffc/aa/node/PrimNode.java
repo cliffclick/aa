@@ -53,11 +53,11 @@ public abstract class PrimNode extends Node {
   public static final StructNode ZFLT = new StructNode(0,false,null );
   public static final StructNode ZSTR = new StructNode(0,false,null );
   public static final StructNode ZMATH= new StructNode(0,false,null );
-  public static final NewNode PCLZ = new NewNode(BitsAlias.CLZX,true);
-  public static final NewNode PINT = new NewNode(BitsAlias.INTX,true);
-  public static final NewNode PFLT = new NewNode(BitsAlias.FLTX,true);
-  public static final NewNode PSTR = new NewNode(BitsAlias.STRX,true); // String clazz, not strings
-  public static final NewNode PMATH= new NewNode(BitsAlias.new_alias(BitsAlias.LOCX),true);
+  public static final NewNode PCLZ = new NewNode("TOP",BitsAlias.CLZX,true);
+  public static final NewNode PINT = new NewNode("INT",BitsAlias.INTX,true);
+  public static final NewNode PFLT = new NewNode("FLT",BitsAlias.FLTX,true);
+  public static final NewNode PSTR = new NewNode("STR",BitsAlias.STRX,true); // String clazz, not strings
+  public static final NewNode PMATH= new NewNode("MATH",BitsAlias.new_alias(BitsAlias.LOCX),true);
   public static TV3 IINT, IBOOL, IFLT, INFLT; // Integer, float instances
 
   private static PrimNode[] PRIMS = null; // All primitives
@@ -261,7 +261,10 @@ public abstract class PrimNode extends Node {
         }
         over.init();
         over.close();
-        ptr0 = new NewNode(BitsAlias.new_alias(BitsAlias.LOCX),true).init();
+        // Some hacky name for the overload group; "f*" or "i!"
+        String p = prims[0]._name;
+        char op = p.charAt(0)=='_' ? p.charAt(1) : p.charAt(0);
+        ptr0 = new NewNode(""+clzname.charAt(0)+op+":",BitsAlias.new_alias(BitsAlias.LOCX),true).init();
         scp.mem(new StoreXNode(scp.mem(),ptr0,over,null));
       }
       clz.add_fld(prims[0]._name,Access.Final,ptr0,null);

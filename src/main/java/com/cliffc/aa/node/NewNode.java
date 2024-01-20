@@ -26,18 +26,23 @@ public class NewNode extends Node {
   // Alias is dead for all time
   private boolean _killed;
 
+  public final String _hint;
+  
   // Just TMP.make(_alias,ISUSED)
   public TypeMemPtr _tptr;
 
-  public NewNode( int alias, boolean is_con ) {
+  public NewNode( String hint, int alias, boolean is_con ) {
     super();
     _reset0_alias = alias;       // Allow a reset, if this alias splits and then we want to run a new test
     set_alias(alias,is_con);
     NEWS.setX(alias,this);
+    _hint = hint;
   }
-  public NewNode( ) { this(BitsAlias.new_alias(),false); }
+  public NewNode( String hint ) { this(hint,BitsAlias.new_alias(),false); }
 
-  @Override public String label() { return "New"+"*"+_alias; } // Self short name
+  @Override public String label() {
+    return  (_killed ? "X" : "")+_hint+"*"+_alias;
+  } 
 
   private void set_alias(int alias, boolean is_con) {
     unelock();                  // Unlock before changing hash

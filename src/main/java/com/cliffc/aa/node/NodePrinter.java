@@ -16,7 +16,7 @@ public abstract class NodePrinter {
   }
 
   // Another bulk pretty-printer.  Uses max depth better.
-  static SB _pp(Node node, int depth, boolean prims, boolean live, SB sb) {
+  private static SB _pp(Node node, int depth, boolean prims, boolean live, SB sb) {
 
     // All Nodes within max depth
     VBitSet visit0 = new VBitSet();
@@ -86,9 +86,11 @@ public abstract class NodePrinter {
   }
 
   private static boolean findNoVisit(Node n, VBitSet visit0) {
-    for( Node def : n.defs() )
+    for( int i=0; i<n.len(); i++ ) {
+      Node def = n.in(i);
       if( def!=null && def!=Env.ROOT && visit0.test(def._uid) )
         return false; // Visited input, so not a root
+    }
     return true;
   }
 

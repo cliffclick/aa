@@ -488,7 +488,7 @@ public class TestNodeSmall {
     // yet built.
     ConNode dsp_prims = new ConNode<>(TypeMemPtr.DISP_SIMPLE).init();
     StructNode dsp_file = new StructNode(1,false,null ).add_fld("^",Access.Final,dsp_prims,null).init();
-    NewNode dsp_file_ptr = new NewNode().init();
+    NewNode dsp_file_ptr = new NewNode("DSP").init();
     Node dsp_file_mem = new StoreXNode(mem,dsp_file_ptr,dsp_file,null).init();
     // Function header with nargs
     FunNode fun = new FunNode("fact",ARG_IDX).addDef(ctl).init();

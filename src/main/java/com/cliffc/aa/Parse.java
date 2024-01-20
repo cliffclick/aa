@@ -184,8 +184,9 @@ import static com.cliffc.aa.type.TypeFld.Access;
  */
 
 public class Parse implements Comparable<Parse> {
+  public static Parse PARSE;    // Helps with debug printing during parsing
   private final String _src;    // Source for error messages; usually a file name
-  private Env _e;    // Lookup context; pushed and popped as scopes come and go
+  private Env _e;               // Lookup context; pushed and popped as scopes come and go
   private final byte[] _buf;    // Bytes being parsed
   private int _x;               // Parser index
   private int _lastNWS;         // Index of last non-white-space char
@@ -221,11 +222,14 @@ public class Parse implements Comparable<Parse> {
   /** Parse a top-level:
    *  prog = stmts END */
   public ErrMsg prog() {
+    PARSE = this;               // Helps with debug printing during parsing
+    System.out.println( NodePrinter.prettyPrint(_e._scope,99,true));
     Node res = stmts();
     if( res == null ) res = Env.ANY;
     scope().set_rez(res);  // Hook result
     // Close file scope; no more program text in this file, so no more fields to add.
     scope().stk().close();
+    PARSE = null;
     return skipWS() == -1 ? null : ErrMsg.trailingjunk(this);
   }
 
@@ -1025,7 +1029,7 @@ public class Parse implements Comparable<Parse> {
     keep(nn);
     nn.add_fld(TypeFld.CLZ,Access.Final, PrimNode.PCLZ, null);
     _tuple(oldx,s,bad,nn,0);
-    Node ptr = new NewNode().peep();
+    Node ptr = new NewNode("TUP").peep();
     Node nn0 = unkeep(nn).peep(); assert nn0==nn;
     mem(new StoreXNode(mem(),keep(ptr),nn0,bad).peep());
     return unkeep(ptr);
@@ -1288,7 +1292,7 @@ public class Parse implements Comparable<Parse> {
     scon.add_fld(".",Access.Final,PrimNode.ZSTR,bad);
     scon.add_fld("0",Access.Final,con(TypeInt.con(str.charAt(0))),bad);
     StructNode scon1 = (StructNode)scon.close().peep();
-    Node ptr = keep(new NewNode().init());
+    Node ptr = keep(new NewNode("STR").init());
     mem( new StoreXNode(mem(),ptr,scon1,bad).peep() );
     return unkeep(ptr);
   }

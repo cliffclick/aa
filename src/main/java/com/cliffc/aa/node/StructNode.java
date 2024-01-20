@@ -79,6 +79,8 @@ public class StructNode extends Node {
   }
 
   @Override String label() {
+    if( is_closure() )
+      return _closed ? "FRAME" : "FRAME?";
     SB sb = new SB().p("@{");
     for( int i=0; i<_flds._len; i++ ) {
       if( i==_nargs ) sb.p("| ");

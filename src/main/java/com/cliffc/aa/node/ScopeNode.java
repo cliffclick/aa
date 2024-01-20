@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 
 import java.util.HashMap;
@@ -24,7 +25,11 @@ public class ScopeNode extends Node {
     _types = types;
     _live = RootNode.defMem(this);
   }
-  @Override public String label() { return "Scope"; }
+  @Override public String label() {
+    if( Parse.PARSE != null && Parse.PARSE.scope()==this )
+      return "CURSCOP";
+    return "Scope";
+  }
   @Override public boolean isCFG() { return true; }
   @Override public boolean isMem() { return true; }
 

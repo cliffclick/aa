@@ -55,7 +55,7 @@ jars = $(subst $(space),$(SEP),$(libs))
 
 # Default to building java classes and not the jar
 #default_targets := build/aa.jar
-default_targets := $(main_classes) $(test_classes)
+default_targets := $(main_classes)
 # Optionally add ctags to the default target if a reasonable one was found.
 ifneq ($(CTAGS),)
 default_targets += tags
@@ -75,7 +75,7 @@ $(main_classes): build/classes/main/%class: $(SRC)/%java
 	@[ -d $(CLZDIR)/main ] || mkdir -p $(CLZDIR)/main
 	@javac $(JAVAC_ARGS) -cp "$(CLZDIR)/main$(SEP)$(jars)" -sourcepath $(SRC) -d $(CLZDIR)/main $(main_javas)
 
-$(test_classes): $(CLZDIR)/test/%class: $(TST)/%java
+$(test_classes): $(CLZDIR)/test/%class: $(TST)/%java $(main_classes)
 	@echo "compiling " $@ " because " $?
 	@[ -d $(CLZDIR)/test ] || mkdir -p $(CLZDIR)/test
 	@javac $(JAVAC_ARGS) -cp "$(CLZDIR)/test$(SEP)$(CLZDIR)/main$(SEP)$(jars)" -sourcepath $(TST) -d $(CLZDIR)/test $(test_javas)
