@@ -31,7 +31,7 @@ public class TestParse {
     DO_HMT=true;
     RSEED=0;
 
-    test("1._*_._(2)", "int:2", "int:2");
+    test(" 1+2 * 3+4 *5", "27", "27");
   }
 
   static private void assertTrue(boolean t) {
@@ -59,7 +59,7 @@ public class TestParse {
     test("1", "1", "1");
     // Unary operator
     test("-1", "-1", "-1");
-    test("!1", "nil", "*[0](...)?");
+    test("!1", "nil", "nil");
     // Binary operators
     test("1+2", "3", "3");
     test("1-2", "-1",  "-1");

@@ -214,6 +214,8 @@ public class Parse implements Comparable<Parse> {
     _lines = new AryInt();//
     _lines.push(0);       // Line 0 at offset 0
     _keeps = new Ary<>(Node.class);
+    StructNode stk = scope().stk();
+    stk.add_fld("$dyn",Access.Final,new DefDynTableNode().init(),null);
   }
 
   // Debugging hook
@@ -223,7 +225,6 @@ public class Parse implements Comparable<Parse> {
    *  prog = stmts END */
   public ErrMsg prog() {
     PARSE = this;               // Helps with debug printing during parsing
-    System.out.println( NodePrinter.prettyPrint(_e._scope,99,true));
     Node res = stmts();
     if( res == null ) res = Env.ANY;
     scope().set_rez(res);  // Hook result
@@ -481,7 +482,7 @@ public class Parse implements Comparable<Parse> {
     // Store into the defining scope (not necessarily local scope)
     mem( new StoreNode(mem(),ptr,ifex,tok,mutable,badf).peep() );
     if( mutable==Access.Final ) Oper.make(tok,false);
-    ifex = unkeep(ifex).peep();
+    ifex = unkeep(ifex);
     assert bal == _keeps._len;  // Balanced keep-alives
     return ifex;
   }
@@ -613,7 +614,7 @@ public class Parse implements Comparable<Parse> {
       }
       keep(arg);
       Node dsp = new FP2DSPNode(expr,errMsg(oldx)).peep();
-      expr = do_call0(true,errMsgs(oldx,oldx),args(dsp,unkeep(arg),unkeep(expr))); // Pass the 1 arg
+      expr = doCall(errMsgs(oldx,oldx),args(dsp,dynCall(),unkeep(arg),unkeep(expr))); // Pass the 1 arg
       assert bal == _keeps._len; // Balanced keep-alives
     }
   }
@@ -654,19 +655,23 @@ public class Parse implements Comparable<Parse> {
       // Load against LHS pointer.  If this is a primitive, the Load loads
       // against the primitive clazz.
       Node over= new LoadNode(mem(),lhs,binop._name,err).peep();
+      // DynTable to call
+      Node dyn = keep(dynCall());
       // Resolve the set of primitive choices
-      Node fun = new DynLoadNode(mem(),over,err).peep();
+      Node fun = new DynLoadNode(mem(),over,((AFieldNode)dyn).in(0),err).peep();
       // Bind the LHS to the function
-      Node bind= keep(new BindFPNode(fun,lhs,false).peep());
+      Node bind= keep(new BindFPNode(fun,lhs).peep());
       // Parse the RHS operand
       Node rhs = binop._lazy
         ? _lazy_expr(binop)
         : _expr_higher_require(binop);
+      //
       // Emit the call to both terms
       bind = unkeep(bind);
+      dyn = unkeep(dyn);
       lhs = unkeep(lhs);
       // LHS in unhooked prior to optimizing/replacing.
-      lhs = do_call(errMsgs(opx,lhsx,rhsx), args(lhs,rhs,bind));
+      lhs = doCall(errMsgs(opx,lhsx,rhsx), args(lhs,dyn,rhs,bind));
       // Invariant: LHS is unhooked
       assert bal == _keeps._len; // Balanced keep-alives
     }
@@ -722,7 +727,7 @@ public class Parse implements Comparable<Parse> {
       _e = e._par;            // Pop nested environment
       Node fptr = new FunPtrNode(ret).peep();
       // The Bind builds a real display; any up-scope references are passed in now.
-      bind = keep(new BindFPNode(fptr,scope().ptr(),false).peep());
+      bind = keep(new BindFPNode(fptr,scope().ptr()).peep());
 
       // Extra variables in the short-circuit are not available afterwards.
       // Set them to Err.
@@ -772,13 +777,16 @@ public class Parse implements Comparable<Parse> {
       int bal = _keeps._len;      // Balanced keep-alives
       keep(e0);
       Parse err = errMsg(oldx);
+      //
+      Node dyn = keep(dynCall());
       // Load against e0 pointer.  If e0 is a primitive, the Load is a no-op;
       // otherwise this converts a reference to a value.
       Node over= new LoadNode(mem(),e0,op._name,err).peep();
       // Resolve the correct function from the overload choices
-      Node fun = new DynLoadNode(mem(),over,err).peep();
+      Node fun = new DynLoadNode(mem(),over,((AFieldNode)dyn).in(0),err).peep();
       // Call the operator
-      n = do_call(errMsgs(oldx,oldx),args(unkeep(e0),fun));
+      dyn = unkeep(dyn);
+      n = doCall(errMsgs(oldx,oldx),args(unkeep(e0),dyn,fun));
       assert bal == _keeps._len; // Balanced keep-alives
     } else {
       // Normal leading term
@@ -816,15 +824,13 @@ public class Parse implements Comparable<Parse> {
         } else {
           Parse bad = errMsg(fld_start);          
           Node adr = keep(n);   // Save address for bind
-          if( Util.eq(tok,"_") ) {
+          n = Util.eq(tok,"_")
             // Using a plain underscore for the field name is a Resolving field.
-            n = new DynLoadNode(mem(),n,    bad).peep();
-          } else {
+            ? new DynLoadNode(mem(),n,dynLoad(),bad).peep()
             // Normal non-oper load
-            n = new    LoadNode(mem(),n,tok,bad).peep();
-          }
+            : new    LoadNode(mem(),n,tok      ,bad).peep();
           // Bind after load
-          n = new BindFPNode(n, unkeep(adr), false).peep();
+          n = new BindFPNode(n, unkeep(adr), tok).peep();
         }
 
       } else if( peek('(') ) {  // Attempt a function-call
@@ -837,14 +843,15 @@ public class Parse implements Comparable<Parse> {
         // Argument tuple, with "this" or display first arg
         StructNode args = new StructNode(0,false,err );
         args.add_fld("0",Access.Final,dsp,err); // TODO: get the display start for errors
+        args.add_fld("1",Access.Final,dynCall(),err);
         keep(args);
         Node arg1 = stmts();
         // Parse rest of arguments
-        _tuple(oldx-1,arg1,errMsg(first_arg_start),args,1); // Parse argument list
+        _tuple(oldx-1,arg1,errMsg(first_arg_start),args,2); // Parse argument list
         Node x = unkeep(args).peep(); assert x==args;
         unkeep(n);                                // Function
         Parse[] badargs = args.fld_starts();      // Args from tuple
-        n = do_call0(false,badargs,args(args,n)); // Pass the tuple
+        n = doCall0(false,badargs,args(args,n));  // Pass the tuple
 
       } else {
         // Check for balanced op with a leading term, e.g. "ary [ idx ]" or
@@ -865,7 +872,7 @@ public class Parse implements Comparable<Parse> {
         //
         //require(fun._bal_close,oldx);
         //if( fun.nargs()==ARG_IDX+2 ) { // array, index
-        //  n = do_call(errMsgs(0,oldx,oldx2),args(bfun,n.unkeep(),idx.unkeep()));
+        //  n = doCall(errMsgs(0,oldx,oldx2),args(bfun,dynCall(),n.unkeep(),idx.unkeep()));
         //} else {
         //  assert fun.nargs()==ARG_IDX+3; // array, index, value
         //  skipWS();
@@ -873,7 +880,7 @@ public class Parse implements Comparable<Parse> {
         //  bfun.keep();
         //  Node val = stmt(false);
         //  if( val==null ) { n.unhook(); return err_ctrl2("Missing stmt after '"+fun._bal_close+"'"); }
-        //  n = do_call(errMsgs(0,oldx,oldx2,oldx3),args(bfun.unkeep(),n.unkeep(),idx.unkeep(),val));
+        //  n = doCall(errMsgs(0,oldx,oldx2,oldx3),args(bfun.unkeep(),dynCall(),n.unkeep(),idx.unkeep(),val));
         //}
         throw TODO();
       }
@@ -915,11 +922,13 @@ public class Parse implements Comparable<Parse> {
     // Do a full lookup on "+", and execute the function
     // Get the overloaded operator field, always late binding
     Node overplus = new LoadNode(mem(),n,"_+_",bad).peep();
+    
+    Node dyn = keep(dynCall());
     // Resolve primitive choices
-    Node plus = new DynLoadNode(mem(),overplus,bad).peep();
+    Node plus = new DynLoadNode(mem(),overplus,((AFieldNode)dyn).in(0),bad).peep();
     Node inc = con(TypeInt.con(d));
     // Add
-    Node sum = do_call0(true,errMsgs(_x-2,_x,_x), args(n,inc,plus));
+    Node sum = doCall(errMsgs(_x-2,_x,_x), args(n,unkeep(dyn),inc,plus));
     // Store result back
     mem(new StoreNode(mem(),ptr,sum,tok,Access.RW,bad).peep());
     return unkeep(n);      // Return pre-increment post-fresh value
@@ -1018,6 +1027,20 @@ public class Parse implements Comparable<Parse> {
     return frsh;
   }
 
+  // A fact hardware to "$dyn".
+  private Node dynLoad() {
+    ScopeNode scope = lookup_scope("$dyn",false);
+    // Display/struct/scope containing the field
+    Node dsp = get_display_ptr(scope);    
+    // Load the resolve field from the display/scope structure
+    return new LoadNode(mem(),dsp,"$dyn", null).peep();
+  }
+  private Node dynCall() {
+    Node ld = dynLoad();
+    // Load a Call/Apply field out of a DynTable
+    return new AFieldNode(ld).peep();
+  }
+  
 
   /** Parse a tuple; first stmt but not the ',' parsed.
    *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
@@ -1163,7 +1186,7 @@ public class Parse implements Comparable<Parse> {
       _e = e._par;            // Pop nested environment; pops nongen also
       Node fptr = new FunPtrNode(ret).peep();
       // Anonymous functions early-bind.  Functions in structs become "methods" and late-bind.
-      return scope().stk().is_closure() ? new BindFPNode(fptr,scope().ptr(),false).peep() : fptr;
+      return scope().stk().is_closure() ? new BindFPNode(fptr,scope().ptr()).peep() : fptr;
     }
   }
 
@@ -1214,7 +1237,7 @@ public class Parse implements Comparable<Parse> {
       throw TODO();
     }
     //require(bfun.funptr().fun()._bal_close,oldx);
-    //return do_call(errMsgs(oldx,oldx2),args(bfun,s));
+    //return doCall(errMsgs(oldx,oldx2),args(bfun,dynLoad(),s));
     throw TODO();
   }
 
@@ -1570,6 +1593,7 @@ public class Parse implements Comparable<Parse> {
   private Node[] args(Node a0                           ) { return _args(new Node[]{null,null,a0}); }
   private Node[] args(Node a0, Node a1                  ) { return _args(new Node[]{null,null,a0,a1}); }
   private Node[] args(Node a0, Node a1, Node a2         ) { return _args(new Node[]{null,null,a0,a1,a2}); }
+  private Node[] args(Node a0, Node a1, Node a2, Node a3) { return _args(new Node[]{null,null,a0,a1,a2,a3}); }
   private Node[] _args(Node[] args) {
     args[CTL_IDX] = ctrl();     // Always control
     args[MEM_IDX] = mem();      // Always memory
@@ -1578,8 +1602,8 @@ public class Parse implements Comparable<Parse> {
 
   // Insert a call, with memory splits.  Wiring happens later, and when a call
   // is wired it picks up projections to merge at the Fun & Parm nodes.
-  private Node do_call( Parse[] bads, Node... args ) { return do_call0(true,bads,args); }
-  private Node do_call0( boolean unpack, Parse[] bads, Node... args ) {
+  private Node doCall( Parse[] bads, Node... args ) { return doCall0(true,bads,args); }
+  private Node doCall0( boolean unpack, Parse[] bads, Node... args ) {
     int bal = _keeps._len;      // Balanced keep-alives
     CallNode call = (CallNode)new CallNode(unpack,bads,args).peep();
     Node cepi = keep(new CallEpiNode(call).peep());

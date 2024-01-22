@@ -1,6 +1,8 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.ErrMsg;
+import com.cliffc.aa.Oper;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
@@ -9,9 +11,57 @@ import static com.cliffc.aa.AA.TODO;
 
 // Bind a 'this' into an unbound function pointer.  Inverse of FP2DSP.  The
 // function input can also be a struct (overload) of function pointers.
+
+// --- PLAN A -----------------------------------------------------------------
+// "1+2" -   Normal Bind on oper
+//   Parser emits:
+//   Load from "1".CLZ of "_+_".  Gets an overload, no binding.
+//   DynLoad "_" from overload, gets a fcn  Does an actual mem Load.
+//   Bind fcn with DISPLAY "1".  Normal Bind.
+
+// "x.y" -   Normal Bind on normal load "free Bind on every Load!"  Makes method-calls on structs work out.
+//   Parser emits:
+//   Load from "x" of "y".
+//   Because: Parser cannot know, so must insert Bind
+//   THIS IS METHOD-CALLS ON STRUCTS: "x.toString()"
+//   Bind loaded "y" with "x", in case "y" is a fcn.
+//   As soon as "y" canNOT be a unbound function, Bind is a no-op, removes.
+//   If "y" becomes e.g. a TMP, this is NOT a fcn, still remove.
+
+// "1._+_" - Oper Bind from Oper Load
+//   Parser emits:
+//   Load from "1".CLZ of "_+_".  Gets an overload.
+//   Bind loaded "_+_" with "1".  Bind is marked as from a Operator Ld
+//   As soon as "_+_" turns into a TMP, binds deep, produces a Deep Ptr
+//   PRODUCES A SPECIAL DEEP-PTR TYPE, NEVER SEEN ELSEWHERE
+//   Error to meet DEEP & not-DEEP ptrs!  Falls to e.g SCALAR.
+
+// Loads against Deep Ptrs are field selects; ignore memory
+
+// "._"
+//   Parser emits:
+//   DynLoad, selects 1 bound fcn from many.  Deep Ptr: does field select.
+//   Because: Parser cannot know, so must insert Bind
+//   Value is a bound fcn, Bind is a no-op removes.
+
+// Summary:
+//   Binds are normal or oper, and can be no-op.
+//   Both   Binds of Deep Ptrs are no-ops, removed.
+//   Normal Binds bind FPtrs, or if cannot be a FPtr (join too high), become no-op, removes
+//   Oper   Binds produce a Deep Ptr from a TMP; of other things go to ALL (error)
+//   Loads (both kinds) of Deep Ptrs do field selects, ignore memory
+
+
+
 public class BindFPNode extends Node {
-  final boolean _over;  // Binds an Overload
-  public BindFPNode( Node fp, Node dsp, boolean over ) { super(fp,dsp); _over = over; }
+  // 3 choices=
+  // - null; always good, never a no-op
+  // - oper is_oper(); always good, never a no-op, does a deep Bind
+  // - oper NOT is_oper(); MAY be no-op; depends on input being a no-display FP; 
+  final String _oper;  // Binds from an oper load
+  
+  public BindFPNode( Node fp, Node dsp ) { this(fp,dsp,null); }
+  public BindFPNode( Node fp, Node dsp, String oper ) { super(fp,dsp); _oper = oper; }
   @Override public String label() {return "BindFP"; }
 
   public Node fp () { return in(0); }
@@ -29,52 +79,44 @@ public class BindFPNode extends Node {
   @Override public Type value() {
     Type tfp = fp ()==null ? TypeFunPtr.GENERIC_FUNPTR.dual() : fp()._val;
     Type dsp = dsp()==null ? Type.ANY : dsp()._val;
-    return bind(tfp,dsp,_over);
+    return bind(tfp,dsp,_oper);
   }
 
-  private Type bind(Type fun, Type dsp, boolean over) {    
-    if( !over && fun instanceof TypeFunPtr tfp ) {
-      if( tfp.has_dsp() ) return tfp; // Already bound
-      return tfp.make_from(dsp);      // Bind it
+  private Type bind(Type fun, Type dsp, String oper) {
+    if( oper!=null && Oper.is_oper(oper) ) {
+      // Push Bind down into overloads
+      assert in(0) instanceof LoadNode ld && Util.eq(_oper,ld._fld);
+      if( fun instanceof TypeMemPtr tmp ) {
+        // Expect fun to be simple
+        assert tmp.is_simple_ptr();
+        // Get the sharper memory struct
+        TypeMem mem = (TypeMem)in(0).in(AA.MEM_IDX)._val;
+        TypeStruct ts = mem.ld(tmp);
+        // Bind all the functions
+        TypeFld[] tfs = TypeFlds.get(ts.len());
+        for( int i=0; i<ts.len(); i++ )
+          tfs[i] = ts.get(i).make_from(bind(ts.at(i),dsp,null));
+        return tmp.make_from(ts.make_from(tfs));
+      } else {
+        return fun.oob(TypeNil.SCALAR); // Await fun to sharpen
+      }
+    } else {
+      return fun instanceof TypeFunPtr tfp && !tfp.has_dsp()
+        ? tfp.make_from(dsp)       // Bind it
+        : fun.oob(TypeNil.SCALAR); // Incorrect BIND, will reduce
     }
-    
-    // Push Bind down into overloads
-    if( over && fun instanceof TypeStruct ts ) {
-      TypeFld[] tfs = TypeFlds.get(ts.len());
-      for( int i=0; i<ts.len(); i++ )
-        tfs[i] = ts.get(i).make_from(bind(ts.at(i),dsp,false));
-      return ts.make_from(tfs);
-    }
-    
-    return fun;
   }
 
   // Displays are always alive, if the Bind is alive.  However, if the Bind is
   // binding an overload the result is a struct-liveness instead just ALL.
-
-  
   @Override public Type live_use( int i ) {
-    // If this bind is binding an overload
-    // - its being used by a resolving field, this _live is some-field live
-    // - the display might be a primitive int/flt or a TMP; its all-alive
-    // - the whole overload is struct-live
-    // Else normal FP bind
-    // - Normal value, normal uses, so struct/fp-or-dsp alive
     // - The display should be a TMP, and liveness flows
-    // - The funptr should be a TFP, and liveness flows
-    if( _over ) {
-      return i==0 ? TypeStruct.ISUSED // Whole overload is used
-        : Type.ALL;                   // Whole primitive or TMP is alive
-    } else {
-      return _live instanceof TypeStruct ts ? ts.at_def(i==0 ? "fp" : "dsp") : _live;
-    }
+    // - The funptr  should be a TFP, and liveness flows
+    return _live instanceof TypeStruct ts ? ts.at_def(i==0 ? "fp" : "dsp") : _live;
   }
   
-  // Bind can be used by a Field, and so have a struct-liveness, and the whole of the Bind
-  // is pushed into functions with
   @Override public boolean assert_live(Type live) {
     if( !(live instanceof TypeStruct ts) ) return false;
-    if( _over ) return true; // Used by a Field node which will select which field is alive
     // Normal binds allow on fields "fp" and "dsp"
     for( TypeFld tf : ts )
       if( !Util.eq(tf._fld,"fp") && !Util.eq(tf._fld,"dsp") )
@@ -83,7 +125,23 @@ public class BindFPNode extends Node {
   }
 
   @Override public Node ideal_reduce() {
-    if( !_over && _live instanceof TypeStruct live ) {
+    // Check that this is a "maybe Bind"
+    if( _oper!=null && !Oper.is_oper(_oper) ) {
+      if( fp()._val instanceof TypeFunPtr tfp ) {
+        if( tfp.has_dsp() )
+          return fp();          // Already bound, no double bind
+      } else {
+        if( fp()._val.above_center() )
+          throw AA.TODO();      // Function is undefined, bind is dead, can be removed
+        else if( fp()._val.isa(TypeFunPtr.GENERIC_FUNPTR) )
+          ; // OK
+        else
+          throw AA.TODO();      // Sideways, BIND is extra, remove
+      }
+    }
+
+    // One or the other input is dead
+    if( _live instanceof TypeStruct live ) {
       if( in(0)!=null && live.at_def("fp" )==Type.ANY ) return setDef(0,null);
       if( in(1)!=null && live.at_def("dsp")==Type.ANY ) return setDef(1,null);
     } else deps_add(this);      // Liveness changes, recheck
@@ -96,12 +154,7 @@ public class BindFPNode extends Node {
   @Override public boolean unify( boolean test ) {
     boolean progress = false;
     TV3 fptv = fp().tvar();
-    if( _over && fptv instanceof TVPtr ptr ) {
-      TVStruct tvs = ptr.load();
-      for( int i = 0; i < tvs.len(); i++ )
-        if( tvs.arg(i) instanceof TVLambda lam )
-          progress |= dsp_unify(lam.dsp(), dsp(), test);
-    } else if( fptv instanceof TVLambda lam ) {      
+    if( fptv instanceof TVLambda lam ) {      
       progress |= dsp_unify(lam.dsp(), dsp(), test);
     } else {
       fptv.deps_add(this);

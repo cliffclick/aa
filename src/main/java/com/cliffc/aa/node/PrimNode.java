@@ -67,7 +67,7 @@ public abstract class PrimNode extends Node {
 
     // int opers
     PrimNode[][] INTS = new PrimNode[][]{
-      //{ new AddI64(), new AddIF64() },
+      { new AddI64(), new AddIF64() },
       //{ new SubI64(), new SubIF64() },
       { new MulI64(), new MulIF64() },
       //{ new DivI64(), new DivIF64() },
@@ -84,7 +84,7 @@ public abstract class PrimNode extends Node {
     };
 
     PrimNode[][] FLTS = new PrimNode[][]{
-      //{ new AddF64(), new AddFI64() },
+      { new AddF64(), new AddFI64() },
       //{ new SubFI64(), new SubF64() },
       { new MulFI64(), new MulF64() },
       //{ new DivF64(), new DivFI64() },
@@ -274,7 +274,7 @@ public abstract class PrimNode extends Node {
     scp.mem(new StoreXNode(scp.mem(),Env.GVN.add_flow(ptr),clz,null));
   }
 
-  // Build and install match package
+  // Build and install math package
   private static NewNode make_math(PrimNode rand) {
     ZMATH.add_fld(TypeFld.CLZ,Access.Final,PCLZ,null);
     Node pi = con(TypeFlt.PI.wrap());
@@ -346,9 +346,16 @@ public abstract class PrimNode extends Node {
   @Override TV3 _set_tvar() {
     // All arguments are pre-unified to unique bases, wrapped in a primitive
     // with a clazz reference
-    for( int i=DSP_IDX; i<_formals.len(); i++ )
-      if( _formals.at(i)!=Type.ANY )
-        in(i-DSP_IDX).set_tvar().unify(wrap_base(_formals.at(i)),false);
+    if( in(0) != null )
+      in(0).set_tvar().unify(wrap_base(_formals.at(DSP_IDX)),false);
+    // Skip dyntable, dead in all primitives
+    assert in(1) == null;
+    // 2-arg primitive sets next arg
+    if( len()>2 ) {
+      in(2).set_tvar().unify(wrap_base(_formals.at(ARG_IDX+1)),false);
+      assert len()==3;
+    }
+      
     // Return is some primitive
     return wrap_base(_ret);
   }
@@ -491,7 +498,7 @@ public abstract class PrimNode extends Node {
   // 2Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim2OpI64 extends PrimNode {
     Prim2OpI64( String name ) { super(name,TypeTuple.INT64_INT64,TypeInt.INT64); }
-    @Override public TypeNil apply( TypeNil[] args ) { return TypeInt.con(op(args[0].getl(),args[1].getl())); }
+    @Override public TypeNil apply( TypeNil[] args ) { return TypeInt.con(op(args[0].getl(),args[2].getl())); }
     abstract long op( long x, long y );
   }
 
@@ -503,7 +510,7 @@ public abstract class PrimNode extends Node {
 
   abstract static class Prim2OpIF64 extends PrimNode {
     Prim2OpIF64( String name ) { super(name,TypeTuple.INT64_NFLT64,TypeFlt.FLT64); }
-    @Override public TypeFlt apply( TypeNil[] args ) { return TypeFlt.con(op(args[0].getl(),args[1].getd())); }
+    @Override public TypeFlt apply( TypeNil[] args ) { return TypeFlt.con(op(args[0].getl(),args[2].getd())); }
     abstract double op( long x, double y );
   }
   static class AddIF64 extends Prim2OpIF64 { AddIF64() { super("_+_"); } double op( long l, double r ) { return l+r; } }
@@ -671,7 +678,7 @@ public abstract class PrimNode extends Node {
 
 
   public static class RandI64 extends PrimNode {
-    public RandI64() { super("rand",TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, Type.ANY, TypeInt.INT64),TypeInt.INT64); }
+    public RandI64() { super("rand",TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, Type.ANY, Type.ANY, TypeInt.INT64),TypeInt.INT64); }
     @Override boolean is_oper() { return false; }
     @Override public TypeNil apply( TypeNil[] args ) { return TypeInt.INT64;  }
     // Rands have hidden internal state; 2 Rands are never equal

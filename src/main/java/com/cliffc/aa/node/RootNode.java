@@ -269,6 +269,7 @@ public class RootNode extends Node {
       live = switch( use(j) ) {
       case CProjNode use -> live;   // No implied live memory
       case   ConNode use -> live;   // No implied live memory
+      case DefDynTableNode use -> live; // No implied live memory
       case MProjNode use -> (TypeMem)live.meet(use._live);
       default -> throw TODO();  // Handle escaping calls, rturns.  Also null not expected
       };

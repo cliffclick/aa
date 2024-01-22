@@ -53,9 +53,13 @@ public final class CallEpiNode extends Node {
         return null;
 
     // Add or remove Call Graph edges according to fidxs
-    if( CG_wire() ) return this;
+    Node progress = null;
+    if( CG_wire() ) {
+      _val = value();
+      progress = this;
+    }
 
-    if( CallNode.tctl(tcall) != Type.CTRL ) return null; // Call not executable
+    if( CallNode.tctl(tcall) != Type.CTRL ) return progress; // Call not executable
 
     // The one allowed function is already wired?  Then directly inline.
     // Requires this calls 1 target, and the 1 target is only called by this.
@@ -81,21 +85,21 @@ public final class CallEpiNode extends Node {
       }
     }
 
-    if( call.err(true)!=null ) return null; // CallNode claims args in-error, do not inline
+    if( call.err(true)!=null ) return progress; // CallNode claims args in-error, do not inline
 
     // Only inline wired single-target function with valid args.  CallNode wires.
-    if( !is_CG(true) ) return null;
+    if( !is_CG(true) ) return progress;
     int fidx = fidxs.abit();
-    if( fidx <= 1 ) return null; // More than one choice
+    if( fidx <= 1 ) return progress; // More than one choice
 
     // Call allows 1 function not yet inlined, sanity check it.
-    if( nwired()!=1 ) return null; // More than 1 wired, inline only via FunNode
-    if( isPrim() ) return null;    // Only inline via FunNode
+    if( nwired()!=1 ) return progress; // More than 1 wired, inline only via FunNode
+    if( isPrim() ) return progress;    // Only inline via FunNode
     int cnargs = call.nargs();
     RetNode ret = RetNode.get(fidx);
-    if( ret==null ) return null;
+    if( ret==null ) return progress;
     FunNode fun = ret.fun();
-    if( fun._val != Type.CTRL ) return null;
+    if( fun._val != Type.CTRL ) return progress;
     assert !fun.isDead() && fun.nargs() == cnargs; // All checked by call.err
 
     // Check for several trivial cases that can be fully inlined immediately.
@@ -109,10 +113,10 @@ public final class CallEpiNode extends Node {
     if( rmem==null || (rmem instanceof ParmNode && rmem.in(CTL_IDX) == fun) || rmem._val ==TypeMem.ANYMEM )
       rmem = cmem;
     // Check that function return memory and post-call memory are compatible
-    if( !(_val instanceof TypeTuple ttval) ) return null;
+    if( !(_val instanceof TypeTuple ttval) ) return progress;
     Type selfmem = ttval.at(MEM_IDX);
     if( !rmem._val.isa( selfmem ) )
-      return null;
+      return progress;
 
     // Check for zero-op body (id function)
     if( rrez instanceof ParmNode && rrez.in(CTL_IDX) == fun && cmem == rmem && inline )
@@ -175,7 +179,7 @@ public final class CallEpiNode extends Node {
       }
     }
 
-    return null;
+    return progress;
   }
 
   // Merge call-graph edges, but the call-graph is not discovered prior to GCP.
@@ -495,61 +499,26 @@ public final class CallEpiNode extends Node {
       fun.del(call());
     }
     assert is_CG(false);
-    return new TVLeaf();
-  }
 
-  // Same as HM.Apply.unify
-  @Override public boolean unify( boolean test ) {
-    assert !_is_copy;
-    boolean progress = false;
+    _tvar = new TVLeaf();
     CallNode call = call();     // Call header for Apply
-    Node fdx = call.fdx();      // node {dsp args -> ret}
-    TV3 tv3 = fdx.tvar();       // type {dsp args -> ret}
-
-    // Peek thru any error
-    if( tv3 instanceof TVErr err ) tv3 = err.as_lambda();
-
-    // If not one already, make a lambda term for the function.
-    if( !(tv3 instanceof TVLambda tfun) ) {
-      if( test ) return true;
-      Env.GVN.add_flow(this); // Re-unify after forcing a Lambda, to get the args
-      TVLambda lam = new TVLambda(call.nargs(),
-                                  new TVLeaf(),// display
-                                  tvar());     // Result
-      return fdx.tvar().unify(lam,false);
+    Node fdx = call.fdx();      // node {dsp dyn args -> ret}
+    TV3 tfun = fdx.set_tvar();  // type {dsp dyn args -> ret}
+    
+    TVLambda lam = tfun instanceof TVLambda lam0 ? lam0
+      : new TVLambda(call.nargs(),new TVLeaf(),tvar());
+    if( !(tfun instanceof TVLambda) )
+      tfun.unify(lam,false);
+      
+    assert lam.nargs() == call.nargs();
+    for( int i=DSP_IDX; i<call.nargs(); i++ ) {
+      TV3 targ = call.in(i).set_tvar();
+      if( lam.arg(i) != null )
+        lam.arg(i).unify( targ, false );
     }
-
-    // Check for progress amongst args
-    int tnargs = tfun.nargs();
-    int cnargs = call.nargs();
-    int nargs = Math.min(tnargs,cnargs);
-    for( int i=DSP_IDX; i<nargs; i++ ) {
-      // TODO:
-      //// Do not unify against dead args.
-      //// If the call arg is dead, then all called fcns must have that arg dead as well.
-      //// If the call arg is alive, it might have other, non-fcn-arg, uses.
-      //// Tighter test: if all called fcns are dead on that arg, do not unify.
-      //if( call.in(i)._live.above_center() ) {
-      //  call.in(i).deps_add(this);
-      //  continue;
-      //}
-      TV3 formal = tfun.arg(i);
-      TV3 actual = call.tvar(i);
-      progress |= actual.unify(formal,test);
-      if( progress && test ) return true;
-      tfun = tfun.find().as_lambda();
-    }
-
-    // Check for progress on the return & memory
-    progress |= tvar().unify(tfun.ret(),test);
-
-    if( tnargs > nargs )  // Missing arguments
-      progress |= tvar().unify_err("Passing "+cnargs+" arguments to a function taking "+tnargs+" arguments",tfun,call._badargs[cnargs-ARG_IDX],test);
-    if( cnargs > nargs ) throw TODO(); // Too many arguments
-    tfun.deps_add(this);
-    return progress;
+    tvar().unify(lam.ret(),false);
+    return tvar();
   }
-
   // Unify trailing result ProjNode with the CallEpi directly.
   @Override public boolean unify_proj( ProjNode proj, boolean test ) {
     if( proj._idx==REZ_IDX )

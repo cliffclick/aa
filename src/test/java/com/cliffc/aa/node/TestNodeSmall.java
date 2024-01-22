@@ -500,7 +500,7 @@ public class TestNodeSmall {
     RetNode ret = new RetNode(fun,parm_mem,parm_dsp_ptr,rpc,fun).init();
     FunPtrNode fptr = new FunPtrNode(ret).init();
     fptr._name = "fact";
-    BindFPNode bind = new BindFPNode(fptr,dsp_file_ptr,false);
+    BindFPNode bind = new BindFPNode(fptr,dsp_file_ptr);
     // Close the cycle
     dsp_file.add_fld("fact",Access.Final,bind,null);
     dsp_file.close();

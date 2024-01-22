@@ -319,7 +319,7 @@ public class EXE {
             return;
           }
           dbx++;                // Bump deBrujin index
-        } else if( syn instanceof Root root ) {
+        } else if( syn instanceof Root ) {
           if( _name.equals("$dyn") ) {
             DefDynTable def = new DefDynTable();
             def._par = _par;
@@ -624,12 +624,8 @@ public class EXE {
       _tvar = new TVLeaf();
       _ptr.prep_tree(nongen);
       
-      // Normally produces a TVDynTable from a TVDynTable.
-      // If an idle Def$Dyn, then both are TVLeaf instance, and leave it idle.
       TV3 tv3 = tvar();
       TV3 ptr = _ptr.tvar();
-      //if( tv3 instanceof TVLeaf && ptr instanceof TVLeaf )
-      //  return false;
       // Inflate ptr to a dyntable
       TVDynTable ptrdyn;
       if( ptr instanceof TVDynTable tdyn0 )

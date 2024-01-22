@@ -58,7 +58,7 @@ jars = $(subst $(space),$(SEP),$(libs))
 default_targets := $(main_classes)
 # Optionally add ctags to the default target if a reasonable one was found.
 ifneq ($(CTAGS),)
-default_targets += tags
+default_targets += TAGS_AGE
 endif
 
 default: $(default_targets)
@@ -207,6 +207,7 @@ lib/annotations-16.0.2.jar:
 # Build emacs tags (part of a tasty emacs ide experience)
 tags:	TAGS
 TAGS:	$(main_javas) $(test_javas) $(exec_javas)
+	echo building tags and tags_age
 	@rm -f TAGS
 	@$(CTAGS) -e --recurse=yes --extra=+q --fields=+fksaiS $(SRC) $(TST)
 	@touch "--date=next hour" TAGS_AGE

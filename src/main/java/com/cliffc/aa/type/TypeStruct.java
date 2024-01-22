@@ -322,6 +322,9 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   public  static final TypeStruct D1    = make_test("d",TypeInt.TRUE ,Access.Final); // @{d:1}
   public  static final TypeStruct ARW   = make_test("a",TypeFlt.FLT64,Access.RW   );
 
+  // Most general dyn table
+  public static final TypeStruct DYNTABLE = ISUSED;
+  
   // Pile of sample structs for testing
   static final TypeStruct[] TYPES = new TypeStruct[]{ISUSED,POINT,A,C0,D1,ARW};
 

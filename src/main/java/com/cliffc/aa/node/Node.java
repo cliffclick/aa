@@ -363,11 +363,10 @@ public abstract class Node implements Cloneable, IntSupplier {
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !(o instanceof Node n) ) return false;
-    if( !Util.eq(label(), n.label()) ) return false;
     if( _len != n._len ) return false;
     // Note pointer-equality
     for( int i=0; i<_len; i++ ) if( _defs[i] != n._defs[i] ) return false;
-    return true;
+    return Util.eq( label(), n.label() );
   }
  
   // --------------------------------------------------------------------------
@@ -494,6 +493,13 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Add a non-local dependent.
   void deps_add( Node dep ) {
     assert findDef(dep) == -1 && findUse(dep) == -1; // Non-local; local dependents already handled
+    deps_add_live(dep);
+  }
+  // No-assert version, allowing e.g. a change in value to trigger a change in
+  // liveness on a direct input - which otherwise the normal version triggers
+  // an assert, because neighbors are auto-magically added to the worklist
+  // already.  However, value changes only add uses, not defs, and vice-versa.
+  void deps_add_live( Node dep ) {
     if( _deps==null ) _deps = new Ary<>(new Node[1],0);
     if( _deps.find(dep)==-1 && NodeUtil.mid_work_assert()) {
       assert dep!=null;

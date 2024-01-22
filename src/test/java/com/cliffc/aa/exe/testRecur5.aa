@@ -8,7 +8,7 @@ gen = { ->
   };
   (inc 0)
 };
-// Make 2 hidden countes
+// Make 2 hidden counters
 cntX0 =(gen);
 cntY0 =(gen);
 // Increment both to 1

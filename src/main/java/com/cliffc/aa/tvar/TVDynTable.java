@@ -6,6 +6,7 @@ import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
 import java.util.Arrays;
+import java.util.HashSet;
 
 import static com.cliffc.aa.AA.TODO;
 
@@ -43,6 +44,7 @@ public class TVDynTable extends TV3 {
 
   // Add a DynField reference to this table
   public boolean add_dyn( int uid, TV3 match, TV3 pattern ) {
+    assert !unified();
     if( _args==null ) { _args = new TV3[2]; _uids = new int[1];  _cmps = new long[1];  _labels = new String[1]; }
     if( _max == _uids.length ) {
       int len = _max*2;
@@ -83,6 +85,21 @@ public class TVDynTable extends TV3 {
 
   @Override int eidx() { return TVErr.XDYN; }
 
+  // All field labels for a particular DynLoad/DynField
+  public  HashSet<String>  fields(HashSet<String> labels, int uid) {  VBS.clear(); return _fields(labels,uid); }
+  private HashSet<String> _fields(HashSet<String> labels, int uid) {
+    if( VBS.tset(_uid) ) return labels;
+    for( int idx=0; idx<_max; idx++ )
+      if( is_dyn(idx) && _uids[idx]==uid && _labels[idx] != null ) {
+        labels.add(_labels[idx]);
+      } else {
+        if( first(idx) instanceof TVDynTable nest )
+          nest._fields(labels,uid);
+      }
+    return labels;
+  }
+
+  
   // -------------------------------------------------------------
 
   // Resolve all pairs of inputs as DynTables

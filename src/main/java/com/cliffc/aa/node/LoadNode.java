@@ -46,6 +46,8 @@ public class LoadNode extends Node {
     if( ta==TypeNil.NIL || ta==TypeNil.XNIL )
       ta = (TypeNil)ta.meet(PrimNode.PINT._val);
 
+    // Exactly only prior Operator Binds produce Deep Ptrs, and these do
+    // field-selects from the struct instead of loads.
     TypeStruct ts = ta instanceof TypeMemPtr tmp && !tmp.is_simple_ptr()
       ? tmp._obj
       : tm.ld(ta);
@@ -86,8 +88,9 @@ public class LoadNode extends Node {
     if( i!=MEM_IDX ) return Type.ALL;
     // Memory demands
     Node def=mem();
-    if( adr().len() <= MEM_IDX || adr().in(MEM_IDX) != def )
-      adr().deps_add(def);
+    // If adr() value changes, the def liveness changes; this is true even if
+    // def is ALSO adr().def() which the normal deps_add asserts prevent.
+    adr().deps_add_live(def);
     if( adr.above_center() ) return Type.ANY; // Nothing is demanded
     if( !(adr instanceof TypeNil ptr) )  // Demand everything not killed at this field
       return RootNode.defMem(def);
