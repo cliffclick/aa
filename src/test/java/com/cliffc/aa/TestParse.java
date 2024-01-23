@@ -31,7 +31,7 @@ public class TestParse {
     DO_HMT=true;
     RSEED=0;
 
-    test(" 1+2 * 3+4 *5", "27", "27");
+    test(" 1+2 * 3+4 *5", "int:27", "int:27");
   }
 
   static private void assertTrue(boolean t) {

@@ -7,6 +7,7 @@ import com.cliffc.aa.util.VBitSet;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.function.IntSupplierg;
 
 import static com.cliffc.aa.AA.TODO;
 
@@ -21,7 +22,7 @@ public class TVDynTable extends TV3 {
 
   private int _max;             // In-use count, for array-doubling.  Counts *pairs* in _args[].
 
-  private int[] _uids;          // Which Syntaxes/Nodes
+  private IntSupplier[] _uids;  // Which Syntaxes/Nodes
 
   private long[] _cmps;         // Prior match results; 2 bits for (1,2,3) becomes (1,3,7 in trial_resolve)
   
@@ -43,9 +44,14 @@ public class TVDynTable extends TV3 {
   private boolean is_dyn(int idx) { return secnd(idx)!=null; }
 
   // Add a DynField reference to this table
-  public boolean add_dyn( int uid, TV3 match, TV3 pattern ) {
+  public boolean add_dyn( IntSupplier uid, TV3 match, TV3 pattern ) {
     assert !unified();
-    if( _args==null ) { _args = new TV3[2]; _uids = new int[1];  _cmps = new long[1];  _labels = new String[1]; }
+    if( _args==null ) {
+      _args = new TV3[2];
+      _uids = new IntSupplier[1];
+      _cmps = new long[1];
+      _labels = new String[1];
+    }
     if( _max == _uids.length ) {
       int len = _max*2;
       _args  = Arrays.copyOf(_args  ,len*2);
@@ -56,13 +62,15 @@ public class TVDynTable extends TV3 {
     _args[len()  ] = match;
     _args[len()+1] = pattern;
     _uids[_max++ ] = uid;
+    if( uid instanceof Node node )
+      deps_add_deep(node);
     return true;
   }
 
   // Add a Apply reference to this table
-  public boolean add_apy( int uid, TV3 tv ) {  return add_dyn(uid,tv,null);  }
+  public boolean add_apy( IntSupplier uid, TV3 tv ) {  return add_dyn(uid,tv,null);  }
 
-  private int idx(int uid) {
+  private int idx(IntSupplier uid) {
     for( int i=0; i<_max; i++ )
       if( _uids[i]==uid )
         return i;
@@ -70,14 +78,14 @@ public class TVDynTable extends TV3 {
   }
 
   // Find TV3 reference for an Apply
-  public TV3 find_apy(int uid) {
+  public TV3 find_apy(IntSupplier uid) {
     if( _uids==null ) return null;
     int idx = idx(uid);
     return idx== -1 ? null : first(idx);
   }
 
   // Find a DynField reference at the top level
-  public String find_label(int uid) {
+  public String find_label(IntSupplier uid) {
     if( _uids==null ) return null;
     int idx = idx(uid);
     return idx== -1 ? null : _labels[idx];
@@ -86,8 +94,8 @@ public class TVDynTable extends TV3 {
   @Override int eidx() { return TVErr.XDYN; }
 
   // All field labels for a particular DynLoad/DynField
-  public  HashSet<String>  fields(HashSet<String> labels, int uid) {  VBS.clear(); return _fields(labels,uid); }
-  private HashSet<String> _fields(HashSet<String> labels, int uid) {
+  public  HashSet<String>  fields(HashSet<String> labels, IntSupplier uid) {  VBS.clear(); return _fields(labels,uid); }
+  private HashSet<String> _fields(HashSet<String> labels, IntSupplier uid) {
     if( VBS.tset(_uid) ) return labels;
     for( int idx=0; idx<_max; idx++ )
       if( is_dyn(idx) && _uids[idx]==uid && _labels[idx] != null ) {
@@ -110,7 +118,7 @@ public class TVDynTable extends TV3 {
     boolean progress = false;
     for( int idx=0; idx<_max; idx++ )
       if( is_dyn(idx) ) {
-        progress |= resolve(idx, test);
+        progress |= _resolve(idx, test);
       } else {
         if( first(idx) instanceof TVDynTable nest )
           progress |= nest._resolve(test);
@@ -118,8 +126,14 @@ public class TVDynTable extends TV3 {
     return progress;
   }
 
+  // UID must be found
+  public boolean resolve(IntSupplier uid, boolean test) {
+    return _resolve(idx(uid),test);
+  };
+
+  
   // Try to resolve the label; return true if progress
-  private boolean resolve(int idx, boolean test) {
+  private boolean _resolve(int idx, boolean test) {
     TV3 matches = first(idx);
     TV3 pattern = secnd(idx);
     if( !(matches instanceof TVStruct str) ) return false; // No progress until a TVStruct
@@ -149,7 +163,7 @@ public class TVDynTable extends TV3 {
         assert cmp != 7;
         yess++;
         if( match==pattern ) continue; // Already matched, no progress
-        if( test ) return true; // Always progress from here
+        if( test ) return ptrue(); // Always progress from here
         progress = handle_match(idx,i,str,pattern);
         pattern = pattern.find();
         break;
@@ -162,7 +176,7 @@ public class TVDynTable extends TV3 {
     // If, later this maybe turns into a No, then we're in an error situation already.
     // To get consistent errors, we need to always have the sane field be the Last Maybe
     if( yess==0 && maybes==1 ) {
-      if( test ) return true; // Gonna match the Last Maybe
+      if( test ) return ptrue(); // Gonna match the Last Maybe
       set_cmp(idx,maybex,1);    // Treat as a YES
       progress = handle_match(idx,maybex,str,pattern);
     }
@@ -328,7 +342,7 @@ public class TVDynTable extends TV3 {
     if( !debug && !hasDyn() ) return sb.p("-");
     sb.p("[[  ");
     for( int i=0; i<_max; i++ ) {
-      sb.p(is_dyn(i) ? 'D' : 'A').p(_uids[i]).p(": ");
+      sb.p(is_dyn(i) ? 'D' : 'A').p(_uids[i].getAsInt()).p(": ");
       if( is_dyn(i) ) {
         if( _labels[i]==null ) {
           _args[i*2  ]._str(sb,visit,dups,debug,prims);

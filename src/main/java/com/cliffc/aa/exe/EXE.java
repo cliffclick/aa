@@ -216,7 +216,7 @@ public class EXE {
   private static String require(String s, char c) { require(c); return s; }
 
   // ----------------- Syntax ---------------------
-  static abstract class Syntax implements IntSupplier {
+  static abstract class Syntax implements IntSupplier, TVDynElement {
     private static int CNT=1;
     final int _uid=CNT++;
     @Override public int getAsInt() { return _uid; }
@@ -250,6 +250,8 @@ public class EXE {
     abstract Val eval( Env e );
 
     static void reset() { CNT=1; }
+
+    public void add_work() { }
   }
 
   
@@ -633,9 +635,9 @@ public class EXE {
       else
         ptr.unify(ptrdyn = new TVDynTable(),false);
       
-      TV3 self = ptrdyn.find_apy(_par._uid);
+      TV3 self = ptrdyn.find_apy(_par);
       if( self==null )
-        ptrdyn.add_apy(_par._uid,tv3);
+        ptrdyn.add_apy(_par,tv3);
       else
         assert self==tv3;
 
@@ -699,7 +701,7 @@ public class EXE {
       TVDynTable dyn = new TVDynTable();
       _dyn.tvar().unify(dyn,false);
       dyn = (TVDynTable)dyn.find();
-      dyn.add_dyn(_uid,s.find(),_tvar);
+      dyn.add_dyn(this,s.find(),_tvar);
     }
 
     // Re-unify with resolved labels
@@ -715,7 +717,7 @@ public class EXE {
     }
     @Override Val eval( Env e ) {
       DynVal dyn = _dyn.eval(e).as_dyn();
-      String label = dyn._dyn.find_label(_uid);
+      String label = dyn._dyn.find_label(this);
       return _ptr.eval(e).as_struct().at(label);
     }
   }
@@ -1147,7 +1149,7 @@ public class EXE {
     
     Val at(Apply a) {
       if( _dyn==null ) return this;
-      TV3 dyn = _dyn.find_apy(a._uid);
+      TV3 dyn = _dyn.find_apy(a);
       return new DynVal(dyn instanceof TVDynTable tdyn ? tdyn : null);
     }
     

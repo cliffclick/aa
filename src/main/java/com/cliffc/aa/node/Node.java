@@ -3,9 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
-import com.cliffc.aa.tvar.TV3;
-import com.cliffc.aa.tvar.TVExpanding;
-import com.cliffc.aa.tvar.TVLeaf;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.util.*;
@@ -570,7 +568,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   
   public void add_flow_defs() { GVN.add_flow_defs(this); }
   public void add_flow_uses() { GVN.add_flow_uses(this); }
-  //public Node add_flow     () { return GVN.add_flow(this); }
+  public void add_work     () { GVN.add_flow(this); }
   //public void add_reduce_uses() { GVN.add_reduce_uses(this); }
 
 

@@ -30,8 +30,8 @@ public class AFieldNode extends Node {
     else  ptr.unify(ptrdyn = new TVDynTable(),false);
 
     TV3 tv3 = tvar();
-    TV3 self = ptrdyn.find_apy(_uid);
-    if( self==null ) ptrdyn.add_apy(_uid,tv3);
+    TV3 self = ptrdyn.find_apy(this);
+    if( self==null ) ptrdyn.add_apy(this,tv3);
     else             assert self==tv3;
 
     ptrdyn.resolve(false);

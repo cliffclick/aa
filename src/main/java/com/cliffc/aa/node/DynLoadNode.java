@@ -77,7 +77,7 @@ public class DynLoadNode extends Node {
     // possible choices.
     Type t = TypeNil.XSCALAR;
     if( dyn().tvar() instanceof TVDynTable dyn )
-      for( String label : dyn.fields(_resolves,_uid) )
+      for( String label : dyn.fields(_resolves,this) )
         t = t.meet(LoadNode.lookup(ts,tm,label));
     return t;
   }
@@ -140,13 +140,16 @@ public class DynLoadNode extends Node {
     TV3 _dyn = dyn().set_tvar();
     TVDynTable dyn = new TVDynTable();
     _dyn.unify(dyn,false);
+    dyn = (TVDynTable)dyn.find();
 
     // Load self into the table
-    ((TVDynTable)dyn.find()).add_dyn(_uid,ptr.load(),_tvar);
+    dyn.add_dyn(this,ptr.load(),_tvar);
+    dyn.deps_add_deep(dyn());
     return _tvar;
   }
 
   @Override public boolean unify( boolean test ) {
-    return dyn().tvar() instanceof TVDynTable tab && tab.resolve(test);
+    _tvar.deps_add_deep(this);
+    return dyn().tvar() instanceof TVDynTable tab && tab.resolve(this,test);
   }  
 }
