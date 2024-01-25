@@ -55,8 +55,7 @@ public abstract class StoreAbs extends Node {
       // Kill specific structs or fields
       return _live_kill(tmp);
     }
-    if( in(i).len()>2 && adr() != in(i).in(2) )
-      adr().deps_add(in(i));
+    adr().deps_add_live(in(i));
     
     // Liveness as a TypeMem.  If current liveness is the default ALL, go ahead
     // an upgrade to RootNodes global default - which globally excludes kills.

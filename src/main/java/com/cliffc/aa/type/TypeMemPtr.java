@@ -300,10 +300,8 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   }
 
   @Override public Type sharptr2( TypeMem mem ) {
-    // Primitives are boxed, and so not immediately shallow (but their clazz is
-    // shallow, so sharpen it).
     if( is_prim() )
-      return make_from(_obj.sharptr2(mem));
+      return this;
     
     return mem.sharpen(this);
   }

@@ -113,7 +113,7 @@ public final class FunPtrNode extends Node {
     TV3[] args = new TV3[nargs()];
     args[0] = rez.set_tvar();
     for( int i=DSP_IDX; i<nargs(); i++ )
-      args[i] = parms[i]==null ? null : parms[i].set_tvar();
+      args[i] = parms[i]==null ? new TVLeaf() : parms[i].set_tvar();
     return new TVLambda(args);
   }
   

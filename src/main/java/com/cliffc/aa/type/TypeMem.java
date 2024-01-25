@@ -448,11 +448,16 @@ public class TypeMem extends Type<TypeMem> {
   Type _sharp(Type dull, final HashMap<BitsAlias,TypeMemPtr> dull_cache, final VBitSet visit ) {
     if( !(dull instanceof Cyclic) ) return dull; // Nothing to sharpen
     Type t;
-    if( dull instanceof TypeMemPtr tmp && tmp.is_simple_ptr() ) {
-      t = sharp_get(tmp._aliases);
-      if( t !=null ) return t;
-      t = dull_cache.get(tmp._aliases);
-      if( visit.tset(t._uid) ) return t;
+    if( dull instanceof TypeMemPtr tmp ) {
+      if( tmp.is_simple_ptr() ) {
+        t = sharp_get(tmp._aliases);
+        if( t !=null ) return t;
+        t = dull_cache.get(tmp._aliases);
+        if( visit.tset(t._uid) ) return t;
+      } else {
+        assert tmp.is_prim();
+        return dull;
+      }
     } else if( dull instanceof TypeStruct dullts ) {
       t = dullts.copy2();
     } else {

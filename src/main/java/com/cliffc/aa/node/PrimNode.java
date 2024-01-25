@@ -457,7 +457,7 @@ public abstract class PrimNode extends Node {
   // 2Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim2OpF64 extends PrimNode {
     Prim2OpF64( String name ) { super(name,TypeTuple.FLT64_FLT64,TypeFlt.FLT64); }
-    @Override TypeFlt apply( TypeNil[] args ) { return TypeFlt.con(op(args[0].getd(),args[1].getd())); }
+    @Override TypeFlt apply( TypeNil[] args ) { return TypeFlt.con(op(args[0].getd(),args[2].getd())); }
     abstract double op( double x, double y );
   }
 

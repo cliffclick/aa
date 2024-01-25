@@ -333,7 +333,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     old._delUse(this);
     // Either last use of old & goes dead, or at least 1 fewer uses & changes liveness
     if( old._ulen==0 ) old.kill();
-    //else GVN.add_flow_reduce(old);
+    else GVN.add_flow_reduce(old);
     return this;
   }
 
@@ -665,7 +665,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       add_flow_uses();          // Classic forwards flow
       Env.GVN.add_reduce_uses( this );
       deps_work_clear();
-      if( shouldCon() ) GVN.add_reduce(this); // Replace a constant
+      if( shouldCon() ) GVN.add_flow_reduce(this); // Replace a constant
       //if( this instanceof CallNode call && CallNode.ttfp(oval)!=CallNode.ttfp(nval) ) {
       //  GVN.add_reduce(call);        // Can wire
       //  GVN.add_reduce(call.cepi()); // Can wire

@@ -49,7 +49,7 @@ public class StoreXNode extends StoreAbs {
   }
 
   // Is this Store alive, based on given liveness?
-  @Override boolean _is_live( TypeStruct live ) {  return live==TypeStruct.ISUSED; }
+  @Override boolean _is_live( TypeStruct live ) {  return live!=TypeStruct.UNUSED; }
 
   @Override boolean st_st_check( StoreAbs sta ) {
     return sta instanceof StoreXNode st;

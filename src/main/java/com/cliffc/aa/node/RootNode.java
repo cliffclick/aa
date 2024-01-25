@@ -231,13 +231,12 @@ public class RootNode extends Node {
     if( n!=null && PROGRESS.find(n)==-1 ) PROGRESS.push(n);
     TypeMem mem = (t==null||t==Type.ALL) ? TypeMem.ALLMEM : (TypeMem)t;
     for( int alias : KILL_ALIASES )
-      mem.set(alias,TypeStruct.UNUSED);
+      mem = mem.set(alias,TypeStruct.UNUSED);
     return mem;
   }
   
   // Set mem for Combo: its all low minus kills, used to JOIN away the kills
   public static void resetDefMemHigh() {
-    //TypeMem tmem = TypeMem.ALLMEM;
     TypeMem tmem = Env.ROOT.primMem();
     // Reset memory; all is unused - except externals, primitives.
     assert tmem.at(BitsAlias.ALLX)==TypeStruct.UNUSED;
@@ -245,7 +244,7 @@ public class RootNode extends Node {
     tmem = tmem.make_from(BitsAlias.ALLX,TypeStruct.ISUSED);
     // Remove all kills
     for( int alias : KILL_ALIASES )
-      assert tmem.at(alias)==TypeStruct.UNUSED;
+      tmem = tmem.set(alias,TypeStruct.UNUSED);
     setCacheDef(tmem);
   }
 
@@ -285,7 +284,7 @@ public class RootNode extends Node {
     
     // Killables never become alive
     for( int kill : KILL_ALIASES )
-      assert live.at(kill)==TypeStruct.UNUSED;
+      live = live.set(kill,TypeStruct.UNUSED);
     
     // Liveness for return value: All reaching aliases plus their escapes are alive.
     BitsAlias ralias = ralias();

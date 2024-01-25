@@ -763,11 +763,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     final String _str;
     int _x;
     final NonBlockingHashMap<String,Type> _dups = new NonBlockingHashMap<>();
-    final TypeMemPtr _intclz, _fltclz;
-    Parse(String str, TypeMemPtr intclz, TypeMemPtr fltclz) {
+    Parse(String str) {
       _str = str; 
-      _intclz = intclz;
-      _fltclz = fltclz;
     }
     Type type() { return type(null,false,-2); }
 
@@ -872,14 +869,14 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     private Type maybe_int(String dup, int oldx2) {
       TypeInt t = TypeInt.valueOfInt(id_num());
       if( t==null ) t = TypeInt.con((long)back_num(oldx2));
-      TypeMemPtr wrap = t.wrap_deep(_intclz);
+      TypeMemPtr wrap = t.wrap();
       if( dup!=null ) _dups.put(dup,wrap);
       return wrap;
     }
     private Type maybe_flt(String dup, int oldx2) {
       TypeFlt t = TypeFlt.valueOfFlt(id_num());
       if( t==null ) t = TypeFlt.con(back_num(oldx2));
-      TypeMemPtr wrap = t.wrap_deep(_fltclz);
+      TypeMemPtr wrap = t.wrap();
       if( dup!=null ) _dups.put(dup,wrap);
       return wrap;
     }
@@ -994,8 +991,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     }
     @Override public String toString() { return _str.substring(_x); }
   }
-  public static Type _valueOf( String str, TypeMemPtr intclz, TypeMemPtr fltclz ) {
-    Parse P = new Parse(str,intclz,fltclz);
+  public static Type _valueOf( String str ) {
+    Parse P = new Parse(str);
     Type t1 = P.type();
     Type t2 = t1 instanceof TypeTuple || t1 instanceof TypeMem
       ? t1                       // Since never recursive, these call Cyclic.install internally
@@ -1004,13 +1001,10 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   }
   public static Type valueOf( String str ) {
     if( str==null ) return null;
-    Type t = _valueOf(str,null,null);
+    Type t = _valueOf(str);
     //String rez = t.str(new SB(), true, false).toString();
     //assert stripIndent(rez).equals(stripIndent(str));
     return t;
-  }
-  public static Type valueOf( String str, TypeMemPtr intclz, TypeMemPtr fltclz ) {
-    return str==null ? null : _valueOf(str,intclz,fltclz);    
   }
   private static String stripIndent(String s){ return s.replace("\n","").replace(" ",""); }
 

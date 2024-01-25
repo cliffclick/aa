@@ -165,7 +165,7 @@ abstract public class TVExpanding extends TV3 {
         return false;           // Dup, do not insert
     }
     _delay_fresh.push(df);
-    assert _delay_fresh.len()<=10; // Switch to worklist format
+    assert _delay_fresh.len()<=15; // Switch to worklist format
     return true;
   }
 

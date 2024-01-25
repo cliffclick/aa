@@ -101,9 +101,10 @@ public class BindFPNode extends Node {
         return fun.oob(TypeNil.SCALAR); // Await fun to sharpen
       }
     } else {
-      return fun instanceof TypeFunPtr tfp && !tfp.has_dsp()
-        ? tfp.make_from(dsp)       // Bind it
-        : fun.oob(TypeNil.SCALAR); // Incorrect BIND, will reduce
+      if( fun instanceof TypeFunPtr tfp && !tfp.has_dsp() )
+        return tfp.make_from(dsp);
+      // Incorrect BIND, will reduce
+      return fun;
     }
   }
 
@@ -124,6 +125,12 @@ public class BindFPNode extends Node {
     return true;
   }
 
+  // If LIFTING and fpv is low , can lift to a function.
+  // If FALLING and fpv is high, can fall to a function.
+  private static boolean canBeFun(Type fpv) {
+    return TypeFunPtr.GENERIC_FUNPTR.dual().isa(fpv);
+  }
+  
   @Override public Node ideal_reduce() {
     // Check that this is a "maybe Bind"
     if( _oper!=null && !Oper.is_oper(_oper) ) {
@@ -132,7 +139,7 @@ public class BindFPNode extends Node {
           // Already bound, no double bind
          (fpv instanceof TypeFunPtr tfp && tfp.has_dsp()) ||
           // Sideways, BIND is extra, remove
-          !TypeFunPtr.GENERIC_FUNPTR.dual().isa(fpv) )
+          !canBeFun(fpv) )
         // Remove unneeded Bind
         return fp();
     }

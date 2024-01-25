@@ -58,6 +58,7 @@ public class NewNode extends Node {
       _killed = true;
       RootNode.kill_alias(_alias);
       Env.GVN.add_reduce_uses(this);
+      Env.GVN.add_reduce(this);
       Env.GVN.add_flow(this);
       return this;
     }

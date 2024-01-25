@@ -146,9 +146,6 @@ public class Env implements AutoCloseable {
     return new TypeEnv(val,     // GCP result
                        fidxs,   // Escaping FIDXS
                        aliases, // Escaping ALIASES
-                       // Fix printing/parsing
-                       (TypeMemPtr)mem.sharptr(TypeMemPtr.INTPTR),
-                       (TypeMemPtr)mem.sharptr(TypeMemPtr.FLTPTR),
                        tval,
                        errs0.isEmpty() ? null : errs0);
   }

@@ -66,9 +66,6 @@ default: $(default_targets)
 # Just the classes, no jarring step
 classes: $(classes)
 
-# Build the test classes
-test:	$(test_classes)
-
 # Compile just the out-of-date files
 $(main_classes): build/classes/main/%class: $(SRC)/%java
 	@echo "compiling " $@ " because " $?
@@ -155,6 +152,12 @@ check:	sandbox/timing.txt sandbox/out.0
 
 hm_tests:	$(test_classes) build/aa.jar
 	$(JVM) org.junit.runner.JUnitCore com.cliffc.aa.HM.TestHM
+
+
+# Run standard tests
+test:	build/aa.jar
+	echo "Testing"
+	$(JVM) org.junit.runner.JUnitCore com.cliffc.aa.type.TestType com.cliffc.aa.TestStable
 
 
 # EXE, a standalone lambda calc interpreter

@@ -26,7 +26,7 @@ public class TestType {
     for( int i=0; i<ts.len(); i++ )
       ss[i] = ts.at(i).str(new SB(), true, false).toString();
     for( int i=0; i<ts.len(); i++ ) {
-      Type t = Type._valueOf(ss[i],null,null);
+      Type t = Type._valueOf(ss[i]);
       assertSame(ts.at(i),t);
     }
   }

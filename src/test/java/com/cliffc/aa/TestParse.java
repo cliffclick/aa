@@ -1,4 +1,4 @@
-  package com.cliffc.aa;
+package com.cliffc.aa;
 
 import com.cliffc.aa.node.PrimNode;
 import com.cliffc.aa.tvar.TV3;
@@ -28,12 +28,10 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
     DO_GCP=true;
-    DO_HMT=true;
+    DO_HMT=false;
     RSEED=0;
-
-    //test(" 1+2 * 3+4 *5", "int:27", "int:27");
-    // testOver5.aa, One DynLoad, fcn needs DynTable
-    test("fcn = {(@{a=1},@{b=2})._}; (fcn().a, fcn().b)", "*[](int:1,int:2)", "*(int:1,int:2)");
+    
+    test("a=@{x=1.2;y;}; a.x", "flt:1.2", "flt:1.2");
   }
 
   static private void assertTrue(boolean t) {
@@ -1012,7 +1010,7 @@ HashTable = {@{
       Type actual = te._t;      // Sharpen any memory pointers
       String gcp_a = format_alias(gcp);
       String gcp_b = format_fidx(gcp_a);
-      Type expect = Type.valueOf(gcp_b, te._intclz, te._fltclz);
+      Type expect = Type.valueOf(gcp_b);
       assertEquals(expect,actual);
     }
     // Check HMT result
@@ -1079,15 +1077,15 @@ HashTable = {@{
 
   // Run a program in all 3 modes, yes function returns, no errors
   // Short form test: simple GCP, no formal args
-  private void test( String program, String gcp, String hmt ) {
+  static void test( String program, String gcp, String hmt ) {
     _test2(program,gcp,hmt,gcp,hmt,null,null,null,0);
   }
   // Short form test: simple GCP, no formal args
-  static private void test( String program, String gcp, String hmt, String gcp_both, String hmt_both ) {
+  static void test( String program, String gcp, String hmt, String gcp_both, String hmt_both ) {
     _test2(program,gcp,hmt,gcp_both,hmt_both,null,null,null,0);
   }
 
-  static private void test( String program, String gcp, String hmt, String gcp_both, String hmt_both, String esc_ptrs, String esc_funs ) {
+  static void test( String program, String gcp, String hmt, String gcp_both, String hmt_both, String esc_ptrs, String esc_funs ) {
     _test2(program,gcp,hmt,gcp_both,hmt_both,esc_ptrs,esc_funs,null,0);
   }
 
