@@ -33,7 +33,8 @@ public class RootNode extends Node {
   @Override public boolean isMem() { return true; }
   @Override public boolean isMultiHead() { return true; }
 
-  public void setPrimMem(Node mem) { setDef(3,mem); }
+  public void setPrimMem(Node mem) { setDef(ARG_IDX,mem); }
+  public TypeMem primMem() { return (TypeMem)val(ARG_IDX); }
   
   TypeMem rmem(Node dep) {
     deps_add(dep);
@@ -217,7 +218,6 @@ public class RootNode extends Node {
     PROGRESS.clear();
   }
   private static TypeMem CACHE_DEF_MEM = TypeMem.ALLMEM;
-  private static TypeMem CACHE_DEF_MEM_FLAT = TypeMem.ALLMEM;
   private static TypeTuple CACHE_DEF;
   
   private static final Ary<Node> PROGRESS = new Ary<>(new Node[1],0);
@@ -225,41 +225,49 @@ public class RootNode extends Node {
     if( n!=null && PROGRESS.find(n)==-1 ) PROGRESS.push(n);
     return CACHE_DEF_MEM;
   }
-  public static TypeMem defMemFlat(Node n) {
+  
+  public static TypeMem removeKills(Node n) { return removeKills(n,null); }
+  public static TypeMem removeKills(Node n, Type t) {
     if( n!=null && PROGRESS.find(n)==-1 ) PROGRESS.push(n);
-    return CACHE_DEF_MEM_FLAT;
+    TypeMem mem = (t==null||t==Type.ALL) ? TypeMem.ALLMEM : (TypeMem)t;
+    for( int alias : KILL_ALIASES )
+      mem.set(alias,TypeStruct.UNUSED);
+    return mem;
   }
-  // Lift default memory to nothing
+  
+  // Set mem for Combo: its all low minus kills, used to JOIN away the kills
   public static void resetDefMemHigh() {
-    TypeMem tmem = (TypeMem)Env.ROOT.val(ARG_IDX);
+    //TypeMem tmem = TypeMem.ALLMEM;
+    TypeMem tmem = Env.ROOT.primMem();
     // Reset memory; all is unused - except externals, primitives.
     assert tmem.at(BitsAlias.ALLX)==TypeStruct.UNUSED;
     assert tmem.at(BitsAlias.LOCX)==TypeStruct.UNUSED;
-    tmem = tmem.make_from(BitsAlias.EXTX,TypeStruct.ISUSED); // Externals still unknown
-    // Remove all kills, but none at reset
+    tmem = tmem.make_from(BitsAlias.ALLX,TypeStruct.ISUSED);
+    // Remove all kills
     for( int alias : KILL_ALIASES )
       assert tmem.at(alias)==TypeStruct.UNUSED;
     setCacheDef(tmem);
   }
 
+  // Default values for Nodes reading from maximally unknown memory - e.g.
+  // functions escaped to external callers.
   public static void resetDefMemLow() {
-    TypeMem tmem = (TypeMem)Env.ROOT.val(ARG_IDX);
+    TypeMem tmem = Env.ROOT.primMem();
     tmem = tmem.make_from(BitsAlias.ALLX,TypeStruct.ISUSED); // All aliases not prim mem, both internal and external
     // Remove all kills, but none at reset
     assert KILL_ALIASES==BitsAlias.EMPTY;
     setCacheDef(tmem);
   }
 
-  private static void setCacheDef(TypeMem tmem) {
+  public static void setCacheDef(TypeMem tmem) {
     CACHE_DEF_MEM = tmem;
-    CACHE_DEF_MEM_FLAT = tmem.flatten_live_fields();
     CACHE_DEF = TypeTuple.make(Type.CTRL,tmem,TypeNil.SCALAR,TypeNil.SCALAR);
   }
 
   @Override public Type live() {
     // Pre-combo, all memory is alive, except kills
     if( Combo.pre() )
-      return defMemFlat(null);
+      return removeKills(null);
     
     // During/post combo, check external Call users.
     // There is e.g. a Control user and many Constant users.
@@ -416,7 +424,7 @@ public class RootNode extends Node {
 
   // Unify trailing result ProjNode with RootNode results; but no unification
   // with anything from Root, all results are independent.
-  @Override public boolean unify_proj( ProjNode proj, boolean test ) { return false; }
+  @Override public TV3 unify_proj( ProjNode proj ) { return null; }
 
   @Override int hash() { return 123456789+1; }
   @Override public boolean equals(Object o) { return this==o; }
@@ -425,7 +433,6 @@ public class RootNode extends Node {
   public static void reset_to_init0() {
     KILL_ALIASES = BitsAlias.EMPTY;
     CACHE_DEF_MEM = TypeMem.ALLMEM;
-    CACHE_DEF_MEM_FLAT = TypeMem.ALLMEM;
     CACHE_DEF = null;
     PROGRESS.clear();
     while( Env.ROOT.len()>4 ) Env.ROOT.pop();
@@ -434,8 +441,8 @@ public class RootNode extends Node {
     Env.ROOT.setDef(REZ_IDX,Env.ALL);
     RootNode.resetDefMemLow();
     Env.ROOT._val  = CACHE_DEF;
-    Env.ROOT._live = CACHE_DEF_MEM_FLAT;
+    Env.ROOT._live = TypeMem.ALLMEM;
     Env.MEM_0._val = CACHE_DEF_MEM;
-    Env.MEM_0._live= CACHE_DEF_MEM_FLAT;
+    Env.MEM_0._live= TypeMem.ALLMEM;
   }
 }

@@ -11,26 +11,26 @@ import java.util.IdentityHashMap;
 import static com.cliffc.aa.AA.TODO;
 
 /** Type variable base class
- *
+ * <p>
  * Type variables can unify (ala Tarjan Union-Find), and can have structure
  * such as "{ A -> B }" or "@{ x = A, y = A }".  Type variables includes
  * polymorphic structures and fields (structural typing not duck typing),
  * polymorphic nil-checking, an error type, and fully supports recursive types.
- *
+ * <p>
  * Type variables can be "is_copy", meaning the concrete vars are
  * value-equivalent and not just type equivalent.
- *
+ * <p>
  * Field labels can be inferred, and are used to implement a concrete form of
  * overloads or adhoc-polymorphism.  E.g. the blank Field in "(123,"abc")._"
  * will infer either field ".0" or ".1" according to which field types.
- *
+ * <p>
  * Bases include anything from the GCP lattice, and are generally sharper than
  * e.g. 'int'.  Bases with values of '3' and "abc" are fine.
- *
+ * <p>
  * See HM.java for a simplified complete implementation.  The HM T2 class uses
  * a "soft class" implementation notion: Strings are used to denote java-like
  * classes.  This implementation uses concrete Java classes.
- *
+ * <p>
  * BNF for the "core AA" pretty-printed types:
  *    T = Vnnn               | // Leaf number nnn
  *        Xnnn>>T            | // Unified; lazily collapsed with 'find()' calls

@@ -20,7 +20,7 @@ public final class RetNode extends Node {
     super(ctrl,mem,val,rpc,fun);
     _nargs=fun.nargs();
     set_fidx(fun._fidx);
-    _live = RootNode.defMem(null);
+    _live = RootNode.removeKills(null);   // All mem minus KILLS
   }
   
   // Short self name
@@ -104,8 +104,7 @@ public final class RetNode extends Node {
         setDef(4,null);          // We're a copy now!
         progress=this;
         Env.GVN.add_reduce_uses(this); // Following FunPtrs do not need their displays
-      } else
-        fun().deps_add(this);
+      }
     }
 
     // If no users inlining, wipe out all edges
@@ -127,8 +126,6 @@ public final class RetNode extends Node {
     Node mem = mem();
     if( mem instanceof ParmNode && mem.in(0)==fun() )
       return setDef(1,null);
-    if( mem!=null )
-      mem.deps_add(this);
 
     // Collapsed to a constant?  Remove any control interior.
     Node ctl = ctl();

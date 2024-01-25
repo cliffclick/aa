@@ -5,8 +5,8 @@ import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 
-import static com.cliffc.aa.AA.TODO;
 import static com.cliffc.aa.AA.MEM_IDX;
+import static com.cliffc.aa.AA.TODO;
 
 // Store a value into a named struct field.  Does it's own nil-check and value
 // testing; also checks final field updates.
@@ -55,11 +55,12 @@ public abstract class StoreAbs extends Node {
       // Kill specific structs or fields
       return _live_kill(tmp);
     }
-    adr().deps_add(in(i));
+    if( in(i).len()>2 && adr() != in(i).in(2) )
+      adr().deps_add(in(i));
     
     // Liveness as a TypeMem.  If current liveness is the default ALL, go ahead
     // an upgrade to RootNodes global default - which globally excludes kills.
-    TypeMem live0 = (TypeMem)RootNode.defMemFlat(this).join(_live);
+    TypeMem live0 = RootNode.removeKills(in(i),_live);
     // Specific live-use varies from field-vs-struct
     return _live_use(live0,tmp,i);
   }
@@ -86,10 +87,8 @@ public abstract class StoreAbs extends Node {
       return kill_rez_stall_till_live();
 
     // Store of a Store, same address
-    if( mem instanceof StoreNode st ) {
+    if( mem instanceof StoreAbs st ) {
       Node adr0 = st.adr();
-//      if( adr  instanceof FreshNode f ) adr  = f.id();
-//      if( adr0 instanceof FreshNode f ) adr0 = f.id();
       if( adr == adr0 && st_st_check(st) ) {
         // Do not bypass a parallel writer
         if( st.check_solo_mem_writer(this) &&
@@ -97,17 +96,27 @@ public abstract class StoreAbs extends Node {
             st._live.isa(st.mem()._live) ) {
           // Storing same-over-same, just use the first store
           if( rez()==st.rez() ) return st;
-          // If not wiping out an error, wipe out the first store
-          if( st.rez()==null || st.rez().err(true)==null ) {
-//            set_def(1,st.mem());
-//            return this;
-            throw TODO();
+          // Store field over struct
+          if( this instanceof StoreNode sfld && st instanceof StoreXNode snew ) {
+            StructNode str = snew.struct();
+            assert str.nUses()==1; // Need to either clone the struct or profit metric
+            if( str.set_fld(sfld._fld,sfld._fin,rez(),false) ) {
+              str.xval();
+              // Delete self
+              return snew;
+            }
+            // Can fail to wipe out a final field
+          } else {
+            // If not wiping out an error, wipe out the first store
+            // Works for a StoreX wiping out a prior Store or StoreX.
+            // Works for a Store  wiping out a prior Store same field.
+            if( st.rez()==null || st.rez().err(true)==null ) {
+              //            set_def(1,st.mem());
+              //            return this;
+              throw TODO();
+            }
           }
-        } else {
-          mem.deps_add(this);    // If become solo writer, check again
         }
-      } else {
-        st.adr().deps_add(this);      // If address changes, check again
       }
     }
 

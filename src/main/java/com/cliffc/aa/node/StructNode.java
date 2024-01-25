@@ -257,9 +257,6 @@ public class StructNode extends Node {
     return _tvar;
   }
 
-  // Structs are pre-unified in set_tvar
-  @Override public boolean unify( boolean test ) { return false; }
-
   @Override public ErrMsg err( boolean fast ) {
     if( _tvar==null ) return null;
     if( !(tvar() instanceof TVErr terr) ) return null;

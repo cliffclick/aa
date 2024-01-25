@@ -1,13 +1,11 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.*;
-import static com.cliffc.aa.AA.MEM_IDX;
 import static com.cliffc.aa.Env.GVN;
 
 // See CallNode.  Slot 0 is the Call.  The remaining slots are Returns which
@@ -26,7 +24,7 @@ import static com.cliffc.aa.Env.GVN;
 
 public final class CallEpiNode extends Node {
   public boolean _is_copy;
-  public CallEpiNode( Node... nodes ) { super(nodes); }
+  public CallEpiNode( Node... nodes ) { super(nodes); _live = TypeMem.ALLMEM; }
   @Override public String label() {// Self short name
     if( _is_copy ) return "CopyEpi";
     if( isDead() ) return "XallEpi";
@@ -67,7 +65,7 @@ public final class CallEpiNode extends Node {
     if( !unknown_callers() && nwired()==1 && wired(0) instanceof RetNode ret && !ret.isPrim() && !call.isPrim() ) { // Wired to 1 target
       assert fidxs.abit() == ret._fidx; // Correct call graph
       FunNode fun = ret.fun();
-      if( fun != null && fun.len()==2 && !fun.unknown_callers(this) && // Function is only called by 1 (and not the unknown caller)
+      if( fun != null && fun.len()==2 && !fun.unknown_callers() && // Function is only called by 1 (and not the unknown caller)
           call.err(true)==null &&       // And args are ok
           call.mem().in(0) != call &&   // Dead self-recursive
           fun.in(1).nUses()==2 &&       // And only calling fun
@@ -257,7 +255,7 @@ public final class CallEpiNode extends Node {
     // and GCP flow type in parallel and create a mapping.  Then walk the
     // output HM type and CCP flow type in parallel, and join output CCP types
     // with the matching input CCP type.
-    if( false && AA.DO_HMT )
+    if( false && DO_HMT )
       trez = hm_apply_lift(tvar(),trez);
 
     return TypeTuple.make(Type.CTRL,tmem,trez);
@@ -353,10 +351,12 @@ public final class CallEpiNode extends Node {
       if( n.findDef(call) == -1 ) return false; // Wired below but not above
     }
     // Check forward edges from CALL to CEPI
-    for( Node use : call.uses() ) {
+    for( int i=0; i<call.nUses(); i++ ) {
+      Node use = call.use(i);
       if( use==this ) continue;
       if( use instanceof FunNode fun ) use = fun.ret();
-      if( findDef(use) == -1 ) return false; // Wired above but not below
+      if( findDef(use) == -1 )
+        return false;           // Wired above but not below
     }
     if( fidxs==BitsFun.NALL ) return !precise; // Some kind of error condition
     // If precise, check that every fidx is wired.  If not precise we might
@@ -520,10 +520,10 @@ public final class CallEpiNode extends Node {
     return tvar();
   }
   // Unify trailing result ProjNode with the CallEpi directly.
-  @Override public boolean unify_proj( ProjNode proj, boolean test ) {
+  @Override public TV3 unify_proj( ProjNode proj ) {
     if( proj._idx==REZ_IDX )
-      return tvar().unify(proj.tvar(),test);
-    throw TODO(); // memory unify
+      return set_tvar();
+    throw TODO();
   }
 
 }

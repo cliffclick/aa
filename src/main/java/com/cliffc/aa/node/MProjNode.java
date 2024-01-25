@@ -20,8 +20,6 @@ public class MProjNode extends ProjNode {
     return c.oob(TypeMem.ALLMEM);
   }
 
-  @Override public Type live_use( int i ) { return _live; }
-
   @Override public Node ideal_reduce() {
     if( isPrim() ) return null;
     // Fold dying calls

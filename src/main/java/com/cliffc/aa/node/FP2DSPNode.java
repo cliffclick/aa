@@ -40,10 +40,10 @@ public class FP2DSPNode extends Node {
         frsh2._val = bind.dsp()._val;
         frsh2._live = _live;
         return frsh2;
+      } else {
+        frsh.id().deps_add(this);
       }
-      frsh.deps_add(this);
     }
-    fp.deps_add(this);
     return null;
   }
 

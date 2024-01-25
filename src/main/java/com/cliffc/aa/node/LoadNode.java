@@ -92,20 +92,19 @@ public class LoadNode extends Node {
     // def is ALSO adr().def() which the normal deps_add asserts prevent.
     adr().deps_add_live(def);
     if( adr.above_center() ) return Type.ANY; // Nothing is demanded
-    if( !(adr instanceof TypeNil ptr) )  // Demand everything not killed at this field
-      return RootNode.defMem(def);
-
+    
+    // Demand everything not killed at this field.
+    if( !(adr instanceof TypeNil ptr) || // Not a ptr, assume it becomes one
+        ptr._aliases==BitsAlias.NALL )   // All aliases, then all mem needed
+      return RootNode.removeKills(def);  // All mem minus KILLS
+  
     // TODO: Liveness for generic clazz fields
     //if( ptr instanceof TypeMemPtr tmp && !tmp.is_simple_ptr() ) {
     //  tmp._obj.get(TypeFld.CLZ);
     //}
     
-    if( ptr._aliases.is_empty() )
-      return Type.ANY; // Nothing is demanded still
+    if( ptr._aliases.is_empty() ) return Type.ANY; // Nothing is demanded still
 
-    // Demand memory produce the desired field from a struct
-    if( ptr._aliases==BitsAlias.NALL )
-      return RootNode.defMem(def);
     // Demand field "_fld" be "ALL", which is the default
     return TypeMem.make(ptr._aliases,_live_use);
   }
@@ -154,10 +153,10 @@ public class LoadNode extends Node {
     if( mem instanceof MProjNode mprj ) {
       if( mprj.in(0) instanceof CallEpiNode cepi && !cepi._is_copy ) {
         if( adr instanceof NewNode nnn && !nnn.escaped(this) ) {
-    //      Env.GVN.add_reduce(this); // Re-run reduce
-    //      return set_mem(cepi.call().mem());
+          //Env.GVN.add_reduce(this); // Re-run reduce
+          //return set_mem(cepi.call().mem());
           throw TODO();
-        } else adr.deps_add(this);
+        }
       }
     }
 

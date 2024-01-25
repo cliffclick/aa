@@ -132,10 +132,8 @@ public class FunNode extends Node {
   // True if more unknown callers may appear on a Fun, Parm, Call, CallEpi, Ret.
   // One-shot transition from having unknown callers to not having.
   // At Combo, all callers are known and stay known: even Root is a known caller.
-  public boolean unknown_callers( Node dep ) {
-    if( isPrim() ) return true; // Too early
-    if( _unknown_callers && dep!=null ) deps_add(dep);
-    return _unknown_callers;
+  public boolean unknown_callers( ) {
+    return isPrim() || _unknown_callers;
   }
   // Checks the unknown caller situation, and one-shot transits from having
   // unknown-callers to all-callers-known.
@@ -182,7 +180,7 @@ public class FunNode extends Node {
   }
 
   @Override public Type value() {
-    if( unknown_callers(this) ) return Type.CTRL;
+    if( unknown_callers() ) return Type.CTRL;
     if( in(0)==this )           // is_copy
       return val(1).oob(Type.CTRL);
     for( int i=1; i<len(); i++ ) {

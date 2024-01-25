@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TV3;
 
 import static com.cliffc.aa.AA.MEM_IDX;
 
@@ -34,8 +35,8 @@ public class ProjNode extends Node {
   @Override public boolean has_tvar() { return true; }
 
   // Unify with the parent TVar sub-part
-  @Override public boolean unify( boolean test ) {
-    return has_tvar() && in(0).unify_proj(this,test);
+  @Override public TV3 _set_tvar( ) {
+    return in(0).unify_proj(this);
   }
 
   public static ProjNode proj( Node head, int idx ) {

@@ -482,7 +482,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   public boolean unify( boolean test ) { return false; }
 
   // Unify this Proj with the matching TV2 part from the multi-TV2-producing
-  public boolean unify_proj( ProjNode proj, boolean test ) { throw TODO(); }
+  public TV3 unify_proj( ProjNode proj ) { throw TODO(); }
   
   // --------------------------------------------------------------------------
 
@@ -621,6 +621,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       GVN.add_flow_defs(this);  // Defs  of change should recheck liveness
       if( nnn!=this ) {         // Replacement
         GVN.add_reduce_uses(this); // New chances for V-N
+        GVN.add_reduce_defs(this); // Unused NewNode kills
         subsume(nnn);           // Replace
       }
       return nnn._elock();      // Put progress in VALs and return change
@@ -662,12 +663,13 @@ public abstract class Node implements Cloneable, IntSupplier {
       assert nval.isa(oval);    // Monotonically improving
       _val = nval;
       add_flow_uses();          // Classic forwards flow
+      Env.GVN.add_reduce_uses( this );
       deps_work_clear();
+      if( shouldCon() ) GVN.add_reduce(this); // Replace a constant
       //if( this instanceof CallNode call && CallNode.ttfp(oval)!=CallNode.ttfp(nval) ) {
       //  GVN.add_reduce(call);        // Can wire
       //  GVN.add_reduce(call.cepi()); // Can wire
       //}
-      //if( nval.is_con() ) GVN.add_reduce(this); // Replace a constant
       //if( this instanceof RootNode ) add_flow();    // Rerun liveness
     }
     return progress;

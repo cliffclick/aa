@@ -26,6 +26,7 @@ public class TVLambda extends TV3 {
     for( int i=ARG_IDX; i<nargs; i++ )
       _args[i] = new TVLeaf();
   }
+  public TVLambda( TV3[] args ) { super(args); }
   // return in slot 0, memory in slot 1, display in slot 2, args in slots 3+
   public TV3 ret () { return arg(0); }
   public TV3 dsp () { return arg(DSP_IDX); }
@@ -132,7 +133,8 @@ public class TVLambda extends TV3 {
     sb.p("{ ");
     // Special print for empty TVDynTable
     TV3 dyn = _args[DSP_IDX];
-    if( dyn instanceof TVLeaf && !dyn.unified() ) sb.p("- ");
+    if( dyn==null ) sb.p("- ");
+    else if( dyn instanceof TVLeaf && !dyn.unified() ) sb.p("- ");
     else dyn._str(sb,visit,dups,debug,prims).p(' ');
     for( int i=ARG_IDX; i<nargs(); i++ )
       if( _args[i]!=null )

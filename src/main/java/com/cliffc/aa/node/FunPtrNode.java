@@ -76,8 +76,8 @@ public final class FunPtrNode extends Node {
     // all memory
     FunNode fun = xfun();
     if( fun==null ) return TypeMem.ANYMEM; // Dead, no memory demand
-    if( fun.unknown_callers(this) || fun.last() instanceof RootNode )
-      return RootNode.defMemFlat(ret);
+    if( fun.unknown_callers() || fun.last() instanceof RootNode )
+      return RootNode.removeKills(ret); // All mem minus KILLS
     // During/post-combo, Ret is alive only if called or escaped.
     Env.ROOT.deps_add(ret);
     if( Env.ROOT.rfidxs().test(fun._fidx) ) // Escaped
@@ -105,32 +105,16 @@ public final class FunPtrNode extends Node {
   @Override public TV3 _set_tvar() {
     RetNode ret = ret();
     Node rez = ret.rez();
-    if( rez==null ) return new TVLeaf(); // Happens for broken Lambdas
+    assert rez!=null;
     Env.GVN.add_flow(this);
-    Node dsp  = ret.fun().parm(DSP_IDX);
-    TV3 tdsp  = dsp == null ? new TVLeaf() : dsp.set_tvar();
-    return new TVLambda(nargs(),tdsp,rez.set_tvar());
-  }
 
-  // Implements class HM.Lambda unification.
-  @Override public boolean unify( boolean test ) {
-    RetNode ret = ret();
-    if( ret.isCopy() ) return false; // GENSYM
     FunNode fun = ret.fun();
     ParmNode[] parms = fun.parms();
-    TVLambda lam = (TVLambda)tvar();
-
-    // Each normal argument from the parms directly
-    boolean progress = false;
-    for( int i=DSP_IDX; i<parms.length; i++ )
-      // Parms can be missing
-      if( parms[i]!=null ) {
-        progress |= lam.arg(i).unify(parms[i].tvar(),test);
-        if( test && progress ) return true;
-        lam = (TVLambda)lam.find();
-      }
-    progress |= lam.ret().unify(ret.rez().tvar(),test);
-
-    return progress;
+    TV3[] args = new TV3[nargs()];
+    args[0] = rez.set_tvar();
+    for( int i=DSP_IDX; i<nargs(); i++ )
+      args[i] = parms[i]==null ? null : parms[i].set_tvar();
+    return new TVLambda(args);
   }
+  
 }

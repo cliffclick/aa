@@ -344,7 +344,7 @@ public class CallNode extends Node {
     if( _is_copy ) return def._live;
     boolean is_keep = isKeep();
     if( i==CTL_IDX ) return def.isMem() ? TypeMem.ALLMEM : Type.ALL;
-    if( i==MEM_IDX ) return RootNode.defMemFlat(def).join(_live);
+    if( i==MEM_IDX ) return RootNode.removeKills(def,_live); // JOIN away kills
     if( i==nargs() ) return _unpacked ? FP_LIVE : Type.ALL;
     if( !_unpacked ) return TypeStruct.ISUSED;
     if( is_keep  )   return Type.ALL; // Still under construction, all alive
@@ -397,18 +397,6 @@ public class CallNode extends Node {
 
 
   @Override public boolean has_tvar() { return false; }
-
-  // Unify ProjNodes with the Call arguments directly.
-  @Override public boolean unify_proj( ProjNode proj, boolean test ) {
-    TV3 tvp = proj.tvar();     // Projection tvar
-    TV3 tv3 = tvar(proj._idx); // Input tvar matching projection
-    if( proj._idx!=DSP_IDX )
-      return tvp.unify(tv3,test); // Unify with Call arguments
-    // Specifically for the function/display, only unify on the display part.
-    if( tv3 instanceof TVLambda lam ) // Expecting the call input to be a function
-      return lam.dsp().unify(tvp,test);
-    return tv3.deps_add_deep(proj);    // Proj will unify once tv3 becomes a fun
-  }
 
   @Override public ErrMsg err( boolean fast ) {
     // Expect a function pointer

@@ -71,13 +71,13 @@ public class DynLoadNode extends Node {
       }
       return t;
     }
-    
+
     // Meet over all possible choices.  This DynLoad might have resolved
     // differently with different TV3s from different paths, so meet over all
     // possible choices.
     Type t = TypeNil.XSCALAR;
     if( dyn().tvar() instanceof TVDynTable dyn )
-      for( String label : dyn.fields(_resolves,this) )
+      for( String label : dyn.fields(_resolves,this,Combo.HM_AMBI) )
         t = t.meet(LoadNode.lookup(ts,tm,label));
     return t;
   }
@@ -96,14 +96,14 @@ public class DynLoadNode extends Node {
     // def is ALSO adr().def() which the normal deps_add asserts prevent.
     adr().deps_add_live(def);
     if( adr.above_center() ) return Type.ANY; // Nothing is demanded
-    if( !(adr instanceof TypeNil ptr) )  // Demand everything not killed at this field
-      return RootNode.defMem(def);
+
+    // Demand everything not killed at this field.
+    if( !(adr instanceof TypeNil ptr) || // Not a ptr, assume it becomes one
+        ptr._aliases==BitsAlias.NALL )   // All aliases, then all mem needed
+      return RootNode.removeKills(def);  // All mem minus KILLS
   
     if( ptr._aliases.is_empty() )  return Type.ANY; // Nothing is demanded still
 
-    // Demand memory produce the desired field from a struct
-    if( ptr._aliases==BitsAlias.NALL )
-      return RootNode.defMem(def);
     // TODO: not quite monotonic, if def is high and falls to mem
     TypeStruct obj = def._val instanceof TypeMem mem
       // Named fields are live
@@ -144,12 +144,10 @@ public class DynLoadNode extends Node {
 
     // Load self into the table
     dyn.add_dyn(this,ptr.load(),_tvar);
-    dyn.deps_add_deep(dyn());
     return _tvar;
   }
 
   @Override public boolean unify( boolean test ) {
-    _tvar.deps_add_deep(this);
     return dyn().tvar() instanceof TVDynTable tab && tab.resolve(this,test);
   }  
 }

@@ -173,6 +173,9 @@ public class TVStruct extends TVExpanding {
   @Override public void _union_impl( TV3 tv3 ) {
     TVStruct ts = tv3.as_struct(); // Invariant when called
     ts._open = ts._open & _open;
+    for( int i=0,idx; i<_max; i++ )
+      if( _pins[i] && (idx=ts.idx(_flds[i])) != -1 )
+        ts._pins[idx]=true;
   }
 
   // Unify this into that.  Ultimately "this" will be U-F'd into "that" and so
@@ -291,8 +294,14 @@ public class TVStruct extends TVExpanding {
       clz = pclz1==null ? null : pclz1.load(); // Shared CLZ is only RHS
     } else {
       if( pclz1==null ) {        // CLZ only on LHS
-        that.add_fld( TypeFld.CLZ, pclz1 = (TVPtr)pclz0._fresh(), this._pins[0] ); // Move shared CLZ into RHS
         progress = ptrue();
+        if( test ) return true;
+        // Force a RHS CLZ as a fresh of LHS CLZ
+        int p1idx = that.idx(TypeFld.CLZ);
+        TVLeaf pclz = p1idx == -1 ? new TVLeaf() : (TVLeaf)that.arg(p1idx);
+        if( p1idx == -1 ) that.add_fld( TypeFld.CLZ, pclz, this._pins[idx(TypeFld.CLZ)] ); // Move shared CLZ into RHS
+        pclz0._fresh_unify(pclz,test);
+        pclz1 = (TVPtr)pclz.find();
       } else {
         // Both, unify into RHS clz
         progress |= pclz0._fresh_unify(pclz1,false);
@@ -303,7 +312,7 @@ public class TVStruct extends TVExpanding {
       if( progress ) {
         for( int i=0; i<that._max; i++ ) {
           String key = that._flds[i];
-          if( !Util.eq(key,TypeFld.CLZ) && // Already unified CLZ
+          if( !that._pins[i] && !Util.eq(key,TypeFld.CLZ) && // Already unified CLZ
               clz.do_into_clz(key,that,i,test,false) != 0 ) { // Hit in clazz, done with unify
             i--;                // Field was removed, go again
           }
@@ -318,7 +327,7 @@ public class TVStruct extends TVExpanding {
       if( Util.eq(key,TypeFld.CLZ) ) continue; // Already unified CLZ
       // Fold into the shared CLZ, if possible
       TV3 lhs = arg(i);
-      if( clz!=null ) {
+      if( clz!=null && !_pins[i] ) {
         clz = clz.find().as_struct();
         int rez = clz.do_into_clz(key,this,i,test,true);
         if( rez!=0 ) {          // Hit in clazz, done with unify
@@ -368,7 +377,7 @@ public class TVStruct extends TVExpanding {
     if( !_open && that._open ) {
       progress = ptrue();
       if( test ) return progress;
-      that._open = false;
+      that.close();
     }
 
     if( _open ) add_delay_fresh(); // If this Struct can add fields, must fresh-unify that Struct

@@ -4,6 +4,8 @@ import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.NonBlockingHashMapLong;
 
+import java.util.HashSet;
+
 /** Combined Global Constant Propagation and Hindly-Milner with extensions.
 
 See HM/HM.java for a complete stand-alone research version.
@@ -136,6 +138,9 @@ public abstract class Combo {
   public static boolean during() { return !AA.LIFTING              ; }
   public static boolean post  () { return  AA.LIFTING &&  HM_FREEZE; }
 
+
+  static final HashSet<DynLoadNode> DYNS = new HashSet<>();
+  
   public static void opto() {
     assert Env.GVN.work_is_clear();
     // This pass LIFTS not FALLs
@@ -149,8 +154,10 @@ public abstract class Combo {
         n._val = n._live = Type.ANY;  // Highest value
         if( n.has_tvar() ) n.set_tvar();
         Env.GVN.add_flow(n);
-        if( n instanceof FunNode fun && !n.isPrim() )
+        if( n instanceof FunNode fun )
           fun.set_unknown_callers();
+        if( n instanceof DynLoadNode dyn )
+          DYNS.add(dyn);
     });
     Env.ROOT.xval();
     Env.ROOT.xliv();
@@ -230,8 +237,8 @@ public abstract class Combo {
 
   private static void add_new_leaf_work() { }
   private static void add_ambi_work() {
-    //for( Resolvable r : Resolvable.RESOLVINGS.values() )
-    //  throw AA.TODO();
+    for( DynLoadNode dyn : DYNS )
+      Env.GVN.add_flow(dyn);
   }
 
   private static final NonBlockingHashMapLong<Node> FREEZE_WORK = new NonBlockingHashMapLong<>();
@@ -245,5 +252,5 @@ public abstract class Combo {
     FREEZE_WORK.clear();
   }
 
-  static void reset() { HM_NEW_LEAF = HM_AMBI = HM_FREEZE=false; FREEZE_WORK.clear(); }
+  static void reset() { HM_NEW_LEAF = HM_AMBI = HM_FREEZE=false; FREEZE_WORK.clear(); DYNS.clear(); }
 }

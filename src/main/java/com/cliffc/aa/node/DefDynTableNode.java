@@ -29,6 +29,7 @@ public class DefDynTableNode extends Node {
   @Override public TV3 _set_tvar() { return new TVLeaf(); }
 
   @Override public boolean unify( boolean test ) {
+    if( !test ) tvar().deps_add_deep(this);
     return tvar() instanceof TVDynTable tdyn && tdyn.resolve(test);
   }
 

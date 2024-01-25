@@ -41,7 +41,7 @@ public class ParmNode extends Node {
     Type t = Type.ANY;
     int len = fun.len();
     boolean wired_root = fun.last() instanceof RootNode;
-    if( wired_root || fun.unknown_callers(this) ) {
+    if( wired_root || fun.unknown_callers() ) {
       if( wired_root ) len--;
       // During/after Combo, use the HM type for the GCP type instead of the given default
       if( _idx==MEM_IDX ) {

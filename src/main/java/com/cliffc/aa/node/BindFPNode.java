@@ -127,17 +127,14 @@ public class BindFPNode extends Node {
   @Override public Node ideal_reduce() {
     // Check that this is a "maybe Bind"
     if( _oper!=null && !Oper.is_oper(_oper) ) {
-      if( fp()._val instanceof TypeFunPtr tfp ) {
-        if( tfp.has_dsp() )
-          return fp();          // Already bound, no double bind
-      } else {
-        if( fp()._val.above_center() )
-          throw AA.TODO();      // Function is undefined, bind is dead, can be removed
-        else if( fp()._val.isa(TypeFunPtr.GENERIC_FUNPTR) )
-          ; // OK
-        else
-          throw AA.TODO();      // Sideways, BIND is extra, remove
-      }
+      Type fpv = fp()._val;
+      if( fpv.above_center() || // float is dead, no need to bind
+          // Already bound, no double bind
+         (fpv instanceof TypeFunPtr tfp && tfp.has_dsp()) ||
+          // Sideways, BIND is extra, remove
+          !TypeFunPtr.GENERIC_FUNPTR.dual().isa(fpv) )
+        // Remove unneeded Bind
+        return fp();
     }
 
     // One or the other input is dead

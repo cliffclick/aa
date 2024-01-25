@@ -7,7 +7,7 @@ import com.cliffc.aa.util.VBitSet;
 
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.function.IntSupplierg;
+import java.util.function.IntSupplier;
 
 import static com.cliffc.aa.AA.TODO;
 
@@ -93,16 +93,22 @@ public class TVDynTable extends TV3 {
 
   @Override int eidx() { return TVErr.XDYN; }
 
-  // All field labels for a particular DynLoad/DynField
-  public  HashSet<String>  fields(HashSet<String> labels, IntSupplier uid) {  VBS.clear(); return _fields(labels,uid); }
-  private HashSet<String> _fields(HashSet<String> labels, IntSupplier uid) {
+  // All resolved field labels for a particular DynLoad/DynField
+  public  HashSet<String>  fields(HashSet<String> labels, IntSupplier uid, boolean all) {  VBS.clear(); return _fields(labels,uid,all); }
+  private HashSet<String> _fields(HashSet<String> labels, IntSupplier uid, boolean all) {
     if( VBS.tset(_uid) ) return labels;
     for( int idx=0; idx<_max; idx++ )
-      if( is_dyn(idx) && _uids[idx]==uid && _labels[idx] != null ) {
-        labels.add(_labels[idx]);
+      if( is_dyn(idx) && _uids[idx]==uid ) {
+        if( _labels[idx] != null )
+          labels.add(_labels[idx]);
+        else if( all ) {
+          TVStruct ts = (TVStruct)first(idx);
+          for( int i=0; i<ts.len(); i++ )
+            labels.add(ts._flds[i]);
+        }
       } else {
         if( first(idx) instanceof TVDynTable nest )
-          nest._fields(labels,uid);
+          nest._fields(labels,uid,all);
       }
     return labels;
   }
@@ -270,7 +276,50 @@ public class TVDynTable extends TV3 {
   
   // -------------------------------------------------------------
   @Override boolean _fresh_unify_impl(TV3 tv3, boolean test) {
-    throw TODO();
+    TVDynTable that = (TVDynTable)tv3; // Invariant when called
+    boolean progress = false;
+    for( int i=0; i<_max; i++ ) {
+      IntSupplier node = _uids[i];
+      int idx = that.idx(node);
+      if( idx == -1 ) throw TODO();
+      else {
+        assert is_dyn(i) == that.is_dyn(idx);
+        if( is_dyn(i) ) {
+          // Unify match on match
+          progress |= first(i)._fresh_unify(that.first(idx),test);
+          // Unify pattern on pattern; resolved patterns still should unify
+          progress |= secnd(i)._fresh_unify(that.secnd(idx),test);
+          if( test && progress ) return progress;
+
+          // cmps have to align; a Y or N in "this" maps to a Y or N in "that",
+          // and can force a MAYBE to a Y/N.  A MAYBE in "this" does not force.
+          if( first(i) instanceof TVStruct str ) {
+            for( int j=0; j<str.len(); j++ ) {
+              int cmp = get_cmp(i,j);
+              if( cmp==1 || cmp==7 ) { // Force
+                TVStruct thatstr = (TVStruct)that.first(idx);
+                int thatj = thatstr.idx(str.fld(j));
+                int thatcmp = that.get_cmp(idx,thatj);
+                if( cmp != thatcmp )
+                  throw TODO(); 
+              }
+              else ;   // MAYBE does not force.
+            }
+          }
+          if( _labels[i]!=null && _labels[i] != that._labels[idx] ) {
+            progress = true;
+            if( test ) return true;
+            assert that._labels[idx]==null;
+            that._labels[idx] = _labels[i];
+          }
+        
+        } else {
+          // Should be 2 Call/Apply table entries, recursively fresh first(i)/that.first(idx)
+          progress |= first(i)._fresh_unify(that.first(idx),test);
+        }
+      }
+    }
+    return progress;
   }
   
   

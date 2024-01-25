@@ -1052,7 +1052,7 @@ public class Parse implements Comparable<Parse> {
     keep(nn);
     nn.add_fld(TypeFld.CLZ,Access.Final, PrimNode.PCLZ, null);
     _tuple(oldx,s,bad,nn,0);
-    Node ptr = new NewNode("TUP").peep();
+    Node ptr = new NewNode("TUP").init();
     Node nn0 = unkeep(nn).peep(); assert nn0==nn;
     mem(new StoreXNode(mem(),keep(ptr),nn0,bad).peep());
     return unkeep(ptr);
@@ -1080,7 +1080,7 @@ public class Parse implements Comparable<Parse> {
    */
   private Node struct() {
     int oldx = _x-1, pidx;      // Opening @{
-    try( Env e = new Env(_e, null, 0, ctrl(), mem(), _e._scope.stk(), null) ) { // Nest an environment for the local vars
+    try( Env e = new Env(_e, null, 0, ctrl(), mem(), _e._scope.ptr(), null) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
       stmts(true);              // Create local vars-as-fields
       require('}',oldx);        // Matched closing }
@@ -1104,9 +1104,9 @@ public class Parse implements Comparable<Parse> {
     int oldx = _x;              // Past opening '{'
 
     // Incrementally build up the formals, starting with the display
-    Ary<Type> formals = new Ary<>(new Type[]{Type.CTRL,TypeMem.ALLMEM,scope().ptr()._tptr});
-    Ary<Parse> bads= new Ary<>(new Parse [ARG_IDX]);
-    Ary<String> ids= new Ary<>(new String[]{null,null,"^"});
+    Ary<Type  > formals= new Ary<>(new Type  []{Type.CTRL,TypeMem.ALLMEM,scope().ptr()._tptr,TypeNil.SCALAR});
+    Ary<Parse > bads   = new Ary<>(new Parse [ARG_IDX+1]);
+    Ary<String> ids    = new Ary<>(new String[]{null,null,"^","$dyn"});
 
     // Parse arguments
     while( true ) {
@@ -1141,15 +1141,15 @@ public class Parse implements Comparable<Parse> {
     }
     // If this is a no-arg function, we may have parsed 1 or 2 tokens as-if
     // args, and then reset.  Also reset to just the mem & display args.
-    if( _x == oldx ) { formals.set_len(ARG_IDX);  ids.set_len(ARG_IDX); bads.set_len(ARG_IDX); }
+    if( _x == oldx ) { formals.set_len(ARG_IDX+1);  ids.set_len(ARG_IDX+1); bads.set_len(ARG_IDX+1); }
 
     // Build the FunNode header
     FunNode fun = keep(new FunNode(formals.len()).init());
 
     // Build Parms for system incoming values
     Node rpc = new ParmNode(CTL_IDX,fun,null,TypeRPC.ALL_CALL   ).init();
-    Node dsp = new ParmNode(DSP_IDX,fun,null,formals.at(DSP_IDX)).init();
     Node mem = new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM     ).init();
+    Node dsp = new ParmNode(DSP_IDX,fun,null,formals.at(DSP_IDX)).init();
 
     // Increase scope depth for function body.
     try( Env e = new Env(_e, fun, formals._len-DSP_IDX, fun, mem, dsp, null) ) { // Nest an environment for the local vars

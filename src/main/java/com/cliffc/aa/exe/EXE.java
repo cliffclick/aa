@@ -216,7 +216,7 @@ public class EXE {
   private static String require(String s, char c) { require(c); return s; }
 
   // ----------------- Syntax ---------------------
-  static abstract class Syntax implements IntSupplier, TVDynElement {
+  static abstract class Syntax implements IntSupplier {
     private static int CNT=1;
     final int _uid=CNT++;
     @Override public int getAsInt() { return _uid; }

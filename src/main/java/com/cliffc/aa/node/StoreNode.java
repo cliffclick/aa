@@ -55,7 +55,8 @@ public class StoreNode extends StoreAbs {
   }
 
   @Override boolean st_st_check( StoreAbs sta ) {
-    return sta instanceof StoreNode st && Util.eq(_fld,st._fld);
+    return (sta instanceof StoreNode st && Util.eq(_fld,st._fld)) ||
+      sta instanceof StoreXNode;
   }
 
   

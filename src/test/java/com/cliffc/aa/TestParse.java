@@ -31,7 +31,9 @@ public class TestParse {
     DO_HMT=true;
     RSEED=0;
 
-    test(" 1+2 * 3+4 *5", "int:27", "int:27");
+    //test(" 1+2 * 3+4 *5", "int:27", "int:27");
+    // testOver5.aa, One DynLoad, fcn needs DynTable
+    test("fcn = {(@{a=1},@{b=2})._}; (fcn().a, fcn().b)", "*[](int:1,int:2)", "*(int:1,int:2)");
   }
 
   static private void assertTrue(boolean t) {

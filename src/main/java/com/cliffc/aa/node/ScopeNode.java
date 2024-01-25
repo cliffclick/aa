@@ -81,7 +81,7 @@ public class ScopeNode extends Node {
 
   @Override public TypeMem live() {
     //assert is_keep() || Combo.pre() || is_prim();
-    return RootNode.defMem(this);
+    return RootNode.removeKills(this);
   }
 
   @Override public Type live_use( int i ) {
