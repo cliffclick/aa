@@ -28,10 +28,19 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
     DO_GCP=true;
-    DO_HMT=false;
+    DO_HMT=true;
     RSEED=0;
-    
-    test("a=@{x=1.2;y;}; a.x", "flt:1.2", "flt:1.2");
+
+    test("""
+fcn = { ->
+  @{ qi = { x -> x.a };
+     qf = { x -> x.b };
+  }._
+};
+bar = { x -> fcn() x };
+(bar @{a=2}, bar @{b=3.3})
+""",
+         "*[23](_, 0=PA:$[]@{^=$[5,6](...); _=%[5,6][]; $nil}?, 1=PA)", "*[23](_,int:2,flt:3.3)",null,null,"[23]",null);
   }
 
   static private void assertTrue(boolean t) {

@@ -421,7 +421,8 @@ public abstract class Node implements Cloneable, IntSupplier {
             // Things like CProj or DProj are either all/not alive.  If
             // 'this.isMem', e.g. a Call or CallEpi, the Projs keep the node
             // alive but do not add any memory refinements.
-            if( isMem && ulive==Type.ALL ) ulive = TypeMem.ANYMEM;
+            if( ulive==Type.ANY ) continue;
+            if( isMem && !(ulive instanceof TypeMem) ) ulive = TypeMem.ANYMEM;
             live = live.meet(ulive); // Make alive used fields
           }
         }
