@@ -47,7 +47,13 @@ abstract public class TV3 implements Cloneable {
   public static final boolean WIDEN = true;
 
   private static int CNT=1;
-  public int _uid=CNT++; // Unique dense int, used in many graph walks for a visit bit
+  static int TV3UID = -1;
+  private int uid() {
+    if( CNT==TV3UID )
+      System.out.println();
+    return CNT++;
+  }
+  public int _uid=uid(); // Unique dense int, used in many graph walks for a visit bit
 
   // Disjoint Set Union set-leader.  Null if self is leader.  Not-null if not a
   // leader, but pointing to a chain leading to a leader.  Rolled up to point
@@ -324,6 +330,16 @@ abstract public class TV3 implements Cloneable {
     boolean progress = _fresh_unify(that,test);
     VARS.clear();  DUPS.clear();
     FRESH_ROOT = null;
+    
+    if( !test && progress ) {
+      that = that.find();
+      FRESH_ROOT = new TVExpanding.DelayFresh(this,that,frsh,nongen);
+      boolean progress2 = _fresh_unify(that,true);
+      assert !progress2;
+      VARS.clear();  DUPS.clear();
+      FRESH_ROOT = null;
+    }
+    
     return progress;
   }
 
@@ -784,7 +800,7 @@ abstract public class TV3 implements Cloneable {
     try {
       assert !unified();
       TV3 tv3 = (TV3)clone();
-      tv3._uid = CNT++;
+      tv3._uid = uid();
       tv3._args = _args==null ? null : _args.clone();
       return tv3;
     } catch(CloneNotSupportedException cnse) {throw TODO();}
