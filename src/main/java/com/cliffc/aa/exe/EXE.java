@@ -643,11 +643,7 @@ public class EXE {
 
       ptrdyn.resolve(false);
     }
-    
-    @Override boolean hm(boolean test) {
-      return false;
-    }
-    
+
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       return reduce.apply(map.apply(this),_ptr.visit(map,reduce));
     }
