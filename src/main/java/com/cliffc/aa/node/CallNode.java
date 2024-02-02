@@ -1,7 +1,6 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
-import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVErr;
 import com.cliffc.aa.tvar.TVLambda;
 import com.cliffc.aa.type.*;
@@ -370,11 +369,10 @@ public class CallNode extends Node {
     // unwinding.
     if( val(0)==Type.XCTRL ) return Type.ANY;
     CallEpiNode cepi = cepi();
-    if( cepi==null ) {
-      deps_add(def);
+    deps_add_live(def);
+    if( cepi==null || !cepi.is_CG(true) ) {
       return Type.ALL.oob(Combo.post());
     }
-    if( !cepi.is_CG(true) ) return Type.ALL; // Not fully wired, assume a worse user yet to come
 
     // Since wired, we can check all uses to see if this argument is alive.
     Type t = Type.ANY;

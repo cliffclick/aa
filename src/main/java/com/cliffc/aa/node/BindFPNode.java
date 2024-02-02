@@ -158,12 +158,10 @@ public class BindFPNode extends Node {
   @Override public boolean unify( boolean test ) {
     boolean progress = false;
     TV3 fptv = fp().tvar();
-    if( fptv instanceof TVLambda lam ) {      
-      progress |= dsp_unify(lam.dsp(), dsp(), test);
-    } else {
-      fptv.deps_add(this);
-    }
-    return progress;
+    if( fptv instanceof TVLambda lam )
+      return dsp().tvar().unify(lam.dsp(),test);
+    fptv.deps_add(this);
+    return false;
   }
 
   private static boolean dsp_unify( TV3 dsp0, Node dsp, boolean test ) {

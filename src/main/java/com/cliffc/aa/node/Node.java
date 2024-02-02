@@ -874,6 +874,10 @@ public abstract class Node implements Cloneable, IntSupplier {
     return found;
   }
 
+  // For loads and stores only
+  boolean ld_st_check(StoreAbs st) { throw AA.TODO(); }
+
+  
   // Shortcut
   public Type sharptr( Node mem ) { return mem._val.sharptr(_val); }
 

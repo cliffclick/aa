@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
@@ -54,6 +55,8 @@ public class StoreXNode extends StoreAbs {
   @Override boolean st_st_check( StoreAbs sta ) {
     return sta instanceof StoreXNode st;
   }
+  
+  @Override boolean ld_st_check(StoreAbs st) { throw AA.TODO(); }
  
   @Override public TV3 _set_tvar() {
     assert rez()!= Env.ANY; // Did not clear out during iter; return mem().tvar()

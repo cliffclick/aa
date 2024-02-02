@@ -66,6 +66,7 @@ public abstract class StoreAbs extends Node {
   abstract Type _live_use( TypeMem live0, TypeMemPtr tmp, int i );
   abstract TypeMem _live_kill(TypeMemPtr tmp);
 
+  // Can 'this' Store wipe out or fold into a prior store
   abstract boolean st_st_check( StoreAbs st );
   
   @Override public Node ideal_reduce() {

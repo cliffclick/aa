@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
@@ -59,6 +60,7 @@ public class StoreNode extends StoreAbs {
       sta instanceof StoreXNode;
   }
 
+  @Override boolean ld_st_check(StoreAbs st) { throw AA.TODO(); }
   
 //  @Override public Node ideal_reduce() {
 //    if( is_prim() ) return null;

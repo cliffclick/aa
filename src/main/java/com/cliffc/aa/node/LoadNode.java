@@ -207,6 +207,17 @@ public class LoadNode extends Node {
     return true;
   }
 
+  // If true, can bypass.
+  @Override boolean ld_st_check(StoreAbs st) {
+    assert adr()==st.adr();
+    // Check if fld hits in a StoreX or direct StoreNode.fld
+    if( st instanceof StoreNode stf )
+      return !Util.eq(stf._fld,_fld);
+    // Assume the StoreX hits the field in question
+    return false;
+  }
+
+  
   // Find a matching prior Store - matching address.
   // Returns null if highest available memory does not match address.
   static Node find_previous_struct(Node ldst, Node mem, Node adr, BitsAlias aliases ) {
@@ -216,15 +227,19 @@ public class LoadNode extends Node {
     while(true) {
       cnt++; assert cnt < 100; // Infinite loop?
       if( mem instanceof StoreAbs st ) {
-        if( st.adr()==adr ) return st.err(true)== null ? st : null; // Exact matching store
-        st.adr().deps_add(ldst); // If store address changes
-        if( mem == st.mem() ) return null; // Parallel unrelated stores
-        // Wrong address.  Look for no-overlap in aliases
-        Type tst = st.adr()._val;
-        if( !(tst instanceof TypeMemPtr tmp) ) return null; // Store has weird address
-        BitsAlias st_alias = tmp._aliases;
-        if( aliases.join(st_alias) != BitsAlias.EMPTY )
-          return null;        // Aliases not disjoint, might overlap but wrong address
+        if( st.adr()==adr ) {
+          if( !ldst.ld_st_check(st)  )
+            return st.err(true)== null ? st : null; // Exact matching store
+        } else {
+          st.adr().deps_add(ldst); // If store address changes
+          if( mem == st.mem() ) return null; // Parallel unrelated stores
+          // Wrong address.  Look for no-overlap in aliases
+          Type tst = st.adr()._val;
+          if( !(tst instanceof TypeMemPtr tmp) ) return null; // Store has weird address
+          BitsAlias st_alias = tmp._aliases;
+          if( aliases.join(st_alias) != BitsAlias.EMPTY )
+            return null;        // Aliases not disjoint, might overlap but wrong address
+        }
         // Disjoint unrelated store.
         mem = st.mem(); // Advance past
 
@@ -301,7 +316,7 @@ public class LoadNode extends Node {
 
     // Struct needs to have the named field
     TVStruct str = ptr.load();
-    TV3 fld = str.arg_clz(_fld);
+    TV3 fld = str.arg_clz(_fld,false);
     TV3 self = new TVLeaf();
     if( fld==null ) {
       str.add_fld(_fld,self,false);
