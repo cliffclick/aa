@@ -131,14 +131,13 @@ public class TVLambda extends TV3 {
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     sb.p("{ ");
-    // Special print for empty TVDynTable
-    TV3 dyn = _args[DSP_IDX];
-    if( dyn==null ) sb.p("- ");
-    else if( dyn instanceof TVLeaf && !dyn.unified() ) sb.p("- ");
-    else dyn._str(sb,visit,dups,debug,prims).p(' ');
-    for( int i=ARG_IDX; i<nargs(); i++ )
-      if( _args[i]!=null )
+    
+    for( int i=DSP_IDX; i<nargs(); i++ ) {
+      if( _args[i]==null || (i<=DSP_IDX && _args[i] instanceof TVLeaf && !_args[i].unified()) )
+        sb.p("- ");             // Print for leaf display or $dyn
+      else
         _args[i]._str(sb,visit,dups,debug,prims).p(' ');
+    }
     sb.p("-> ");
     // Return
     _args[0]._str(sb,visit,dups,debug,prims).p(' ');    
