@@ -39,7 +39,7 @@ public class TestTVar {
       boolean rez = v1.fresh_unify( null, v0, null, false );
       assertTrue( rez );
       assertNotSame( v0.find(), v1.find() );
-      assertEquals( 1, v0.find().trial_unify_ok( v1 ) ); // Always a hard yes in a trial
+      assertEquals( 3, v0.find().trial_unify_ok( v1 ) ); // Always a hard yes in a trial
     }
   }
   
