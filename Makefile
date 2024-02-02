@@ -131,7 +131,7 @@ sandbox/tests.txt:	$(test_classes)
 	@(cd ${TST}; /usr/bin/find . -name '*.java' | cut -c3- | sed "s/.....$$//" | sed -e 's/\//./g') | grep -v TestUtil | /usr/bin/sort > sandbox/tests.txt
 
 # Base launch line for JVM tests
-JVM=nice java -Xms1g -Xms1g -ea -cp "build/aa.jar${SEP}${jars}${SEP}$(CLZDIR)/test"
+JVM=java -ea -cp "build/aa.jar${SEP}${jars}${SEP}$(CLZDIR)/test"
 
 # Build the AA-test jar and run the junit tests.
 # Actually makes jvm_cmd.txt and status.0 along with out.0
