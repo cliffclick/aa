@@ -1,6 +1,6 @@
 // NON-Polymorphic records; see testRecur10.aa
-// Type: ( A:( @{ x=nint8; }, nint8), A)
-// Eval: ( ( @{ x=3; y=4; }, 3), ( @{ x=4; z=@{ q=1; }; }, 4))
+// Type: *[]( _, A:*[]( _, *[]@{ _; x=nint8; }, nint8), A)
+// Eval: *[]( _, *[]( _, *[]@{ _; x=3; y=4; }, 3), *[]( _, *[]@{ _; x=4; z=*[]@{ _; q=1; }; }, 4))
 ( { fun ->
      (pair (fun @{x =3; y =4       ;} )   // available {x,y}
            (fun @{x =4; z =@{q =1;};} ) ) // available {x,z}

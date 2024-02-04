@@ -1,6 +1,6 @@
 // factorial-like, but arbitrary op-by-2
-// Type: ( int64, int64)
-// Eval: ( 16, 9)
+// Type: *[]( _, int64, int64)
+// Eval: *[]( _, 16, 9)
 fun = { fx x ->
   if x
   ? (fx (fun fx (- x 1)) 2)

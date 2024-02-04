@@ -1,7 +1,7 @@
 // Gen counters
 // Simple test of captured environment
-// Type: ( int64, int64)
-// Eval: ( 2, 1)
+// Type: *[]( _, int64, int64)
+// Eval: *[]( _, 2, 1)
 gen = { ->
   inc = { cnt ->
    (pair cnt { -> (inc (+ cnt 1))} )

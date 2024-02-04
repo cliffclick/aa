@@ -316,10 +316,10 @@ public class LoadNode extends Node {
 
     // Struct needs to have the named field
     TVStruct str = ptr.load();
-    TV3 fld = str.arg_clz(_fld,false);
+    TV3 fld = str.arg_clz(_fld);
     TV3 self = new TVLeaf();
     if( fld==null ) {
-      str.add_fld(_fld,self,false);
+      str.add_fld(_fld,self );
     } else {
       self.unify(fld,false);
     }
@@ -344,7 +344,7 @@ public class LoadNode extends Node {
       if( fld!=null ) return do_fld(fld,test);
       // If the struct is open, add field here and done.
       // Field is not pinned, because it might belong in a superclazz
-      if( tstr.is_open() ) return tstr.add_fld(_fld,tvar(),false);
+      if( tstr.is_open() ) return tstr.add_fld(_fld,tvar() );
     }
 
     // struct is end-of-super-chain, miss_field

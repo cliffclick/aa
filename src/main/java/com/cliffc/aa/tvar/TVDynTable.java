@@ -3,6 +3,7 @@ package com.cliffc.aa.tvar;
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.Util;
 import com.cliffc.aa.util.VBitSet;
 
 import java.util.Arrays;
@@ -68,7 +69,7 @@ public class TVDynTable extends TV3 {
   }
 
   // Add a Apply reference to this table
-  public boolean add_apy( IntSupplier uid, TV3 tv ) {  return add_dyn(uid,tv,null);  }
+  public void add_apy( IntSupplier uid, TV3 tv ) {add_dyn( uid, tv, null );}
 
   private int idx(IntSupplier uid) {
     for( int i=0; i<_max; i++ )
@@ -102,7 +103,7 @@ public class TVDynTable extends TV3 {
         if( _labels[idx] != null )
           labels.add(_labels[idx]);
         else if( all ) {
-          TVStruct ts = (TVStruct)first(idx);
+          TVStruct ts = ((TVPtr)first(idx)).load();
           for( int i=0; i<ts.len(); i++ )
             labels.add(ts._flds[i]);
         }
@@ -142,7 +143,8 @@ public class TVDynTable extends TV3 {
   private boolean _resolve(int idx, boolean test) {
     TV3 matches = first(idx);
     TV3 pattern = secnd(idx);
-    if( !(matches instanceof TVStruct str) ) return false; // No progress until a TVStruct
+    if( !(matches instanceof TVPtr ptr) ) return false; // No progress until a TVPtr
+    TVStruct str = ptr.load();
     if( str.is_open() )  return false; // More matches are possible
     // Resolve field by field, removing resolved fields.  Should be 1 YES resolve in the end.
     int yess=0, maybes=0;
@@ -241,10 +243,12 @@ public class TVDynTable extends TV3 {
   
   // -------------------------------------------------------------
   @Override boolean _unify_impl( TV3 tv3 ) {
-    TVDynTable that = (TVDynTable)tv3;
+    return _unify_impl0((TVDynTable)tv3,0);
+  }
+  private boolean _unify_impl0( TVDynTable that, int i ) {
 
     // Unify this into that.  uids in this are either new or old in that.
-    for( int i=0; i<_max; i++ ) {
+    for( ; i<_max; i++ ) {
       int idx = that.idx(_uids[i]); // Get match in RHS
       String slhs = _labels[i];
       if( idx == -1 ) {
@@ -255,12 +259,23 @@ public class TVDynTable extends TV3 {
         String srhs = that._labels[idx];
         if( srhs==null )
           that._labels[idx] = slhs;
-        else if( slhs!=null || !slhs.equals(srhs) )
+        else if( slhs!=null && !slhs.equals(srhs) )
           throw TODO();
 
         // Merge other args
+        assert !unified() && !that.unified();
         that._unify_half(idx*2  ,first(i));
+        that = (TVDynTable)that.find();
+        if( unified() )
+          // Tail call on unified 'this'
+          return ((TVDynTable)find())._unify_impl0(that,i);
+        assert !unified() && !that.unified();
         that._unify_half(idx*2+1,secnd(i));
+        that = (TVDynTable)that.find();
+        if( unified() )
+          // Tail call on unified 'this'
+          return ((TVDynTable)find())._unify_impl0(that,i+1);
+        assert !unified() && !that.unified();
       }
     }
     // uids in that not this, no need to check
@@ -287,6 +302,7 @@ public class TVDynTable extends TV3 {
         if( is_dyn(i) ) {
           // Unify match on match
           progress |= first(i)._fresh_unify(that.first(idx),test);
+          that = (TVDynTable)that.find();
           // Unify pattern on pattern; resolved patterns still should unify
           progress |= secnd(i)._fresh_unify(that.secnd(idx),test);
           if( test && progress ) return progress;
@@ -300,13 +316,15 @@ public class TVDynTable extends TV3 {
                 TVStruct thatstr = (TVStruct)that.first(idx);
                 int thatj = thatstr.idx(str.fld(j));
                 int thatcmp = that.get_cmp(idx,thatj);
-                if( cmp != thatcmp )
-                  throw TODO(); 
+                if( cmp != thatcmp ) {
+                  assert thatcmp==0 || thatcmp==3; // Forcing the cmp requires it be forcable
+                  that.set_cmp(idx,thatj,cmp);
+                }
               }
               else ;   // MAYBE does not force.
             }
           }
-          if( _labels[i]!=null && _labels[i] != that._labels[idx] ) {
+          if( _labels[i]!=null && !Util.eq(_labels[i],that._labels[idx]) ) {
             progress = true;
             if( test ) return true;
             assert that._labels[idx]==null;

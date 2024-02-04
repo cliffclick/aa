@@ -1,4 +1,4 @@
 // Simple pair
-// Type: ( 3, 4)
-// Eval: ( 3, 4)
+// Type: *[]( _, 3, 4)
+// Eval: *[]( _, 3, 4)
 (pair 3 4)

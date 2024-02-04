@@ -4,7 +4,6 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.Util;
 import com.cliffc.aa.util.VBitSet;
 
 
@@ -12,6 +11,7 @@ import com.cliffc.aa.util.VBitSet;
  *  The ground term includes a ptr-to-int-clazz.
  */
 public class TVPtr extends TV3 {
+  public static final TVPtr PTRCLZ = new TVPtr(BitsAlias.CLZ,TVStruct.STRCLZ);
   // This is a pointer tracking aliases.
   // The actual pointed-at type is tracked in memory.
   BitsAlias _aliases;
@@ -78,16 +78,18 @@ public class TVPtr extends TV3 {
 
   @Override void _widen( byte widen ) { }
 
-  boolean is_clz_ptr() {
-    return _aliases==BitsAlias.CLZ &&
-      load().len()==1 && Util.eq(TypeFld.CLZ,load().fld(0));
-  }
-
   boolean is_prim() { return _aliases==BitsAlias.EMPTY && load().is_prim(); }
 
+  @Override public VBitSet _get_dups_impl(VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
+    if( load().len()>0 )
+      return load()._get_dups(visit,dups,debug,prims);
+    visit.clear(_uid);
+    return dups;
+  }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
-    if( is_clz_ptr() ) return sb.p("_");
+    if( load().len()==0 )
+      return sb.p("_");
     if( is_prim() ) // Shortcut for boxed primitives
       return load()._str(sb,visit,dups,debug,prims);
     if( _may_nil && _aliases.is_empty() && load().len()==0 )

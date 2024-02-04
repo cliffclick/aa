@@ -168,7 +168,7 @@ public class StoreNode extends StoreAbs {
     // Add/unify field into struct
     TV3 fld = rez().set_tvar();
     TV3 xfld = ts.arg(_fld);
-    if( xfld==null ) ts.add_fld(_fld,fld,false);
+    if( xfld==null ) ts.add_fld(_fld,fld );
     else             fld.unify(xfld,false);
     return null;
   }

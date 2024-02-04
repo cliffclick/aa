@@ -121,6 +121,7 @@ public class EXE {
     // Parse a struct
     if( peek("@{") ) {
       Struct str = new Struct();
+      str.add(TypeFld.CLZ,Struct.CLZ);
       while( !peek("}") ) str.add(require(id(),'='),require(fterm(),';'));
       return str;      
     }
@@ -270,7 +271,7 @@ public class EXE {
   // --- Nil ------------------------
   static class Nil extends Syntax {
     @Override SB str(SB sb) { return sb.p("nil"); }
-    @Override void prep_tree(Ary<TV3> nongen) { _tvar = new TVStruct(true); _tvar.add_may_nil(false); }
+    @Override void prep_tree(Ary<TV3> nongen) { _tvar = new TVPtr(BitsAlias.EMPTY,new TVStruct(true)); _tvar.add_may_nil(false); }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
     @Override NilVal eval( Env e ) { return NilVal.NIL; }
   }
@@ -509,6 +510,7 @@ public class EXE {
       case KontVal k -> true;   // Surely a bug
       case StructVal s -> true;
       case NilVal n -> false;
+      case PtrVal p -> true;
       default -> throw TODO();
       };
       Syntax syn = t ? _t : _f;
@@ -558,6 +560,7 @@ public class EXE {
 
   // --- Struct ------------------------
   static class Struct extends Syntax {
+    static final Struct CLZ = new Struct();
     final Ary<String> _labels;
     final Ary<Syntax> _flds;
     Struct( ) { _labels = new Ary<>(String.class); _flds = new Ary<>(Syntax.class); }
@@ -570,7 +573,7 @@ public class EXE {
     }
     @Override void prep_tree(Ary<TV3> nongen) {
       TVStruct str = new TVStruct(_labels);
-      _tvar = str;
+      _tvar = new TVPtr(BitsAlias.EMPTY,str);
       for( int i=0; i<_flds._len; i++ ) {
         _flds.at(i).prep_tree(nongen);
         str.arg(i).unify(_flds.at(i).tvar(),false);
@@ -583,11 +586,11 @@ public class EXE {
         rez = reduce.apply(rez,fld.visit(map,reduce));
       return rez;
     }
-    @Override StructVal eval( Env e ) {
+    @Override PtrVal eval( Env e ) {
       StructVal s = new StructVal();      
       for( int i=0; i<_flds._len; i++ )
         s.add(_labels.at(i),_flds.at(i).eval(e));
-      return s;
+      return new PtrVal(s);
     }
   }
 
@@ -601,11 +604,11 @@ public class EXE {
       _tvar = new TVLeaf();
       _ptr.prep_tree(nongen);
 
-      TVStruct s = new TVStruct(new String[]{_lab},new TV3[]{_tvar},true);
+      TVPtr ptr = new TVPtr(BitsAlias.EMPTY,new TVStruct(new String[]{_lab},new TV3[]{_tvar},true));
       // TODO: Cannot add use_nil without the full up-cast of not-nil after IF
       //s.add_use_nil();
-      _ptr.tvar().unify(s,false);
-      if( !(_ptr.tvar() instanceof TVStruct str && str.idx(_lab)>=0) )
+      _ptr.tvar().unify(ptr,false);
+      if( ptr.find().as_ptr().load().idx(_lab) == -1 )
         throw new IllegalArgumentException("Missing field '"+_lab+"'");
     }
     
@@ -613,7 +616,7 @@ public class EXE {
       return reduce.apply(map.apply(this),_ptr.visit(map,reduce));
     }
     @Override Val eval( Env e ) {
-      return _ptr.eval(e).as_struct().at(_lab);
+      return _ptr.eval(e).as_ptr().load().at(_lab);
     }
   }
 
@@ -692,12 +695,12 @@ public class EXE {
       _tvar = new TVLeaf();
       _ptr.prep_tree(nongen);
       _dyn.prep_tree(nongen);
-      TVStruct s = new TVStruct(new String[]{},new TV3[]{},true);
-      _ptr.tvar().unify(s,false);
+      TVPtr ptr = new TVPtr(BitsAlias.EMPTY,new TVStruct(new String[]{},new TV3[]{},true));
+      _ptr.tvar().unify(ptr,false);
       TVDynTable dyn = new TVDynTable();
       _dyn.tvar().unify(dyn,false);
       dyn = (TVDynTable)dyn.find();
-      dyn.add_dyn(this,s.find(),_tvar);
+      dyn.add_dyn(this,ptr.find(),_tvar);
     }
 
     // Re-unify with resolved labels
@@ -714,7 +717,7 @@ public class EXE {
     @Override Val eval( Env e ) {
       DynVal dyn = _dyn.eval(e).as_dyn();
       String label = dyn._dyn.find_label(this);
-      return _ptr.eval(e).as_struct().at(label);
+      return _ptr.eval(e).as_ptr().load().at(label);
     }
   }
 
@@ -970,15 +973,16 @@ public class EXE {
 
   // Pair results
   static class Pair extends PrimSyn {
-    final int _alias;
+    static final String[] FLDS = new String[]{TypeFld.CLZ,"0","1"};
     private static TVLeaf x,y;
+    final int _alias;
     public Pair() {
-      super(x=new TVLeaf(),y=new TVLeaf(),new TVStruct(IDS[2],new TV3[]{x,y}));
+      super(x=new TVLeaf(),y=new TVLeaf(),new TVPtr(BitsAlias.EMPTY,new TVStruct(FLDS,new TV3[]{TVPtr.PTRCLZ,x,y})));
       _alias = BitsAlias.new_alias(BitsAlias.LOCX);
     }
     @Override PrimSyn make() { return new Pair(); }
     @Override SB str(SB sb) { return sb.p("pair"); }
-    @Override StructVal apply( Env e ) { return new StructVal().add("0",e._vs[ARG_IDX]).add("1",e._vs[ARG_IDX+1]); }    
+    @Override PtrVal apply( Env e ) { return new PtrVal(new StructVal().add(TypeFld.CLZ,PtrVal.PTRCLZ).add("0",e._vs[ARG_IDX]).add("1",e._vs[ARG_IDX+1])); }
   }
 
 
@@ -1024,6 +1028,7 @@ public class EXE {
     IntVal    as_int   () { return null; }
     FltVal    as_flt   () { return null; }
     StrVal    as_str   () { return null; }
+    PtrVal    as_ptr   () { return null; }
     KontVal   as_kont  () { return null; }    
     StructVal as_struct() { return null; }
     TypeNil   as_flow  () { throw TODO(); }
@@ -1101,6 +1106,23 @@ public class EXE {
     public static void reset() { UID=1; }
   }
   
+  private static class PtrVal extends Val {
+    static final PtrVal PTRCLZ = new PtrVal(new StructVal());
+    final StructVal _val;
+    PtrVal( StructVal val ) { _val = val; }
+    @Override PtrVal as_ptr() { return this; }
+    StructVal load() { return _val; }
+    SB _str(SB sb, VBitSet visit, VBitSet dups) {
+      return load()._str(sb.p("*[]"),visit,dups);
+    }
+    @Override void _get_dups(VBitSet visit, VBitSet dups) {
+      if( this==PTRCLZ ) return;
+      if( visit.tset(_uid) )
+        dups.set(_uid);
+      _val._get_dups(visit,dups);
+    }
+  }
+
   private static class StructVal extends Val {
     int _len;
     String[] _labels = new String[2];
@@ -1117,15 +1139,19 @@ public class EXE {
     @Override StructVal as_struct() { return this; }
     Val at(String label) { return _vals[Util.find(_labels,label)]; }
     SB _str(SB sb, VBitSet visit, VBitSet dups) {
-      if( _labels.length==0 || _labels[0].equals("0") ) {
+      if( _len==0 ) return sb.p("()");
+      if( Util.find(_labels,"0")!= -1 ) {
         sb.p("( ");
-        for( int i=0; i<_len; i++ )
-          _vals[i].str(sb,visit,dups).p(", ");
+        for( int i=0; i<_len; i++ ) {
+          if( Util.eq(_labels[i],TypeFld.CLZ) )  sb.p("_, ");
+          else _vals[i].str(sb,visit,dups).p(", ");
+        }
         return sb.unchar(2).p(")");
       } else {
         sb.p("@{ ");
         for( int i=0; i<_len; i++ )
-          _vals[i].str(sb.p(_labels[i]).p("="),visit,dups).p("; ");
+          if( Util.eq(_labels[i],TypeFld.CLZ) )  sb.p("_; ");
+          else _vals[i].str(sb.p(_labels[i]).p("="),visit,dups).p("; ");
         return sb.p("}");
       }
     }

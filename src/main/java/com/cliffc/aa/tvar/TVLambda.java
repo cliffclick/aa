@@ -71,7 +71,7 @@ public class TVLambda extends TV3 {
     assert i>=nargs;
     lam._args = Arrays.copyOf(lam._args,i+1);
     TVErr err = new TVErr();
-    err.err("Bad arg count",arg(i),null,test);
+    err.err("Bad arg count",arg(i),null,false);
     Arrays.fill(lam._args,nargs,lam.nargs(),err);
     arg(i)._fresh_unify(err,false);
     return ptrue();

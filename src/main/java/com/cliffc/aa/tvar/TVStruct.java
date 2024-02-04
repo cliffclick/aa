@@ -13,18 +13,30 @@ import static com.cliffc.aa.AA.TODO;
  * Has (recursive) fields with labels.  A struct can be open or closed; open
  * structs allow more fields to appear.  Open structs come from FieldNodes
  * which know that a particular field must be present, and also maybe more.
- * Closed structs come from StructNodes which list all the present fields.
- * If field #0 is present, it is named "." and holds the Clazz for this struct.
- * 
- * Fields may be pinned or not.  Pinned fields cannot lift to a superclazz, and
- * come from StructNodes.  Unpinned fields are not necessarily in the correct
- * struct, and may migrate up the superclazz chain.  
+ * Closed structs come from StructNodes which list all the present fields.  If
+ * a field '^' is present it holds the super-Clazz for this struct, which may
+ * in turn have another super-Clazz field.
+ *
+ * Fields may not shadow; caller (e.g. the Parser) must deBruijn rename as
+ * needed to avoid collisions.
+ *
+ * if a struct is closed, all his supers are closed also.
+ * if a struct is open, his super may be open or closed.
+ *
+ * When unifying:
+ * - Recursively unify CLZ first; then there exists a common shared CLZ
+ * - If a field on one side is found in the other, unify fields.
+ * - If a field on one side is missing in a closed other, field is dropped.
+ * - If a field on one side is missing in a open other, repeat lookup on common CLZ
+ *
+ * Fields in open structs may unify with a super-clazz field, open or closed.
+ * Fields in closed structs may only unify with local fields
+ *
  */
 public class TVStruct extends TVExpanding {
   public static final String[] FLDS0 = new String[0];
   public static final TV3   [] TVS0  = new TV3   [0];
-  // Empty closed struct.  Used for e.g. no-class Structs.
-  //public static final TVStruct EMPTY = new TVStruct(false);
+  public static final TVStruct STRCLZ = new TVStruct(false);
   
   // True if more fields can be added.  Generally false for a known Struct, and
   // true for a Field reference to an unknown struct.
@@ -32,13 +44,8 @@ public class TVStruct extends TVExpanding {
   
   // The set of field labels, 1-to-1 with TV3 field contents.  Most field
   // operations are UNORDERED, so we generally need to search the fields by
-  // string - except for the clazz field "." always in slot 0.
+  // string
   protected String[] _flds;       // Field labels
-
-  // Pinned fields do not lift to the super-clazz field.  Unpinned fields, if
-  // deleted by unification, instead lift to the next open super-clazz or
-  // delete if we hit the top of the super-clazz chain.
-  private boolean[] _pins;
   
   private int _max;             // Max set of in-use flds/args
 
@@ -57,8 +64,6 @@ public class TVStruct extends TVExpanding {
   public TVStruct( String[] flds, TV3[] tvs, boolean open ) {
     super(tvs);
     _flds = flds;
-    _pins = new boolean[flds.length];
-    Arrays.fill(_pins,true);
     _open = open;
     _max = flds.length;
     assert tvs.length==_max;
@@ -68,7 +73,21 @@ public class TVStruct extends TVExpanding {
     return new TVStruct(new String[]{TypeFld.CLZ},new TV3[]{ new TVBase(TypeNil.NIL)});
   }
 
+  public boolean is_open() { return _open; }
+  // Close if open
+  public void close() {
+    if( !_open ) return;
+    _open=false;
+    _deps_work_clear();
+  }
+
   @Override public int len() { return _max; }  
+
+  // Common accessor not called 'find' which already exists
+  public int idx( String fld ) {
+    for( int i=0; i<_max; i++ ) if( Util.eq(_flds[i],fld) ) return i;
+    return -1;
+  }
 
   public String fld( int i ) { assert !unified();  return _flds[i]; }
   
@@ -87,48 +106,34 @@ public class TVStruct extends TVExpanding {
     TVPtr clz = pclz();
     return clz==null ? null : clz.load().arg_clz(fld);
   }
+
   
   // Return the TV3 for field 'fld' or null if missing, with OUT rollups
   public TV3 debug_arg(String fld) {
     int i = idx(fld);
     return i>=0 ? debug_arg(i) : null;
   }
-
-  public boolean is_open() { return _open; }
-  // Close if open
-  public void close() {
-    if( !_open ) return;
-    _open=false;
-    _deps_work_clear();
-  }
   
-  // Clazz for this struct, or null for ClazzClazz
+  // Clazz for this struct, or null if none
   public TVPtr pclz() {
-    TV3 clz = arg(TypeFld.CLZ);
-    return clz instanceof TVPtr ptr ? ptr : null;
+    return _max>0 && Util.eq(_flds[0],TypeFld.CLZ) ? (TVPtr)arg(0) : null;
   }
 
   @Override boolean can_progress() { throw TODO(); }
-
-  // Common accessor not called 'find' which already exists
-  public int idx( String fld ) {
-    for( int i=0; i<_max; i++ ) if( Util.eq(_flds[i],fld) ) return i;
-    return -1;
-  }
   
-  public boolean add_fld(String fld, TV3 tvf, boolean pin) {
-    assert idx(fld)== -1;
+  public boolean add_fld(String fld, TV3 tvf ) {
+    boolean is_clz = Util.eq(fld,TypeFld.CLZ);
+    if( _open ) assert !is_clz;        // Never a clazz in open
+    else assert (_max==0)==is_clz && arg_clz(fld)==null; // Clazz only in slow 0
     ptrue();
     if( _max == _flds.length ) {
       int len=1;
       while( len<=_max ) len<<=1;
       _flds = Arrays.copyOf(_flds,len);
       _args = Arrays.copyOf(_args,len);
-      _pins = Arrays.copyOf(_pins,len);
     }
     _flds[_max] = fld;
     _args[_max] = tvf;
-    _pins[_max] = pin;
     _max++;
     // New field is just as wide
     tvf.widen(_widen,false);
@@ -136,33 +141,14 @@ public class TVStruct extends TVExpanding {
     move_delay();
     return true;
   }
-
-  // Remove
-  void del_fld0( int idx) {
-    assert !unified();
-    assert !Util.eq(_flds[idx],TypeFld.CLZ); // Never remove clazz
-    ptrue();
-    _args[idx] = _args[_max-1];
-    _flds[idx] = _flds[_max-1];
-    _pins[idx] = _pins[_max-1];
-    _max--;
-    // Changed struct shape, move delayed-fresh updates to now
-    move_delay();
-  }
   
   boolean del_fld(int idx) {
-    boolean pin = _pins[idx];
-    String fld = _flds[idx];
-    del_fld0(idx);
-    // UN-Pinned fields are re-inserted into the next open super-clazz
-    if( !pin )
-      throw TODO();
+    assert !unified();
+    assert !Util.eq(_flds[idx],TypeFld.CLZ); // Never remove clazz
+    _args[idx] = _args[_max-1];
+    _flds[idx] = _flds[_max-1];
+    _max--;
     return ptrue();
-  }
-  // Remove field; true if something got removed
-  public void del_fld( String fld) {
-    int idx = idx(fld);
-    if( idx != -1 ) del_fld( idx );
   }
 
 
@@ -173,219 +159,163 @@ public class TVStruct extends TVExpanding {
   @Override public void _union_impl( TV3 tv3 ) {
     TVStruct ts = tv3.as_struct(); // Invariant when called
     ts._open = ts._open & _open;
-    for( int i=0,idx; i<_max; i++ )
-      if( _pins[i] && (idx=ts.idx(_flds[i])) != -1 )
-        ts._pins[idx]=true;
   }
 
   // Unify this into that.  Ultimately "this" will be U-F'd into "that" and so
   // all structure changes go into "that".
   @Override boolean _unify_impl( TV3 tv3 ) {
+    assert !unified() && !tv3.unified();
     TVStruct that = (TVStruct)tv3; // Invariant when called
-    assert !this.unified() && !that.unified();
-    TVStruct thsi = this;
-    
-    // Unify LHS CLZ into RHS CLZ
-    TVPtr pclz0 = this.pclz(), pclz1 = that.pclz();
-    TVStruct clz;
-    // Basically 3 choices: both have one, only one CLZ but the other is open, no CLZ.
-    if( pclz0==null ) {          // No LHS CLZ
-      clz = pclz1==null ? null : pclz1.load(); // Shared CLZ is only RHS
-    } else {
-      if( pclz1==null ) {        // CLZ only on LHS
-        clz=pclz0.load();
-        assert _pins[idx(TypeFld.CLZ)]; // CLZ always pinned
-        that.add_fld( TypeFld.CLZ, pclz0, true ); // Move shared CLZ into RHS, but RHS fields might need to be in CLZ
-      } else {
-        // Both, unify
-        clz = pclz1.load();
-        pclz0._unify(pclz1,false);
-      }
+    // Open /open  unify
+    if(  _open &&  that._open ) return _unify_impl_open (that);
+    // close/close unify
+    if( !_open && !that._open ) return _unify_impl_close(that);
+    // open /close unify
+    return _open ? _unify_impl_mix(that,false) : that._unify_impl_mix(this,true);
+  }
+
+  private boolean _unify_impl_open( TVStruct that ) {
+    assert pclz()==null && that.pclz()==null; // No CLZ on open
+    // Walk left, search right
+    // If found, unify
+    // else add right
+    for( int i=0; i<_max; i++ ) { // Walk left
+      TV3 fthat = that.arg(_flds[i]); // Search right 
+      if( fthat != null )             // If found
+        arg(i)._unify(fthat,false);   // Unify
+      else
+        that.add_fld(_flds[i],arg(i)); // Not found so add
     }
-    thsi = (TVStruct)thsi.find();
-    that = (TVStruct)that.find();
-
-    // Unify LHS fields into RHS.  None in are the CLZ
-    for( int i=0; i<thsi._max; i++ ) {
-      assert !thsi.unified();
-      String key  = thsi._flds[i];
-      TV3 fthis   = thsi.arg(i);
-      boolean pin = thsi._pins[i];
-      if( Util.eq(key,TypeFld.CLZ) ) continue; // Already unified CLZ
-      // Fold into the shared CLZ, if possible
-      if( clz!=null && (clz=clz.find().as_struct()).do_into_clz(key,this,i,false,false)!=0 ) {
-        thsi = (TVStruct)thsi.find();
-        that = (TVStruct)that.find();
-        continue;               // Leave field in LHS, its gonna unify anyways
-      }
-
-      // Check RHS
-      int ti = that.idx(key);
-      if( ti == -1 ) {          // Missing field in that
-        if( that.is_open() ) {
-          that.add_fld(key,fthis,pin); // Add to RHS
-        } else {
-          //that.del_fld(key);    // Remove from RHS but its already gone
-        }
-      } else {
-        fthis._unify(that.arg(ti),false); // Unify fields
-      }
-      thsi = (TVStruct)thsi.find();
-      that = (TVStruct)that.find();
-    }
-
-    // Fields on the RHS are aligned with the LHS also
-    assert !that.unified(); // Missing a find
-    for( int i=0; i<that._max; i++ ) {
-      assert !that.unified(); // Missing a find
-      String key = that._flds[i];
-      if( Util.eq(key,TypeFld.CLZ) ) continue; // Already unified CLZ
-      if( clz!=null && clz.do_into_clz(key,that,i, false, false)!=0 ) {
-        thsi = (TVStruct)thsi.find();
-        that = (TVStruct)that.find();
-        i--;                    // Field was removed, go again
-        continue;
-      }
-      int idx = thsi.idx(key);
-      if( idx== -1 ) {                               // Missing field in this
-        if( !is_open() ) {
-          that.del_fld( key ); // Drop from RHS to match LHS
-          i--;
-        }
-        assert !that.unified(); // Missing a find
-      }                      // Else, since field already in RHS do nothing
-    }
-
-    assert !that.unified(); // Missing a find
     return ptrue();
   }
 
-  // If field i exists in clz (recursively) then
-  //   if field is not pinned, remove from here and unify there.
-  //   else dup-field error
-  // Returns 0 if not found, -1 if found & no progress, 1 if found & progress
-  // If not-fresh, then only returns 0 or 1
-  int do_into_clz( String fld, TVStruct str, int i, boolean test, boolean fresh ) {
-    TV3 arg = arg(fld);         // Find in CLZ
-    if( arg != null ) {
-      if( str._pins[i] ) throw TODO(); // Found in CLZ but pinned here - so dup-field error
-      TV3 tvf = str.arg(i);     // Field to be moved into CLZ
-      if( !fresh && !test )     // Delete field from RHS
-        str.del_fld0(i);
-      boolean progress = fresh ? tvf._fresh_unify(arg,test) : tvf._unify(arg,test); // Unify (and return true)
-      return fresh && !progress ? -1 : 1;
+  private boolean _unify_impl_close( TVStruct that ) {
+    // Both have CLZ (or both are STRCLZ analogs)
+    assert (_max==0 && that._max==0) || (pclz()!=null && that.pclz()!=null); 
+    // Walk left, search right (local no CLZ)
+    // If found, unify
+    // else ignore (del right) & assert not in CLZ
+    for( int i=0; i<_max; i++ ) {     // Walk left
+      TV3 fthat = that.arg(_flds[i]); // Search right no CLZ
+      if( fthat != null )             // If found
+        arg(i)._unify(fthat,false);   // Unify
+      // Else ignore (del right)
     }
-    TVPtr pclz = pclz();
-    if( pclz==null ) return 0;
-    return pclz.load().do_into_clz( fld, str, i, test, fresh );
+    // Walk right, search left (local no CLZ)
+    // if not found, del right
+    for( int i=0; i<that._max; i++ ) { // Walk right
+      TV3 fthis = arg(that._flds[i]);  // Search left no CLZ
+      if( fthis == null )              // If not found
+        that.del_fld(i--);             // Remove extras right
+    }
+    return ptrue();
+  }
+
+  private boolean _unify_impl_mix( TVStruct that, boolean flip ) {
+    assert _open && pclz()==null;
+    assert !that._open && that.pclz()!=null;
+    // walk left (open), search right plus CLZ
+    //  if found, unify
+    //  else ERROR missing field
+    for( int i=0; i<_max; i++ ) {         // Walk left
+      TV3 fthat = that.arg_clz(_flds[i]); // Search right plus CLZ
+      if( fthat != null )                 // If found
+        arg(i)._unify(fthat,false);       // Unify
+      else
+        arg(i)._unify_err("Missing field "+_flds[i],null,null,false);
+    }
+    // Flip because keeping 'this' and not 'that'
+    if( flip ) {
+      _uid  = that._uid ;
+      _max  = that._max ;
+      _args = that._args;
+      _flds = that._flds;
+      _open = that._open;
+      // TODO ALL THE REST OF THE FIELDS
+      // OR REWRITE HOW UNION GETS CALLED
+    }
+    return ptrue();
   }
   
   // -------------------------------------------------------------
+
+  
+  // Fresh-Unify this into that.  Ultimately a clone of "this" will be U-F'd
+  // into "that" and so all structure changes go into "that".
   @Override boolean _fresh_unify_impl(TV3 tv3, boolean test) {
-    boolean progress = false, missing = false;
-    assert !unified() && !tv3.unified();    
-    TVStruct that = (TVStruct)tv3.find();
-    
-    // Unify LHS CLZ into RHS CLZ
-    TVPtr pclz0 = this.pclz(), pclz1 = that.pclz();
-    TVStruct clz;
-    // Basically 3 choices: both have one, only one CLZ but the other is open, no CLZ.
-    if( pclz0==null ) {          // No LHS CLZ
-      clz = pclz1==null ? null : pclz1.load(); // Shared CLZ is only RHS
-    } else {
-      if( pclz1==null ) {        // CLZ only on LHS
-        progress = ptrue();
-        if( test ) return true;
-        // Force a RHS CLZ as a fresh of LHS CLZ
-        int p1idx = that.idx(TypeFld.CLZ);
-        TVLeaf pclz = p1idx == -1 ? new TVLeaf() : (TVLeaf)that.arg(p1idx);
-        if( p1idx == -1 ) that.add_fld( TypeFld.CLZ, pclz, this._pins[idx(TypeFld.CLZ)] ); // Move shared CLZ into RHS
-        pclz0._fresh_unify(pclz,test);
-        pclz1 = (TVPtr)pclz.find();
-      } else {
-        // Both, unify into RHS clz
-        progress |= pclz0._fresh_unify(pclz1,false);
-        that = (TVStruct)that.find(); // Might have to update
-      }
-      // RHS CLZ changed; check to see if any local fields move into CLZ
-      clz = pclz1.find().as_ptr().load();
-      if( progress ) {
-        for( int i=0; i<that._max; i++ ) {
-          String key = that._flds[i];
-          if( !that._pins[i] && !Util.eq(key,TypeFld.CLZ) && // Already unified CLZ
-              clz.do_into_clz(key,that,i,test,false) != 0 ) { // Hit in clazz, done with unify
-            i--;                // Field was removed, go again
-          }
-        }
-      }
+    assert !unified() && !tv3.unified();
+    TVStruct that = (TVStruct)tv3; // Invariant when called
+    // Open /open  unify
+    if(  _open &&  that._open ) return _fresh_unify_impl_open (that );
+    // close/close unify
+    if( !_open && !that._open ) return _fresh_unify_impl_close(that,test);
+    // open /close unify
+    return _open ? _fresh_unify_impl_mix_open(that,test) : _fresh_unify_impl_mix_close(that,test);
+  }
+
+  private boolean _fresh_unify_impl_open (TVStruct that ) {
+    assert pclz()==null && that.pclz()==null; // No CLZ on open
+    // Walk left, search right
+    // If found, unify
+    // else add right
+    boolean progress = false;
+    for( int i=0; i<_max; i++ ) {         // Walk left
+      TV3 fthat = that.arg(_flds[i]);     // Search right
+      progress |= fthat != null           // If found
+        ? arg(i)._fresh_unify(fthat,false)// Unify
+        : that.add_fld(_flds[i],arg(i)._fresh()); // Not found so add fresh
     }
-
-    // Now do non-CLZ fields
-    for( int i=0; i<_max; i++ ) {
-      String key = _flds[i];
-
-      if( Util.eq(key,TypeFld.CLZ) ) continue; // Already unified CLZ
-      // Fold into the shared CLZ, if possible
-      TV3 lhs = arg(i);
-      if( clz!=null && !_pins[i] ) {
-        clz = clz.find().as_struct();
-        int rez = clz.do_into_clz(key,this,i,test,true);
-        if( rez!=0 ) {          // Hit in clazz, done with unify
-          if( rez > 0 ) progress = ptrue();
-          continue;
-        } 
-      }
-      
-      int ti = that.idx(key);
-      if( ti == -1 ) {          // Missing in RHS
-
-        if( that.is_open() ) {
-          if( test )
-            return ptrue(); // Will definitely make progress
-          progress |= that.add_fld(key,lhs._fresh(),_pins[i]);
-        } else if( is_open() ) // RHS not open, put copy of LHS into RHS with miss_fld error
-          throw TODO();       // miss_fld
-        else missing = true; // Else neither side is open, field is not needed in RHS
-        
-      } else {
-        TV3 rhs = that.arg(ti); // Lookup via field name
-        progress |= lhs._fresh_unify(rhs,test);
-        that._pins[ti] |= _pins[i];        
-      }
-      assert !unified();      // If LHS unifies, VARS is missing the unified key
-      that = (TVStruct)that.find(); // Might have to update
-      if( progress && test ) return progress;
-    }
-
-    // Fields in RHS and not the LHS are also merged; if the LHS is open we'd
-    // just copy the missing fields into it, then unify the structs (shortcut:
-    // just skip the copy).  If the LHS is closed, then the extra RHS fields
-    // are removed.
-    if( !is_open() && (_max != that._max || missing) )
-      for( int i=0; i<that._max; i++ ) {
-        String key = that._flds[i];
-        if( Util.eq(key,TypeFld.CLZ) ) continue; // Already unified CLZ
-        
-        TV3 lhs = arg(key); // Lookup vis field name
-        if( lhs==null ) {
-          if( test ) return ptrue();
-          progress |= that.del_fld(i--);
-        }
-      }
-
-    // If LHS is closed, force RHS closed
-    if( !_open && that._open ) {
-      progress = ptrue();
-      if( test ) return progress;
-      that.close();
-    }
-
-    if( _open ) add_delay_fresh(); // If this Struct can add fields, must fresh-unify that Struct
-    
     return progress;
   }
-  
-  
+
+  private boolean _fresh_unify_impl_close(TVStruct that, boolean test) {
+    assert pclz()!=null && that.pclz()!=null; // Both have CLZ (only fails for CLZCLZ which is always EQ so doesn't get here)
+    // Walk left, search right (local no CLZ)
+    // If found, fresh_unify
+    // else ignore (del right) & assert not in CLZ
+    boolean progress = false;
+    for( int i=0; i<_max; i++ ) {     // Walk left
+      TV3 fthat = that.arg(_flds[i]); // Search right
+      if( fthat != null )
+        progress |= arg(i)._fresh_unify(fthat,test);
+    }
+    // Walk right, search left (local no CLZ)
+    // if not found, del right
+    for( int i=0; i<that._max; i++ ) { // Walk right
+      TV3 fthis = arg(that._flds[i]);  // Search left no CLZ
+      if( fthis == null )              // If not found
+        progress |= that.del_fld(i--); // Remove extras right
+    }
+    return progress;
+  }
+
+  private boolean _fresh_unify_impl_mix_open(TVStruct that, boolean test) {
+    assert pclz()==null && that.pclz()!=null; // Open on left, closed on right
+    // Walk left, search right (with CLZ)
+    // If found, unify
+    // else ignore (del right)
+    boolean progress = false;
+    for( int i=0; i<_max; i++ ) {         // Walk left
+      TV3 fthat = that.arg_clz(_flds[i]); // Search right (with CLZ)
+      if( fthat != null )
+        progress |= arg(i)._fresh_unify(fthat,test);
+    }
+    return progress;
+  }
+
+  private boolean _fresh_unify_impl_mix_close(TVStruct that, boolean test) {
+    assert pclz()!=null && that.pclz()==null; // Close on left, open on right
+    if( test ) return ptrue();
+    // Make a brand-new closed RHS as a clone of LHS, then normal _unify_impl_mix
+    TVStruct lhs = new TVStruct(_flds.clone(),new TV3[_max],false);
+    for( int i=0; i<_max; i++ )
+      lhs._args[i] = arg(i)._fresh();
+    // Fresh-copy the left, then normal _unify_impl_mix
+    that._unify_impl_mix(lhs,false);
+    return that.union(lhs);
+  }
+
+
   // -------------------------------------------------------------
 
   @Override int _trial_unify_ok_impl( TV3 tv3 ) {
@@ -416,8 +346,7 @@ public class TVStruct extends TVExpanding {
   @Override boolean _exact_unify_impl( TV3 tv3 ) {
     TVStruct ts = (TVStruct)tv3;
     return (!_open && !ts._open ) &&   // Both are closed (no adding unmatching fields)
-      Arrays.equals(_flds,ts._flds) && // And all fields match
-      Arrays.equals(_pins,ts._pins);   // And all fields match
+      Arrays.equals(_flds,ts._flds);   // And all fields match
   }
 
   // -------------------------------------------------------------
@@ -446,7 +375,6 @@ public class TVStruct extends TVExpanding {
   @Override public TVStruct copy() {
     TVStruct st = (TVStruct)super.copy();
     st._flds = _flds.clone();
-    st._pins = _pins.clone();
     return st;
   }
 
@@ -499,7 +427,7 @@ public class TVStruct extends TVExpanding {
     boolean is_tup = is_tup(debug), once=_open;
     sb.p(is_tup ? "( " : "@{ ");
     for( int idx : sorted_flds() ) {
-      if( !is_tup ) {                         // Skip tuple field names
+      if( !is_tup && !Util.eq(_flds[idx],TypeFld.CLZ) ) { // Skip tuple field names
         sb.p(_flds[idx]);
         sb.p("=");
       }

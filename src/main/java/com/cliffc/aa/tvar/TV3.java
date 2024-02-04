@@ -148,16 +148,15 @@ abstract public class TV3 implements Cloneable {
   private long dbl_uid(long uid) {  assert !unified(); return ((long)_uid<<32)|uid; }
 
   public boolean may_nil() { return _may_nil; }
-  TV3 strip_nil() { _may_nil = false; return this; }
 
   // Set may_nil flag.  Return progress flag.
   // Set an error if both may_nil and use-nil.
-  public boolean add_may_nil(boolean test) {
-    if( _may_nil ) return false;   // No change
-    if( test ) return ptrue();     // Will be progress
+  public void add_may_nil( boolean test) {
+    if( _may_nil ) return;   // No change
+    if( test ) return;       // Will be progress
     if( _use_nil )
-      _unify_err("May be nil",null,null,test);
-    return (_may_nil=ptrue());     // Progress
+      _unify_err("May be nil",null,null,false);
+    _may_nil = ptrue();
   }
   // Set use_nil flag. Set an error if both may_nil and use-nil.
   public void add_use_nil() {
@@ -177,7 +176,7 @@ abstract public class TV3 implements Cloneable {
 
   // -----------------
   // U-F union; this becomes that; returns 'that'.
-  // No change if only testing, and reports progress.
+  // Reports progress.
   final boolean union(TV3 that) {
     if( this==that ) return false;
     assert !unified() && !that.unified(); // Cannot union twice
@@ -225,7 +224,7 @@ abstract public class TV3 implements Cloneable {
 
   // Supports iso-recursive types, nilable, overload field resolution, and the
   // normal HM structural recursion.
-  static NonBlockingHashMapLong<TV3> DUPS = new NonBlockingHashMapLong<>();
+  public static final NonBlockingHashMapLong<TV3> DUPS = new NonBlockingHashMapLong<>();
   public boolean unify( TV3 that, boolean test ) {
     if( this==that ) return false;
     assert DUPS.isEmpty();
@@ -262,7 +261,6 @@ abstract public class TV3 implements Cloneable {
     if( rez==that ) return false; // Been there, done that
     assert rez==null;
     DUPS.put(luid,that);        // Close cycles
-
 
     if( test ) return ptrue();  // Always progress from here
     // Same classes.   Swap to keep uid low.
@@ -359,10 +357,9 @@ abstract public class TV3 implements Cloneable {
     if( nongen_in() ) return vput(that,_unify(that,test));
 
     // LHS leaf, RHS is unchanged but goes in the VARS
-    boolean progress = false;
     if( this instanceof TVLeaf lf ) {
       if( !test ) lf.add_delay_fresh();
-      return vput(that,progress);
+      return vput(that,false);
     }
     if( that instanceof TVLeaf ) // RHS is a tvar; union with a deep copy of LHS
       return test || vput(that,that.union(_fresh()));
@@ -378,6 +375,7 @@ abstract public class TV3 implements Cloneable {
         : this._fresh_unify_err      (that,test);
 
     // Progress on parts
+    boolean progress = false;
     if( _may_nil && !that._may_nil ) {
       if( test ) return ptrue();
       progress = that._may_nil = ptrue();
@@ -468,7 +466,7 @@ abstract public class TV3 implements Cloneable {
     // copy if it appears at this level in the nongen set.  Otherwise, we'd
     // clone it down to the leaves - and keep all the nongen leaves.
     // Stopping here preserves the cyclic structure instead of unrolling it.
-    if( nongen_in() ) {
+    if( nongen_in() || this==TVPtr.PTRCLZ ) {
       vput(this,true);
       return this;
     }

@@ -1,4 +1,4 @@
 // Simple struct test
-// Type: @{ a=1; }
-// Eval: @{ a=1; }
+// Type: *[]@{ _; a=1; }
+// Eval: *[]@{ _; a=1; }
 @{ a =1; }

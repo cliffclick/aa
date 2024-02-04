@@ -156,8 +156,8 @@ hm_tests:	$(test_classes) build/aa.jar
 
 # Run standard tests
 test:	build/aa.jar
-	echo "Testing"
-	$(JVM) org.junit.runner.JUnitCore com.cliffc.aa.type.TestType com.cliffc.aa.TestStable
+	@echo "  testing"
+	@$(JVM) org.junit.runner.JUnitCore com.cliffc.aa.type.TestType com.cliffc.aa.TestTVar com.cliffc.aa.exe.TestEXE com.cliffc.aa.TestStable
 
 
 # EXE, a standalone lambda calc interpreter
@@ -173,8 +173,8 @@ etst_classes := $(patsubst $(TST)/%java,$(CLZDIR)/test/%class,$(etst_javas))
 test_aas   := $(wildcard $(TST)/$(AA)/exe/*aa)
 
 exe:	$(main_classes) $(exec_classes) $(etst_classes) build/aa.jar
-	echo testing EXE
-	$(JVM) org.junit.runner.JUnitCore com.cliffc.aa.exe.TestEXE
+	@echo testing EXE
+	@$(JVM) org.junit.runner.JUnitCore com.cliffc.aa.exe.TestEXE
 
 
 
