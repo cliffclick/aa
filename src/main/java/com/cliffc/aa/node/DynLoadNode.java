@@ -143,7 +143,7 @@ public class DynLoadNode extends Node {
     dyn = (TVDynTable)dyn.find();
 
     // Load self into the table
-    dyn.add_dyn(this,ptr.load(),_tvar);
+    dyn.add_dyn(this,ptr,_tvar);
     return _tvar;
   }
 

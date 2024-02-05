@@ -249,7 +249,7 @@ public class StructNode extends Node {
       // Must set _tvar before recursively calling set_tvar.  The primitive
       // ClzClz gets a specific type which triggers asserts for everybody else,
       // so uses a special constructor.
-      _tvar = this==PrimNode.ZCLZ ? TVStruct.make_clzclz() : new TVStruct(_flds);
+      _tvar = this==PrimNode.ZCLZ ? TVStruct.STRCLZ : new TVStruct(_flds);
     TVStruct ts = (TVStruct)_tvar;
     // Unify all fields
     for( int i=0; i<len(); i++ )

@@ -4,6 +4,8 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.node.FreshNode;
 import com.cliffc.aa.util.Ary;
 
+import java.util.Arrays;
+
 import static com.cliffc.aa.AA.TODO;
 
 abstract public class TVExpanding extends TV3 {
@@ -75,7 +77,7 @@ abstract public class TVExpanding extends TV3 {
       return true;
     }
     @Override public String toString() {
-      return "delayed_fresh_unify["+_lhs+" to "+_rhs+", "+_nongen+"]";
+      return "delayed_fresh_unify["+_lhs+" to "+_rhs+", "+ Arrays.toString( _nongen ) +"]";
     }
   }
   
@@ -144,7 +146,10 @@ abstract public class TVExpanding extends TV3 {
 
   // Record that on the delayed fresh list and return that.  If `this` ever
   // unifies to something, we need to Fresh-unify the something with `that`.
-  @Override void add_delay_fresh() { if( FRESH_ROOT!=null ) add_delay_fresh(FRESH_ROOT); }
+  @Override void add_delay_fresh() {
+    if( FRESH_ROOT!=null && FRESH_ROOT._rhs!=null )
+      add_delay_fresh(FRESH_ROOT);
+  }
   private boolean add_delay_fresh( DelayFresh df ) {
     df.update();
     // Lazy make a list to hold

@@ -217,7 +217,7 @@ public class CallNode extends Node {
 
     // Call can skip a direct BindFP to the source of the FP itself
     if( fdx() instanceof BindFPNode bind && bind.fp()._val instanceof TypeFunPtr  )
-      return set_fdx(bind.fp());
+      return GVN.add_reduce(set_fdx(bind.fp()));
     
     // Have some sane function choices?
     TypeFunPtr tfp  = ttfp(tcall);

@@ -254,6 +254,7 @@ public abstract class PrimNode extends Node {
         // arguments may vary, and the correct primitive is picked using
         // overload resolution.
         StructNode over = new StructNode(0,false,null );
+        over.add_fld(TypeFld.CLZ,Access.Final,PCLZ,null);
         int cnt=0;
         for( PrimNode prim : prims ) {
           String fld = (""+cnt++).intern();

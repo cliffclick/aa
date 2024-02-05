@@ -1,6 +1,5 @@
 package com.cliffc.aa;
 
-import org.junit.BeforeClass;
 import org.junit.Test;
 
 import static com.cliffc.aa.TestParse.test;
@@ -34,7 +33,6 @@ public class TestStable {
 
     // Function application, traditional paren/comma args
     test("1._+_._(2)", "int:3", "int:3" );
-
   }
 
   // More complex overload tests

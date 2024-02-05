@@ -94,7 +94,7 @@ public class NewNode extends Node {
   @Override public boolean has_tvar() { /*assert used(); */ return true; }
 
   @Override public TV3 _set_tvar() {
-    return new TVPtr(BitsAlias.make0(_alias), new TVStruct(true) );
+    return this==PrimNode.PCLZ ? TVPtr.PTRCLZ : new TVPtr(BitsAlias.make0(_alias), new TVStruct(true) );
   }
 
   // clones during inlining all become unique new sites

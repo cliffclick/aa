@@ -45,7 +45,7 @@ public class TVDynTable extends TV3 {
   private boolean is_dyn(int idx) { return secnd(idx)!=null; }
 
   // Add a DynField reference to this table
-  public boolean add_dyn( IntSupplier uid, TV3 match, TV3 pattern ) {
+  public void add_dyn( IntSupplier uid, TV3 match, TV3 pattern ) {
     assert !unified();
     if( _args==null ) {
       _args = new TV3[2];
@@ -65,7 +65,6 @@ public class TVDynTable extends TV3 {
     _uids[_max++ ] = uid;
     if( uid instanceof Node node )
       deps_add_deep(node);
-    return true;
   }
 
   // Add a Apply reference to this table

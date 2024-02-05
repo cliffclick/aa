@@ -830,7 +830,7 @@ public class Parse implements Comparable<Parse> {
             // Normal non-oper load
             : new    LoadNode(mem(),n,tok      ,bad).peep();
           // Bind after load
-          n = new BindFPNode(n, unkeep(adr), tok).peep();
+          n = new BindFPNode(n, unkeep(adr), Oper.is_oper(tok) ? 1 : 0).peep();
         }
 
       } else if( peek('(') ) {  // Attempt a function-call

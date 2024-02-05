@@ -73,13 +73,14 @@ public class StoreXNode extends StoreAbs {
     return null;
   }
 
-  @Override public boolean unify( boolean test ) {
-    TVPtr   ptr = (TVPtr   )adr().tvar();
-    TVStruct ts = (TVStruct)rez().tvar();
-    if( Combo.pre() )
-      return unify(ptr.aliases(),ts,test);
-    return ptr.load().unify(ts,test);
-  }
+  //@Override public boolean unify( boolean test ) {
+  //  TVPtr   ptr = (TVPtr   )adr().tvar();
+  //  TVStruct ts = (TVStruct)rez().tvar();
+  //  if( Combo.pre() )
+  //    return unify(ptr.aliases(),ts,test);
+  //  return ptr.load().unify(ts,test);
+  //}
+
   public static boolean unify( BitsAlias aliases, TVStruct ts, boolean test ) {
     assert aliases!=BitsAlias.NALL;
     boolean progress = false;

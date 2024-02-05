@@ -88,12 +88,12 @@ public class TVPtr extends TV3 {
   }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
-    if( load().len()==0 )
+    if( load().len()==0 && _aliases.is_empty() && _may_nil )
+      return sb.p("nil");
+    if( load().len()==0 && (_aliases.is_empty() || _aliases==BitsAlias.CLZ) )
       return sb.p("_");
     if( is_prim() ) // Shortcut for boxed primitives
       return load()._str(sb,visit,dups,debug,prims);
-    if( _may_nil && _aliases.is_empty() && load().len()==0 )
-      return sb.p("nil");
     sb.p("*");
     _aliases.str(sb);
     if( _args.length>0 && _args[0]!=null ) arg(0)._str(sb,visit,dups,debug,prims);

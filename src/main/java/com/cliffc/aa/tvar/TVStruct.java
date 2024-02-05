@@ -69,10 +69,6 @@ public class TVStruct extends TVExpanding {
     assert tvs.length==_max;
   }
 
-  public static TVStruct make_clzclz() {
-    return new TVStruct(new String[]{TypeFld.CLZ},new TV3[]{ new TVBase(TypeNil.NIL)});
-  }
-
   public boolean is_open() { return _open; }
   // Close if open
   public void close() {
@@ -213,7 +209,7 @@ public class TVStruct extends TVExpanding {
 
   private boolean _unify_impl_mix( TVStruct that, boolean flip ) {
     assert _open && pclz()==null;
-    assert !that._open && that.pclz()!=null;
+    assert !that._open && (that._max==0 || that.pclz()!=null);
     // walk left (open), search right plus CLZ
     //  if found, unify
     //  else ERROR missing field

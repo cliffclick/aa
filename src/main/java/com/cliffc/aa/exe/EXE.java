@@ -225,7 +225,7 @@ public class EXE {
     Syntax _par;                // Parent in the AST
 
     TV3 _tvar;                  // Current HM type
-    TV3 tvar() {                // U-F find
+    public TV3 tvar() {         // U-F find
       TV3 t = _tvar.find();
       return t == _tvar ? t : (_tvar = t);
     }
@@ -723,7 +723,7 @@ public class EXE {
 
 
   // --- Root ------------------------
-  static class Root extends Syntax {
+  public static class Root extends Syntax {
     final Syntax  _prog;
     Root( Syntax prog ) {
       _prog=prog;
@@ -737,7 +737,7 @@ public class EXE {
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       return reduce.apply(map.apply(this),_prog.visit(map,reduce));
     }
-    @Override Val eval( Env e ) {
+    @Override public Val eval( Env e ) {
       e = new Env(null);
       return _prog.eval(e);
     }
