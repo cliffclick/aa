@@ -1,0 +1,19 @@
+
+// Type: *[]( _, 1, 2)
+// Eval: *[]( _, 1, 2)
+
+// Displays are closed & defined def-by-def.  So prior partial displays in the gen set.
+
+// So AA does something EXE does not - AA can/will allow fcns to forward-ref other fcns.
+// This allows mutual recursion (is_even/is_odd).
+// To do this in AA, I need the display to allow self-references.
+
+
+dsp1 = @{
+  // factorial, is_even/is_odd, mutually recursive defined in same display chunk
+  fcn = { somedsp1 -> { -> (pair @{a =1;} @{b =2;})._ } }; // Takes an instanceof dsp1 for display
+  bound = (dsp1.fcn  dsp1); // Bind
+};
+// dsp2 goes here, for things defined after fcn
+// but on last stanza so no need?
+(pair (dsp1.bound).a (dsp1.bound).b)

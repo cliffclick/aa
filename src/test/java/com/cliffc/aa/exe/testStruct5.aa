@@ -1,10 +1,9 @@
-// Evil old regression test.
-// Could still work if I allow self-cycles in structs
-// Type: Cyclic reference to self0
-// Eval: CRASH
-sx = { ignore ->
-  self0 =@{ succ = (sx self0); };
-  self0
+// Recursive linked-list discovery, with no end clause.  Since this code has
+// no exit (it is an infinite loop, endlessly reading from an infinite input
+// and writing an infinite output), gcp gets a cyclic approximation.
+// Type: { - { - A -> B } C:*[]@{ n0=C; v0=A;  ..., } -> D:*[]@{ _; n1=D; v1=B; } }
+// Eval: A:[LAMBDA,( e3=A),()]
+map = { fcn lst ->
+  @{ n1 = (map fcn lst.n0); v1 = (fcn lst.v0); }
 };
-self1 =@{ nope =7; succ = self1; };
-(sx self1)
+map

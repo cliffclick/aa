@@ -1,7 +1,7 @@
 // Gen counters
 // Simple test of captured environment
 // Type: A:*[]( _, int64, { - -> A })
-// Eval: *[]( _, 1, K7[LAMBDA,( $dyn=-,e3=1),( e3=K2[LAMBDA,( e3=K2),( $dyn=-),( e3=K1[LAMBDA,( e3=K1),()]),()]),( $dyn=-),( e3=K1),()])
+// Eval: *[]( _, 1, [LAMBDA,( $dyn=-,e3=1),B:( e3=[LAMBDA,B]),( $dyn=-),C:( e3=[LAMBDA,C]),()])
 gen = { ->
   inc = { cnt ->
    (pair cnt { -> (inc (+ cnt 1))} )

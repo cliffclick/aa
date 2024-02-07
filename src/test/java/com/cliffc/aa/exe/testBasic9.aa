@@ -1,5 +1,5 @@
 // Combo of simple
 // Type: *[]( _, nint8, { - A -> nint8 })
-// Eval: *[]( _, 5, K1[LAMBDA,( e3=K1),()])
+// Eval: *[]( _, 5, A:[LAMBDA,( e3=A),()])
 fun = { p -> if p ? 4 : 5 };
 (pair (fun 0) fun)

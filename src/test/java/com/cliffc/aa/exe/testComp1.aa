@@ -1,4 +1,4 @@
 // Function composition
 // Type: { - { - A -> B } A -> B }
-// Eval: K1[LAMBDA,()]
+// Eval: [LAMBDA,()]
 { f g -> (f g)}

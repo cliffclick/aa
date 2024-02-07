@@ -3,5 +3,5 @@
 // fields.  The field offsets can be resolved once this function is called.
 // See testOver14.aa
 // Type: { [[  D3: _ in { - A -> B }, A10: C, D8: _ in *[]@{ v=A;  ..., }]] _ -> B }
-// Eval: K1[LAMBDA,()]
+// Eval: [LAMBDA,()]
 { x -> (x._ x._.v)}

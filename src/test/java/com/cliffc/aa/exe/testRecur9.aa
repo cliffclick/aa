@@ -1,6 +1,6 @@
 // Wrapped ints
 // Type: A:*[]@{ _; add={ - B:*[]@{ _; add={ - *[]@{ i=int64;  ..., } *[]@{ i=int64;  ..., } -> B }; i=int64; } C:*[]@{ _; add={ - *[]@{ i=int64;  ..., } *[]@{ i=int64;  ..., } -> C }; i=int64; } -> A }; i=int64; }
-// Eval: *[]@{ _; add=K5[LAMBDA,( $dyn=0,e3=7),( e3=K1[LAMBDA,( e3=K1),()]),()]; i=7; }
+// Eval: *[]@{ _; add=[LAMBDA,( $dyn=0,e3=7),A:( e3=[LAMBDA,A]),()]; i=7; }
 int = { i ->        // An integer is a struct...
   @{ add = { x y -> // With an 'add' field which is a fcn
        (int (+ x.i y.i)) // ... which unwraps to ints and adds and rewraps

@@ -16,7 +16,7 @@ public class TestEXE {
     File folder = new File("src/test/java/com/cliffc/aa/exe");
     File[] tests = folder.listFiles(file -> file.getName().endsWith("aa") /*&& !file.getName().contains("Over")*/);
     Arrays.sort(tests, (s0,s1) -> Util.alphanumCompare(s0.toString(),s1.toString()));
-    //tests = new File[]{new File("src/test/java/com/cliffc/aa/exe/testStruct7.aa")};
+    //tests = new File[]{new File("src/test/java/com/cliffc/aa/exe/testStruct8.aa")};
     for( File f : tests ) {
       String prog = Files.readString( f.toPath());
       String extype = get_expected(prog,"// Type: ");
@@ -43,7 +43,8 @@ public class TestEXE {
 
   private static String get_expected(String prog, String marker) {
     int idx = prog.indexOf(marker);
-    if( idx == -1 ) throw new RuntimeException("Test file lacks a "+marker+" comment");
+    if( idx == -1 )
+      throw new RuntimeException("Test file lacks a "+marker+" comment");
     int eol = prog.indexOf('\n', idx+1);
     return prog.substring(idx+marker.length(),eol).trim();
   }
