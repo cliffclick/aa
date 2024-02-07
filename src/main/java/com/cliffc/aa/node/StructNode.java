@@ -3,9 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.TV3;
-import com.cliffc.aa.tvar.TVErr;
-import com.cliffc.aa.tvar.TVStruct;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
@@ -254,6 +252,12 @@ public class StructNode extends Node {
     // Unify all fields
     for( int i=0; i<len(); i++ )
       ts.arg(i).unify(in(i).set_tvar(),false); // Unify (possible cycle)
+    // Force slot 0 to be a sensible CLZ for all but CLZCLZ
+    if( this!=PrimNode.ZCLZ ) {
+      assert Util.eq(ts.fld(0),TypeFld.CLZ);
+      if( ts.arg(0) instanceof TVLeaf leaf )
+        leaf.unify(new TVPtr(BitsAlias.EMPTY,new TVStruct(true)),false);
+    }
     return _tvar;
   }
 

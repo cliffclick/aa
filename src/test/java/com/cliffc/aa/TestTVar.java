@@ -2,8 +2,8 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
-import org.junit.Test;
 import org.junit.Ignore;
+import org.junit.Test;
 
 import static org.junit.Assert.*;
 
@@ -194,6 +194,61 @@ public class TestTVar {
       assertFalse(rez);
     }
   }
+
+  // Testing criss-cross Fresh unify.  Getting this wrong gets me infinite
+  // blow-up instead of a cycle.
+  // FRESH: { V4:@{a=V2} @{b=V4} -> ret }
+  // THAT : { V1         V2      -> ret }
+  
+  // Unification will unify V1 to a fresh of @{a=V2}, unify V2 to a fresh of
+  // @{b=V3}, but then the fresh @{a=V2} gets unified with the V2-unify of
+  // @{b=V3} and the cycle closes.
+  // RESULT: { V1:@{a=V2}  V2:@{b=V1} -> ret }
+
+  private static TV3[] _testCrissCross() {
+    TV3 ret = new TVLeaf();
+    TVLeaf   dsp1 = new TVLeaf();
+    TVLeaf   dyn1 = new TVLeaf();
+    // { dsp dyn -> ret }
+    TVStruct dsp0 = new TVStruct(new String[]{TypeFld.CLZ,"a"},new TV3[]{TVPtr.PTRCLZ,dyn1});
+    TVStruct dyn0 = new TVStruct(new String[]{TypeFld.CLZ,"b"},new TV3[]{TVPtr.PTRCLZ,dsp0});
+    TVLambda lam0 = new TVLambda(new TV3[]{ret,null,dsp0,dyn0});
+    // { V1  V2 -> ret }
+    TVLambda lam1 = new TVLambda(new TV3[]{ret,null,dsp1,dyn1});
+    return new TV3[]{ lam0, lam1, dsp0, dsp1, dyn0, dyn1 };
+  }
+  @Test public void testCrissCross() {
+    // Normal unify, fields remain separate
+    { TV3[] tvs = _testCrissCross();
+      TV3 lam0 = tvs[0], lam1 = tvs[1], dsp0 = tvs[2], dsp1 = tvs[3], dyn0 = tvs[4], dyn1 = tvs[5];
+      boolean rez = lam0.unify(lam1,false);
+      assertTrue(rez);
+      assertSame(lam0.find(),lam1.find());
+      assertSame(dsp0.find(),dsp1.find());
+      assertSame(dyn0.find(),dyn1.find());
+    }
+    // Fresh unify, will cross-cross
+    { TV3[] tvs = _testCrissCross();
+      TV3 lam0 = tvs[0], lam1 = tvs[1], dsp0 = tvs[2], dsp1 = tvs[3], dyn0 = tvs[4], dyn1 = tvs[5];
+      boolean rez = lam0.fresh_unify(null,lam1,null,false);
+      assertTrue(rez);
+      TV3 B = dyn1.find();
+      TV3 C = dsp1.find();
+      assertSame(dsp0.as_struct().arg("a"),B);
+      assertSame(dsp1.find().as_struct().arg("a"),B);
+      assertSame(B.as_struct().arg("b"),C);
+    }
+    // Fresh unify other way
+    { TV3[] tvs = _testCrissCross();
+      TV3 lam0 = tvs[0], lam1 = tvs[1], dsp0 = tvs[2], dsp1 = tvs[3], dyn0 = tvs[4], dyn1 = tvs[5];
+      boolean rez = lam1.fresh_unify(null,lam0,null,false);
+      assertFalse(rez);
+      assertFalse(dsp0.unified());
+      assertFalse(dsp1.unified());
+      assertFalse(dyn0.unified());
+      assertFalse(dyn1.unified());
+    }
+  }
   
 
   
@@ -350,8 +405,5 @@ public class TestTVar {
       assertEquals( -1, vclzC0.idx( "fld0" ) );
       assertTrue(vclzC0.idx("fld2") > 0  );
     }
-
   }
-
-  
 }

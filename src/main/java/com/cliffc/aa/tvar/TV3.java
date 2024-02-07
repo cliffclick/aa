@@ -179,6 +179,7 @@ abstract public class TV3 implements Cloneable {
   // Reports progress.
   final boolean union(TV3 that) {
     if( this==that ) return false;
+    ptrue();
     assert !unified() && !that.unified(); // Cannot union twice
     if( _may_nil ) that.add_may_nil(false);
     if( _use_nil ) that.add_use_nil();
@@ -193,7 +194,7 @@ abstract public class TV3 implements Cloneable {
     that._union_deps(this);
     // Actually make "this" into a "that"
     _uf = that;                 // U-F union
-    return ptrue();
+    return true;
   }
 
   // Merge subclass specific bits
@@ -331,8 +332,9 @@ abstract public class TV3 implements Cloneable {
     
     if( !test && progress ) {
       that = that.find();
-      FRESH_ROOT = new TVExpanding.DelayFresh(this,that,frsh,nongen);
-      boolean progress2 = _fresh_unify(that,true);
+      TV3 thsi = this.find();
+      FRESH_ROOT = new TVExpanding.DelayFresh(thsi,that,frsh,nongen);
+      boolean progress2 = thsi._fresh_unify(that,true);
       assert !progress2;
       VARS.clear();  DUPS.clear();
       FRESH_ROOT = null;
@@ -345,9 +347,9 @@ abstract public class TV3 implements Cloneable {
     assert !unified() && !that.unified();
 
     // Check for cycles
-    TV3 prior = VARS.get(this);
-    if( prior!=null )                        // Been there, done that
-      return prior.find()._unify(that,test); // Also, 'prior' needs unification with 'that'
+    TV3 prior = vget();
+    if( prior!=null )                 // Been there, done that
+      return prior._unify(that,test); // Also, 'prior' needs unification with 'that'
 
     // Must check this after the cyclic check, in case the 'this' is cyclic
     if( this==that ) return false;
@@ -398,10 +400,15 @@ abstract public class TV3 implements Cloneable {
         assert this.getClass()==that.getClass();
         assert !unified();      // If LHS unifies, VARS is missing the unified key
         TV3 lhs = arg(i);
-        TV3 rhs = i<that._args.length ? that.arg(i) : null;
-        progress |= rhs == null // Missing RHS?
-          ? _fresh_missing_rhs(that,i,test)
-          : lhs._fresh_unify(rhs,test);
+        if( i<that._args.length ) {
+          TV3 rhs = that.arg(i);  // Never null
+          // Check for a cycle from the Fresh side to the That side.
+          // If found, need to unify (not fresh).
+          progress |= rhs.vcrisscross(test);
+          progress |= lhs._fresh_unify(rhs,test);
+        } else {
+          progress |= _fresh_missing_rhs(that,i,test);
+        }
         that = that.find();
       }
       if( progress && test ) return progress;
@@ -418,6 +425,21 @@ abstract public class TV3 implements Cloneable {
     return progress;
   }
 
+  TV3 vget() {
+    assert !unified();
+    TV3 val = VARS.get(this);
+    if( val!=null && val.unified() )
+      VARS.put(this,val=val.find());
+    return val;
+  }
+  
+  boolean vcrisscross(boolean test) {
+    // Check for a cycle from the Fresh side to the That side.
+    // If found, need to unify (not fresh).
+    TV3 cyclic = vget();
+    return cyclic !=null && this != cyclic && cyclic._unify(this,test);
+  }
+  
   // This is fresh, and neither is a TVErr, and they are different classes
   boolean _fresh_unify_err(TV3 that, boolean test) {
     assert !(this instanceof TVErr) && !(that instanceof TVErr);
@@ -460,8 +482,8 @@ abstract public class TV3 implements Cloneable {
   
   TV3 _fresh() {
     assert !unified();
-    TV3 rez = VARS.get(this);
-    if( rez!=null ) return rez.find(); // Been there, done that
+    TV3 rez = vget();
+    if( rez!=null ) return rez; // Been there, done that
     // Unlike the original algorithm, to handle cycles here we stop making a
     // copy if it appears at this level in the nongen set.  Otherwise, we'd
     // clone it down to the leaves - and keep all the nongen leaves.

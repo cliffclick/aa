@@ -1,5 +1,6 @@
 package com.cliffc.aa.tvar;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.SB;
@@ -198,6 +199,8 @@ public class TVDynTable extends TV3 {
     String label = _labels[idx];
     if( label != null && !label.equals(choice) ) throw TODO("Two valid choices: "+label+" and "+choice);
     _labels[idx] = choice;
+    if( _uids[idx] instanceof Node n )
+      Env.GVN.add_flow(n);
     // We got the One True Match, unify
     return matches.arg(i).unify(pattern,false);
   }
@@ -298,7 +301,14 @@ public class TVDynTable extends TV3 {
       if( idx == -1 ) throw TODO();
       else {
         assert is_dyn(i) == that.is_dyn(idx);
+        TV3 cyclic = that.first(idx).vget();
+        if( cyclic !=null && that.first(idx) != cyclic)
+          throw TODO();         // vcrisscross
         if( is_dyn(i) ) {
+          cyclic = that.secnd(idx).vget();
+          if( cyclic !=null && that.secnd(idx) != cyclic)
+            throw TODO();         // vcrisscross
+          
           // Unify match on match
           progress |= first(i)._fresh_unify(that.first(idx),test);
           that = (TVDynTable)that.find();
@@ -386,7 +396,7 @@ public class TVDynTable extends TV3 {
   }
 
   private static final VBitSet HDVBS = new VBitSet();
-  boolean hasDyn() { HDVBS.clear(); return _hasDyn(); };
+  boolean noDynLoad() { HDVBS.clear(); return !_hasDyn(); };
   private boolean _hasDyn() {
     if( HDVBS.tset(_uid) ) return false;
     for( int i=0; i<_max; i++ )
@@ -397,7 +407,7 @@ public class TVDynTable extends TV3 {
   }
   
   @Override public VBitSet _get_dups_impl(VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
-    if( !hasDyn() ) return dups;
+    if( !debug && noDynLoad() ) return dups;
     for( int i=0; i<len(); i++ )
       if( _args[i] != null )
         _args[i]._get_dups(visit,dups,debug,prims);
@@ -405,7 +415,7 @@ public class TVDynTable extends TV3 {
   }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
-    if( !debug && !hasDyn() ) return sb.p("-");
+    if( !debug && noDynLoad() ) return sb.p("-");
     sb.p("[[  ");
     for( int i=0; i<_max; i++ ) {
       sb.p(is_dyn(i) ? 'D' : 'A').p(_uids[i].getAsInt()).p(": ");

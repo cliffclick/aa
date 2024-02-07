@@ -108,6 +108,11 @@ public class BindFPNode extends Node {
 
   Type bind(Type fun) {
     Type dsp = dsp()._val;
+    if( fun instanceof TypeMemPtr tmp ) {
+      assert tmp.is_prim();
+      setBad();
+      return fun;
+    }
     assert !(fun instanceof TypeMemPtr);
     if( !(fun instanceof TypeFunPtr tfp) ) {
       if( !canBeFun(fun) ) setBad();
