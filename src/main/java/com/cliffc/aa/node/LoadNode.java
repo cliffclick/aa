@@ -329,22 +329,24 @@ public class LoadNode extends Node {
 
   // All field loads against a pointer.
   @Override public boolean unify( boolean test ) {
-    boolean progress = false;
     TV3 ptr0 = adr().tvar();
-    Type ta = adr()._val;
 
     if( ptr0 instanceof TVErr ) throw TODO();
     TVPtr ptr = ptr0.as_ptr();
     TVStruct tstr = ptr.load();
+    
+    // If the field is in the struct, unify and done
+    TV3 fld = tstr.arg(_fld);
+    if( fld!=null ) return do_fld(fld,test);
+    // If the struct is open, add field here and done.
+    if( tstr.is_open() ) return test || tstr.add_fld(_fld,tvar() );
 
     // Search up the super-clazz chain
     for( ; tstr!=null; tstr = tstr.pclz().load() ) {
+      assert !tstr.is_open();  // Invariant: superclazzes not open
       // If the field is in the struct, unify and done
-      TV3 fld = tstr.arg(_fld);
+      fld = tstr.arg(_fld);
       if( fld!=null ) return do_fld(fld,test);
-      // If the struct is open, add field here and done.
-      // Field is not pinned, because it might belong in a superclazz
-      if( tstr.is_open() ) return tstr.add_fld(_fld,tvar() );
     }
 
     // struct is end-of-super-chain, miss_field
