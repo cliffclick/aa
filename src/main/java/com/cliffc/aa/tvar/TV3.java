@@ -363,8 +363,14 @@ abstract public class TV3 implements Cloneable {
       if( !test ) lf.add_delay_fresh();
       return vput(that,false);
     }
-    if( that instanceof TVLeaf ) // RHS is a tvar; union with a deep copy of LHS
-      return test || vput(that,that.union(_fresh()));
+    if( that instanceof TVLeaf ) { // RHS is a tvar; union with a deep copy of LHS
+      if( test ) return true;
+      // Must call _fresh first to trigger vcrisscross.
+      // This handles the case where 'that' is a Leaf and appears inside of 'this'.
+      TV3 frsh = _fresh();
+      that.vcrisscross(test);
+      return that.union(frsh);
+    }
 
     //// Special handling for nilable
     //if( !(that instanceof TVNil) && this instanceof TVNil nil ) return vput(that,nil._unify_nil_l(that,test));

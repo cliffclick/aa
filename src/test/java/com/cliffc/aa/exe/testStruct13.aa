@@ -1,0 +1,9 @@
+// Test of writing co-recursive functions in a natural style
+// Type: nint1
+// Eval: 1
+dsp = @{ 
+  is_even = { mydsp n -> if n ? (mydsp.is_odd  mydsp (- n 1)) : 1 };
+  is_odd  = { mydsp n -> if n ? (mydsp.is_even mydsp (- n 1)) : 0 };
+  rez = (dsp.is_odd dsp 3);
+};
+dsp.rez

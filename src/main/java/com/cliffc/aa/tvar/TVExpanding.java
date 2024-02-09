@@ -97,7 +97,13 @@ abstract public class TVExpanding extends TV3 {
     int cnt=0;
     while( DELAY_FRESH.len() > 0 ) {
       DelayFresh df = DELAY_FRESH.pop();
-      boolean progress = df.lhs().fresh_unify(df._frsh,df.rhs(),df._nongen,false);
+      // TODO: Drop fancy stuff, and just _frsh.unify
+      // TODO TODO: Drop do_delay_fresh and just use worklist
+      assert df._frsh.id().tvar()==df.lhs();
+      assert df._frsh     .tvar()==df.rhs();
+      assert df._frsh._nongen==df._nongen;
+      boolean progress = df._frsh.unify(false);
+      //boolean progress = df.lhs().fresh_unify(df._frsh,df.rhs(),df._nongen,false);
       Env.GVN.add_flow(df._frsh);
       assert cnt++ < 20;
     }

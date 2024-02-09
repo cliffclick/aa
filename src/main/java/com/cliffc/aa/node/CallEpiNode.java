@@ -367,7 +367,7 @@ public final class CallEpiNode extends Node {
           if( last()!=Env.ROOT ) return false;
         } else {
           RetNode ret = RetNode.get(fidx);
-          if( !ret.isCopy() && findDef(ret)== -1 && ret.fun().nargs()==call.nargs())
+          if( ret!=null && !ret.isCopy() && findDef(ret)== -1 && ret.fun().nargs()==call.nargs())
             return false;
         }
       }
@@ -417,7 +417,7 @@ public final class CallEpiNode extends Node {
           ret = fun = Env.ROOT;
         } else {
           RetNode ret2 = RetNode.get(fidx);
-          if( ret2.isCopy() ) continue;
+          if( ret2==null || ret2.isCopy() ) continue;
           FunNode fun2 = ret2.fun();
           if( fun2==null ) continue; // Broken function
           if( call.nargs() != fun2.nargs() ) continue; // Mismatched

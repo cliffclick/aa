@@ -250,6 +250,44 @@ public class TestTVar {
     }
   }
   
+  // Testing criss-cross Fresh unify.  Getting this wrong gets me infinite
+  // blow-up instead of a cycle.
+  // FRESH: V2:*[]@{fld=V1}
+  // THAT : V1
+  // Result:
+  // FRESH: V2:*[]@{fld=V3}
+  // THAT : V3:*[]@{fld=V3}
+
+  private static TV3[] _testCrissCross2() {
+    TVLeaf   v1 = new TVLeaf();
+    TVStruct v2 = new TVStruct(new String[]{TypeFld.CLZ,"fld"},new TV3[]{TVPtr.PTRCLZ,v1});
+    return new TV3[]{ v1,v2 };
+  }
+  @Test public void testCrissCross2() {
+    // Normal unify, fields remain separate
+    { TV3[] tvs = _testCrissCross2();
+      TV3 v1 = tvs[0], v2 = tvs[1];
+      boolean rez = v1.unify(v2,false);
+      assertTrue(rez);
+      assertSame(v1.find(),v2.find());
+      assertSame(v2.as_struct().arg("fld"),v2);
+    }
+    // Fresh unify
+    { TV3[] tvs = _testCrissCross2();
+      TV3 v1 = tvs[0], v2 = tvs[1];
+      boolean rez = v1.fresh_unify(null,v2,null,false);
+      assertFalse(rez);
+    }
+    // Fresh unify other way.  This will trigger criss-cross
+    { TV3[] tvs = _testCrissCross2();
+      TV3 v1 = tvs[0], v2 = tvs[1];
+      boolean rez = v2.fresh_unify(null,v1,null,false);
+      assertTrue(rez);
+      assertSame(v1.find().as_struct().arg("fld"),v1.find());
+      assertSame(v2.find().as_struct().arg("fld"),v1.find());
+      assertNotSame( v1.find(), v2.find() );
+    }
+  }
 
   
   // Build a super-class chain list.

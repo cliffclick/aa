@@ -120,8 +120,14 @@ public class EXE {
 
     // Parse a struct
     if( peek("@{") ) {
-      Struct str = new Struct();
-      str.add(TypeFld.CLZ,Struct.CLZ);
+      Struct str = new Struct(false);
+      while( !peek("}") ) str.add(require(id(),'='),require(fterm(),';'));
+      return str;      
+    }
+    
+    // Parse a struct *as a closure*
+    if( peek("%{") ) {
+      Struct str = new Struct(true);
       while( !peek("}") ) str.add(require(id(),'='),require(fterm(),';'));
       return str;      
     }
@@ -329,6 +335,14 @@ public class EXE {
             return;
           }
           dbx++;                // Bump deBrujin index
+        }
+        case Struct str -> {
+          if( str._closure ) {  // Closure is basically a pile-o-Lets
+            if( (_argn=str._labels.find(_name)) != -1 )
+              // Take TVar from the Struct, and since closure its fresh also
+              { init(str,str.fld(_argn).tvar().fresh(nongen.asAry()),dbx,_argn); return; }
+            //dbx++;              // Bump deBrujin index
+          }
         }
         case Root root -> {
           if( _name.equals("$dyn") ) {
@@ -549,7 +563,6 @@ public class EXE {
       def   .unify(_def .tvar(),false); // Unify def with _def._tvar
       _body .prep_tree(nongen);
       tvar().unify(_body.tvar(),false); // Unify 'Let._tvar' with the '_body._tvar'
-      //_dyn = _body.dyn();
     }
     
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
@@ -570,23 +583,25 @@ public class EXE {
 
   // --- Struct ------------------------
   static class Struct extends Syntax {
-    static final Struct CLZ = new Struct();
+    static final Struct CLZ = new Struct(true);
     final Ary<String> _labels;
     final Ary<Syntax> _flds;
-    Struct( ) { _labels = new Ary<>(String.class); _flds = new Ary<>(Syntax.class); }
+    final boolean _closure;
+    Struct( boolean closure ) { _labels = new Ary<>(String.class); _flds = new Ary<>(Syntax.class); _closure = closure; }
     void add( String label, Syntax fld ) { _labels.push(label); _flds.push(fld); fld._par = this; }
+    Syntax fld(int i) { return _flds.at(i); }
     @Override SB str(SB sb) {
-      sb.p("@{ ");
+      sb.p(_closure ? '%' : '@').p("{ ");
       for( int i=0; i<_flds._len; i++ )
-        _flds.at(i).str(sb.p(_labels.at(i)).p(" = ")).p("; ");
+        fld(i).str(sb.p(_labels.at(i)).p(" = ")).p("; ");
       return sb.unchar(1).p("}");
     }
     @Override void prep_tree(Ary<TV3> nongen) {
       TVStruct str = new TVStruct(_labels);
       _tvar = new TVPtr(BitsAlias.EMPTY,str);
       for( int i=0; i<_flds._len; i++ ) {
-        _flds.at(i).prep_tree(nongen);
-        str.arg(i).unify(_flds.at(i).tvar(),false);
+        fld(i).prep_tree(nongen);
+        str.arg(i).unify(fld(i).tvar(),false);
       }
     }
     
@@ -603,7 +618,7 @@ public class EXE {
       PtrVal ptr = (PtrVal)val;
       StructVal s = ptr.load();
       for( int i=0; i<_flds._len; i++ )
-        s.add(_labels.at(i),_flds.at(i).eval(e));
+        s.add(_labels.at(i),fld(i).eval(e));
       return ptr;
     }
   }

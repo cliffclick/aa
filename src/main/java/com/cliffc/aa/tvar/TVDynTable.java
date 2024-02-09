@@ -318,11 +318,12 @@ public class TVDynTable extends TV3 {
 
           // cmps have to align; a Y or N in "this" maps to a Y or N in "that",
           // and can force a MAYBE to a Y/N.  A MAYBE in "this" does not force.
-          if( first(i) instanceof TVStruct str ) {
+          if( first(i) instanceof TVPtr ptr ) {
+            TVStruct str = ptr.load();
             for( int j=0; j<str.len(); j++ ) {
               int cmp = get_cmp(i,j);
               if( cmp==1 || cmp==7 ) { // Force
-                TVStruct thatstr = (TVStruct)that.first(idx);
+                TVStruct thatstr = ((TVPtr)that.first(idx)).load();
                 int thatj = thatstr.idx(str.fld(j));
                 int thatcmp = that.get_cmp(idx,thatj);
                 if( cmp != thatcmp ) {
@@ -418,7 +419,7 @@ public class TVDynTable extends TV3 {
     if( !debug && noDynLoad() ) return sb.p("-");
     sb.p("[[  ");
     for( int i=0; i<_max; i++ ) {
-      sb.p(is_dyn(i) ? 'D' : 'A').p(_uids[i].getAsInt()).p(": ");
+      sb.p(_uids[i].getAsInt()).p(is_dyn(i) ? "Load" : "Call").p(": ");
       if( is_dyn(i) ) {
         if( _labels[i]==null ) {
           _args[i*2  ]._str(sb,visit,dups,debug,prims);

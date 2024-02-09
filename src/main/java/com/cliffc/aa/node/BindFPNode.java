@@ -198,6 +198,7 @@ public class BindFPNode extends Node {
   @Override public boolean unify( boolean test ) {
     assert dsp()!=null;         // Removed if null
     TV3 fptv = fp ().tvar();
+    assert fptv==tvar();
     TV3 dsp  = dsp().tvar();
     if( fptv instanceof TVLambda lam )
       return dsp.unify(lam.dsp(),test);

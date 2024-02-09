@@ -2,6 +2,6 @@
 // some fields; at least: "{ B C -> D }" and "@{ v=C; ...}", and may have more
 // fields.  The field offsets can be resolved once this function is called.
 // See testOver14.aa
-// Type: { [[  D3: _ in { - A -> B }, A10: C, D8: _ in *[]@{ v=A;  ..., }]] _ -> B }
+// Type: { [[  3Load: _ in { - A -> B }, 10Call: C, 8Load: _ in *[]@{ v=A;  ..., }]] _ -> B }
 // Eval: [LAMBDA,()]
 { x -> (x._ x._.v)}

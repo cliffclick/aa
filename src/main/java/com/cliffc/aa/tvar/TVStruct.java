@@ -191,7 +191,7 @@ public class TVStruct extends TVExpanding {
 
   private boolean _unify_impl_close( TVStruct that ) {
     // Both have CLZ (or both are STRCLZ analogs)
-    assert (_max==0 && that._max==0) || (pclz()!=null && that.pclz()!=null); 
+    //assert (_max==0 && that._max==0) || (pclz()!=null && that.pclz()!=null); 
     // Walk left, search right (local no CLZ)
     // If found, unify
     // else ignore (del right) & assert not in CLZ
@@ -214,7 +214,7 @@ public class TVStruct extends TVExpanding {
   // LHS/this is open, RHS/that is closed.
   private boolean _unify_impl_mix_open( TVStruct that ) {
     assert _open && pclz()==null;
-    assert !that._open && (that._max==0 || that.pclz()!=null);
+    //assert !that._open && (that._max==0 || that.pclz()!=null);
     // walk left (open), search right plus CLZ
     //  if found, unify
     //  else ignore (del right)
@@ -230,7 +230,7 @@ public class TVStruct extends TVExpanding {
 
   // LHS/this is closed, RHS/that is open.
   private boolean _unify_impl_mix_close( TVStruct that ) {
-    assert !_open && (_max==0 || pclz()!=null);
+    //assert !_open && (_max==0 || pclz()!=null);
     assert that._open && that.pclz()==null;
     that.close();
     // walk left (close), search right
@@ -241,7 +241,7 @@ public class TVStruct extends TVExpanding {
       if( fthat == null )                // If not found
         that.add_fld(_flds[i],arg(i));
     }
-    assert that.pclz()!=null; // RHS is closed, has clz
+    //assert that.pclz()!=null; // RHS is closed, has clz
     // walk right (open), search left plus CLZ
     //  if found, unify
     //  else ERROR missing field
@@ -469,7 +469,7 @@ public class TVStruct extends TVExpanding {
       }
     }
     // Print clazz field up front.
-    boolean is_tup = is_tup(debug), once=_open;
+    boolean is_tup = is_tup(), once=_open;
     sb.p(is_tup ? "( " : "@{ ");
     for( int idx : sorted_flds() ) {
       if( !is_tup && !Util.eq(_flds[idx],TypeFld.CLZ) ) { // Skip tuple field names
@@ -487,15 +487,12 @@ public class TVStruct extends TVExpanding {
     return sb;
   }
 
-  boolean is_tup(boolean debug) {
+  boolean is_tup() {
     if( _max==0 ) return true;
-    boolean label=true;
-    for( int i=0; i<len(); i++ ) {
-      char c = _flds[i].charAt(0);
-      if( debug && c=='&' ) return false;
-      else if( Character.isDigit(c) ) label=false;
-    }
-    return !label;
+    for( int i=0; i<len(); i++ )
+      if( Character.isDigit(_flds[i].charAt(0)) )
+        return true;
+    return false;
   }
 
   // Stoopid hand-rolled bubble sort
