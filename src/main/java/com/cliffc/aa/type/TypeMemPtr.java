@@ -93,7 +93,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
 
   @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return _obj._str_complex(visit,dups); }
 
-  boolean is_clz_ptr() { return _obj==TypeStruct.UNUSED && _aliases.abit()==BitsAlias.CLZX; }
+  boolean is_clz_ptr() { return this==Cons.CLZ_TMP; }
   
   static TypeMemPtr valueOf(Parse P, String cid, boolean any, boolean is_con) {
     P.require(is_con ? '$' : '*');

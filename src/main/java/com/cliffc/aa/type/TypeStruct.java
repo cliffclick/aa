@@ -225,7 +225,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   public static TypeStruct malloc_test( TypeFld fld0, TypeFld fld1 ) {
     return malloc(false,ALL,TypeFlds.make(fld0,fld1));
   }
-  public static TypeStruct malloc_test( TypeStruct clz, TypeFld fld0, TypeFld fld1 ) {
+  public static TypeStruct malloc_test( Type clz, TypeFld fld0, TypeFld fld1 ) {
     return malloc(false,ALL,TypeFlds.make(TypeFld.make_clz(clz),fld0,fld1));
   }
   public static TypeStruct malloc_prim( Type clz, Type fld ) {
@@ -264,7 +264,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   public static TypeStruct make_test( String fld_name, Type t, Access a ) { return make(TypeFld.make(fld_name,t,a)); }
   public static TypeStruct make_test( TypeFld fld0, TypeFld fld1 ) { return make(TypeFlds.make(fld0,fld1)); }
   public static TypeStruct make_prim( TypeFld fld0, TypeFld fld1 ) { return make(false,TypeNil.NIL,TypeFlds.make(fld0,fld1)); }
-  public static TypeStruct make_test( Type def, TypeStruct clz, TypeFld fld0, TypeFld fld1 ) {
+  public static TypeStruct make_test( Type def, Type clz, TypeFld fld0, TypeFld fld1 ) {
     return make(false,def,TypeFlds.make(TypeFld.make_clz(clz),fld0,fld1));
   }
   public boolean is_prim() { return _flds.length==2 && _flds[0].is_clz() && _flds[1].is_prim(); }
@@ -595,12 +595,12 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
       _flds[i] = (TypeFld)map.map(_flds[i]);
   }
 
-  static boolean isDigit(char c) { return '0' <= c && c <= '9'; }
   public boolean is_tup() {
     int len = len();
     if( len==0 || (len==1 && get(TypeFld.CLZ)!=null) ) return true;
     for( int i=0; i<len; i++ )
-      if( isDigit(_flds[i]._fld.charAt(0)) ) return true;
+      if( TypeFld.isTup(_flds[i]._fld) )
+        return true;
     return false;
   }
 
@@ -627,6 +627,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
 
     // Shortcuts for the large primitive clazz structures
     if( !indent ) {
+      if( this==Cons.CLZ_CLZ ) return sb.p("CLZ");
       if( is_top_clz() ) return sb.p("@{TOPCLZ}");
       if( is_int_clz() ) return sb.p("@{INTCLZ}");
       if( is_flt_clz() ) return sb.p("@{FLTCLZ}");

@@ -91,8 +91,12 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     if( _t!=null ) _t._str_dups(visit,dups,ucnt, indent);
   }
 
+  static boolean isDigit(char c) { return '0' <= c && c <= '9'; }
+  static boolean isTup(String fld) {
+    return isDigit(fld.charAt(0)) && isDigit(fld.charAt(fld.length()-1));
+  }
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    if( !TypeStruct.isDigit(_fld.charAt(0)) || // Do not print number-named final fields for tuples, unless dups are involved
+    if( !isTup(_fld) || // Do not print number-named final fields for tuples, unless dups are involved
         _access!=Access.Final ||  // Odd access permissions
         dups.get(_uid)!=null || _t==null || dups.get(_t._uid)!=null ) // DUP:_t is ambiguous with DUP:0=_t and 0=DUP:_t; so print field name
       _access.str(sb.p(_fld));                                        // Print "field="

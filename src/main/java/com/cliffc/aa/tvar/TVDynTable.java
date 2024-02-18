@@ -2,7 +2,7 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.node.Node;
-import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.Util;
 import com.cliffc.aa.util.VBitSet;
@@ -383,8 +383,22 @@ public class TVDynTable extends TV3 {
   }
   
   // -------------------------------------------------------------
-  @Override Type _as_flow( Node dep ) {
-    throw TODO();
+  @Override TypeMemPtr _as_flow( Node dep ) {
+    Type t = ADUPS.get(_uid);
+    if( t!=null )
+      return (TypeMemPtr)t;     // Been there, done that
+    TypeFld[] flds = TypeFlds.get(_max);
+    for( int i=0; i<_max; i++ )
+      flds[i] = TypeFld.malloc(fld_name(i),null,TypeFld.Access.Final);
+    Arrays.sort(flds,( tf0, tf1) -> TypeFld.scmp(tf0._fld,tf1._fld));
+    TypeStruct ts = TypeStruct.malloc(false,false,false,Type.ANY,flds);
+    ADUPS.put(_uid,ts);         // Stop cycles
+
+    // Recursively type fields
+    for( int i=0; i<_max; i++ )
+      flds[i]._t = first(i)._as_flow(dep);
+    
+    return TypeMemPtr.malloc(false,false,BitsAlias.EMPTY,ts);
   }
 
   @Override public TVDynTable copy() {
@@ -414,12 +428,15 @@ public class TVDynTable extends TV3 {
         _args[i]._get_dups(visit,dups,debug,prims);
     return dups;
   }
-  
+
+  private String fld_name(int i) {
+    return (_uids[i].getAsInt() + (is_dyn(i) ? "Load" : "Call")).intern();
+  }
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     if( !debug && noDynLoad() ) return sb.p("-");
     sb.p("[[  ");
     for( int i=0; i<_max; i++ ) {
-      sb.p(_uids[i].getAsInt()).p(is_dyn(i) ? "Load" : "Call").p(": ");
+      sb.p(fld_name(i)).p(": ");
       if( is_dyn(i) ) {
         if( _labels[i]==null ) {
           _args[i*2  ]._str(sb,visit,dups,debug,prims);
