@@ -392,13 +392,14 @@ public class TVDynTable extends TV3 {
       flds[i] = TypeFld.malloc(fld_name(i),null,TypeFld.Access.Final);
     Arrays.sort(flds,( tf0, tf1) -> TypeFld.scmp(tf0._fld,tf1._fld));
     TypeStruct ts = TypeStruct.malloc(false,false,false,Type.ANY,flds);
-    ADUPS.put(_uid,ts);         // Stop cycles
+    TypeMemPtr tmp = TypeMemPtr.malloc(false,false,BitsAlias.EMPTY,ts);
+    ADUPS.put(_uid,tmp);         // Stop cycles
 
     // Recursively type fields
     for( int i=0; i<_max; i++ )
       flds[i]._t = first(i)._as_flow(dep);
     
-    return TypeMemPtr.malloc(false,false,BitsAlias.EMPTY,ts);
+    return tmp;
   }
 
   @Override public TVDynTable copy() {

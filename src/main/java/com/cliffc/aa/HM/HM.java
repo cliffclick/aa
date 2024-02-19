@@ -173,7 +173,7 @@ public class HM {
     // Initialize the primitives
     for( PrimSyn prim : new PrimSyn[]{ new If(), new Pair(), new EQ(), new EQ0(), new IMul(), new FMul(), new I2F(), new Add(), new Dec(), new IRand(), new Str(), new Triple(), new Factor(), new IsEmpty(), new NotNil()} )
       PRIMSYNS.put(prim.name(),prim);
-    new EXTStruct(T2.make_str(TypeMemPtr.STRPTR),TypeMemPtr.STR_ALIAS);
+    new EXTStruct(T2.make_str(TypeMemPtr.STRPTR),BitsAlias.STRX);
 
     // Parse
     Work<Syntax> work = WORK = new Work<>(rseed);

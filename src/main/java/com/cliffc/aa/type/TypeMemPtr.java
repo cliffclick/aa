@@ -146,12 +146,11 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public TypeMemPtr make_from( BitsAlias aliases ) { return _aliases==aliases ? this : make(aliases.test(0),aliases.clear(0),_obj); }
 
   // Legacy constructor for legacy HM tests
-  public static final int STR_ALIAS = 4; // Legacy str ptr value
-  public static TypeMemPtr make_str(String s) { return make_str(TypeInt.con( s.isEmpty() ? 0 : s.charAt(0))); }
-  public static TypeMemPtr make_str(Type t) { return make_str(BitsAlias.make0(STR_ALIAS),t); }
-  public static TypeMemPtr make_str(BitsAlias aliases, Type t) {
+  public static TypeMemPtr make_str(String s) { return make_str(TypeInt.con(s.length()),TypeInt.con( s.isEmpty() ? 0 : s.charAt(0))); }
+  public static TypeMemPtr make_str(TypeInt len, TypeInt char0) { return make_str(BitsAlias.make0(BitsAlias.STRX),len,char0); }
+  public static TypeMemPtr make_str(BitsAlias aliases, TypeInt len, TypeInt char0) {
     // Make a string object
-    TypeStruct ts = TypeStruct.make_prim(TypeFld.make_clz(TypeStruct.XSTRZ()),TypeFld.make_prim(t));
+    TypeStruct ts = TypeStruct.make_prim(TypeFld.make_clz(TypeStruct.XSTRZ()),TypeFld.make_prim(len));
     return TypeMemPtr.make(aliases.test(0),aliases.clear(0),ts);
   }
   public boolean is_str() { return _obj.is_str(); }
@@ -181,7 +180,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public  static final TypeMemPtr DISP_SIMPLE= make(false,BitsAlias.NALL,TypeStruct.ISUSED); // closed display
   public  static final TypeMemPtr INTPTR = TypeMemPtr.make_con(BitsAlias.INT,true,TypeStruct.ISUSED);   // Simple ptr-to-wrapped int
   public  static final TypeMemPtr FLTPTR = TypeMemPtr.make_con(BitsAlias.FLT,true,TypeStruct.ISUSED);   // Simple ptr-to-wrapped flt
-  public  static final TypeMemPtr STRPTR = make_str(TypeInt.INT8);
+  public  static final TypeMemPtr STRPTR = make_str(TypeInt.INT8,TypeInt.con('A'));
 
   static final Type[] TYPES = new Type[]{ISUSED0,EMTPTR,DISPLAY,DISPLAY_PTR};
   public static void init1( HashMap<String,TypeNil> types ) {

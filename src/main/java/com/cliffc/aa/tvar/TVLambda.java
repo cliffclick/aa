@@ -133,7 +133,7 @@ public class TVLambda extends TV3 {
     sb.p("{ ");
     for( int i=DSP_IDX; i<nargs(); i++ ) {
       if( _args[i]==null ) sb.p("- ");
-      else if( i==ARG_IDX && _args[i] instanceof TVLeaf && !_args[i].unified() ) sb.p("- ");
+      else if( i<=ARG_IDX && _args[i] instanceof TVLeaf && !_args[i].unified() ) sb.p("- ");
       else _args[i]._str(sb,visit,dups,debug,prims).p(' ');
     }
     sb.p("-> ");
