@@ -5,17 +5,17 @@ import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.BufferedReader;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Random;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
-import java.util.Random;
 
 import static com.cliffc.aa.AA.*;
 
@@ -95,8 +95,8 @@ public class EXE {
     if( peek('"') ) return string();
 
     // Parse a Lambda
-    if( peek('{') ) {           // Lambda 
-      Ary<String> args = new Ary<>(new String[]{null,null,"$dyn"});
+    if( peek('{') ) {           // Lambda
+      Ary<String> args = new Ary<>(new String[]{null,null,null,"$dyn"});
       while( !peek('-') ) args.push(id());
       require('>');
       return new Lambda(args.asAry(), require(fterm(),'}'));
@@ -105,7 +105,7 @@ public class EXE {
     // Parse an Apply
     if( peek('(') ) {
       Syntax fun = fterm();
-      Ary<Syntax> args = new Ary<>(new Syntax[]{null,null,new AField(new Ident("$dyn"))});
+      Ary<Syntax> args = new Ary<>(new Syntax[]{null,null,null,new AField(new Ident("$dyn"))});
       while( !peek(')') ) args.push(fterm());
       return new Apply(fun, args.asAry());
     }
@@ -121,13 +121,6 @@ public class EXE {
     // Parse a struct
     if( peek("@{") ) {
       Struct str = new Struct(false);
-      while( !peek("}") ) str.add(require(id(),'='),require(fterm(),';'));
-      return str;      
-    }
-    
-    // Parse a struct *as a closure*
-    if( peek("%{") ) {
-      Struct str = new Struct(true);
       while( !peek("}") ) str.add(require(id(),'='),require(fterm(),';'));
       return str;      
     }
@@ -254,12 +247,12 @@ public class EXE {
     // SEK style evaluation machine.
     // Env is a linked list, with a Val (for Let) or a set of Vals (for Lambda).
     // A Val is either an Int, or a Kontinuation; K has a Lambda and an Env.
-    final Val eval( Env e ) { Val def = eval0(e); return eval1(e,def); }
+    final Val eval( Env env ) { Val def = eval0(env); return eval1(env,def); }
     // 2 parts; first part defs (if any) in the local Env.
     // Second part fills in the def.
     // Allows cyclic structs and self-recursive functions.
-    abstract Val eval0( Env e );
-    Val eval1( Env e, Val def ) { return def; };
+    abstract Val eval0( Env env );
+    Val eval1( Env env, Val def ) { return def; };
 
     static void reset() { CNT=1; }
 
@@ -273,10 +266,10 @@ public class EXE {
     Con( int    con ) { _con = new IntVal(con); }
     Con( double con ) { _con = new FltVal(con); }
     Con( String con ) { _con = new StrVal(con); }
-    @Override SB str(SB sb) { return _con.str(sb); }
+    @Override final SB str(SB sb) { return _con.str(sb); }
     @Override void prep_tree(Ary<TV3> nongen) { _tvar = TV3.from_flow(_con.as_flow()); }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
-    @Override Val eval0( Env e ) { return _con; }
+    @Override Val eval0( Env env ) { return _con; }
   }
 
   // --- Nil ------------------------
@@ -284,7 +277,7 @@ public class EXE {
     @Override SB str(SB sb) { return sb.p("nil"); }
     @Override void prep_tree(Ary<TV3> nongen) { _tvar = new TVPtr(BitsAlias.EMPTY,new TVStruct(true)); _tvar.add_may_nil(false); }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
-    @Override NilVal eval0( Env e ) { return NilVal.NIL; }
+    @Override NilVal eval0( Env env ) { return NilVal.NIL; }
   }
 
   // --- DefDynTable ------------------------
@@ -295,12 +288,14 @@ public class EXE {
       return tvar() instanceof TVDynTable tdyn && tdyn.resolve( test );
     }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
+    // Type flow of the TVDynTable, set after the program types
+    private DynVal _dyn;
+    // True if all resolved
     boolean resolvedDyn() {
-      return !(tvar() instanceof TVDynTable tdyn) || tdyn.all_resolved();
+      _dyn = new DynVal(tvar() instanceof TVDynTable tdyn ? tdyn : null);
+      return _dyn._dyn==null || _dyn._dyn.all_resolved(); // Type error: Failed to resolve
     }
-    @Override Val eval0( Env e ) {
-      return new DynVal(tvar() instanceof TVDynTable tdyn ? tdyn : null);
-    }
+    @Override DynVal eval0( Env env ) { return _dyn; }
   }
 
   // --- Ident ------------------------
@@ -310,7 +305,7 @@ public class EXE {
 
     private Syntax _def;
     private int _dbx;           // deBrujin index
-    private int _argn;          // Arg index for Lambda, 0 for Let
+    private String _argn;       // Arg index for Lambda, 0 for Let
     
     Ident( String name ) { _name=name; }
     @Override SB str(SB sb) { return sb.p(_name); }
@@ -320,9 +315,13 @@ public class EXE {
       for( Syntax syn = _par, prior=this; syn!=null; prior=syn, syn = syn._par ) {
         switch( syn ) {
         case Lambda lam -> {
-          if( (_argn=Util.find(lam._args,_name)) != -1 )
+          int argn = Util.find(lam._args,_name);
+          if( argn != -1 ) {
             // Take TVar from the lambda directly; and zero-bias the arg index
-            {  init(lam,lam.arg(_argn), dbx, _argn);  return; }
+            String dbarg = Util.eq(_name,"$dyn") ? _name : ("arg"+(argn-(ARG_IDX+1))).intern();
+            init(lam, lam.arg(argn), dbx, dbarg);
+            return;
+          }
           dbx++;                // Bump deBrujin index
           was_apply = false;
         }
@@ -331,19 +330,19 @@ public class EXE {
             boolean fresh = prior==let._body;
             if( !fresh && was_apply && !(prior instanceof Struct) )
               throw new IllegalArgumentException("Cyclic reference to "+_name);
-            init(let,fresh ? let._def.tvar().fresh(nongen.asAry()) : let._def.tvar(),dbx,ARG_IDX);
+            init(let,fresh ? let._def.tvar().fresh(nongen.asAry()) : let._def.tvar(),dbx,_name);
             return;
           }
           dbx++;                // Bump deBrujin index
         }
-        case Struct str -> {
-          if( str._closure ) {  // Closure is basically a pile-o-Lets
-            if( (_argn=str._labels.find(_name)) != -1 )
-              // Take TVar from the Struct, and since closure its fresh also
-              { init(str,str.fld(_argn).tvar().fresh(nongen.asAry()),dbx,_argn); return; }
-            //dbx++;              // Bump deBrujin index
-          }
-        }
+        //case Struct str -> {
+        //  if( str._closure ) {  // Closure is basically a pile-o-Lets
+        //    if( (_argn=str._labels.find(_name)) != -1 )
+        //      // Take TVar from the Struct, and since closure its fresh also
+        //      { init(str,str.fld(_argn).tvar().fresh(nongen.asAry()),dbx,_argn); return; }
+        //    //dbx++;              // Bump deBrujin index
+        //  }
+        //}
         case Root root -> {
           if( _name.equals("$dyn") ) {
             DefDynTable def = new DefDynTable();
@@ -362,7 +361,7 @@ public class EXE {
       throw TODO("'"+_name+"' not found");
     }
     
-    private void init( Syntax def, TV3 tv, int dbx, int argn ) {
+    private void init( Syntax def, TV3 tv, int dbx, String argn ) {
       _tvar = tv;
       _def  = def;
       _dbx  = dbx;
@@ -370,12 +369,12 @@ public class EXE {
     }
     
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
-    @Override Val eval0( Env e ) {
+    @Override Val eval0( Env env ) {
       // Normal lookup using deBrujin index
-      Env e0 = e;
+      Env e0 = env;
       for( int i=0; i<_dbx; i++ )
-        e0 = e0._e;               // Index env via deBrujin index
-      return e0._vs[_argn];
+        e0 = e0._e;             // Index env via deBrujin index
+      return e0._vals.get(_argn);
     }
   }
 
@@ -402,13 +401,13 @@ public class EXE {
     TV3 arg(int i) { return tvar().arg(i); }
     
     @Override void prep_tree(Ary<TV3> nongen) {
-      _tvar = new TVLambda(nargs(),new TVLeaf(),new TVLeaf());
+      _tvar = new TVLambda(nargs(),null,new TVLeaf());
       // Extend the nongen set by the new variables
-      for( int i=AA.DSP_IDX; i<nargs(); i++ ) nongen.push(arg(i));
+      for( int i=AA.ARG_IDX; i<nargs(); i++ ) nongen.push(arg(i));
       // Prep the body
       _body.prep_tree(nongen);
       // Pop nongen stack
-      nongen.pop(nargs()-AA.DSP_IDX);
+      nongen.pop(nargs()-AA.ARG_IDX);
       // TVLambda ret is made early, unify with body now
       ((TVLambda)tvar()).ret().unify(_body.tvar(),false);
     }
@@ -416,8 +415,8 @@ public class EXE {
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       return reduce.apply(map.apply(this),_body.visit(map,reduce));
     }
-    @Override KontVal eval0( Env e ) { return new KontVal(e,this);  }    
-    Val apply( Env e ) { return _body.eval(e); }
+    @Override KontVal eval0( Env env ) { return new KontVal(env,this); }
+    Val apply( Env env ) { return _body.eval(env); }
   }
 
   // --- Apply ------------------------
@@ -446,12 +445,12 @@ public class EXE {
 
       TV3 tfun = _fun.tvar();
       TVLambda lam = tfun instanceof TVLambda lam0 ? lam0
-        : new TVLambda(nargs(),new TVLeaf(),tvar());
+        : new TVLambda(nargs(),null,tvar());
       if( !(tfun instanceof TVLambda) )
         tfun.unify(lam,false);
       
       assert lam.nargs() == nargs();
-      for( int i=DSP_IDX; i<nargs(); i++ ) {
+      for( int i=ARG_IDX; i<nargs(); i++ ) {
         _args[i].prep_tree(nongen);
         if( lam.arg(i) != null )
           lam.arg(i).unify( _args[i].tvar(), false );
@@ -467,14 +466,19 @@ public class EXE {
           rez = reduce.apply(rez,arg.visit(map,reduce));
       return rez;
     }
-    @Override Val eval0( Env e ) {
+    @Override Val eval0( Env env ) {
       // Eval the function
-      KontVal fun = _fun.eval(e).as_kont();
-      Env e2 = new Env(fun._e);
-      for( int i=DSP_IDX; i<nargs(); i++ )
-        e2._vs[i] = _args[i].eval(e);
+      KontVal fun = _fun.eval(env).as_kont();
+      // TODO: keeping existing structure until I can roll this Env build into
+      // the function header and not at the Call/Apply site.
+      Env e2 = new Env(fun._env);
+      e2._vals.put("$dyn",_args[ARG_IDX].eval(env));
+      for( int i=ARG_IDX+1; i<nargs(); i++ )
+        e2.arg(i-(ARG_IDX+1),_args[i].eval(env));
       // Eval the body, in the context of the closure extended by the args
       return fun._lam.apply(e2);
+      // TODO: pre-bind Prims...
+      // (3 .+ 4)  // dot-field is ok after a prim int/flt/str.  Does prim lookup & binds.
     }
   }
 
@@ -525,8 +529,8 @@ public class EXE {
       rez = reduce.apply(rez,_f   .visit(map,reduce));
       return rez;
     }
-    @Override Val eval0( Env e ) {
-      Val pred = _pred.eval(e);
+    @Override Val eval0( Env env ) {
+      Val pred = _pred.eval(env);
       boolean t = switch( pred ) {
       case IntVal II -> II._con!=0;
       case FltVal FF -> FF._con!=0;
@@ -537,7 +541,7 @@ public class EXE {
       default -> throw TODO();
       };
       Syntax syn = t ? _t : _f;
-      return syn.eval(e);
+      return syn.eval(env);
     }
   }
   
@@ -573,21 +577,52 @@ public class EXE {
     @Override Val eval0( Env e ) {
       Env e0 = new Env(e);       // Premature push: no def yet, so null
       Val def = _def.eval0(e0);  // Eval def part 0
-      e0._vs[ARG_IDX] = def;     // Close the cycle
+      e0._vals.put(_arg,def);    // Close the cycle
       _def.eval1(e0,def);        // Eval def part 1
-      if( def instanceof KontVal k ) 
-        k._e = e0;              // Let Rec
+      //if( def instanceof KontVal k )
+      //  k._env = e0;            // Let Rec
       return _body.eval(e0);
-    }    
+    }
   }
 
   // --- Struct ------------------------
+  /**
+     GIANT TODO:
+     
+     Observed that AA mixes Structs and Closures, on purpose.
+     EXE does not.
+
+     This is the Root Cause of why the AA test testStable.testStruct() fails but
+     the matching EXE tests testStruct[9,10,12] (especially 12) don't have issues.
+
+     The AA code triggers a recursive def of the display/closure, which appears
+     as a polymorphic empty struct inside the DynTables and when fresh-unifying
+     endlessly fresh clones and grows without bounds.  Doesn't happen for EXE
+     variants, which end up with no or trivial displays.
+
+     To show this problem in EXE (where its hugely easier to control and debug)
+     I need to fold Let and Struct together.  Let needs to becomes a LetMutRec
+     (its really a LetRec already), and then its basically a Struct plus or
+     minus some "is_closure" flag and whether or not Idents are polymorphic or
+     not.  Loads from Fields are not polymorphic, inside LetMutRec defs, or
+     Lambda args.  Idents from closures ARE polymorphic.
+
+
+   */
+    
+
   static class Struct extends Syntax {
     static final Struct CLZ = new Struct(true);
     final Ary<String> _labels;
     final Ary<Syntax> _flds;
     final boolean _closure;
-    Struct( boolean closure ) { _labels = new Ary<>(String.class); _flds = new Ary<>(Syntax.class); _closure = closure; }
+    final int _alias;
+    Struct( boolean closure ) {
+      _labels = new Ary<>(String.class);
+      _flds = new Ary<>(Syntax.class);
+      _closure = closure;
+      _alias = BitsAlias.new_alias(BitsAlias.LOCX);
+    }
     void add( String label, Syntax fld ) { _labels.push(label); _flds.push(fld); fld._par = this; }
     Syntax fld(int i) { return _flds.at(i); }
     @Override SB str(SB sb) {
@@ -611,14 +646,14 @@ public class EXE {
         rez = reduce.apply(rez,fld.visit(map,reduce));
       return rez;
     }
-    @Override PtrVal eval0( Env e ) {
-      return new PtrVal(new StructVal());
+    @Override PtrVal eval0( Env env ) {
+      return new PtrVal(_alias,new StructVal());
     }
-    @Override PtrVal eval1( Env e, Val val ) {
+    @Override PtrVal eval1( Env env, Val val ) {
       PtrVal ptr = (PtrVal)val;
       StructVal s = ptr.load();
       for( int i=0; i<_flds._len; i++ )
-        s.add(_labels.at(i),fld(i).eval(e));
+        s.add(_labels.at(i),fld(i).eval(env));
       return ptr;
     }
   }
@@ -679,8 +714,8 @@ public class EXE {
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       return reduce.apply(map.apply(this),_ptr.visit(map,reduce));
     }
-    @Override Val eval0( Env e ) {
-      return _ptr.eval(e).as_dyn().at((Apply)_par);
+    @Override Val eval0( Env env ) {
+      return _ptr.eval(env).as_dyn().at((Apply)_par);
     }
   }
 
@@ -713,11 +748,13 @@ public class EXE {
   static class DynField extends Syntax {
     Syntax _ptr;                // The struct to select from; a list of labels
     Syntax _dyn;                // The DynTable, gives a self->label mapping
+    private String _label;
     DynField(Syntax ptr, Syntax dyn ) {
       _ptr = ptr;
       _dyn = dyn;
       ptr._par = this;
       dyn._par = this;
+      _label = (_uid+"Load").intern(); // Generated by TVDynTable
     }
     @Override SB str(SB sb) { return _ptr.str(sb).p("._"); }
     @Override void prep_tree(Ary<TV3> nongen) {
@@ -743,10 +780,10 @@ public class EXE {
       T ptr = reduce.apply(rez,_ptr.visit(map,reduce));
       return  reduce.apply(ptr,_dyn.visit(map,reduce));
     }
-    @Override Val eval0( Env e ) {
-      DynVal dyn = _dyn.eval(e).as_dyn();
+    @Override Val eval0( Env env ) {
+      DynVal dyn = _dyn.eval(env).as_dyn();
       String label = dyn._dyn.find_label(this);
-      return _ptr.eval(e).as_ptr().load().at(label);
+      return _ptr.eval(env).as_ptr().load().at(label);
     }
   }
 
@@ -766,9 +803,9 @@ public class EXE {
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       return reduce.apply(map.apply(this),_prog.visit(map,reduce));
     }
-    @Override public Val eval0( Env e ) {
-      e = new Env(null);
-      return _prog.eval(e);
+    @Override public Val eval0( Env env ) {
+      env = new Env(env);
+      return _prog.eval(env);
     }
 
     // Compute HM type
@@ -803,10 +840,10 @@ public class EXE {
   // --- PrimSyn ------------------------
   abstract static class PrimSyn extends Lambda {
     static final String[][] IDS = new String[][] {
-      {},
-      {"0"},
-      {"0","1"},
-      {"0","1","2"},
+      {"ctl","mem","dsp"},
+      {"ctl","mem","dsp","dyn"},
+      {"ctl","mem","dsp","dyn","0"},
+      {"ctl","mem","dsp","dyn","0","1"},
     };
     static TV3 INT64() { return new TVBase(TypeInt.INT64); }
     static TV3 FLT64() { return new TVBase(TypeFlt.FLT64); }
@@ -814,96 +851,99 @@ public class EXE {
     
     final TV3[] _tvs;
     PrimSyn(TV3... tvs) {
-      super(IDS[tvs.length-1],null);
+      super(IDS[tvs.length],null);
       _tvs = tvs;
     }
     abstract PrimSyn make();
+    abstract String name();
+    @Override final SB str(SB sb) { return sb.p(name()); }
     TV3 tret() { return _tvs[_tvs.length-1]; }
     
     @Override void prep_tree(Ary<TV3> nongen) {
-      TVLambda lam = new TVLambda(nargs()+AA.ARG_IDX,new TVLeaf(),tret());
-      for( int i=0; i<nargs(); i++ )
-        lam.arg(AA.ARG_IDX+i).unify(_tvs[i],false);
+      TVLambda lam = new TVLambda(nargs(),null,tret());
+      for( int i=0; i<_tvs.length-1; i++ )
+        lam.arg(ARG_IDX+1+i).unify(_tvs[i],false);
       _tvar = lam;
     }
     
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this);  }
-    @Override Val apply( Env e ) {
-      Val v1 = e._vs[ARG_IDX+1];
-      IntVal i0 = e._vs[ARG_IDX].as_int();
-      FltVal f0 = e._vs[ARG_IDX].as_flt();
-      if( i0!=null ) return new IntVal(iop(i0._con,v1==null ? 0   : v1.as_int()._con));
-      if( f0!=null ) return new FltVal(dop(f0._con,v1==null ? 0.0 : v1.as_flt()._con));      
+    @Override Val apply( Env env ) {
+      // See Apply.eval for field names
+      Val v0 = env.arg(0);
+      Val v1 = env.arg(1);
+      if( v0 instanceof IntVal i0 ) return new IntVal(iop(i0._con,v1==null ?  0  : v1.getl()));
+      if( v0 instanceof FltVal f0 ) return new FltVal(dop(f0._con,v1==null ?  0  : v1.getd()));
+      if( v0 instanceof StrVal s0 ) return new StrVal(sop(s0._con,v1==null ? null: v1.gets()));
       throw TODO();
     }
-    int    iop(int    x, int    y) { throw TODO(); }
+    long   iop(long   x, long   y) { throw TODO(); }
     double dop(double x, double y) { throw TODO(); }
+    String sop(String x, String y) { throw TODO(); }
   }
 
   // add integers
   static class Add extends PrimSyn {
     public Add() { super(INT64(), INT64(), INT64()); }
     @Override PrimSyn make() { return new Add(); }
-    @Override SB str(SB sb) { return sb.p("+"); }
-    @Override int iop(int x, int y) { return x+y; }
+    @Override String name() { return "+"; }
+    @Override long iop(long x, long y) { return x+y; }
   }
 
   // sub integers
   static class Sub extends PrimSyn {
     public Sub() { super(INT64(), INT64(), INT64()); }
     @Override PrimSyn make() { return new Sub(); }
-    @Override SB str(SB sb) { return sb.p("-"); }
-    @Override int iop(int x, int y) { return x-y; }
+    @Override String name() { return "-"; }
+    @Override long iop(long x, long y) { return x-y; }
   }
 
   // mul integers
   static class Mul extends PrimSyn {
     public Mul() { super(INT64(), INT64(), INT64()); }
     @Override PrimSyn make() { return new Mul(); }
-    @Override SB str(SB sb) { return sb.p("*"); }
-    @Override int iop(int x, int y) { return x*y; }
+    @Override String name() { return "*"; }
+    @Override long iop(long x, long y) { return x*y; }
   }
 
   // div integers
   static class Div extends PrimSyn {
     public Div() { super(INT64(), INT64(), INT64()); }
     @Override PrimSyn make() { return new Div(); }
-    @Override SB str(SB sb) { return sb.p("/"); }
-    @Override int iop(int x, int y) { return x/y; }
+    @Override String name() { return "/"; }
+    @Override long iop(long x, long y) { return x/y; }
   }
 
   // greater integers
   static class GT extends PrimSyn {
     public GT() { super(INT64(), INT64(), INT64()); }
     @Override PrimSyn make() { return new GT(); }
-    @Override SB str(SB sb) { return sb.p(">"); }
-    @Override int iop(int x, int y) { return x>y ? 1 : 0; }
+    @Override String name() { return ">"; }
+    @Override long iop(long x, long y) { return x>y ? 1 : 0; }
   }
 
   // equal integers
   static class EQ extends PrimSyn {
     public EQ() { super(INT64(), INT64(), INT64()); }
     @Override PrimSyn make() { return new EQ(); }
-    @Override SB str(SB sb) { return sb.p("=="); }
-    @Override int iop(int x, int y) { return x==y ? 1 : 0; }
+    @Override String name() { return "=="; }
+    @Override long iop(long x, long y) { return x==y ? 1 : 0; }
   }
 
   // inc integers
   static class Inc extends PrimSyn {
     public Inc() { super(INT64(), INT64()); }
     @Override PrimSyn make() { return new Inc(); }
-    @Override SB str(SB sb) { return sb.p("+1"); }
-    @Override int iop(int x, int y) { return x+1; }
+    @Override String name() { return "+1"; }
+    @Override long iop(long x, long y) { return x+1; }
   }
 
   // convert ints
   static class I2F extends PrimSyn {
     public I2F() { super(INT64(), FLT64()); }
     @Override PrimSyn make() { return new I2F(); }
-    @Override SB str(SB sb) { return sb.p("i2f"); }
-    @Override Val apply( Env e ) {
-      IntVal i0 = e._vs[ARG_IDX].as_int();
-      return new FltVal(i0._con);
+    @Override String name() { return "i2f"; }
+    @Override Val apply( Env env ) {
+      return new FltVal(env.arg(0).getl());
     }
   }
 
@@ -912,8 +952,8 @@ public class EXE {
     private static final Random R = new Random(0x123456789L);
     public Rnd() { super(INT64()); }
     @Override PrimSyn make() { return new Rnd(); }
-    @Override SB str(SB sb) { return sb.p("rnd"); }
-    @Override Val apply(Env e) {
+    @Override String name() { return "rnd"; }
+    @Override IntVal apply( Env env ) {
       return new IntVal(R.nextBoolean() ? 1 : 0);
     }
     static void reset() { R.setSeed(0x123456789L); };
@@ -923,7 +963,7 @@ public class EXE {
   static class FAdd extends PrimSyn {
     public FAdd() { super(FLT64(), FLT64(), FLT64()); }
     @Override PrimSyn make() { return new FAdd(); }
-    @Override SB str(SB sb) { return sb.p("f+"); }
+    @Override String name() { return "f+"; }
     @Override double dop(double x, double y) { return x+y; }
   }
 
@@ -931,7 +971,7 @@ public class EXE {
   static class FMul extends PrimSyn {
     public FMul() { super(FLT64(), FLT64(), FLT64()); }
     @Override PrimSyn make() { return new FMul(); }
-    @Override SB str(SB sb) { return sb.p("f*"); }
+    @Override String name() { return "f*"; }
     @Override double dop(double x, double y) { return x*y; }
   }
 
@@ -939,7 +979,7 @@ public class EXE {
   static class FSub extends PrimSyn {
     public FSub() { super(FLT64(), FLT64(), FLT64()); }
     @Override PrimSyn make() { return new FSub(); }
-    @Override SB str(SB sb) { return sb.p("f-"); }
+    @Override String name() { return "f-"; }
     @Override double dop(double x, double y) { return x-y; }
   }
   
@@ -947,11 +987,9 @@ public class EXE {
   static class FGT extends PrimSyn {
     public FGT() { super(FLT64(), FLT64(), INT64()); }
     @Override PrimSyn make() { return new FGT(); }
-    @Override SB str(SB sb) { return sb.p("f>"); }
-    @Override Val apply( Env e ) {
-      FltVal f0 = e._vs[ARG_IDX  ].as_flt();
-      FltVal f1 = e._vs[ARG_IDX+1].as_flt();
-      return new IntVal(f0._con > f1._con ? 1 : 0);
+    @Override String name() { return "f>"; }
+    @Override IntVal apply( Env env ) {
+      return new IntVal(env.arg(0).getd() > env.arg(1).getd() ? 1 : 0);
     }
   }
 
@@ -959,10 +997,9 @@ public class EXE {
   static class F2I extends PrimSyn {
     public F2I() { super(FLT64(), INT64()); }
     @Override PrimSyn make() { return new F2I(); }
-    @Override SB str(SB sb) { return sb.p("f2i"); }
-    @Override Val apply( Env e ) {
-      FltVal f0 = e._vs[ARG_IDX].as_flt();
-      return new IntVal((int)(f0._con+.5));
+    @Override String name() { return "f2i"; }
+    @Override IntVal apply( Env env ) {
+      return new IntVal((long)(env.arg(0).getd()+0.5));
     }
   }
 
@@ -970,10 +1007,10 @@ public class EXE {
   static class Len extends PrimSyn {
     public Len() { super(STR(), INT64()); }
     @Override PrimSyn make() { return new Len(); }
-    @Override SB str(SB sb) { return sb.p("#"); }
-    @Override Val apply( Env e ) {
-      StrVal s0 = e._vs[ARG_IDX].as_str();
-      return new IntVal(s0._con.length());
+    @Override String name() { return "#"; }
+    @Override IntVal apply( Env env ) {
+      StrVal s = (StrVal)env.arg(0);
+      return new IntVal(s._con.length());
     }
   }
 
@@ -981,11 +1018,11 @@ public class EXE {
   static class SAdd extends PrimSyn {
     public SAdd() { super(STR(), STR(), STR()); }
     @Override PrimSyn make() { return new SAdd(); }
-    @Override SB str(SB sb) { return sb.p("s+"); }
-    @Override Val apply( Env e ) {
-      StrVal s0 = e._vs[ARG_IDX  ].as_str();
-      StrVal s1 = e._vs[ARG_IDX+1].as_str();
-      return new StrVal(s0._con + s1._con);
+    @Override String name() { return "s+"; }
+    @Override Val apply( Env env ) {
+      String s0 = env.arg(0).gets();
+      String s1 = env.arg(1).gets();
+      return new StrVal(s0+s1);
     }
   }
 
@@ -993,10 +1030,10 @@ public class EXE {
   static class Str extends PrimSyn {
     public Str() { super(INT64(), STR()); }
     @Override PrimSyn make() { return new Str(); }
-    @Override SB str(SB sb) { return sb.p("str"); }
-    @Override Val apply( Env e ) {
-      IntVal i0 = e._vs[ARG_IDX].as_int();
-      return new StrVal(""+i0._con);
+    @Override String name() { return "str"; }
+    @Override StrVal apply( Env env ) {
+      Val i0 = env.arg(0);
+      return new StrVal(""+i0.getl());
     }
   }
 
@@ -1004,14 +1041,21 @@ public class EXE {
   static class Pair extends PrimSyn {
     static final String[] FLDS = new String[]{TypeFld.CLZ,"0","1"};
     private static TVLeaf x,y;
+    private static int alias;
     final int _alias;
     public Pair() {
-      super(x=new TVLeaf(),y=new TVLeaf(),new TVPtr(BitsAlias.EMPTY,new TVStruct(FLDS,new TV3[]{TVPtr.PTRCLZ,x,y})));
-      _alias = BitsAlias.new_alias(BitsAlias.LOCX);
+      super(x=new TVLeaf(),y=new TVLeaf(),new TVPtr(BitsAlias.make0(alias = BitsAlias.new_alias(BitsAlias.LOCX)),new TVStruct(FLDS,new TV3[]{TVPtr.PTRCLZ,x,y})));
+      _alias = alias;
     }
     @Override PrimSyn make() { return new Pair(); }
-    @Override SB str(SB sb) { return sb.p("pair"); }
-    @Override PtrVal apply( Env e ) { return new PtrVal(new StructVal().add(TypeFld.CLZ,PtrVal.PTRCLZ).add("0",e._vs[ARG_IDX]).add("1",e._vs[ARG_IDX+1])); }
+    @Override String name() { return "pair"; }
+    @Override PtrVal apply( Env env ) {
+      StructVal sv = new StructVal();
+      sv.add(TypeFld.CLZ,PtrVal.PTRCLZ);
+      sv.add("0",env.arg(0));
+      sv.add("1",env.arg(1));
+      return new PtrVal(_alias,sv);
+    }
   }
 
 
@@ -1052,37 +1096,40 @@ public class EXE {
     String dup_name( NonBlockingHashMapLong<String> dups ) {
       return dups.put(_uid,""+(char)('A'+dups.size()));
     }
+    long   getl() { throw TODO(); }
+    double getd() { throw TODO(); }
+    String gets() { throw TODO(); }
     public static void reset() { EVCNT=0; }
   }
 
   private static class Env extends Val {
-    final Env _e;               // Linked list
-    final Val[] _vs;            // Values; referenced via deBrujin
-    Env(Env e) { _e=e; _vs = new Val[ARG_IDX+2]; }
+    final Env _e;               // Linked list (deBrujin index)
+    private final HashMap<String,Val> _vals; // Values; referenced via string 
+    Env(Env e) { _e=e; _vals = new HashMap<>(); }
+    Val  arg(int i) { return _vals.get("arg"+i  ); }
+    void arg(int i, Val v) { _vals.put("arg"+i,v); }
     @Override SB _str0(SB sb, VBitSet visit, NonBlockingHashMapLong<String> dups) {
       sb.p("( ");
-      if( _vs[DSP_IDX]!=null ) _vs[DSP_IDX]._str(sb.p("$dyn="),visit,dups).p(',');
-      for( int i=ARG_IDX; i< _vs.length; i++ )
-        if( _vs[i] != null )
-          _vs[i]._str(sb.p("e").p(i).p("="),visit,dups).p(',');
+      for( String name : _vals.keySet() ) 
+        _vals.get(name)._str(sb.p(name).p("="),visit,dups).p(',');
       sb.unchar(1).p(")");
       return _e==null ? sb : _e._str(sb.p(','),visit,dups);
     }
     String _get_dups(VBitSet visit, NonBlockingHashMapLong<String> dups) {
       if( visit.tset(_uid) ) return dup_name(dups);
-      for( int i=DSP_IDX; i< _vs.length; i++ )
-        if( _vs[i] != null )
-          _vs[i]._get_dups(visit,dups);
+      for( Val val : _vals.values() )
+        val._get_dups(visit,dups);
       return _e==null ? null : _e._get_dups(visit,dups);
     }
   }
   
   private static class IntVal extends Val {
-    final int _con;
-    IntVal(int con) { _con=con; }
+    final long _con;
+    IntVal(long con) { _con=con; }
     IntVal as_int() { return this; }
     @Override SB _str (SB sb, VBitSet visit, NonBlockingHashMapLong<String> dups) { return sb.p(_con); }
     @Override SB _str0(SB sb, VBitSet visit, NonBlockingHashMapLong<String> dups) { throw TODO(); }
+    @Override long getl() { return _con; }
     TypeNil as_flow() { return TypeInt.con(_con); }
   }
   
@@ -1092,6 +1139,7 @@ public class EXE {
     FltVal as_flt() { return this; }
     @Override SB _str (SB sb, VBitSet visit, NonBlockingHashMapLong<String> dups) { return sb.p(_con).p("f"); }
     @Override SB _str0(SB sb, VBitSet visit, NonBlockingHashMapLong<String> dups) { throw TODO(); }
+    @Override double getd() { return _con; }
     TypeNil as_flow() { return TypeFlt.con(_con); }
   }
   
@@ -1101,6 +1149,7 @@ public class EXE {
     StrVal as_str() { return this; }
     @Override SB _str (SB sb, VBitSet visit, NonBlockingHashMapLong<String> dups) { return sb.p('"').p(_con).p('"'); }
     @Override SB _str0(SB sb, VBitSet visit, NonBlockingHashMapLong<String> dups) { throw TODO(); }
+    @Override String gets() { return _con; }
     TypeNil as_flow() { return TypeMemPtr.STRPTR; }
   }
   
@@ -1111,32 +1160,33 @@ public class EXE {
   }
   
   private static class KontVal extends Val {
-    Env _e;
+    Env _env;
     final Lambda _lam;
-    KontVal(Env e, Lambda lam) { _e=e; _lam=lam; }
+    KontVal(Env env, Lambda lam) { _env=env; _lam=lam; }
     KontVal as_kont() { return this; }
     @Override SB _str0(SB sb, VBitSet visit, NonBlockingHashMapLong<String> dups) {
       sb.p("[");
       //_lam.str();
       sb.p("LAMBDA");
       sb.p(",");
-      if( _e!=null ) _e._str(sb,visit,dups);
+      if( _env!=null ) _env._str(sb,visit,dups);
       return sb.p("]");
     }
     @Override String _get_dups(VBitSet visit, NonBlockingHashMapLong<String> dups) {
       if( visit.tset(_uid) ) return dup_name(dups);
-      return _e==null ? null : _e._get_dups(visit,dups);
+      return _env==null ? null : _env._get_dups(visit,dups);
     }
   }
   
   private static class PtrVal extends Val {
-    static final PtrVal PTRCLZ = new PtrVal(new StructVal());
+    static final PtrVal PTRCLZ = new PtrVal(0,new StructVal());
     final StructVal _val;
-    PtrVal( StructVal val ) { _val = val; }
+    final int _alias;
+    PtrVal( int alias, StructVal val ) { _val = val; _alias = alias; }
     @Override PtrVal as_ptr() { return this; }
     StructVal load() { return _val; }
     @Override SB _str0(SB sb, VBitSet visit, NonBlockingHashMapLong<String> dups) {
-      return load()._str(sb.p("*[]"),visit,dups);
+      return load()._str(sb.p("*[").p(_alias).p("]"),visit,dups);
     }
     @Override String _get_dups(VBitSet visit, NonBlockingHashMapLong<String> dups) {
       if( this==PTRCLZ ) return null;
@@ -1193,7 +1243,6 @@ public class EXE {
     }
   }
 
-  
   private static class DynVal extends Val {
     final TVDynTable _dyn;
     DynVal(TVDynTable dyn) { _dyn = dyn; }
@@ -1234,6 +1283,6 @@ public class EXE {
     Syntax.reset();
     Rnd.reset();
     Env.reset();
-    KontVal.reset();
+    com.cliffc.aa.Env.top_reset(); // Hard reset\
   }
 }

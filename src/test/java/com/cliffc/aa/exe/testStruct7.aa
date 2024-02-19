@@ -1,6 +1,6 @@
 // Self recursive structure
 // Type: A:*[]@{ x=A; }
-// Eval: A:*[]@{ x=A; }
+// Eval: A:*[17]@{ x=A; }
 q = @{
   x = q;
 };

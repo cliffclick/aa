@@ -1,4 +1,4 @@
 // y is the self-recursive function, so never returns
-// Type: { - A:{ - A -> A } -> B }
-// Eval: A:[LAMBDA,( e3=A),()]
+// Type: { - - A:{ - - A -> A } -> B }
+// Eval: A:[LAMBDA,( x=A),()]
 x = { y -> (x (y y))}; x

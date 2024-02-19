@@ -1,5 +1,5 @@
 // Function composition
-// Type: { - { - A -> B } { - B -> C } -> { - A -> C } }
+// Type: { - - { - - A -> B } { - - B -> C } -> { - - A -> C } }
 // Eval: [LAMBDA,()]
 { f g ->
   { arg ->

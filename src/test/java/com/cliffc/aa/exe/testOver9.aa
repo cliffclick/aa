@@ -1,6 +1,6 @@
 // One DynLoad, fcn needs DynTable
 // Type: *[]@{ a=int64; b=int64; c=int64; d=int64; }
-// Eval: *[]@{ a=4; b=4; c=12; d=5; }
+// Eval: *[18]@{ a=4; b=4; c=12; d=5; }
 
 fcn = { x y ->
   (@{

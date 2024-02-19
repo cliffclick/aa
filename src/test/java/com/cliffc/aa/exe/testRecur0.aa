@@ -1,5 +1,5 @@
 // factorial
-// Type: { - int64 -> int64 }
-// Eval: A:[LAMBDA,( e3=A),()]
+// Type: { - - int64 -> int64 }
+// Eval: A:[LAMBDA,( fact=A),()]
 fact = { n -> if n ? (* n (fact (- n 1))) : 1 };
 fact

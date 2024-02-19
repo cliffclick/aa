@@ -1,8 +1,8 @@
 // Recursive linked-list discovery, with no end clause.  Since this code has
 // no exit (it is an infinite loop, endlessly reading from an infinite input
 // and writing an infinite output), gcp gets a cyclic approximation.
-// Type: { - { - A -> B } C:*[]@{ n0=C; v0=A;  ..., } -> D:*[]@{ n1=D; v1=B; } }
-// Eval: A:[LAMBDA,( e3=A),()]
+// Type: { - - { - - A -> B } C:*[]@{ n0=C; v0=A;  ..., } -> D:*[]@{ n1=D; v1=B; } }
+// Eval: A:[LAMBDA,( map=A),()]
 map = { fcn lst ->
   @{ n1 = (map fcn lst.n0); v1 = (fcn lst.v0); }
 };

@@ -1,4 +1,4 @@
 // Simple id fcn 
-// Type: { - A -> A }
+// Type: { - - A -> A }
 // Eval: [LAMBDA,()]
 { x -> x }

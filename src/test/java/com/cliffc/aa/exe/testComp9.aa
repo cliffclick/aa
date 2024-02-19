@@ -1,6 +1,6 @@
 // More complicated nested application
-// Type: { - A -> *[]( _, 5, 5) }
-// Eval: [LAMBDA,A:( e3=[LAMBDA,A]),B:( e3=[LAMBDA,B]),()]
+// Type: { - - A -> *[17]( _, 5, 5) }
+// Eval: [LAMBDA,A:( map=[LAMBDA,A]),B:( fcn=[LAMBDA,B]),()]
 // fcn ignores p and returns a fcn to make a pair
 fcn = { p -> { a -> (pair a a) }};
 // map fun over x
