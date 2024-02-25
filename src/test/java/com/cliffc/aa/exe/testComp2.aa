@@ -1,6 +1,6 @@
 // Function composition
 // Type: { - - { - - A -> B } { - - B -> C } -> { - - A -> C } }
-// Eval: <*[0]@{ _ },LAM2>
+// Eval: <*[0]@{ _ },LAM3>
 { f g ->
   { arg ->
     (g (f arg))

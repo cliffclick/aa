@@ -1,5 +1,5 @@
 // factorial
 // Type: { - - int64 -> int64 }
-// Eval: A:<*[0]@{ _ fact=A; },LAM3>
+// Eval: A:<*[0]@{ _ fact=A; },LAM4>
 fact = { n -> if n ? (* n (fact (- n 1))) : 1 };
 fact

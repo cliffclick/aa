@@ -1,7 +1,7 @@
 // Gen counters
 // Simple test of captured environment
-// Type: A:*[17]( _, int64, { - - -> A })
-// Eval: *[17]( _, 1, <*[4]@{ _ $dyn=-; arg0=1; },LAM3>)
+// Type: A:*[2]( _, int64, { - - -> A })
+// Eval: *[2]( _, 1, <*[6]@{ _ $dyn=-; arg0=1; },LAM5>)
 gen = { ->
   inc = { cnt ->
    (pair cnt { -> (inc (+ cnt 1))} )

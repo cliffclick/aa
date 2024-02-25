@@ -1,5 +1,5 @@
 // Combo of simple
-// Type: *[17]( _, nint8, { - - A -> nint8 })
-// Eval: *[17]( _, 5, A:<*[0]@{ _ fun=A; },LAM1>)
+// Type: *[3]( _, nint8, { - - A -> nint8 })
+// Eval: *[3]( _, 5, A:<*[0]@{ _ fun=A; },LAM2>)
 fun = { p -> if p ? 4 : 5 };
 (pair (fun 0) fun)

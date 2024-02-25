@@ -1,5 +1,5 @@
 // Map to make a pair
-// Type: *[17]( _, 5, 5)
-// Eval: *[17]( _, 5, 5)
+// Type: *[3]( _, 5, 5)
+// Eval: *[3]( _, 5, 5)
 map = { fun x -> (fun x)};
 (map { a -> (pair a a)} 5)

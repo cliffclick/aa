@@ -1,4 +1,4 @@
 // Simple if
 // Type: { - - A -> nint8 }
-// Eval: <*[0]@{ _ },LAM1>
+// Eval: <*[0]@{ _ },LAM2>
 { p -> if p ? 4 : 5 }

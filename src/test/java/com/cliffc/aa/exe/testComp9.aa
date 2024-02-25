@@ -1,6 +1,6 @@
 // More complicated nested application
-// Type: { - - A -> *[17]( _, 5, 5) }
-// Eval: <B:*[0]@{ _ map=<B,LAM4>; },LAM5>
+// Type: { - - A -> *[2]( _, 5, 5) }
+// Eval: <B:*[0]@{ _ map=<B,LAM6>; },LAM7>
 // fcn ignores p and returns a fcn to make a pair
 fcn = { p -> { a -> (pair a a) }};
 // map fun over x

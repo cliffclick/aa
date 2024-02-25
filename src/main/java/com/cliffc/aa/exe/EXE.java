@@ -221,7 +221,7 @@ public class EXE {
     final int _uid=CNT++;
     @Override public int getAsInt() { return _uid; }
     // Frame and Lambda counter
-    static int FCNT=1;
+    static int FCNT=2;
     
     Syntax _par;                // Parent in the AST
 
@@ -256,7 +256,7 @@ public class EXE {
     abstract Val eval0( PtrVal penv );
     Val eval1( PtrVal penv, Val def ) { return def; };
 
-    static void reset() { CNT=1; FCNT=1; }
+    static void reset() { CNT=1; FCNT=2; }
 
     public void add_work() { }
   }
@@ -385,21 +385,21 @@ public class EXE {
     static final Ary<Lambda> FUNS = new Ary<>(Lambda.class);
     final Syntax _body;         // Function body
     final String[] _args;       // Argument names
-    final int _fidx;            // Unique ID for frame and lambda
+    final int _fid;             // Unique ID for frame and lambda
     
     Lambda(String[] args, Syntax body ) {
       _body = body;  if( body!=null ) body._par = this;
       _args = args;
-      _fidx = FCNT++;
-      FUNS.setX(_fidx,this);
+      _fid = FCNT++;
+      FUNS.setX(_fid,this);
     }
     @Override SB str(SB sb) {
-      sb.p(_fidx).p("{ ");
+      sb.p(_fid).p("{ ");
       for( int i=AA.DSP_IDX; i< nargs(); i++ )
         sb.p(_args[i]).p(' ');
       return _body.str(sb.p("-> ")).p(" }");
     }
-    SB strShort( SB sb ) { return sb.p("LAM").p(_fidx); }
+    SB strShort( SB sb ) { return sb.p("LAM").p(_fid); }
     int nargs() { return _args.length; }
     TV3 arg(int i) { return tvar().arg(i); }
     
@@ -475,7 +475,7 @@ public class EXE {
       // TODO: keeping existing structure until I can roll this StructVal build into
       // the function header and not at the Call/Apply site.
       StructVal env2 = new StructVal(fun._penv);
-      PtrVal penv2 = new PtrVal(fun._lam._fidx,env2);
+      PtrVal penv2 = new PtrVal(fun._lam._fid,env2);
       env2.add("$dyn",_args[ARG_IDX].eval(penv));
       for( int i=ARG_IDX+1; i<nargs(); i++ )
         env2.arg(i-(ARG_IDX+1),_args[i].eval(penv));
@@ -553,7 +553,7 @@ public class EXE {
   static class Let extends Syntax {
     final Syntax _def, _body;
     final String _arg;       // Argument name
-    int _fidx;               // Enclosing frame alias
+    int _fid;                // Enclosing frame alias
     static final Ary<Let> LETS = new Ary<Let>(Let.class);
     
     Let(String arg, Syntax def, Syntax body ) {
@@ -565,8 +565,8 @@ public class EXE {
     @Override SB str(SB sb) { return _body.str(_def.str(sb.p(_arg).p(" = ")).p("; ")); }
     @Override void prep_tree(Ary<TV3> nongen) {
       for( Syntax syn = _par; true; syn = syn._par ) {
-        if( syn instanceof Lambda lam ) { _fidx = lam ._fidx; break; }
-        if( syn instanceof Root root  ) { _fidx = root._fidx; break; }
+        if( syn instanceof Lambda lam ) { _fid = lam ._fid; break; }
+        if( syn instanceof Root root  ) { _fid = root._fid; break; }
       }
       _tvar = new TVLeaf();
       TVLeaf def = new TVLeaf();
@@ -584,7 +584,7 @@ public class EXE {
       return  reduce.apply(def,_body.visit(map,reduce));
     }
     @Override Val eval0( PtrVal penv ) {
-      PtrVal p0 = new PtrVal(_fidx,new StructVal(penv)); // Premature push: no def yet, so null
+      PtrVal p0 = new PtrVal(_fid,new StructVal(penv)); // Premature push: no def yet, so null
       Val def = _def.eval0(p0);  // Eval def part 0
       p0.load().add(_arg,def);   // Close the cycle
       _def.eval1(p0,def);        // Eval def part 1
@@ -623,16 +623,16 @@ public class EXE {
   static class Struct extends Syntax {
     final Ary<String> _labels;
     final Ary<Syntax> _flds;
-    final int _alias;
+    final int _fid;
     Struct( ) {
       _labels = new Ary<>(String.class);
       _flds = new Ary<>(Syntax.class);
-      _alias = FCNT++;
+      _fid = FCNT++;
     }
     void add( String label, Syntax fld ) { _labels.push(label); _flds.push(fld); fld._par = this; }
     Syntax fld(int i) { return _flds.at(i); }
     @Override SB str(SB sb) {
-      sb.p('*').p(_alias).p("@{ ");
+      sb.p('*').p(_fid).p("@{ ");
       for( int i=0; i<_flds._len; i++ )
         fld(i).str(sb.p(_labels.at(i)).p(" = ")).p("; ");
       return sb.unchar(1).p("}");
@@ -653,7 +653,7 @@ public class EXE {
       return rez;
     }
     @Override PtrVal eval0( PtrVal penv ) {
-      return new PtrVal(_alias,new StructVal());
+      return new PtrVal(_fid,new StructVal());
     }
     @Override PtrVal eval1( PtrVal penv, Val val ) {
       PtrVal ptr = (PtrVal)val;
@@ -797,11 +797,11 @@ public class EXE {
   // --- Root ------------------------
   public static class Root extends Syntax {
     final Syntax  _prog;
-    final int _fidx;            // Root or global frame
+    final int _fid;             // Root or global frame
     Root( Syntax prog ) {
       _prog=prog;
       prog._par = this;
-      _fidx = 0;
+      _fid = 0;
     }
     @Override SB str( SB sb ) { return _prog.str(sb.p("Root ")); }
     @Override void prep_tree(Ary<TV3> nongen) {
@@ -812,7 +812,7 @@ public class EXE {
       return reduce.apply(map.apply(this),_prog.visit(map,reduce));
     }
     @Override public Val eval0( PtrVal penv ) {
-      penv = new PtrVal(_fidx,new StructVal(null));
+      penv = new PtrVal(_fid,new StructVal(null));
       return _prog.eval(penv);
     }
 
@@ -1050,10 +1050,10 @@ public class EXE {
     static final String[] FLDS = new String[]{TypeFld.CLZ,"0","1"};
     private static TVLeaf x,y;
     private static int alias;
-    final int _alias;
+    final int _fid;
     public Pair() {
-      super(x=new TVLeaf(),y=new TVLeaf(),new TVPtr(BitsAlias.make0(alias = BitsAlias.new_alias(BitsAlias.LOCX)),new TVStruct(FLDS,new TV3[]{TVPtr.PTRCLZ,x,y})));
-      _alias = alias;
+      super(x=new TVLeaf(),y=new TVLeaf(),new TVPtr(BitsAlias.make0(alias = FCNT++),new TVStruct(FLDS,new TV3[]{TVPtr.PTRCLZ,x,y})));
+      _fid = alias;
     }
     @Override PrimSyn make() { return new Pair(); }
     @Override String name() { return "pair"; }
@@ -1062,7 +1062,7 @@ public class EXE {
       sv.add(TypeFld.CLZ,PtrVal.PTRCLZ);
       sv.add("0",penv.load().arg(0));
       sv.add("1",penv.load().arg(1));
-      return new PtrVal(_alias,sv);
+      return new PtrVal(_fid,sv);
     }
   }
 
@@ -1165,11 +1165,11 @@ public class EXE {
   private static class PtrVal extends Val {
     static final PtrVal PTRCLZ = new PtrVal(0,new StructVal());
     final StructVal _val;
-    final int _fidx;
-    PtrVal( int fidx, StructVal val ) { _val = val; _fidx = fidx; }
+    final int _fid;
+    PtrVal( int fidx, StructVal val ) { _val = val; _fid = fidx; }
     @Override PtrVal as_ptr() { return this; }
     StructVal load() { return _val; }
-    SB strShort(SB sb) { return sb.p("*[").p(_fidx).p("]"); }
+    SB strShort(SB sb) { return sb.p("*[").p(_fid).p("]"); }
     @Override SB _str0(SB sb, VBitSet visit, NonBlockingHashMapLong<String> dups) {
       return load()._str(strShort(sb),visit,dups);
     }
