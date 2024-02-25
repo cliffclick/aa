@@ -335,16 +335,7 @@ public class EXE {
             init(let,fresh ? let._def.tvar().fresh(nongen.asAry()) : let._def.tvar(),dbx,_name);
             return;
           }
-          dbx++;                // Bump deBrujin index
         }
-        //case Struct str -> {
-        //  if( str._closure ) {  // Closure is basically a pile-o-Lets
-        //    if( (_argn=str._labels.find(_name)) != -1 )
-        //      // Take TVar from the Struct, and since closure its fresh also
-        //      { init(str,str.fld(_argn).tvar().fresh(nongen.asAry()),dbx,_argn); return; }
-        //    //dbx++;              // Bump deBrujin index
-        //  }
-        //}
         case Root root -> {
           if( _name.equals("$dyn") ) {
             DefDynTable def = new DefDynTable();
@@ -584,13 +575,11 @@ public class EXE {
       return  reduce.apply(def,_body.visit(map,reduce));
     }
     @Override Val eval0( PtrVal penv ) {
-      PtrVal p0 = new PtrVal(_fid,new StructVal(penv)); // Premature push: no def yet, so null
-      Val def = _def.eval0(p0);  // Eval def part 0
-      p0.load().add(_arg,def);   // Close the cycle
-      _def.eval1(p0,def);        // Eval def part 1
-      //if( def instanceof KontVal k )
-      //  k._env = e0;            // Let Rec
-      return _body.eval(p0);
+      assert _fid==penv._fid;
+      Val def = _def.eval0(penv);  // Eval def part 0
+      penv.load().add(_arg,def);   // Close the cycle
+      _def.eval1(penv,def);        // Eval def part 1
+      return _body.eval(penv);
     }
   }
 
@@ -618,7 +607,6 @@ public class EXE {
 
 
    */
-    
 
   static class Struct extends Syntax {
     final Ary<String> _labels;
@@ -1189,12 +1177,16 @@ public class EXE {
     StructVal( ) { }
     StructVal( PtrVal env ) { add(TypeFld.CLZ,env); }
     void add( String label, Val val) {
-      if( _len == _vals.length )  {
-        _labels = Arrays.copyOf(_labels,_len<<1);
-        _vals   = Arrays.copyOf(_vals  ,_len<<1);
+      int idx = Util.find(_labels,label);
+      if( idx == -1 ) {
+        if( _len == _vals.length )  {
+          _labels = Arrays.copyOf(_labels,_len<<1);
+          _vals   = Arrays.copyOf(_vals  ,_len<<1);
+        }
+        idx = _len++;
       }
-      _labels[_len  ] = label;
-      _vals  [_len++] = val;
+      _labels[idx] = label;
+      _vals  [idx] = val;
     }
     Val at(String label) {
       int idx = Util.find(_labels,label);
