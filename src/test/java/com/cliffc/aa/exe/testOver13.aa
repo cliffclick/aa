@@ -3,5 +3,5 @@
 // fields.  The field offsets can be resolved once this function is called.
 // See testOver14.aa
 // Type: { - [[  3Load: _ in { - - A -> B }, 10Call: C, 8Load: _ in *[]@{ v=A;  ..., }]] _ -> B }
-// Eval: [LAMBDA,()]
+// Eval: <*[0]@{ _ },LAM1>
 { x -> (x._ x._.v)}

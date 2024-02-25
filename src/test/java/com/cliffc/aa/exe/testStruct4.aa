@@ -1,6 +1,6 @@
 // Simple OPEN struct test
 // Type: { - - *[]@{ u=A;  ..., } -> A }
-// Eval: [LAMBDA,A:( x=[LAMBDA,A]),()]
+// Eval: <A:*[0]@{ _ x=<A,LAM1>; },LAM2>
 
 x = { z -> z}; (x { y -> y.u})
 

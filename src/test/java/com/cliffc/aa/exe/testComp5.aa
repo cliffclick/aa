@@ -1,4 +1,4 @@
 // Defines map, ignores it
 // Type: { - - A -> 5 }
-// Eval: [LAMBDA,A:( map=[LAMBDA,A]),()]
+// Eval: <A:*[0]@{ _ map=<A,LAM2>; },LAM3>
 map = { fun -> { x -> (fun x)}}; { p -> 5 }

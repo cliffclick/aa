@@ -1,7 +1,7 @@
 // Evil old regression test.
 // Works after I allow self-cycles in structs
 // Type: A:*[]@{ succ=A; }?
-// Eval: A:*[17]@{ succ=*[17]@{ succ=*[18]@{ succ=nil; }; }; }
+// Eval: *[1]@{ succ=*[1]@{ succ=*[3]@{ succ=nil; }; }; }
 sx = { ignore ->
   self0 = @{
     succ = if (rnd) ? (sx self0) : @{succ =nil;}; // Self-cycle on self0, plus a (rnd) to end the infinite recursion
