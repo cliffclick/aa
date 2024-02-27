@@ -93,6 +93,8 @@ abstract public class TVExpanding extends TV3 {
 
   // Called from Combo after a Node unification; allows incremental update of
   // Fresh unification.
+  // TODO: PRETTY SURE I CAN REMOVE THIS ENTIRELY.
+  // JUST USE THE NORMAL WORKLIST.
   public static void do_delay_fresh() {
     int cnt=0;
     while( DELAY_FRESH.len() > 0 ) {
@@ -102,8 +104,8 @@ abstract public class TVExpanding extends TV3 {
       assert df._frsh.id().tvar()==df.lhs();
       assert df._frsh     .tvar()==df.rhs();
       assert df._frsh._nongen==df._nongen;
-      boolean progress = df._frsh.unify(false);
-      //boolean progress = df.lhs().fresh_unify(df._frsh,df.rhs(),df._nongen,false);
+      //boolean progress = df._frsh.unify(false);
+      boolean progress = df.lhs().fresh_unify(df._frsh,df._nongen,df.rhs(),false);
       Env.GVN.add_flow(df._frsh);
       assert cnt++ < 20;
     }
@@ -153,7 +155,7 @@ abstract public class TVExpanding extends TV3 {
   // Record that on the delayed fresh list and return that.  If `this` ever
   // unifies to something, we need to Fresh-unify the something with `that`.
   @Override void add_delay_fresh() {
-    if( FRESH_ROOT!=null && FRESH_ROOT._rhs!=null )
+    if( FRESH_ROOT!=null && FRESH_ROOT._rhs!=null && FRESH_ROOT._frsh!=null )
       add_delay_fresh(FRESH_ROOT);
   }
   private boolean add_delay_fresh( DelayFresh df ) {

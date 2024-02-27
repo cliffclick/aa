@@ -35,17 +35,6 @@ public class FP2DSPNode extends Node {
     // Note: cannot bypass Fresh nodes here; might need to Fresh a display.
     if( fp instanceof BindFPNode bind )
       return bind.dsp();
-    // Replace FP2DSP/Fresh/Bind/display with Fresh/display
-    if( fp instanceof FreshNode frsh ) {
-      if( frsh.id() instanceof BindFPNode bind ) {
-        Node frsh2 = frsh.copy(true).setDef(0,bind.dsp());
-        frsh2._val = bind.dsp()._val;
-        frsh2._live = _live;
-        return frsh2;
-      } else {
-        frsh.id().deps_add(this);
-      }
-    }
     return null;
   }
 

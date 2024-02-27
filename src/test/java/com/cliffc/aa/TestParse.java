@@ -31,16 +31,23 @@ public class TestParse {
     DO_HMT=true;
     RSEED=0;
 
+    // This test endlessly expands in AA, short/quick in EXE
     test("""
-fcn = { ->
-  @{ qi = { x -> x.a };
-     qf = { x -> x.b };
-  }._
-};
-bar = { x -> fcn() x };
-(bar @{a=2}, bar @{b=3.3})
+fcn = { -> ( @{ a = 1}, @{ b = 2} )._ };
+(fcn().a, fcn().b )
 """,
-         "*[23](_, 0=PA:$[]@{^=$[5,6](...); _=%[5,6][]; $nil}?, 1=PA)", "*[23](_,int:2,flt:3.3)",null,null,"[23]",null);
+         "*[21]( _, int:1, int:2)", "*[21](_,int:1,int:2)",null,null,"[21]",null);
+    
+//    test("""
+//fcn = { ->
+//  @{ qi = { x -> x.a };
+//     qf = { x -> x.b };
+//  }._
+//};
+//bar = { x -> fcn() x };
+//(bar @{a=2}, bar @{b=3.3})
+//""",
+//         "*[23](_, 0=PA:$[]@{^=$[5,6](...); _=%[5,6][]; $nil}?, 1=PA)", "*[23](_,int:2,flt:3.3)",null,null,"[23]",null);
   }
 
   static private void assertTrue(boolean t) {

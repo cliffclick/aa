@@ -332,7 +332,7 @@ public class EXE {
             boolean fresh = prior==let._body;
             if( !fresh && was_apply && !(prior instanceof Struct) )
               throw new IllegalArgumentException("Cyclic reference to "+_name);
-            init(let,fresh ? let._def.tvar().fresh(nongen.asAry()) : let._def.tvar(),dbx,_name);
+            init(let,fresh ? let._def.tvar().fresh(null,nongen.asAry()) : let._def.tvar(),dbx,_name);
             return;
           }
         }

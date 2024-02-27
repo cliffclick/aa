@@ -26,7 +26,7 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Source of unique ids
   private static int CNT=1; // Do not hand out UID 0
-  int newuid() {
+  public static int newuid() {
     assert CNT < 100000 : "infinite node create loop";
     if( CNT==AA.UID )
       System.out.print("");     // Handy break-at-UID

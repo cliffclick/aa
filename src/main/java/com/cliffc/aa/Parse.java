@@ -1052,7 +1052,7 @@ public class Parse implements Comparable<Parse> {
     keep(nn);
     nn.add_fld(TypeFld.CLZ,Access.Final, PrimNode.PCLZ, null);
     _tuple(oldx,s,bad,nn,0);
-    Node ptr = new NewNode("TUP").init();
+    Node ptr = new NewNode("NEW").init();
     Node nn0 = unkeep(nn).peep(); assert nn0==nn;
     mem(new StoreXNode(mem(),keep(ptr),nn0,bad).peep());
     return unkeep(ptr);

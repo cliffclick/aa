@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVExpanding;
@@ -19,6 +20,7 @@ public class FreshNode extends Node {
   public FreshNode( Node id, Env e ) {
     super(id);
     // Copy the set of NONGEN variables.
+    addDef(e._scope.ptr());
     for( ; e!=null; e=e._par ) {
       StructNode stk = e._scope.stk();
       for( int i=0; i<stk._nargs; i++ )
@@ -64,7 +66,8 @@ public class FreshNode extends Node {
     
   @Override public boolean unify( boolean test ) {
     TV3 fresh = id().tvar(), that = tvar();
-    return fresh.fresh_unify(this,that,_nongen,test);
+    //return fresh.fresh(this,_nongen).unify(that,test);
+    return fresh.fresh_unify(null,_nongen,that,test);
   }
   // Two FreshNodes are only equal, if they have compatible TVars
   @Override public boolean equals(Object o) {

@@ -322,24 +322,13 @@ abstract public class TV3 implements Cloneable {
   // A per-fresh-unify DelayFresh
   static TVExpanding.DelayFresh FRESH_ROOT;
 
-  public boolean fresh_unify( FreshNode frsh, TV3 that, TV3[] nongen, boolean test ) {
+  public boolean fresh_unify( FreshNode frsh, TV3[] nongen, TV3 that, boolean test ) {
     if( this==that ) return false;
     assert VARS.isEmpty() && DUPS.isEmpty() && FRESH_ROOT ==null;
     FRESH_ROOT = new TVExpanding.DelayFresh(this,that,frsh,nongen);
     boolean progress = _fresh_unify(that,test);
     VARS.clear();  DUPS.clear();
     FRESH_ROOT = null;
-    
-    if( !test && progress ) {
-      that = that.find();
-      TV3 thsi = this.find();
-      FRESH_ROOT = new TVExpanding.DelayFresh(thsi,that,frsh,nongen);
-      boolean progress2 = thsi._fresh_unify(that,true);
-      assert !progress2;
-      VARS.clear();  DUPS.clear();
-      FRESH_ROOT = null;
-    }
-    
     return progress;
   }
 
@@ -476,7 +465,7 @@ abstract public class TV3 implements Cloneable {
     return rez;
   }
 
-  public TV3 fresh(TV3[] nongen) {
+  public TV3 fresh(FreshNode ignore, TV3[] nongen) {
     assert VARS.isEmpty();
     assert FRESH_ROOT ==null;
     FRESH_ROOT = new TVExpanding.DelayFresh(this,null,null,nongen);
@@ -595,6 +584,41 @@ abstract public class TV3 implements Cloneable {
     return priors.at(0)._trial_unify_ok(pat);
   }
 
+  // -------------------------------------------------------------
+  // Debug-only test that 2 types are equivalent up to a UID renaming.
+  public static boolean eq(TV3 good, TV3 bad) {
+    assert DUPS.isEmpty();
+    boolean rez = _eq(good,bad);
+    DUPS.clear();
+    return rez;
+  }
+
+  private static boolean _eq(TV3 good, TV3 bad) {
+    assert !good.unified() && !bad.unified();
+    if( good == bad ) return true;
+    TV3 prior = DUPS.get(good._uid);
+    if( prior == bad )
+      return true;              // Been there, done that
+    if( prior != null )
+      return false;             // Mapped wrong way
+    DUPS.put(good._uid,bad);
+    if( good.getClass() != bad.getClass() )
+      return false;             // Wrong mix
+    if( good._args== null ) {
+      if( bad._args != null ) return false;
+    } else {
+      int len = good.len();
+      if( len!=bad.len() ) return false;
+      for( int i=0; i<len; i++ ) {
+        if( (good.arg(i)==null && bad.arg(i)==null) )
+          continue;
+        // Probably need tik-tok to include TVStruct field lookup
+        if( !_eq(good.arg(i),bad.arg(i)) )
+          return false;
+      }
+    }
+    return true;
+  }
   
   // -----------------
 

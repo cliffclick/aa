@@ -198,13 +198,13 @@ public class TVStruct extends TVExpanding {
     for( int i=0; i<_max; i++ ) {     // Walk left
       TV3 fthat = that.arg(_flds[i]); // Search right no CLZ
       if( fthat != null )             // If found
-        arg(i)._unify(fthat,false);   // Unify
+        find().arg(i)._unify(fthat,false);   // Unify
       // Else ignore (del right)
     }
     // Walk right, search left (local no CLZ)
     // if not found, del right
     for( int i=0; i<that._max; i++ ) { // Walk right
-      TV3 fthis = arg(that._flds[i]);  // Search left no CLZ
+      TV3 fthis = ((TVStruct)find()).arg(that._flds[i]);  // Search left no CLZ
       if( fthis == null )              // If not found
         that.del_fld(i--);             // Remove extras right
     }
