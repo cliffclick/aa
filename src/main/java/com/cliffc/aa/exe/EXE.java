@@ -96,7 +96,7 @@ public class EXE {
 
     // Parse a Lambda
     if( peek('{') ) {           // Lambda
-      Ary<String> args = new Ary<>(new String[]{null,null,null,"$dyn"});
+      Ary<String> args = new Ary<>(new String[]{null,null,TypeFld.CLZ,"$dyn"});
       while( !peek('-') ) args.push(id());
       require('>');
       return new Lambda(args.asAry(), require(fterm(),'}'));
@@ -319,9 +319,8 @@ public class EXE {
         case Lambda lam -> {
           int argn = Util.find(lam._args,_name);
           if( argn != -1 ) {
-            // Take TVar from the lambda directly; and zero-bias the arg index
-            String dbarg = Util.eq(_name,"$dyn") ? _name : ("arg"+(argn-(ARG_IDX+1))).intern();
-            init(lam, lam.arg(argn), dbx, dbarg);
+            // Take TVar from the lambda directly; and use the arg name
+            init(lam, lam.arg(argn), dbx, _name);
             return;
           }
           dbx++;                // Bump deBrujin index
@@ -390,7 +389,7 @@ public class EXE {
         sb.p(_args[i]).p(' ');
       return _body.str(sb.p("-> ")).p(" }");
     }
-    SB strShort( SB sb ) { return sb.p("LAM").p(_fid); }
+    void strShort( SB sb ) {sb.p( "LAM" ).p( _fid );}
     int nargs() { return _args.length; }
     TV3 arg(int i) { return tvar().arg(i); }
     
@@ -410,7 +409,19 @@ public class EXE {
       return reduce.apply(map.apply(this),_body.visit(map,reduce));
     }
     @Override KontVal eval0( PtrVal penv ) { return new KontVal(penv,this); }
-    Val apply( PtrVal penv ) { return _body.eval(penv); }
+
+    // Passed arguments to the call; build an environment with those args and
+    // evaluate.  The DSP_IDX arg is the prior environment (call stack).
+    Val apply( Val... args ) {
+      assert args.length==nargs();
+      // Build a local environment / stack frame
+      StructVal env = new StructVal();
+      PtrVal penv = new PtrVal(_fid,env);
+      for( int i=DSP_IDX; i<args.length; i++ )
+        env.add(_args[i],args[i]);
+      // Eval in the extended environment
+      return _body.eval(penv);
+    }
   }
 
   // --- Apply ------------------------
@@ -461,17 +472,15 @@ public class EXE {
       return rez;
     }
     @Override Val eval0( PtrVal penv ) {
-      // Eval the function
+      // Eval the function in the current environment
       KontVal fun = _fun.eval(penv).as_kont();
-      // TODO: keeping existing structure until I can roll this StructVal build into
-      // the function header and not at the Call/Apply site.
-      StructVal env2 = new StructVal(fun._penv);
-      PtrVal penv2 = new PtrVal(fun._lam._fid,env2);
-      env2.add("$dyn",_args[ARG_IDX].eval(penv));
-      for( int i=ARG_IDX+1; i<nargs(); i++ )
-        env2.arg(i-(ARG_IDX+1),_args[i].eval(penv));
-      // Eval the body, in the context of the closure extended by the args
-      return fun._lam.apply(penv2);
+      // Pass args to the lambda and build an env there
+      Val[] args = new Val[nargs()];
+      args[DSP_IDX] = fun._penv; // Use the functions' environment (call stack) when eval'ing
+      for( int i=ARG_IDX; i<nargs(); i++ )
+        args[i] = _args[i].eval(penv);
+      // Eval the body with arguments
+      return fun._lam.apply(args);
       // TODO: pre-bind Prims...
       // (3 .+ 4)  // dot-field is ok after a prim int/flt/str.  Does prim lookup & binds.
     }
@@ -836,10 +845,10 @@ public class EXE {
   // --- PrimSyn ------------------------
   abstract static class PrimSyn extends Lambda {
     static final String[][] IDS = new String[][] {
-      {"ctl","mem","dsp"},
-      {"ctl","mem","dsp","dyn"},
-      {"ctl","mem","dsp","dyn","0"},
-      {"ctl","mem","dsp","dyn","0","1"},
+      {"ctl","mem",TypeFld.CLZ},
+      {"ctl","mem",TypeFld.CLZ,"$dyn"},
+      {"ctl","mem",TypeFld.CLZ,"$dyn","arg1"},
+      {"ctl","mem",TypeFld.CLZ,"$dyn","arg1","arg2"},
     };
     static TV3 INT64() { return new TVBase(TypeInt.INT64); }
     static TV3 FLT64() { return new TVBase(TypeFlt.FLT64); }
@@ -863,10 +872,10 @@ public class EXE {
     }
     
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this);  }
-    @Override Val apply( PtrVal penv ) {
+    @Override Val apply( Val... args ) {
       // See Apply.eval for field names
-      Val v0 = penv.load().arg(0);
-      Val v1 = penv.load().arg(1);
+      Val v0 = args[ARG_IDX+1];
+      Val v1 = args.length>ARG_IDX+2 ? args[ARG_IDX+2] : null;
       if( v0 instanceof IntVal i0 ) return new IntVal(iop(i0._con,v1==null ?  0  : v1.getl()));
       if( v0 instanceof FltVal f0 ) return new FltVal(dop(f0._con,v1==null ?  0  : v1.getd()));
       if( v0 instanceof StrVal s0 ) return new StrVal(sop(s0._con,v1==null ? null: v1.gets()));
@@ -938,8 +947,8 @@ public class EXE {
     public I2F() { super(INT64(), FLT64()); }
     @Override PrimSyn make() { return new I2F(); }
     @Override String name() { return "i2f"; }
-    @Override Val apply( PtrVal penv ) {
-      return new FltVal(penv.load().arg(0).getl());
+    @Override FltVal apply( Val... args ) {
+      return new FltVal(args[ARG_IDX+1].getl());
     }
   }
 
@@ -949,7 +958,7 @@ public class EXE {
     public Rnd() { super(INT64()); }
     @Override PrimSyn make() { return new Rnd(); }
     @Override String name() { return "rnd"; }
-    @Override IntVal apply( PtrVal penv ) {
+    @Override IntVal apply( Val... args ) {
       return new IntVal(R.nextBoolean() ? 1 : 0);
     }
     static void reset() { R.setSeed(0x123456789L); };
@@ -984,8 +993,8 @@ public class EXE {
     public FGT() { super(FLT64(), FLT64(), INT64()); }
     @Override PrimSyn make() { return new FGT(); }
     @Override String name() { return "f>"; }
-    @Override IntVal apply( PtrVal penv ) {
-      return new IntVal(penv.load().arg(0).getd() > penv.load().arg(1).getd() ? 1 : 0);
+    @Override IntVal apply( Val... args ) {
+      return new IntVal(args[ARG_IDX+1].getd() > args[ARG_IDX+2].getd() ? 1 : 0);
     }
   }
 
@@ -994,8 +1003,8 @@ public class EXE {
     public F2I() { super(FLT64(), INT64()); }
     @Override PrimSyn make() { return new F2I(); }
     @Override String name() { return "f2i"; }
-    @Override IntVal apply( PtrVal penv ) {
-      return new IntVal((long)(penv.load().arg(0).getd()+0.5));
+    @Override IntVal apply( Val... args ) {
+      return new IntVal((long)(args[ARG_IDX+1].getd()+0.5));
     }
   }
 
@@ -1004,8 +1013,8 @@ public class EXE {
     public Len() { super(STR(), INT64()); }
     @Override PrimSyn make() { return new Len(); }
     @Override String name() { return "#"; }
-    @Override IntVal apply( PtrVal penv ) {
-      StrVal s = (StrVal)penv.load().arg(0);
+    @Override IntVal apply( Val... args ) {
+      StrVal s = (StrVal)args[ARG_IDX+1];
       return new IntVal(s._con.length());
     }
   }
@@ -1015,9 +1024,9 @@ public class EXE {
     public SAdd() { super(STR(), STR(), STR()); }
     @Override PrimSyn make() { return new SAdd(); }
     @Override String name() { return "s+"; }
-    @Override Val apply( PtrVal penv ) {
-      String s0 = penv.load().arg(0).gets();
-      String s1 = penv.load().arg(1).gets();
+    @Override StrVal apply( Val... args ) {
+      String s0 = args[ARG_IDX+1].gets();
+      String s1 = args[ARG_IDX+2].gets();
       return new StrVal(s0+s1);
     }
   }
@@ -1027,8 +1036,8 @@ public class EXE {
     public Str() { super(INT64(), STR()); }
     @Override PrimSyn make() { return new Str(); }
     @Override String name() { return "str"; }
-    @Override StrVal apply( PtrVal penv ) {
-      Val i0 = penv.load().arg(0);
+    @Override StrVal apply( Val... args ) {
+      Val i0 = args[ARG_IDX+1];
       return new StrVal(""+i0.getl());
     }
   }
@@ -1045,11 +1054,11 @@ public class EXE {
     }
     @Override PrimSyn make() { return new Pair(); }
     @Override String name() { return "pair"; }
-    @Override PtrVal apply( PtrVal penv ) {
+    @Override PtrVal apply( Val... args ) {
       StructVal sv = new StructVal();
       sv.add(TypeFld.CLZ,PtrVal.PTRCLZ);
-      sv.add("0",penv.load().arg(0));
-      sv.add("1",penv.load().arg(1));
+      sv.add("0",args[ARG_IDX+1]);
+      sv.add("1",args[ARG_IDX+2]);
       return new PtrVal(_fid,sv);
     }
   }
@@ -1169,7 +1178,7 @@ public class EXE {
   }
 
   private static class StructVal extends Val {
-    static final String[] ARGS = new String[]{"arg0","arg1","arg2"};
+    static final String[] ARGS = new String[]{"ctl","mem",TypeFld.CLZ,"$dyn","arg1","arg2"};
     @Override StructVal as_struct() { return this; }
     int _len;
     String[] _labels = new String[2];
