@@ -221,7 +221,7 @@ public class EXE {
     final int _uid=CNT++;
     @Override public int getAsInt() { return _uid; }
     // Frame and Lambda counter
-    static int FCNT=2;
+    static int FCNT=3;
     
     Syntax _par;                // Parent in the AST
 
@@ -241,7 +241,7 @@ public class EXE {
     abstract SB str(SB sb);
 
     // First pass
-    abstract void prep_tree(Ary<TV3> nongen);
+    abstract void prep_tree(Ary<TV3> nongen, TVPtr penv);
 
     // Later passes, true for progress
     boolean hm(boolean test) { return false; }
@@ -256,7 +256,7 @@ public class EXE {
     abstract Val eval0( PtrVal penv );
     Val eval1( PtrVal penv, Val def ) { return def; };
 
-    static void reset() { CNT=1; FCNT=2; }
+    static void reset() { CNT=1; FCNT=3; }
 
     public void add_work() { }
   }
@@ -269,7 +269,7 @@ public class EXE {
     Con( double con ) { _con = new FltVal(con); }
     Con( String con ) { _con = new StrVal(con); }
     @Override final SB str(SB sb) { return _con.str(sb); }
-    @Override void prep_tree(Ary<TV3> nongen) { _tvar = TV3.from_flow(_con.as_flow()); }
+    @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) { _tvar = TV3.from_flow(_con.as_flow()); }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
     @Override Val eval0( PtrVal penv ) { return _con; }
   }
@@ -277,96 +277,63 @@ public class EXE {
   // --- Nil ------------------------
   static class Nil extends Syntax {
     @Override SB str(SB sb) { return sb.p("nil"); }
-    @Override void prep_tree(Ary<TV3> nongen) { _tvar = new TVPtr(BitsAlias.EMPTY,new TVStruct(true)); _tvar.add_may_nil(false); }
+    @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) { _tvar = new TVPtr(BitsAlias.EMPTY,new TVStruct(true)); _tvar.add_may_nil(false); }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
     @Override NilVal eval0( PtrVal penv ) { return NilVal.NIL; }
-  }
-
-  // --- DefDynTable ------------------------
-  static class DefDynTable extends Syntax {
-    @Override SB str(SB sb) { return sb.p("def$dyn"); }
-    @Override void prep_tree(Ary<TV3> nongen) { _tvar = new TVLeaf(); }
-    @Override boolean hm(boolean test) {
-      return tvar() instanceof TVDynTable tdyn && tdyn.resolve( test );
-    }
-    @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
-    // Type flow of the TVDynTable, set after the program types
-    private DynVal _dyn;
-    // True if all resolved
-    boolean resolvedDyn() {
-      _dyn = new DynVal(tvar() instanceof TVDynTable tdyn ? tdyn : null);
-      return _dyn._dyn==null || _dyn._dyn.all_resolved(); // Type error: Failed to resolve
-    }
-    @Override DynVal eval0( PtrVal penv ) { return _dyn; }
   }
 
   // --- Ident ------------------------
   // Lambda argument or Let def
   static class Ident extends Syntax {
-    private final String _name;       // The identifier name
-
-    private Syntax _def;
-    private int _dbx;           // deBrujin index
-    private String _argn;       // Arg index for Lambda, 0 for Let
+    private final String _name; // The identifier name
+    private int _dbx;           // Display index (deBrujin); count of frames up
     
     Ident( String name ) { _name=name; }
     @Override SB str(SB sb) { return sb.p(_name); }
-    @Override void prep_tree(Ary<TV3> nongen) {
-      int dbx = 0;
-      boolean was_apply=false;
-      for( Syntax syn = _par, prior=this; syn!=null; prior=syn, syn = syn._par ) {
-        switch( syn ) {
-        case Lambda lam -> {
-          int argn = Util.find(lam._args,_name);
-          if( argn != -1 ) {
-            // Take TVar from the lambda directly; and use the arg name
-            init(lam, lam.arg(argn), dbx, _name);
-            return;
-          }
-          dbx++;                // Bump deBrujin index
-          was_apply = false;
+    @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
+
+      for( ; penv!=null; penv = penv.load().pclz() ) {
+        // Find under the given name, in the current env
+        TVStruct env = penv.load();
+        TV3 arg = env.arg(_name);
+        if( arg != null ) {
+          _tvar = isFresh() ? arg.fresh(null,nongen.asAry()) : arg;
+          return;
         }
-        case Let let -> {
-          if( let._arg.equals(_name) ) {
-            boolean fresh = prior==let._body;
-            if( !fresh && was_apply && !(prior instanceof Struct) )
-              throw new IllegalArgumentException("Cyclic reference to "+_name);
-            init(let,fresh ? let._def.tvar().fresh(null,nongen.asAry()) : let._def.tvar(),dbx,_name);
-            return;
-          }
-        }
-        case Root root -> {
-          if( _name.equals("$dyn") ) {
-            DefDynTable def = new DefDynTable();
-            def._par = _par;
-            if( _par instanceof DynField dfld ) dfld._dyn = def;
-            else if( _par instanceof AField fld ) fld._ptr = def;
-            else TODO();
-            def.prep_tree(nongen);
-            return;
-          }
-        }
-        case Apply apply -> was_apply = true;
-        default -> {}
-        }
+        // Search up a env layer
+        _dbx++;
       }
       throw TODO("'"+_name+"' not found");
     }
-    
-    private void init( Syntax def, TV3 tv, int dbx, String argn ) {
-      _tvar = tv;
-      _def  = def;
-      _dbx  = dbx;
-      _argn = argn;
+
+    private boolean isFresh() {
+      boolean was_apply=false;
+      for( Syntax syn = _par, prior=this; syn!=null; prior=syn, syn = syn._par ) {
+        switch( syn ) {
+        case Lambda lam:
+          if( Util.find(lam._args,_name)>=0 ) return false;
+          was_apply = false;
+          break;
+        case Root root when Util.eq(_name,"$dyn"):
+          return false;
+        case Let let when let._arg.equals(_name):
+          if( prior!=let._body && was_apply && !(prior instanceof Struct) )
+            throw new IllegalArgumentException("Cyclic reference to "+_name);
+          return prior==let._body;
+        case Apply apply: was_apply = true; break;
+        default: break;
+        }
+      }
+      throw TODO();
     }
-    
+
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
     @Override Val eval0( PtrVal penv ) {
       // Normal lookup using deBrujin index
       PtrVal ptr = penv;
       for( int i=0; i<_dbx; i++ )
         ptr = ptr.load().dsp();    // Index env via deBrujin index
-      return ptr.load().at(_argn); // 
+      return ptr.load().at(_name); //
     }
   }
 
@@ -393,14 +360,21 @@ public class EXE {
     int nargs() { return _args.length; }
     TV3 arg(int i) { return tvar().arg(i); }
     
-    @Override void prep_tree(Ary<TV3> nongen) {
-      _tvar = new TVLambda(nargs(),null,new TVLeaf());
+    @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
+      _tvar = new TVLambda(nargs(),penv,new TVLeaf());
+      // Extend the environment with a new call-stack/nested env
+      String[] args = Arrays.copyOfRange(_args,DSP_IDX,_args.length);
+      TV3[] vals = new TV3[args.length];
+      for( int i=DSP_IDX; i<nargs(); i++ )
+        vals[i-DSP_IDX] = arg(i);
+      TVStruct env = new TVStruct(args,vals,true);
+      penv = new TVPtr(BitsAlias.make0(_fid),env);
       // Extend the nongen set by the new variables
-      for( int i=AA.ARG_IDX; i<nargs(); i++ ) nongen.push(arg(i));
+      for( int i=ARG_IDX; i<nargs(); i++ ) nongen.push(arg(i));
       // Prep the body
-      _body.prep_tree(nongen);
+      _body.prep_tree(nongen,penv);
       // Pop nongen stack
-      nongen.pop(nargs()-AA.ARG_IDX);
+      nongen.pop(nargs()-ARG_IDX);
       // TVLambda ret is made early, unify with body now
       ((TVLambda)tvar()).ret().unify(_body.tvar(),false);
     }
@@ -444,21 +418,20 @@ public class EXE {
     }
     int nargs() { return _args.length; }
     
-    @Override void prep_tree(Ary<TV3> nongen) {
+    @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
       _tvar = new TVLeaf();
-      _fun.prep_tree(nongen);
+      _fun.prep_tree(nongen,penv);
 
       TV3 tfun = _fun.tvar();
       TVLambda lam = tfun instanceof TVLambda lam0 ? lam0
-        : new TVLambda(nargs(),null,tvar());
+        : new TVLambda(nargs(),new TVLeaf(),tvar());
       if( !(tfun instanceof TVLambda) )
         tfun.unify(lam,false);
       
       assert lam.nargs() == nargs();
       for( int i=ARG_IDX; i<nargs(); i++ ) {
-        _args[i].prep_tree(nongen);
-        if( lam.arg(i) != null )
-          lam.arg(i).unify( _args[i].tvar(), false );
+        _args[i].prep_tree(nongen,penv);
+        lam.arg(i).unify( _args[i].tvar(), false );
       }
       tvar().unify(lam.ret(),false);
     }
@@ -488,23 +461,23 @@ public class EXE {
 
   // --- If ------------------------
   static class If extends Syntax {
-    final Syntax _pred,_t,_f;
+    final Syntax _pred,_true,_fals;
     If( Syntax pred, Syntax t, Syntax f ) {
       _pred = pred; pred._par = this;
-      _t = t; t._par = this;
-      _f = f; f._par = this;
+      _true = t; t._par = this;
+      _fals = f; f._par = this;
     }
     @Override SB str(SB sb) {
-      sb.p("if ");
-      _pred.str(sb).p(" ? ");
-      _t.str(sb).p(" : ");
-      return _f.str(sb);
+      _pred.str(sb.p("if "));
+      _true.str(sb.p(" ? "));
+      _fals.str(sb.p(" : "));
+      return sb;
     }
-    @Override void prep_tree(Ary<TV3> nongen) {
+    @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
       _tvar = new TVLeaf();
-      _pred.prep_tree(nongen);
-      _t.prep_tree(nongen);
-      _f.prep_tree(nongen);
+      _pred.prep_tree(nongen,penv);
+      _true.prep_tree(nongen,penv);
+      _fals.prep_tree(nongen,penv);
 
       // pred is a simple constant?  Unify one side
       int cmp=0;
@@ -522,15 +495,15 @@ public class EXE {
       //  if( !s.may_nil() ) cmp=1;
       //}
       // Unify both sides
-      if( cmp >= 0 ) tvar().unify(_t.tvar(),false);
-      if( cmp <= 0 ) tvar().unify(_f.tvar(),false);
+      if( cmp >= 0 ) tvar().unify(_true.tvar(),false);
+      if( cmp <= 0 ) tvar().unify(_fals.tvar(),false);
     }
     
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       T slf = map.apply(this), rez;
       rez = reduce.apply(slf,_pred.visit(map,reduce));
-      rez = reduce.apply(rez,_t   .visit(map,reduce));
-      rez = reduce.apply(rez,_f   .visit(map,reduce));
+      rez = reduce.apply(rez,_true.visit(map,reduce));
+      rez = reduce.apply(rez,_fals.visit(map,reduce));
       return rez;
     }
     @Override Val eval0( PtrVal penv ) {
@@ -544,7 +517,7 @@ public class EXE {
       case PtrVal p -> true;
       default -> throw TODO();
       };
-      Syntax syn = t ? _t : _f;
+      Syntax syn = t ? _true : _fals;
       return syn.eval(penv);
     }
   }
@@ -563,18 +536,24 @@ public class EXE {
       LETS.setX(_uid,this);
     }
     @Override SB str(SB sb) { return _body.str(_def.str(sb.p(_arg).p(" = ")).p("; ")); }
-    @Override void prep_tree(Ary<TV3> nongen) {
-      for( Syntax syn = _par; true; syn = syn._par ) {
-        if( syn instanceof Lambda lam ) { _fid = lam ._fid; break; }
-        if( syn instanceof Root root  ) { _fid = root._fid; break; }
-      }
-      _tvar = new TVLeaf();
+    @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
+      // Nice frame-id matching for assert
+      _fid = penv.aliases().getbit();
+      // Define def early, for let-recursive
       TVLeaf def = new TVLeaf();
       nongen.push(def);
-      _def  .prep_tree(nongen);
+      // Add def to environment (or stomp if shadowed)
+      TVStruct env = penv.load();
+      int idx = env.idx(_arg);
+      if( idx == -1 ) env.add_fld(_arg,def); // New name
+      else            env.arg    ( idx,def); // Shadowed; stomp old value
+      // Type def in the expanded environment
+      _def.prep_tree(nongen,penv);
       nongen.pop(1);
-      def   .unify(_def .tvar(),false); // Unify def with _def._tvar
-      _body .prep_tree(nongen);
+      def.find().unify(_def .tvar(),false); // Unify def with _def._tvar
+      // Now type the in the non-fresh environment
+      _body.prep_tree(nongen,penv);
+      _tvar = new TVLeaf();
       tvar().unify(_body.tvar(),false); // Unify 'Let._tvar' with the '_body._tvar'
     }
     
@@ -634,11 +613,11 @@ public class EXE {
         fld(i).str(sb.p(_labels.at(i)).p(" = ")).p("; ");
       return sb.unchar(1).p("}");
     }
-    @Override void prep_tree(Ary<TV3> nongen) {
+    @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
       TVStruct str = new TVStruct(_labels);
-      _tvar = new TVPtr(BitsAlias.EMPTY,str);
+      _tvar = new TVPtr(BitsAlias.make0(_fid),str);
       for( int i=0; i<_flds._len; i++ ) {
-        fld(i).prep_tree(nongen);
+        fld(i).prep_tree(nongen,penv);
         str.arg(i).unify(fld(i).tvar(),false);
       }
     }
@@ -667,9 +646,9 @@ public class EXE {
     Syntax _ptr;
     Field( String lab, Syntax ptr ) { _ptr = ptr; ptr._par = this; _lab=lab; }
     @Override SB str(SB sb) { return _ptr.str(sb).p(".").p(_lab); }
-    @Override void prep_tree(Ary<TV3> nongen) {
+    @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
       _tvar = new TVLeaf();
-      _ptr.prep_tree(nongen);
+      _ptr.prep_tree(nongen,penv);
 
       TVPtr ptr = new TVPtr(BitsAlias.EMPTY,new TVStruct(new String[]{_lab},new TV3[]{_tvar},true));
       // TODO: Cannot add use_nil without the full up-cast of not-nil after IF
@@ -692,9 +671,9 @@ public class EXE {
     Syntax _ptr;
     AField( Syntax ptr ) { _ptr = ptr; ptr._par = this; }
     @Override SB str(SB sb) { return _ptr.str(sb).p(".A").p(_par._uid); }
-    @Override void prep_tree(Ary<TV3> nongen) {
+    @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
       _tvar = new TVLeaf();
-      _ptr.prep_tree(nongen);
+      _ptr.prep_tree(nongen,penv);
       
       TV3 tv3 = tvar();
       TV3 ptr = _ptr.tvar();
@@ -760,10 +739,10 @@ public class EXE {
       _label = (_uid+"Load").intern(); // Generated by TVDynTable
     }
     @Override SB str(SB sb) { return _ptr.str(sb).p("._"); }
-    @Override void prep_tree(Ary<TV3> nongen) {
+    @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
       _tvar = new TVLeaf();
-      _ptr.prep_tree(nongen);
-      _dyn.prep_tree(nongen);
+      _ptr.prep_tree(nongen,penv);
+      _dyn.prep_tree(nongen,penv);
       TVPtr ptr = new TVPtr(BitsAlias.EMPTY,new TVStruct(new String[]{},new TV3[]{},true));
       _ptr.tvar().unify(ptr,false);
       TVDynTable dyn = new TVDynTable();
@@ -795,27 +774,38 @@ public class EXE {
   public static class Root extends Syntax {
     final Syntax  _prog;
     final int _fid;             // Root or global frame
+    final TVDynTable _dyn;
     Root( Syntax prog ) {
       _prog=prog;
       prog._par = this;
-      _fid = 0;
+      _fid = 2;
+      _dyn = new TVDynTable();
     }
     @Override SB str( SB sb ) { return _prog.str(sb.p("Root ")); }
-    @Override void prep_tree(Ary<TV3> nongen) {
-      _prog.prep_tree(nongen);
+    @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
+      _prog.prep_tree(nongen,penv);
       _tvar = _prog.tvar();
+    }
+    @Override boolean hm( boolean test ) {
+      return _dyn.resolve(test);
     }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       return reduce.apply(map.apply(this),_prog.visit(map,reduce));
     }
     @Override public Val eval0( PtrVal penv ) {
-      penv = new PtrVal(_fid,new StructVal(null));
+      StructVal env = new StructVal(null);
+      env.add("$dyn",new DynVal(_dyn));
+      penv = new PtrVal(_fid,env);
       return _prog.eval(penv);
     }
 
     // Compute HM type
     Root do_hm() {
-      prep_tree(new Ary<>(TV3.class));
+      TVStruct env = new TVStruct(true);
+      TVPtr penv = new TVPtr(BitsAlias.make0(_fid),env);
+      env.add_fld("$dyn", _dyn);
+      prep_tree(new Ary<>(TV3.class), penv);
+      
       boolean progress=true;
       while( progress ) {
         progress = visit( syn -> syn.hm(false), (a,b) -> a || b );
@@ -830,13 +820,9 @@ public class EXE {
         },
         (a,b)->null);
 
-      visit( syn -> {
-          if( syn instanceof DefDynTable dyn && !dyn.resolvedDyn() ) {
-            boolean resolve_progress = dyn.hm(false);
-            throw new IllegalArgumentException("Unresolved dynamic field");
-          }
-          else return null;
-        }, (a,b) -> null );
+      assert !_dyn.unified();
+      if( !_dyn.all_resolved() )
+        throw new IllegalArgumentException("Unresolved dynamic field");
       // TODO: Worklist based HM typing
       return this;
     }
@@ -862,10 +848,10 @@ public class EXE {
     abstract PrimSyn make();
     abstract String name();
     @Override final SB str(SB sb) { return sb.p(name()); }
-    TV3 tret() { return _tvs[_tvs.length-1]; }
     
-    @Override void prep_tree(Ary<TV3> nongen) {
-      TVLambda lam = new TVLambda(nargs(),null,tret());
+    @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
+      TV3 tret = _tvs[_tvs.length-1];
+      TVLambda lam = new TVLambda(nargs(),penv,tret);
       for( int i=0; i<_tvs.length-1; i++ )
         lam.arg(ARG_IDX+1+i).unify(_tvs[i],false);
       _tvar = lam;
@@ -1045,12 +1031,9 @@ public class EXE {
   // Pair results
   static class Pair extends PrimSyn {
     static final String[] FLDS = new String[]{TypeFld.CLZ,"0","1"};
-    private static TVLeaf x,y;
-    private static int alias;
-    final int _fid;
     public Pair() {
-      super(x=new TVLeaf(),y=new TVLeaf(),new TVPtr(BitsAlias.make0(alias = FCNT++),new TVStruct(FLDS,new TV3[]{TVPtr.PTRCLZ,x,y})));
-      _fid = alias;
+      super(new TVLeaf(),new TVLeaf(),null);
+      _tvar = _tvs[2] = new TVPtr(BitsAlias.make0(_fid),new TVStruct(FLDS,new TV3[]{TVPtr.PTRCLZ,_tvs[0],_tvs[1]}));
     }
     @Override PrimSyn make() { return new Pair(); }
     @Override String name() { return "pair"; }

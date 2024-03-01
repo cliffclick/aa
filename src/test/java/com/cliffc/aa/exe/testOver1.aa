@@ -1,5 +1,5 @@
 // One DynLoad, no Fresh, resolves local
-// Type: *[3]( _, int64, flt64)
-// Eval: *[3]( _, 3, 5.700000017881393f)
+// Type: *[CLZ]( _, int64, flt64)
+// Eval: *[4]( _, 3, 5.700000017881393f)
 x = @{ i =1; f =2.3f; }; 
 (pair (+ x._ 2) (f+ x._ 3.4f))

@@ -86,6 +86,7 @@ public class TVStruct extends TVExpanding {
   }
 
   public String fld( int i ) { assert !unified();  return _flds[i]; }
+  public void fld(int i,String fld) { assert !unified();  _flds[i]=fld; }
   
   // Return the TV3 for field 'fld' or null if missing
   public TV3 arg(String fld) {
@@ -175,16 +176,18 @@ public class TVStruct extends TVExpanding {
   }
 
   private boolean _unify_impl_open( TVStruct that ) {
-    assert pclz()==null && that.pclz()==null; // No CLZ on open
+    assert (pclz() == null) == (that.pclz() == null); // No CLZ on open
     // Walk left, search right
     // If found, unify
     // else add right
     for( int i=0; i<_max; i++ ) { // Walk left
-      TV3 fthat = that.arg(_flds[i]); // Search right 
+      assert !unified() && !that.unified();
+      TV3 fthat = that.arg(_flds[i]); // Search right
       if( fthat != null )             // If found
         arg(i)._unify(fthat,false);   // Unify
       else
         that.add_fld(_flds[i],arg(i)); // Not found so add
+      assert !unified() && !that.unified();
     }
     return ptrue();
   }
@@ -196,10 +199,12 @@ public class TVStruct extends TVExpanding {
     // If found, unify
     // else ignore (del right) & assert not in CLZ
     for( int i=0; i<_max; i++ ) {     // Walk left
+      assert !unified() && !that.unified();
       TV3 fthat = that.arg(_flds[i]); // Search right no CLZ
       if( fthat != null )             // If found
         find().arg(i)._unify(fthat,false);   // Unify
       // Else ignore (del right)
+      assert !unified() && !that.unified();
     }
     // Walk right, search left (local no CLZ)
     // if not found, del right
@@ -218,12 +223,15 @@ public class TVStruct extends TVExpanding {
     // walk left (open), search right plus CLZ
     //  if found, unify
     //  else ignore (del right)
-    for( int i=0; i<_max; i++ ) {         // Walk left
-      TV3 fthat = that.arg_clz(_flds[i]); // Search right plus CLZ
-      if( fthat != null )                 // If found
-        arg(i)._unify(fthat,false);       // Unify
+    TVStruct thsi = this;
+    for( int i=0; i<thsi._max; i++ ) { // Walk left
+      TV3 fthat = that.arg_clz(thsi._flds[i]); // Search right plus CLZ
+      if( fthat != null )                      // If found
+        thsi.arg(i)._unify(fthat,false);       // Unify
       else
         ; // del_fld but already missing rhs //arg(i)._unify_err("Missing field "+_flds[i],null,null,false);
+      if( thsi.unified() ) { thsi = (TVStruct)thsi.find(); i=-1; }
+      assert !that.unified();
     }
     return ptrue();
   }
@@ -237,20 +245,24 @@ public class TVStruct extends TVExpanding {
     // if found, already unified
     // else add field
     for( int i=0; i<_max; i++ ) {        // Walk LHS
+      assert !unified() && !that.unified();
       TV3 fthat = that.arg(_flds[i]);    // Search left
       if( fthat == null )                // If not found
         that.add_fld(_flds[i],arg(i));
+      assert !unified() && !that.unified();
     }
     //assert that.pclz()!=null; // RHS is closed, has clz
     // walk right (open), search left plus CLZ
     //  if found, unify
     //  else ERROR missing field
     for( int i=0; i<that._max; i++ ) {    // Walk RHS
+      assert !unified() && !that.unified();
       TV3 fthis = arg_clz(that._flds[i]); // Search left plus CLZ
       if( fthis != null )                 // If found
         that.arg(i)._unify(fthis,false);  // Unify
       else
         that.del_fld(i--); //that.arg(i)._unify_err("Missing field "+this._flds[i],null,null,false);
+      assert !unified() && !that.unified();
     }
 
     return ptrue();

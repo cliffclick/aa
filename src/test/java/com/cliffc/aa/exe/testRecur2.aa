@@ -1,4 +1,4 @@
-// Recursive data structure
+// Recursive data structure.  I can type this, but not evaluate it.
 // Type: Cyclic reference to x
 // Eval: CRASH
 // To not crash, I need the pair to evaluate to a struct *first*, before

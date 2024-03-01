@@ -1,4 +1,4 @@
 // Simple id fcn 
-// Type: { - - A -> A }
-// Eval: <*[0]@{ _ },LAM2>
+// Type: { *[2]@{ $dyn=-;  ..., } - A -> A }
+// Eval: <*[2]@{ _ $dyn=-; },LAM3>
 { x -> x }

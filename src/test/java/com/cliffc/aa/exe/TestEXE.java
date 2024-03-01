@@ -16,7 +16,7 @@ public class TestEXE {
     File folder = new File("src/test/java/com/cliffc/aa/exe");
     File[] tests = folder.listFiles(file -> file.getName().endsWith("aa") /*&& !file.getName().contains("Over")*/);
     Arrays.sort(tests, (s0,s1) -> Util.alphanumCompare(s0.toString(),s1.toString()));
-    //tests = new File[]{new File("src/test/java/com/cliffc/aa/exe/testBasic12.aa")};
+    //tests = new File[]{new File("src/test/java/com/cliffc/aa/exe/testStruct13.aa")};
     for( File f : tests ) {
       String prog = Files.readString( f.toPath());
       String extype = get_expected(prog,"// Type: ");

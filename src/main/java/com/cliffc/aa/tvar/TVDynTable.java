@@ -135,6 +135,7 @@ public class TVDynTable extends TV3 {
 
   // UID must be found
   public boolean resolve(IntSupplier uid, boolean test) {
+    assert !unified();
     return _resolve(idx(uid),test);
   };
 
@@ -404,10 +405,12 @@ public class TVDynTable extends TV3 {
 
   @Override public TVDynTable copy() {
     TVDynTable tab = (TVDynTable)super.copy();
-    tab._max    = _max;
-    tab._uids   = _uids.clone();
-    tab._cmps   = _cmps.clone();
-    tab._labels = _labels.clone();
+    tab._max = _max;
+    if( _max > 0 ) {
+      tab._uids   = _uids.clone();
+      tab._cmps   = _cmps.clone();
+      tab._labels = _labels.clone();
+    }
     return tab;
   }
 

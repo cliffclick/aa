@@ -131,6 +131,10 @@ abstract public class TV3 implements Cloneable {
     TV3 u = arg.find();
     return u==arg ? u : (_args[i]=u);
   }
+  public void arg( int i, TV3 arg ) {
+    assert !unified();
+    _args[i] = arg;
+  }
 
   // Fetch a specific arg index, withOUT rollups
   public TV3 debug_arg( int i ) { return _args[i].debug_find(); }
