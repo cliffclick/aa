@@ -44,11 +44,13 @@ public class TypeFlt extends TypeNil<TypeFlt> {
     return super.equals(o) && _z==t2._z && _con==t2._con;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    if( _z==0 )      return ((float)_con)==_con ? sb.p((float)_con).p('f') : sb.p(_con);
-    return _strn(sb).p("flt").p(_z);
+  
+  @Override PENV _str0( PENV P ) {
+    return _z==0
+      ? P.p(_con).p(((float)_con)==_con ? "f" : "")
+      : P.p(_strn()).p("flt").p(_z);
   }
-
+  
   static TypeFlt valueOfFlt(String cid) {
     if( cid==null ) return null;
     return switch(cid) {

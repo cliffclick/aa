@@ -410,11 +410,11 @@ public class EXE {
           arg._par = this;
     }
     @Override SB str(SB sb) {
-      _fun.str(sb.p("(")).p(" ");
+      _fun.str(sb.p('(')).p(' ');
       for( Syntax arg : _args )
         if( arg != null )
-          arg.str(sb).p(" ");
-      return sb.unchar().p(")");
+          arg.str(sb).p(' ');
+      return sb.unchar().p(')');
     }
     int nargs() { return _args.length; }
     

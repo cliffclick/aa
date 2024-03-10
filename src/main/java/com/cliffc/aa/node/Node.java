@@ -91,43 +91,50 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Debugger Printing.
     
-  // {@code toString} is what you get in the debugger.  It has to print 1
-  // line (because this is what a debugger typically displays by default) and
-  // has to be robust with broken graph/nodes.
-  @Override public final String toString() {  return _printLine(new SB(),false).toString(); }
+  // {@code toString} is what you get in the debugger.  It has to print 1 line
+  // (because this is what a debugger typically displays by default) and has to
+  // be robust with broken graph/nodes.
+  @Override public final String toString() {
+    Type.PENV P = new Type.PENV();
+    if( _val!=null ) _val._str_dups(P);
+    return _printLine(P,false).toString();
+  }
 
   // Print a node on 1 line, columnar aligned, as:
   // NNID NNAME DDEF DDEF  [[  UUSE UUSE  ]]  TYPE
   // 1234 sssss 1234 1234 1234 1234 1234 1234 tttttt
-  public final SB _printLine( SB sb, boolean live ) {
+  final Type.PENV _printLine( Type.PENV P, boolean live ) {
+    SB sb = P.sb;
     // If live info requested, print
     if( live ) {
-      String slive = _live.toString();
-      sb.p("%-20.20s ".formatted(slive));
+      int old = sb.len();
+      _live._str(P);
+      int dlen = sb.len()-old;
+      if( dlen > 20 )  sb.unchar(dlen-20);
     }
     // Print uid, label
     sb.p("%4d %-7.7s ".formatted(_uid,label()));
     // Print defs
-    if( isDead() ) return sb.p("DEAD\n");
+    if( isDead() ) return P.p("DEAD\n");
     for( int i=0; i<_len; i++ ) {
       Node def = _defs[i];
       sb.p(def==null ? "____ " : "%4d ".formatted(def._uid));
     }
     // Print uses
-    for( int i = _len; i<3; i++ ) sb.p("     ");
+    for( int i = _len; i<4; i++ ) sb.p("     ");
     sb.p(" [[  ");
     for( int i=0; i<_ulen; i++ ) {
       Node use = _uses[i];
       sb.p(use==null ? "____ " : "%4d ".formatted(use._uid));
     }
     // Align the type print, except for very large nodes
-    int lim = 6 - Math.max(_len,4);
+    int lim = 7 - Math.max(_len,5);
     for( int i = _ulen; i<lim; i++ )
       sb.p("     ");
     sb.p(" ]]  ");
     // Type print
-    if( _val!= null ) _val.str(sb,true,false);
-    return sb.p("\n");
+    if( _val!= null ) _val._str(P);
+    return P.nl();
   }
 
   public String p(int d) { return NodePrinter.prettyPrint(this,d,isPrim()); }

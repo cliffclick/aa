@@ -37,13 +37,13 @@ public class TypeAry extends Type<TypeAry> implements Cyclic {
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
 
-  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    sb.p('[');
-    if( _len!=null && _len != TypeInt.INT64 ) _len._str(visit,dups,sb,debug,indent);
-    sb.p(']');
-    if( _elem !=null ) _elem._str(visit,dups,sb,debug,indent);
-    if( _elem != _stor && _stor!=null ) _stor._str(visit,dups,sb.p('/'),debug,indent);
-    return sb;
+  @Override PENV _str0( PENV P ) {
+    P.p('[');
+    if( _len!=null && _len != TypeInt.INT64 ) _len._str(P);
+    P.p(']');
+    if( _elem !=null ) _elem._str(P);
+    if( _elem != _stor && _stor!=null ) _stor._str(P.p('/'));
+    return P;
   }
 
   static { new Pool(TARY,new TypeAry()); }

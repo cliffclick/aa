@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
+import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.*;
 
 import static com.cliffc.aa.AA.TODO;
@@ -10,18 +11,20 @@ public abstract class NodePrinter {
 
   // Another bulk pretty-printer.  Makes more effort at basic-block grouping.
   public static String prettyPrint(Node node, int depth, boolean prims) { return prettyPrint(node,depth,prims,false); }
-  public static String prettyPrint(Node node, int depth, boolean prims, boolean live) { return _pp(node,depth,prims,live, new SB()).toString(); }
+  public static String prettyPrint(Node node, int depth, boolean prims, boolean live) { return _pp(node,depth,prims,live).sb.toString(); }
   public static String prettyPrint(Ary<Node> roots) {
     throw TODO();
   }
 
   // Another bulk pretty-printer.  Uses max depth better.
-  private static SB _pp(Node node, int depth, boolean prims, boolean live, SB sb) {
-
+  private static Type.PENV _pp(Node node, int depth, boolean prims, boolean live) {
+    Type.PENV P = new Type.PENV();
+    
     // All Nodes within max depth
     VBitSet visit0 = new VBitSet();
     Ary<Ary<Node>> nss = new Ary(Ary.class);
-    _pvisit(node, depth, prims, nss, visit0);
+    _pvisit(node, depth, prims, nss, visit0,live,P);
+    P.visit.clr();
     
     // Convert just that set to a post-order visit from the roots
     Ary<Node> rpos = new Ary<>(Node.class);
@@ -38,30 +41,32 @@ public abstract class NodePrinter {
     for( int i=rpos._len-1; i>=0; i-- ) {
       Node n = rpos.at(i);
       if( n.isCFG() || n.isMultiHead() ) {
-        if( !gap ) sb.nl();     // Blank before multihead
-        n._printLine(sb,live);  // Print head
+        if( !gap ) P.nl();      // Blank before multihead
+        n._printLine(P,live);   // Print head
         // Print MultiTails in a row
         while( --i >= 0 ) {
           Node t = rpos.at(i);
           if( !t.isMultiTail() ) { i++; break; }
-          t._printLine(sb,live);
+          t._printLine(P,live);
         }
-        sb.nl(); // Blank after multitail
+        P.nl();                 // Blank after multitail
         gap = true;
       } else {
-        n._printLine( sb,live );
+        n._printLine( P,live );
         gap = false;
       }
     }
-    return sb;
+    return P;
   }
 
-  private static void _pvisit(Node n, int d, boolean prims, Ary<Ary<Node>> nss, VBitSet visit) {
+  private static void _pvisit(Node n, int d, boolean prims, Ary<Ary<Node>> nss, VBitSet visit, boolean live, Type.PENV P) {
     // Skip prims unless asked-for
     if( !prims && n.isPrim() ) return;
     // Already visited at equal or deeper depth
     if( visit.tset(n._uid) && !findDel(n,d,nss) )
       return;
+    if( live && n._live!=null ) n._live._str_dups(P);
+    if(         n._val !=null ) n._val ._str_dups(P);
     // Insert n into nss at depth d
     Ary<Node> ns = nss.atX(d);
     if( ns==null )              // Lazy make depths
@@ -72,7 +77,7 @@ public abstract class NodePrinter {
     if( d > 0 )
       for( Node def : n.defs() )
         if( def!=null )
-          _pvisit(def,d-1,prims,nss,visit);
+          _pvisit(def,d-1,prims,nss,visit,live,P);
   }
 
   private static boolean findDel(Node n, int d, Ary<Ary<Node>> nss) {

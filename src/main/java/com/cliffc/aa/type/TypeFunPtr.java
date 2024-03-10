@@ -137,34 +137,34 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     return eq;
   }
 
-  @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt, boolean indent ) {
-    if( visit.tset(_uid) ) {
-      if( !dups.containsKey(_uid) )
-        dups.put(_uid,"X"+(char)('A'+ucnt._tfp++));
+  @Override public void _str_dups( PENV P ) {
+    if( P.visit.tset(_uid) ) {
+      if( !P.dups.containsKey(_uid) )
+        P.dups.put(_uid,"X"+(char)('A'+P._tfp++));
       return;
     }
-    _dsp._str_dups(visit,dups,ucnt,indent);
-    _ret._str_dups(visit,dups,ucnt,indent);
+    _dsp._str_dups(P);
+    _ret._str_dups(P);
   }
 
 
-  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    if( _any ) sb.p('~');
-    _fidxs.str(sb);
-    sb.p('{');                  // Arg list start
-    if( debug )
-      _dsp._str(visit,dups, sb, true, indent).p(",");
-    sb.p(_nargs).p(" ->");
-    boolean ind = indent && _ret._str_complex(visit,dups);
-    if( ind ) sb.nl().ii(1).i();
-    else sb.p(' ');
-    _ret._str(visit,dups, sb, debug, indent).p(' ');
-    if( ind ) sb.nl().di(1).i();
-    return _str_nil(sb.p('}'));
+  @Override PENV _str0( PENV P ) {
+    if( _any ) P.p('~');
+    _fidxs.str(P.sb);
+    P.p('{');                   // Arg list start
+    if( P.debug )
+      _dsp._str(P).p(',');
+    P.p(_nargs).p(" ->");
+    boolean ind = P.indent && _ret._str_complex(P);
+    if( P.indent ) P.sb.nl().ii(1).i();
+    else P.p(' ');
+    _ret._str(P).p(' ');
+    if( ind ) P.sb.nl().di(1).i();
+    return P.p('}').p(_str_nil());
   }
 
-  @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) {
-    return this!=_ret && _ret._str_complex(visit,dups);
+  @Override boolean _str_complex0(PENV P) {
+    return this!=_ret && _ret._str_complex(P);
   }
 
   static TypeFunPtr valueOf(Parse P, String cid, boolean any) {

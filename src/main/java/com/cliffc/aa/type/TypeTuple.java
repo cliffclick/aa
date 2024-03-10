@@ -39,26 +39,26 @@ public class TypeTuple extends Type<TypeTuple> {
   // Never part of a cycle so the normal equals works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
 
-  @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt, boolean indent ) {
+  @Override public void _str_dups( PENV P ) {
     for( Type t : _ts )
       if( t!=null )
-        t._str_dups(visit,dups,ucnt,indent);
+        t._str_dups(P);
   }
 
-  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    if( _any ) sb.p('~');
-    sb.p('{');
+  @Override PENV _str0( PENV P ) {
+    if( _any ) P.p('~');
+    P.p('{');
     if( _ts!=null && _ts.length>0 ) { // No commas for zero-length
       int j = _ts.length-1;     // Find length of trailing equal parts
       Type last = _ts[j];       // Last type
       for( j--; j>0; j-- ) if( _ts[j] != last )  break;
-      _ts[0]._str(visit,dups, sb, debug, indent ); // First type
+      _ts[0]._str(P );            // First type
       for( int i=1; i<=j+1; i++ ) // All types up to trailing equal parts
-        _ts[i]._str(visit,dups, sb.p(','), debug, indent );
-      if( j+2<_ts.length-1 )  sb.p("..."); // Abbreviate tail
-      if( _ts.length> j+2 ) last._str(visit,dups, sb.p(','), debug, indent);
+        _ts[i]._str(P.p(','));
+      if( j+2<_ts.length-1 )  P.p("..."); // Abbreviate tail
+      if( _ts.length> j+2 ) last._str(P.p(','));
     }
-    return sb.p('}');
+    return P.p('}');
   }
 
   static TypeTuple valueOf(Parse P, String cid, boolean any) {

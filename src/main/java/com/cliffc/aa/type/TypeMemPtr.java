@@ -68,30 +68,29 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     return _obj == t2._obj || _obj.cycle_equals(t2._obj);
   }
 
-  @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt, boolean indent ) {
-    if( visit.tset(_uid) ) {
-      if( !dups.containsKey(_uid) )
-        dups.put(_uid,"P"+(char)('A'+ucnt._tmp++));
+  @Override public void _str_dups( PENV P ) {
+    if( P.visit.tset(_uid) ) {
+      if( !P.dups.containsKey(_uid) )
+        P.dups.put(_uid,"P"+(char)('A'+P._tmp++));
       return;
     }
-    _obj._str_dups(visit,dups,ucnt, indent);
+    _obj._str_dups(P);
   }
 
-  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    if( _any ) sb.p('~');
+  @Override PENV _str0( PENV P ) {
+    if( _any ) P.p('~');
     // Shortcut for printing boxed primitives
     if( is_prim() && _aliases==BitsAlias.EMPTY ) {
-      if( _obj.at(0)==INTPTR ) return _obj.at(1)._str(visit,dups,sb.p("int:"),debug,indent);
-      if( _obj.at(0)==FLTPTR ) return _obj.at(1)._str(visit,dups,sb.p("flt:"),debug,indent);      
+      if( _obj.at(0)==INTPTR ) return _obj.at(1)._str(P.p("int:"));
+      if( _obj.at(0)==FLTPTR ) return _obj.at(1)._str(P.p("flt:"));      
     }
-    if( is_clz_ptr() ) return sb.p("*CLZ");
-    sb.p(_is_con ? '$' : '*');
-    if( debug ) _aliases.str(sb);
-    sb = _obj._str(visit,dups, sb, debug, indent);
-    return _str_nil(sb);
+    if( is_clz_ptr() ) return P.p("*CLZ");
+    P.p(_is_con ? '$' : '*');
+    if( P.debug ) _aliases.str(P.sb);
+    return _obj._str(P).p(_str_nil());
   }
 
-  @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return _obj._str_complex(visit,dups); }
+  @Override boolean _str_complex0(PENV P) { return _obj._str_complex(P); }
 
   boolean is_clz_ptr() { return this==Cons.CLZ_TMP; }
   

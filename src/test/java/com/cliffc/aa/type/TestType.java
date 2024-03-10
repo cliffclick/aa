@@ -1,7 +1,6 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.SB;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
@@ -24,7 +23,7 @@ public class TestType {
     Ary<Type> ts = Type.ALL_TYPES();
     String[] ss = new String[ts.len()];
     for( int i=0; i<ts.len(); i++ )
-      ss[i] = ts.at(i).str(new SB(), true, false).toString();
+      ss[i] = ts.at(i).toString();
     for( int i=0; i<ts.len(); i++ ) {
       Type t = Type._valueOf(ss[i]);
       assertSame(ts.at(i),t);
@@ -54,13 +53,13 @@ public class TestType {
       "flt64",                  // Class Float range
       "%[CLZ][]",               // BitsAlias.CLZ no nil
       "%[CLZ][]?",              // BitsAlias.CLZ yes nil
-      "*[17](_, 1, ~Scalar)",   // Bare ~type as a field
+      "*[17]( _, 1, ~Scalar)",  // Bare ~type as a field
       "[23]{any,3 -> *[7](3, Scalar) }", // Function returning a struct
-      "*[3](_, 0=PA:*[3]@{_; _*_=*[nALL](); f=flt64}, *[](), 2=PA)", // Struct with self-references
-      "PA:*[7]@{_; add=[23]{any,4 -> PA }; i=int64}", // Struct with function return self-reference
-      "PA:*[18]@{_; n1=*[17]@{_; n1=PA; FB:v1=7}; FB}", // DUP Field
-      "*[18](_, 0=PA:*[17](_, *[4,5]@{_; x=nScalar}, nScalar), 1=PA)",
-      "@{FA:head=*[17]@{_; FA}?}", // Shared field in unrelated structs
+      "*[3]( _, 0=PA:*[3]@{ _; _*_=*[nALL]CLZ; f=flt64}, *[]CLZ, 2=PA)", // Struct with self-references
+      "PA:*[7]@{ _; add=[23]{any,4 -> PA }; i=int64}", // Struct with function return self-reference
+      "PA:*[18]@{ _; n1=*[17]@{ _; n1=PA; FB:v1=7}; FB}", // DUP Field
+      "*[18]( _, 0=PA:*[17]( _, *[4,5]@{ _; x=nScalar}, nScalar), 1=PA)",
+      "@{FA:head=*[17]@{ _; FA}?}", // Shared field in unrelated structs
       "{Ctrl,[[_all_]],int64,int64}", // Label on a wrapped int
     };
     for( String s : ss ) {

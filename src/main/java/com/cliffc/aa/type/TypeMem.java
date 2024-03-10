@@ -115,27 +115,29 @@ public class TypeMem extends Type<TypeMem> {
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
 
-  @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt, boolean indent ) {
-    for( int i = 1; i< _objs.length; i++ )
-      if( _objs[i]!=null )
-        _objs[i]._str_dups(visit,dups,ucnt,indent);
+  @Override public void _str_dups( PENV P ) {
+    if( P.mem )
+      for( int i = 1; i< _objs.length; i++ )
+        if( _objs[i]!=null )
+          _objs[i]._str_dups(P);
   }
 
-  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    if( this==ALLMEM  ) return sb.p("[[_all_]]");
-    if( this==ANYMEM  ) return sb.p("[[_any_]]");
+  @Override PENV _str0( PENV P ) {
+    if( this==ALLMEM  ) return P.p("[[_all_]]");
+    if( this==ANYMEM  ) return P.p("[[_any_]]");
+    if( !P.mem ) return P.p("[[MEM]]");
 
-    sb.p("[[");
-    if( indent ) sb.ii(1).nl(); // Indent memory
+    P.p("[[");
+    if( P.indent ) P.sb.ii(1).nl(); // Indent memory
     for( int i = 1; i< _objs.length; i++ )
       if( _objs[i] != null ) {
-        if( indent ) sb.i();
-        _objs[i]._str(visit,dups, sb.p(i).p(':'), debug, indent).p(",");
-        if( indent ) sb.nl();
+        if( P.indent ) P.sb.i();
+        _objs[i]._str(P.p(i).p(':')).p(',');
+        if( P.indent ) P.nl();
       }
-    if( indent ) sb.di(1).i();
-    else sb.unchar();
-    return sb.p("]]");
+    if( P.indent ) P.sb.di(1).i();
+    else P.sb.unchar();
+    return P.p("]]");
   }
 
 

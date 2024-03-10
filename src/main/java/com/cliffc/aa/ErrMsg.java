@@ -44,25 +44,33 @@ public class ErrMsg implements Comparable<ErrMsg> {
   }
   public static ErrMsg typerr( Parse loc, Type actual, Type expected ) { return typerr(loc,actual, expected,Level.TypeErr); }
   public static ErrMsg typerr( Parse loc, Type actual, Type expected, Level lvl ) {
-    SB sb = actual.str(new SB(), false, false).p(" is not a ");
-    expected.str(sb, false, false); // Expected is already a complex ptr, does not depend on memory
+    Type.PENV P = new Type.PENV(false,false,false);
+    actual  ._str_dups(P);
+    expected._str_dups(P);
+    actual  ._str(P).p(" is not a ");
+    expected._str(P);
     if( actual==Type.ALL && lvl==Level.TypeErr ) lvl=Level.AllTypeErr; // ALLs have failed earlier, so this is a lower priority error report
-    return new ErrMsg(loc,sb.toString(),lvl);
+    return new ErrMsg(loc,P.sb.toString(),lvl);
   }
   public static ErrMsg typerr2( Parse loc, Type actual, Type[] expecteds ) {
-    SB sb = actual.str(new SB(), false, false);
-    sb.p( expecteds.length==1 ? " is not a " : " is none of (");
-    for( Type expect : expecteds ) expect.str(sb, false, false).p(',');
-    sb.unchar().p(expecteds.length==1 ? "" : ")");
-    return new ErrMsg(loc,sb.toString(),Level.TypeErr);
+    Type.PENV P = new Type.PENV(false,false,false);
+    actual._str_dups(P);
+    for( Type expect : expecteds ) expect._str_dups(P);
+    actual._str(P);
+    P.p( expecteds.length==1 ? " is not a " : " is none of (");
+    for( Type expect : expecteds ) expect._str(P).p(',');
+    P.sb.unchar().p(expecteds.length==1 ? "" : ")");
+    return new ErrMsg(loc,P.sb.toString(),Level.TypeErr);
   }
   public static ErrMsg asserterr( Parse loc, Type actual, Type expected ) {
     return typerr(loc,actual, expected,Level.Assert);
   }
   public static ErrMsg field(Parse loc, String msg, String fld, boolean closure, TypeStruct ts) {
-    SB sb = new SB().p(msg).p(Parse.isOp(fld) ? " operator '" : (closure ? " val '" : " field '.")).p(fld).p("'");
-    if( ts != null && !closure ) ts.str(sb.p(" in "), false, false);
-    return new ErrMsg(loc,sb.toString(),Level.Field);
+    Type.PENV P = new Type.PENV();
+    if( ts != null && !closure ) ts._str_dups(P);
+    P.sb.p(msg).p(Parse.isOp(fld) ? " operator '" : (closure ? " val '" : " field '.")).p(fld).p("'");
+    if( ts != null && !closure ) ts._str(P.p(" in "));
+    return new ErrMsg(loc,P.sb.toString(),Level.Field);
   }
   public static ErrMsg niladr(Parse loc, String msg, String fld) {
     String f = fld==null ? msg : msg+" field '."+fld+"'";

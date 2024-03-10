@@ -604,72 +604,74 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     return false;
   }
 
-  @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt, boolean indent ) {
-    if( visit.tset(_uid) ) {
-      if( !dups.containsKey(_uid) && _flds.length > 0 )
-        dups.put(_uid,"S"+(char)('A'+ucnt._ts++));
+  @Override public void _str_dups( PENV P ) {
+    if( P.visit.tset(_uid) ) {
+      if( !P.dups.containsKey(_uid) && _flds.length > 0 )
+        P.dups.put(_uid,"S"+(char)('A'+P._ts++));
       return;
     }
     // Do not walk the primitive prototype from the primitive, because it will
     // use short-cut printing.
-    if( !indent && is_prim_clz() ) return;
+    if( !P.indent && is_prim_clz() ) return;
 
     for( int i=0; i<len(); i++ ) // DO NOT USE iter syntax, else toString fails when the iter pool exhausts during a debug session
-      if( get(i)!=null )
-        get(i)._str_dups(visit,dups,ucnt,indent);
+      if( _flds[i]!=null )
+        _flds[i]._str_dups(P);
+    _def._str_dups(P);
   }
 
-  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    _strn(sb);
+  @Override PENV _str0( PENV P ) {
+    P.p(_strn());
     // To distinguish "DUP:(...)" from "CLZ:(...)" we require another ':' IFF DUP is present.
     //       ()  -- parses as a no-dup tuple
     //   dup:()  -- parses as a    dup tuple
 
     // Shortcuts for the large primitive clazz structures
-    if( !indent ) {
-      if( this==Cons.CLZ_CLZ ) return sb.p("CLZ");
-      if( is_top_clz() ) return sb.p("@{TOPCLZ}");
-      if( is_int_clz() ) return sb.p("@{INTCLZ}");
-      if( is_flt_clz() ) return sb.p("@{FLTCLZ}");
-      if( is_str_clz() ) return sb.p("@{STRCLZ}");
-      if( is_math_clz()) return sb.p("@{MATHCLZ}");
-      if( is_str() ) return sb.p("str:("+_flds[1]._t+")");
+    if( !P.indent ) {
+      if( this==Cons.CLZ_CLZ ) return P.p("CLZ");
+      if( is_top_clz() ) return P.p("@{TOPCLZ}");
+      if( is_int_clz() ) return P.p("@{INTCLZ}");
+      if( is_flt_clz() ) return P.p("@{FLTCLZ}");
+      if( is_str_clz() ) return P.p("@{STRCLZ}");
+      if( is_math_clz()) return P.p("@{MATHCLZ}");
+      if( is_str() ) return P.p("str:("+_flds[1]._t+")");
     }
 
     boolean is_tup = is_tup();
-    sb.p(is_tup ? "(" : "@{");
+    P.p(is_tup ? "(" : "@{");
     // Set the indent flag once for the entire struct.  Indent if any field is complex.
     boolean ind = false;
     for( TypeFld fld : _flds )
-      if( (debug || !Util.eq(fld._fld,TypeFld.CLZ)) && (fld._t!=null && fld._t._str_complex(visit,dups)) )
-        ind=indent;           // Field is complex, indent if asked to do so
-    if( ind ) sb.ii(1);
+      if( (P.debug || !Util.eq(fld._fld,TypeFld.CLZ)) && (fld._t!=null && fld._t._str_complex(P)) )
+        ind=P.indent;           // Field is complex, indent if asked to do so
+    if( ind ) P.sb.ii(1);
     boolean sep=false;
     for( TypeFld fld : _flds ) {
-      if( fld==Cons.CLZ_FLD ) sb.p(" _"); // Short-cut the ever-present display
+      if( fld==Cons.CLZ_FLD ) P.p(" _"); // Short-cut the ever-present display
       else {
-        if( ind ) sb.nl().i();
-        fld._str(visit,dups, sb, debug, indent ); // Field name, access mod, type
+        if( ind ) P.sb.nl().i();
+        fld._str(P);            // Field name, access mod, type
       }
-      sb.p(is_tup ? ", " : "; "); // Between fields
+      P.p(is_tup ? ", " : "; "); // Between fields
       sep=true;
     }
-    if( _def==ALL ) sb.p("..."); // Any extra fields are allowed
-    else if( _def==ANY ) { // No extra fields
-      if( sep ) sb.unchar().unchar();
-    } else sb.p('$').p(_def);    // Unusual extra fields
-    if( ind ) sb.nl().di(1).i();
-    sb.p(!is_tup ? "}" : ")");
-    return sb;
+    if( _def==ALL ) P.p("..."); // Any extra fields are allowed
+    else if( _def==ANY ) {      // No extra fields
+      if( sep ) P.sb.unchar(2);
+    } else {
+      _def._str(P.p('$'));      // Unusual extra fields
+    }
+    if( ind ) P.sb.nl().di(1).i();
+    return P.p(!is_tup ? "}" : ")");
   }
 
-  @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return true; }
+  @Override boolean _str_complex0(PENV P) { return true; }
 
   boolean is_top_clz () { return _flds.length>1 && Util.eq("math",_flds[1]._fld); }
   boolean is_int_clz () { return find("!_" ) != -1; }
   boolean is_flt_clz () { return find("sin") != -1; }
   boolean is_str_clz () { return _flds.length>1 && Util.eq("#_"  ,_flds[1]._fld); }
-  boolean is_math_clz() { return _flds.length>1 && Util.eq("pi"  ,_flds[0]._fld); }
+  boolean is_math_clz() { return _flds.length>1 && Util.eq("pi"  ,_flds[1]._fld); }
   boolean is_prim_clz() {
     return is_top_clz()
       ||   is_int_clz()

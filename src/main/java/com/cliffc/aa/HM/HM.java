@@ -555,7 +555,7 @@ public class HM {
     final SB p0(SB sb, VBitSet visit, VBitSet dups) {
       p1(sb.i(),dups).p('#').p(_uid);
       if( DO_HM  ) _hmt .str(sb.p(", HMT="), visit,dups,false);
-      if( DO_GCP ) _flow.str(sb.p(", GCP="), true, false );
+      if( DO_GCP ) _flow._str(new Type.PENV(sb.p(", GCP="), true, false,false) );
       sb.nl();
       return p2(sb.ii(2),visit,dups).di(2);
     }
@@ -588,7 +588,7 @@ public class HM {
           default -> throw TODO();
           }).p('"');
 
-      return _con.str(sb,true,false);
+      return _con._str(new Type.PENV(sb,true,false,false)).sb;
     }
     @Override SB p2(SB sb, VBitSet visit, VBitSet dups) { return sb; }
     @Override boolean hm(Work<Syntax> work) { return false; }

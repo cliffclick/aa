@@ -82,25 +82,26 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     return _t.cycle_equals(((TypeFld)o)._t);
   }
 
-  @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt, boolean indent ) {
-    if( visit.tset(_uid) ) {
-      if( !dups.containsKey(_uid) )
-        dups.put(_uid,"F"+(char)('A'+ucnt._fld++));
-      return;
-    }
-    if( _t!=null ) _t._str_dups(visit,dups,ucnt, indent);
-  }
-
   static boolean isDigit(char c) { return '0' <= c && c <= '9'; }
   static boolean isTup(String fld) {
     return isDigit(fld.charAt(0)) && isDigit(fld.charAt(fld.length()-1));
   }
-  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
+
+  @Override public void _str_dups( PENV P ) {
+    if( P.visit.tset(_uid) ) {
+      if( !P.dups.containsKey(_uid) )
+        P.dups.put(_uid,"F"+(char)('A'+P._fld++));
+      return;
+    }
+    if( _t!=null ) _t._str_dups(P);
+  }
+
+  @Override PENV _str0( PENV P ) {
     if( !isTup(_fld) || // Do not print number-named final fields for tuples, unless dups are involved
         _access!=Access.Final ||  // Odd access permissions
-        dups.get(_uid)!=null || _t==null || dups.get(_t._uid)!=null ) // DUP:_t is ambiguous with DUP:0=_t and 0=DUP:_t; so print field name
-      _access.str(sb.p(_fld));                                        // Print "field="
-    return _t==null ? sb.p('!') : (_t._str(visit, dups, sb, debug, indent));
+        P.dups.get(_uid)!=null || _t==null || P.dups.get(_t._uid)!=null ) // DUP:_t is ambiguous with DUP:0=_t and 0=DUP:_t; so print field name
+      P.p(_fld).p(_access.str()); // Print "field="
+    return _t==null ? P.p('!') : _t._str(P);
   }
 
   // Parse "=type" and all variants of "=" in SHORTS, or return null.
@@ -175,7 +176,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     private static final String[] SHORTS = new String[]{"="    ,"=="       ,":="        ,/*"~="      ,*/"!:=!","!==!","!=!"};
     private static final String[] LONGS  = new String[]{"final","read-only","read/write",/*"noaccess",*/"!:=!","!==!","!=!"};
     @Override public String toString() { return LONGS[ordinal()]; }
-    public SB str(SB sb) { return sb.p(SHORTS[ordinal()]); }
+    public String str() { return SHORTS[ordinal()]; }
   }
 
   // Setting the type during recursive construction.

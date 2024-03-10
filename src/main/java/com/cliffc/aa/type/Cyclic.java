@@ -377,7 +377,7 @@ public interface Cyclic {
         _uid(_uid(tfp.fidxs().str(sb).p("{ "), tfp.dsp()).p(" -> "), tfp._ret).p(" }");
       }
       case Type.TARY -> throw TODO();
-      default -> h.str(sb, false, false);
+      default -> sb.p(h.toString());
       }
       return sb;
     }

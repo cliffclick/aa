@@ -35,9 +35,10 @@ public class TypeRPC extends TypeNil<TypeRPC> {
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
 
-  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    if( _any ) sb.p('~');
-    return _str_nil(_rpcs.str(sb.p("#")));
+  @Override PENV _str0( PENV P ) {
+    if( _any ) P.p('~');
+    _rpcs.str(P.p('#').sb);
+    return P.p(_str_nil());
   }
 
   static TypeRPC valueOf(Parse P, String cid, boolean any) {

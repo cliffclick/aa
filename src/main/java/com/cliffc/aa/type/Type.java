@@ -209,61 +209,83 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // args stop cycles (VBitSet) or sharpen pointers (TypeMem), or optimize
   // printing strings (SB).
 
+    
+  // "Print Environment" - bunch of flags to shorten all the print signatures
+  public static class PENV {
+    public final SB sb;
+    public final VBitSet visit;        // Been there, done that
+    public final NonBlockingHashMapLong<String> dups; // Types appearing more than once
+    public final boolean debug;        // dump raw aliases and fidxs
+    public final boolean indent;       // indent the output (more than 1 line outout)
+    public final boolean mem;          // dump memory
+    int _fld, _tmp, _tfp, _ts;  // Counters for fancy printing
+    public PENV() { this(true,false,false); }
+    public PENV(boolean debug, boolean indent, boolean mem) { this(new SB(),debug,indent,mem); }
+    public PENV(SB sb, boolean debug, boolean indent, boolean mem) {
+      this.sb = sb;
+      visit = new VBitSet();
+      dups = new NonBlockingHashMapLong<>();
+      this.debug = debug;
+      this.indent = indent;
+      this.mem = mem;
+    }
+    public PENV p(String s) { sb.p(s); return this; }
+    public PENV p(char   c) { sb.p(c); return this; }
+    public PENV p(long   i) { sb.p(i); return this; }
+    public PENV p(double d) { sb.p(d); return this; }
+    public PENV nl() { sb.nl(); return this; }
+
+    @Override public String toString() { return sb.toString(); }
+  }
+
+
   // toString is called on a single Type in the debugger, and prints debug-info.
   @Override public final String toString() {
-    String rez = str(new SB(), true, false).toString();
+    PENV P = new PENV();
+    _str_dups(P);
+    P.visit.clr();
+    String rez = _str(P).sb.toString();
+    // Uncomment to test bi-jections
     //Type t = _valueOf(rez);
     //assert t==this;
     return rez;
   }
-  // Nice, REPL-friendly and error-friendly dump.  Debug flag dumps, e.g. raw
-  // aliases and raw fidxs.  Non-debug dumps are used in ErrMsg.  Many debug
-  // dumps use this version, and intersperse types with other printouts in the
-  // same SB.  This is the 'base' printer, as changing this changes behavior.
-  public final SB str( SB sb, boolean debug, boolean indent ) { return str(sb,null,null,debug,indent); }
-  public final SB str( SB sb, VBitSet typebs, NonBlockingHashMapLong<String> dups, boolean debug, boolean indent ) {
-    if( dups==null ) {
-      assert typebs==null;
-      _str_dups(typebs = new VBitSet(), dups = new NonBlockingHashMapLong<>(), new UCnt(), indent);
-      typebs.clr();
-    }
-    return _str(typebs, dups, sb, debug, indent );
-  }
-  public static class UCnt { int _fld, _tmp, _tfp, _ts; }
 
   // The debug printer must have good handling of dups and cycles - on
   // partially-built types.  It can depend on the UID but not on, e.g., all
   // fields being filled, or the types being interned or having their hash.
   // Walk the entire reachable set of types and gather the dups, and come up
   // with a nice name for each dup.
-  public void _str_dups(VBitSet visit, NonBlockingHashMapLong<String> ignore, UCnt ucnt, boolean indent) { visit.tset(_uid); }
+  public void _str_dups(PENV P) { P.visit.tset(_uid); }
 
   // Internal tick of tick-tock printing
-  final SB _str( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    if( _hash==0 ) sb.p("!!!");
+  public final PENV _str( PENV P ) {
+    if( _hash==0 ) P.p("!!!");
 
     // Some early cutouts for common bulky cases
-    if( this instanceof TypeStruct && this==TypeStruct.ISUSED ) return sb.p("(...)"); // Shortcut for common case
+    if( this instanceof TypeStruct && this==TypeStruct.ISUSED ) return P.p("(...)"); // Shortcut for common case
 
     // Print a dups label, and optionally the type
-    String s = dups.get(_uid);
+    String s = P.dups.get(_uid);
     if( s!=null ) {
-      sb.p(s);                  // Pretty name
-      if( visit.tset(_uid) ) return sb; // Pretty name got defined before
-      sb.p(':');                // pretty name is defined here
+      P.p(s);                            // Pretty name
+      if( P.visit.tset(_uid) ) return P; // Pretty name got defined before
+      P.p(':');                          // pretty name is defined here
     }
-    return _str0(visit,dups,sb,debug,indent);
+    // Recursive tock printing
+    return _str0(P);
   }
 
   // Internal tock of tick-tock printing
-  SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) { return sb.p(STRS[_type]); }
+  PENV _str0( PENV P ) { return P.p(STRS[_type]); }
 
   // True if type is complex to print, and should indent when printing a Type
-  final boolean _str_complex(VBitSet visit, NonBlockingHashMapLong<String> dups) {
-    if( visit.test(_uid) && dups.containsKey(_uid) ) return false;
-    return _str_complex0(visit,dups);
+  final boolean _str_complex(PENV P) {
+    if( P.visit.test(_uid) && P.dups.containsKey(_uid) ) return false;
+    return _str_complex0(P);
   }
-  boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return false; }
+  boolean _str_complex0(PENV P) { return false; }
+
 
   // Shallow array compare, using '==' instead of 'equals'.  Since elements are
   // interned, this is the same as 'equals' except asymptotically faster unless
@@ -893,7 +915,10 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       t = TypeInt.valueOfInt(id);
       if( t!=null ) return t;
       // Succeed or return null
-      return TypeFlt.valueOfFlt(id);
+      t = TypeFlt.valueOfFlt(id);
+      if( t!=null ) return t;
+
+      return null;  // fail
     }
     char at(int x) { return _str.charAt(x); }
     char skipWS() { // Advance to 1st not-WS char and return it, or -1 for end-of-string

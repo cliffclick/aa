@@ -95,27 +95,27 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     {{ "~_0" ,"~n" },  // any, !nil, {!sub,sub}  AND, NOT
      {"~nil_","~"  }}  // any,  nil, {!sub,sub}  YES, OR
   };
-  SB _strn(SB sb) { return sb.p(NSTRS[_any ?1:0][_nil ?1:0][_sub ?1:0]); }
-  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
+  String _strn() { return NSTRS[_any ?1:0][_nil ?1:0][_sub ?1:0]; }
+  @Override PENV _str0( PENV P ) {
     assert this.getClass().equals(TypeNil.class);  // Subclasses handle directly
-    if( this== NIL ) return sb.p( "nil");
-    if( this==XNIL ) return sb.p("xnil");
+    if( this== NIL ) return P.p( "nil");
+    if( this==XNIL ) return P.p("xnil");
     if(  _any && _aliases==BitsAlias.NANY && _fidxs==BitsFun.NANY )
-      return _strn(sb).p("Scalar");
+      return P.p(_strn()).p("Scalar");
     if( !_any && _aliases==BitsAlias.NALL && _fidxs==BitsFun.NALL )
-      return _strn(sb).p("Scalar");
+      return P.p(_strn()).p("Scalar");
     // Fancy with aliases and fidxs
-    if( _any ) sb.p('~');
-    _aliases.str(sb.p('%'));
-    _fidxs  .str(sb);
-    return _str_nil(sb);
+    if( _any ) P.p('~');
+    _aliases.str(P.p('%').sb);
+    _fidxs  .str(P.sb);
+    return P.p(_str_nil());
   }
   // Called from subclasses, which already handle _any.  Appends something for may/must.
   private static final String[][] XSTRS = new String[][]{
     { "?" , ""  }, // all, !nil, {!sub,sub}
     { "=0", "+0"}  // all,  nil, {!sub,sub}
   };
-  SB _str_nil( SB sb ) { return sb.p(XSTRS[_nil ?1:0][_sub ?1:0]); }
+  String _str_nil() { return XSTRS[_nil ?1:0][_sub ?1:0]; }
 
   N val_nil( Parse P ) {
     if( P.peek('?' ) ) _nil = _sub = false;
@@ -131,6 +131,7 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     case "nil"     ->  NIL;     // FTF
     case "xnil"    -> XNIL;     // TTF
     case "_0Scalar" -> make(false,true,true);
+    case "CLZ"     -> Cons.CLZ_CLZ;
     default        -> null;
     };
   }
