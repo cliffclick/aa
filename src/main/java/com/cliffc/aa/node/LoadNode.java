@@ -342,7 +342,7 @@ public class LoadNode extends Node {
     if( tstr.is_open() ) return test || tstr.add_fld(_fld,tvar() );
 
     // Search up the super-clazz chain
-    for( ; tstr!=null; tstr = tstr.pclz().load() ) {
+    for( ; tstr.len()>0; tstr = tstr.pclz().load() ) {
       assert !tstr.is_open();  // Invariant: superclazzes not open
       // If the field is in the struct, unify and done
       fld = tstr.arg(_fld);
