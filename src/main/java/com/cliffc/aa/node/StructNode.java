@@ -85,7 +85,7 @@ public class StructNode extends Node {
       sb.p(_flds.at(i)).p("; ");
     }
     if( _flds._len>0 ) sb.unchar(2);
-    return sb.p("}").toString();
+    return sb.p("}").toString().intern();
   }
   
   // Only if closed

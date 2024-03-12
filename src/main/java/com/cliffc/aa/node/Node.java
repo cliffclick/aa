@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
+import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.tvar.*;
@@ -606,7 +607,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( !_elock ) {             // Not in VALS and can still replace
       Node x = VALS.get(this);  // Try VALS
       if( x != null )           // Hit
-        throw TODO(); //return merge(x);        // Graph replace with x
+        return merge(x);        // Graph replace with x
     }
 
     // Try general ideal call
@@ -639,14 +640,14 @@ public abstract class Node implements Cloneable, IntSupplier {
     return null;
   }
 
-  //// At least as alive
-  //private Node merge(Node x) {
-  //  x._live = x._live.meet(_live);
-  //  if( Combo.post() && tvar() != x.tvar() )
-  //    tvar().unify(x.tvar(),false);
-  //  return GVN.add_flow(x);
-  //}
-
+  // At least as alive
+  private Node merge(Node x) {
+    x._live = x._live.meet(_live);
+    if( Combo.post() && tvar() != x.tvar() )
+      tvar().unify(x.tvar(),false);
+    return GVN.add_flow(x);
+  }
+  
   // Change values at this Node directly.
   public Node do_flow() {
     Node progress=null;

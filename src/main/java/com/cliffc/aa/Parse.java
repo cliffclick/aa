@@ -1454,14 +1454,15 @@ public class Parse implements Comparable<Parse> {
   // OR when defining a type constructor.  Not allowed to forward-ref normal
   // variables, so this is a function variable, not yet defined.  Use an
   // ForwardRef until it gets defined.
-  private ForwardRefNode val_fref(String tok, Parse bad) {
+  private Node val_fref(String tok, Parse bad) {
     ForwardRefNode fref = new ForwardRefNode(tok,bad).init();
     // Place in nearest enclosing closure scope, this will keep promoting until we find the actual scope
     Env e = _e;
     while( e._scope.test_if() ) e = e._par;
     StructNode stk = e._scope.stk();
     stk.add_fld(tok,Access.Final,fref,null);
-    return fref;
+    Node frsh = new FreshNode(fref,_e).peep();
+    return frsh;
   }
   
   // Create a type forward-reference.  Must be type-defined later.  Called when

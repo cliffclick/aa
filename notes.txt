@@ -1,4 +1,32 @@
 =======================================
+03/12/2024
+
+Thinking that not inserting Fresh during parse doesn't work, because lost NONGEN inputs.
+
+Thinking instead of removing extra FRESH, but this probably requires a global pre-pass.
+
+See testRecur12.aa.sav, TestParse.jig for examples.
+
+So...
+
+Parsing A= definition.  Find forward ref B.  GO up scope, find mid-def of A,
+add "B" as a dependence.
+
+Parsing D= def.  Find fref B; go up scope; find mid-def of D, add "B" as a
+dependence.  Repeat for fref C; D ends up with deps {B,C}
+
+Parsing C= def.  Find fref A; add "A" as a dep.
+
+Parsing B= def.  Find fref C; add "C" as a dep.
+
+End of struct, topo-sort by deps and find cycle.  Declare {A,B,C} mutual let-rec.
+Revisit Fresh loads inserted by FREF resolve, and kill extra Fresh.
+
+Leave them in for D's
+
+
+
+=======================================
 03/10/2024
 
 When defining a top-level frame, it is defined in parts and each part may (or
