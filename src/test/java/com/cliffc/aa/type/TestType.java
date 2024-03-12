@@ -23,7 +23,7 @@ public class TestType {
     Ary<Type> ts = Type.ALL_TYPES();
     String[] ss = new String[ts.len()];
     for( int i=0; i<ts.len(); i++ )
-      ss[i] = ts.at(i).toString();
+      ss[i] = ts.at(i).toString(true,false,true);
     for( int i=0; i<ts.len(); i++ ) {
       Type t = Type._valueOf(ss[i]);
       assertSame(ts.at(i),t);

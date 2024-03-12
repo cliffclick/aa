@@ -426,7 +426,7 @@ public final class CallEpiNode extends Node {
             // Call liveness are already meeting EXTMEM.
             // We can wire if the meet-over-all-wired liveness is below the current liveness.
             //TypeMem mlive = (TypeMem)mem._live.meet(TypeMem.EXTMEM);
-            TypeMem mlive = (TypeMem)mem._live.meet(TypeMem.ANYMEM);
+            Type mlive = mem._live.meet(TypeMem.ANYMEM);
             if(  LIFTING && !mlive.isa(call._live) ) return progress;
           }
           ret = ret2; fun = fun2;

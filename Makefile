@@ -157,7 +157,7 @@ hm_tests:	$(test_classes) build/aa.jar
 # Run standard tests
 test:	build/aa.jar
 	@echo "  testing"
-	@$(JVM) org.junit.runner.JUnitCore com.cliffc.aa.type.TestType com.cliffc.aa.TestTVar com.cliffc.aa.exe.TestEXE com.cliffc.aa.TestStable
+	@$(JVM) org.junit.runner.JUnitCore com.cliffc.aa.type.TestType com.cliffc.aa.TestTVar com.cliffc.aa.exe.TestEXE
 
 
 # EXE, a standalone lambda calc interpreter

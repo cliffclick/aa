@@ -94,8 +94,8 @@ abstract public class TV3 implements Cloneable {
   }
 
   // Find the leader, with rollup.  Used in many, many places.
-  public TV3 find() {
-    TV3 leader = _find0();
+  public <T extends TV3> T find() {
+    T leader = (T)_find0();
     return leader;
     //// Additional read-barrier for TVNil to collapse nil-of-something
     //if( !(leader instanceof TVNil tnil) ) return leader;
@@ -760,8 +760,8 @@ abstract public class TV3 implements Cloneable {
 
   // Look for dups, in a tree or even a forest (which Syntax.p() does).  Does
   // not rollup edges, so that debug printing does not have any side effects.
-  public VBitSet get_dups(boolean debug) { return _get_dups(new VBitSet(),new VBitSet(),debug,false); }
-  public VBitSet _get_dups(VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
+  public final VBitSet get_dups(boolean debug) { return _get_dups(new VBitSet(),new VBitSet(),debug,false); }
+  public final VBitSet _get_dups(VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     // Skip dups checks inside common primitives
     if( _uf==null && this instanceof TVStruct clzz && !prims &&
         (clzz.is_int_clz() || clzz.is_flt_clz() || clzz.is_str_clz()) )

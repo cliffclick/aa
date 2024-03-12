@@ -46,11 +46,9 @@ public class FP2DSPNode extends Node {
     if( tv instanceof TVLambda fun )
       return fun.dsp();
     
-    //_tvar=new TVLeaf();
-    //new TVLambda(nargs,_tvar,new TVLeaf());
-    //return _tvar;
-    // How to compute nargs?
-    throw AA.TODO();
+    _tvar=new TVLeaf();
+    new TVLambda(TVLambda.UNKNOWN_NARGS,_tvar,new TVLeaf());
+    return _tvar;
   }
   
   //// Implements class HM.Lambda unification.

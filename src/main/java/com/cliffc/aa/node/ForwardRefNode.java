@@ -30,7 +30,7 @@ public class ForwardRefNode extends Node {
 
   @Override public Type value() {
     if( is_forward_ref() )
-      return TypeFunPtr.make(false,BitsFun.NALL,1,Type.ALL,Type.ALL);
+      return TypeFunPtr.make(false,BitsFun.NALL,1,TypeMemPtr.ISUSED,Type.ALL);
     return in(1)._val;
   }
 

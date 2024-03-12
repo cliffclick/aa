@@ -268,13 +268,13 @@ public class TVDynTable extends TV3 {
         // Merge other args
         assert !unified() && !that.unified();
         that._unify_half(idx*2  ,first(i));
-        that = (TVDynTable)that.find();
+        that = that.find();
         if( unified() )
           // Tail call on unified 'this'
           return ((TVDynTable)find())._unify_impl0(that,i);
         assert !unified() && !that.unified();
         that._unify_half(idx*2+1,secnd(i));
-        that = (TVDynTable)that.find();
+        that = that.find();
         if( unified() )
           // Tail call on unified 'this'
           return ((TVDynTable)find())._unify_impl0(that,i+1);
@@ -312,7 +312,7 @@ public class TVDynTable extends TV3 {
           
           // Unify match on match
           progress |= first(i)._fresh_unify(that.first(idx),test);
-          that = (TVDynTable)that.find();
+          that = that.find();
           // Unify pattern on pattern; resolved patterns still should unify
           progress |= secnd(i)._fresh_unify(that.secnd(idx),test);
           if( test && progress ) return progress;

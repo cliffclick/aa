@@ -22,8 +22,7 @@ public class IfNode extends Node {
     Node tst = in(1);
     if( ctl._val == Type.XCTRL && tst!=Env.ANY )
       return setDef(1,Env.ANY); // Kill test; control projections fold up other ways
-    else ctl.deps_add(this);
-    
+
     // Binary test vs 0?
     if( tst.len()==3 &&
         (tst.val(1)==TypeNil.NIL || tst.val(2)==TypeNil.NIL) ) {
@@ -100,8 +99,6 @@ public class IfNode extends Node {
     if( tt.above_center() ) return Env.XCTRL;
     if( tt==TypeTuple.IF_TRUE  && idx==1 ) return in(0);
     if( tt==TypeTuple.IF_FALSE && idx==0 ) return in(0);
-    Node proj = ProjNode.proj(this,idx);
-    if( proj!=null ) deps_add(proj);
     return null;
   }
 }

@@ -874,10 +874,12 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Easy assertion check
   boolean check_solo_mem_writer(Node memw) {
     boolean found=false;
-    for( Node use : _uses )
+    for( int i=0; i<nUses(); i++ ) {
+      Node use = use(i);
       if( use == memw ) found=true; // Only memw mem-writer follows
       else if( use.isMem()  ) return false; // Found a 2nd mem-writer
       else if( use.isKeep() ) return false; // Being built, might see a store-use yet
+    }
     return found;
   }
 

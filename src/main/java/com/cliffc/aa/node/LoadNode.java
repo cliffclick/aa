@@ -111,15 +111,22 @@ public class LoadNode extends Node {
   
   // Strictly reducing optimizations
   @Override public Node ideal_reduce() {
+    boolean progress = false;
     Node adr = adr();
     Type tadr = adr._val;
 
     // Dunno about other things than pointers
     if( !(tadr instanceof TypeNil tn) ) return null;
     //if( adr instanceof FreshNode frsh ) adr = frsh.id();
-    // If we can find an exact previous store, fold immediately to the value.
     Node ps = find_previous_struct(this, mem(), adr, tn._aliases);
-    if( ps instanceof StoreAbs sta ) {
+    // Move memory higher, bypassing unrelated memory ops
+    if( ps != mem() ) {
+      set_mem(ps);
+      progress = true;
+    }
+
+    // If we can find an exact previous store, fold immediately to the value.
+    if( ps instanceof StoreAbs sta && sta.adr()==adr ) {
       if( sta instanceof StoreNode st ) {
         if( Util.eq(_fld,st._fld) ) // match field in store
           return st.rez();
@@ -138,7 +145,7 @@ public class LoadNode extends Node {
       }
     }
 
-    return null;
+    return progress ? this : null;
   }
 
   // Changing edges to bypass, but typically not removing nodes nor edges
@@ -217,9 +224,8 @@ public class LoadNode extends Node {
     return false;
   }
 
-  
-  // Find a matching prior Store - matching address.
-  // Returns null if highest available memory does not match address.
+
+  // Bypasses as much memory as possible, returning the highest memory possible.
   static Node find_previous_struct(Node ldst, Node mem, Node adr, BitsAlias aliases ) {
     if( mem==null ) return null;
     // Walk up the memory chain looking for an exact matching Store or New
@@ -229,16 +235,16 @@ public class LoadNode extends Node {
       if( mem instanceof StoreAbs st ) {
         if( st.adr()==adr ) {
           if( !ldst.ld_st_check(st)  )
-            return st.err(true)== null ? st : null; // Exact matching store
+            return mem; // Exact matching store
         } else {
           st.adr().deps_add(ldst); // If store address changes
-          if( mem == st.mem() ) return null; // Parallel unrelated stores
+          if( mem == st.mem() ) return mem; // Parallel unrelated stores
           // Wrong address.  Look for no-overlap in aliases
           Type tst = st.adr()._val;
-          if( !(tst instanceof TypeMemPtr tmp) ) return null; // Store has weird address
+          if( !(tst instanceof TypeMemPtr tmp) ) return mem; // Store has weird address
           BitsAlias st_alias = tmp._aliases;
           if( aliases.join(st_alias) != BitsAlias.EMPTY )
-            return null;        // Aliases not disjoint, might overlap but wrong address
+            return mem;        // Aliases not disjoint, might overlap but wrong address
         }
         // Disjoint unrelated store.
         mem = st.mem(); // Advance past
@@ -248,11 +254,11 @@ public class LoadNode extends Node {
         switch( mem0 ) {
         case MemSplitNode node -> mem = node.mem(); // Lifting out of a split/join region
         case CallNode     node -> mem = node.mem(); // Lifting out of a Call
-        case RootNode     node -> { return null; }
-        case PrimNode     prim -> { return null; }
+        case RootNode     node -> { return mem; }
+        case PrimNode     prim -> { return mem; }
         case CallEpiNode  cepi -> {
-          mem = cepi.isCopy(MEM_IDX); // Skip thru a copy
-          if( mem == null ) {
+          Node copymem = cepi.isCopy(MEM_IDX); // Skip thru a copy
+          if( copymem == null ) {
             CallNode call = cepi.call();
             assert call.isCopy(0)==null;
             // The load is allowed to bypass the call if the alias is not killed.
@@ -262,7 +268,7 @@ public class LoadNode extends Node {
             // Collides, might be use/def by call
             if( aliases.overlaps(esc_aliases) ) {
               Env.ROOT.deps_add(ldst); // Revisit if fewer escapes
-              return null;
+              return mem;
             }
             // Compute direct call argument set
             BitsAlias as = BitsAlias.EMPTY;
@@ -275,10 +281,12 @@ public class LoadNode extends Node {
             TypeMem cmem = CallNode.emem((TypeTuple)call._val);
             if( aliases.overlaps(as) || aliases.overlaps(cmem.all_reaching_aliases(as)) ) {
               call.deps_add(ldst); // Revisit if fewer escapes
-              return null;
+              return mem;
             }
             // Peek through call
             mem = call.mem();
+          } else {
+            mem = copymem;
           }
         }
 
@@ -295,7 +303,7 @@ public class LoadNode extends Node {
       } else if( mem instanceof  PhiNode ||  // Would have to match on both sides, and Phi the results'
                  mem instanceof ParmNode ||  // Would have to match all callers, after all is wired
                  mem instanceof  ConNode) {
-        return null;
+        return mem;
       } else {
         throw TODO(); // decide cannot be equal, and advance, or maybe-equal and return null
       }

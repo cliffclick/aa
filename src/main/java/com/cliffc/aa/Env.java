@@ -170,7 +170,8 @@ public class Env implements AutoCloseable {
     }
 
     GVN.add_flow_defs(_scope);  // Recompute liveness of scope inputs
-    _scope.kill();
+    if( _scope.nUses() == 0 )
+      _scope.kill();
   }
 
   // Wire up an early function exit.  Hunts through all scopes until it finds a closure.

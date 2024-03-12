@@ -1,4 +1,105 @@
 =======================================
+03/10/2024
+
+When defining a top-level frame, it is defined in parts and each part may (or
+may not) be "let/in" complete.
+
+Example, hidden/assumed top-level display/frame:
+  fact = {.../*fact is mid-def, NOT FRESH here */... };
+  x = e0; // fact is complete here, but x is not
+  fact(x) // fact uses let-polymorphism here
+
+Same Example, explicit top-level frame:
+  FILE_SCOPE = @{
+    fact = {.../*fact is mid-def, NOT FRESH here */... };
+    x = e0; // fact is complete here, but x is not
+    fact(x) // fact uses let-polymorphism here, but FILE_SCOPE is not complete
+    ...     // FILE_SCOPE carries on with more variable
+  }
+  
+Indeed FILE_SCOPE carries on to the program end, adding vars.
+Same is true for all nested scopes.
+
+BUG: Currently finding FILE_SCOPE in the non-gen set, which recursively
+     includes 'fact' when fact is being used: `fact(x)` which blows its
+     polymorphic flavor.
+
+So from a typing perspective looking at something like:
+  FILE_SCOPE_CURRENT = @{
+    actve, in-progress defs.
+    includes e.g. is_even until is_odd defines
+  };
+  FILE_SCOPE_DONE = @{
+    fact = {...fact...};
+    x = e0;
+    blah = fact(x);
+    .. more added
+  }
+
+Or maybe TOP/FILE_SCOPE NOT in non-gen, but instead their parts go in non-gen
+on a case by case basis.
+
+FILE_SCOPE = @{
+  x = e0; // forward-ref set is empty
+  fact = { ...fref(fact)...}; // remove fact from fref-set, so empty, so done.
+  ...fact(3)... // fact is done, not in non-gen so FRESH
+  is_even = { ...fref(is_odd)... }; // fref(is_odd, not done);
+  blah = {...baz...}; // fref is empty, so done
+  ...blah... // Done, non-in-nongen, so FRESH
+  is_odd  = { ...is_even/not done so NOT FRESH...}// picks up is_even fref set, then removes is_odd, so both are done
+  ...
+}
+
+
+Issue is building up a topo DAG-sort of sets, names are not-fresh in the same
+initial create, and ARE fresh in later uses.
+Set: {A,B,C} // A calls B calls C calls A
+Set: {D,E}   // These can poly call A,B,C but not each other, D,E
+Set: {F,G}   // These can poly call A,B,C but not each other, F,G
+Set: {H,I}   // These can poly call any of the above...
+
+Theory: late-add Fresh???
+For each Closure Store, track f-ref names.
+At end of closure, build SCCs and top-sort DAGS.
+Within SCC, replace frefs with direct Loads, no fresh.
+Not-replaced frefs replace with a Load/Fresh pair.
+
+
+Nasty example; listing fref-sets:
+FILE: @{
+  A = {B};
+  H = {I,A,D};
+  D = {E,C};
+  C = {A}
+  I = {H,E}
+  E = {D,C}
+  B = {C}
+}
+During parse:
+  If outer scope, assume Load/Def always complete here.
+  If current scope, ask if Load/Def is complete & flag it.
+          If not complete, flag Load as unknown.  Add to fref-set for current scope def.
+  When current def completes, gather & reset fref-set.          
+After struct finishes, walk fref-sets, make SCCs.
+  Walk by SCC, all Loads in same SCC not-complete-not-fresh
+  Loads not in current SCC as Fresh
+
+More Nasty Example:
+Done parsing A = {B    }; keep fref-set.  A not defined (yet), missing B.
+Done parsing H = {I,A,D}; keep fref-set.  H not defined (yet), missing I,D.
+Done parsing D = {E,C  }; keep fref-set.  D not defined (yet), missing E,C.
+Done parsing C = {A    }; keep fref-set.  C not defined (yet), has A, but A missing B.
+Done parsing I = {H,E  }; keep fref-set.  I not defined (yet), has I,H,A,D, missing E.
+Done parsing E = {D,C  }; keep fref-set.  E not defined (yet), has everything except B.
+Done parsing B = {C    }; C uses A, A uses B.  Declare mut-rec {A,B,C}.
+Don't see any shortcuts here.
+
+I still think, in the end, I'm gonna visit all fields as part of the "promote"
+logic, and have to do a topo-sort with SCC discovery.  All fref uses get broken
+down into uses from inside the SCC and uses outside the SCC.  
+
+
+=======================================
 12/25/2023
 
 Pondering a "reboot" of AA Node class.

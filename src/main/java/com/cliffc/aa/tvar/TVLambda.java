@@ -14,19 +14,23 @@ import static com.cliffc.aa.AA.*;
  *
  */
 public class TVLambda extends TV3 {
-
+  public static final int UNKNOWN_NARGS = Integer.MAX_VALUE;
+  private int _nargs;
+  
   public TVLambda( int nargs, TV3 dsp, TV3 ret ) {
-    super(new TV3[nargs]);
+    super(new TV3[nargs==UNKNOWN_NARGS ? ARG_IDX : nargs]);
+    // Matches the _args array length if valid, or -1 if unknown args
+    _nargs = nargs;
     // Slot 0/CTL_IDX is reserved for the return.
     // Slot 1/null
     // Slot 2/DSP_IDX is for the display/self/this argument, optional
     // Slots 3+ are normal arguments past display/self/this
     _args[0] = ret;
     _args[DSP_IDX] = dsp;
-    for( int i=ARG_IDX; i<nargs; i++ )
+    for( int i=ARG_IDX; i<_args.length; i++ )
       _args[i] = new TVLeaf();
   }
-  public TVLambda( TV3[] args ) { super(args); }
+  public TVLambda( TV3[] args ) { super(args); _nargs = args.length; }
   // return in slot 0, memory in slot 1, display in slot 2, args in slots 3+
   public TV3 ret () { return arg(0); }
   public TV3 dsp () { return arg(DSP_IDX); }
@@ -44,22 +48,32 @@ public class TVLambda extends TV3 {
 
   @Override boolean _unify_impl(TV3 that ) {
     TV3 thsi = this;
-    int nargs = nargs(), tnargs = ((TVLambda)that).nargs();
+    int nlen = _args.length, tlen = ((TVLambda)that)._args.length;
     int i;
-    for( i=0; i<Math.min(nargs,tnargs); i++ ) {
+    for( i=0; i<Math.min(nlen,tlen); i++ ) {
       if( _args[i]==null ) { assert that._args[i]==null; continue; }
       thsi.arg( i )._unify( that.arg( i ), false );
       thsi = thsi.find();
       that = that.find();      
     }
-    if( nargs != tnargs ) {
+    int tnargs = ((TVLambda)that)._nargs;
+    if( _nargs != tnargs && _nargs != UNKNOWN_NARGS ) {
+      if( tnargs == UNKNOWN_NARGS )
+        throw TODO();
       // Make the arg counts align
-      if( nargs > tnargs ) that._args = _args;
+      if( _nargs > tnargs ) that._args = _args;
       // Flag the extra args as errors
-      for( ; i<Math.max(nargs,tnargs); i++ )
-        that.arg(i)._unify_err("Expected "+tnargs+" but found "+nargs,that,null,false);
+      for( ; i<Math.max(_nargs,tnargs); i++ )
+        that.arg(i)._unify_err("Expected "+tnargs+" but found "+_nargs,that,null,false);
     }
     return ptrue();
+  }
+
+  // -------------------------------------------------------------
+  @Override boolean _fresh_unify_impl(TV3 that, boolean test) {
+    if( _nargs != UNKNOWN_NARGS && ((TVLambda)that)._nargs != UNKNOWN_NARGS )
+      return super._fresh_unify_impl(that,test);
+    throw TODO();
   }
 
   // -------------------------------------------------------------
@@ -117,16 +131,6 @@ public class TVLambda extends TV3 {
     //omem().widen(widen,false);
     for( int i = DSP_IDX; i<nargs(); i++ )
       arg(i).widen((byte)2,false);
-  }
-  
-  @Override public VBitSet _get_dups_impl(VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
-    if( debug  ) return super._get_dups_impl(visit,dups,debug,prims);
-    // Skip memory contents when printing non-debug
-    _args[0]._get_dups(visit,dups,debug,prims); // Return
-    for( int i=DSP_IDX; i<nargs(); i++ )        // All arguments
-      if( _args[i] != null )
-        _args[i]._get_dups(visit,dups,debug,prims);
-    return dups;
   }
   
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {

@@ -141,6 +141,7 @@ public class StructNode extends Node {
   // Add a field
   public Node add_fld( String fld, TypeFld.Access access, Node val, Parse badt ) {
     assert !_closed;
+    assert _flds.find(fld)== -1;
     addDef(val);                // Node in node array
     _flds.push(fld);            // Field name
     _accesses.push(access);     // Access rights to field
@@ -172,13 +173,14 @@ public class StructNode extends Node {
           // Definitely defined here
           //    fref.define();
           throw TODO();        // TODO: Access input by field name
+        } else if( fref.is_defined() ) {
+          // Already defined
         } else {
           // Make field in the parent
           assert !parent.isPrim();
           parent.stk().add_fld(fref._name,TypeFld.Access.RW,fref,_fld_starts.at(i)).xval();
           // Stomp field locally to load from parent
           LoadNode fld = new LoadNode(parent.mem(),parent.ptr(),fref._name,_fld_starts.at(i)).init();
-          fld._val = val(i);
           setDef(i,fld);
           parent.mem().xval();
           Env.GVN.add_work_new(fld);

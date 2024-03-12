@@ -3,8 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.type.Type;
 
-import java.util.function.Predicate;
-
 // Merge results.  Supports many merging paths; used by FunNode and LoopNode.
 public class RegionNode extends Node {
   public RegionNode( Node... ctrls) { super(ctrls); }
@@ -36,8 +34,7 @@ public class RegionNode extends Node {
           }
         del(i);
         return Env.GVN.add_reduce(this); // Progress
-      } else
-        cin.deps_add(this);   // Revisit if becomes XCTRL
+      }
     }
 
     if( len() == 1 ) return null; // No live inputs; dead in value() call

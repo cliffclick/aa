@@ -506,25 +506,25 @@ public class Parse implements Comparable<Parse> {
     ctrl(new CProjNode(ifex,1).peep()); // Control for true branch
     
     // True side
+    ScopeNode t_scope, f_scope;
     try( Env e = _e = new Env(_e, null, -1, ctrl(), mem(), scope().ptr(), null) ) { // Nest an environment for the local vars
       // TODO: Insert cast
       Node t_exp = stmt(false); // Parse true expression
       if( t_exp == null ) t_exp = err_ctrl2("missing expr after '?'");
-      scope().stk().close();
-      scope().setDef(REZ_IDX,t_exp);
+      t_scope = scope();
+      t_scope.stk().close();
+      t_scope.setDef(REZ_IDX,t_exp);
+      // Shuffle lifetimes for the true/false flip
       // KEEP: {MEM, IFEX}
+      unkeep(ifex);
+      // KEEP:{MEM}
+      unkeep(omem);
+      // KEEP:{}
+      keep(t_scope);
+      // KEEP:{TSCOPE}
       _e = e._par;            // Pop nested environment
     }
     
-    // Shuffle lifetimes for the true/false flip
-    ScopeNode t_scope = scope();
-    // KEEP:{MEM, IFEX}
-    unkeep(ifex);
-    // KEEP:{MEM}
-    unkeep(omem);
-    // KEEP:{}
-    keep(t_scope);
-    // KEEP:{TSCOPE}
     mem(omem);           // Reset memory to before the IF for the other arm
     ctrl(new CProjNode(ifex,0).peep()); // Control for false branch    
 
@@ -533,17 +533,20 @@ public class Parse implements Comparable<Parse> {
       // TODO: Insert cast
       Node f_exp = peek(':') ? stmt(false) : con(TypeNil.NIL);
       if( f_exp == null ) f_exp = err_ctrl2("missing expr after ':'");
-      scope().stk().close();
-      scope().setDef(REZ_IDX,f_exp);
+      f_scope = scope();
+      f_scope.stk().close();
+      f_scope.setDef(REZ_IDX,f_exp);
       // KEEP:{TSCOPE}
+      keep(f_scope);
+      // KEEP:{TSCOPE, FSCOPE}
       _e = e._par;            // Pop nested environment
     };
 
     // Find common set of new names
-    ScopeNode f_scope = scope();
-      // KEEP:{TSCOPE}
+    // KEEP:{TSCOPE, FSCOPE}
+    unkeep(f_scope);
     unkeep(t_scope);
-      // KEEP:{}
+    // KEEP:{}
     StructNode f_stk = f_scope.stk();
     StructNode t_stk = t_scope.stk();
     Parse bad = errMsg();

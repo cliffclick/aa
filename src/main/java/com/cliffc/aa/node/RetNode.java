@@ -42,8 +42,8 @@ public final class RetNode extends Node {
   public FunNode fun() { return (FunNode)in(4); }
   
   public FunPtrNode funptr() {
-    for( Node use : uses() )
-      if( use instanceof FunPtrNode fptr )
+    for( int i=0; i<nUses(); i++ )
+      if( use(i) instanceof FunPtrNode fptr )
         return fptr;
     return null;
   }

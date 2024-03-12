@@ -103,6 +103,12 @@ public class TVStruct extends TVExpanding {
     TVPtr clz = pclz();
     return clz==null ? null : clz.load().arg_clz(fld);
   }
+  // Return the first open struct on the super class chain, including self.
+  public TVStruct openClz() {
+    if( _open ) return this;
+    TVPtr pclz = pclz();
+    return pclz==null ? null : pclz.load().openClz();
+  }
 
   
   // Return the TV3 for field 'fld' or null if missing, with OUT rollups
@@ -119,11 +125,12 @@ public class TVStruct extends TVExpanding {
   @Override boolean can_progress() { throw TODO(); }
   
   public boolean add_fld(String fld, TV3 tvf ) {
+    assert !unified();
     boolean is_clz = Util.eq(fld,TypeFld.CLZ);
     int idx = _max;
-    if( _open ) assert !is_clz;        // Never a clazz in open
-    else if( is_clz ) idx=0;
-    assert arg_clz(fld)==null;
+    //if( _open ) assert !is_clz;        // Never a clazz in open
+    if( is_clz ) idx=0;
+    assert arg(fld)==null;
     ptrue();
     if( _max == _flds.length ) {
       int len=1;
@@ -165,107 +172,67 @@ public class TVStruct extends TVExpanding {
   // Unify this into that.  Ultimately "this" will be U-F'd into "that" and so
   // all structure changes go into "that".
   @Override boolean _unify_impl( TV3 tv3 ) {
-    assert !unified() && !tv3.unified();
-    TVStruct that = (TVStruct)tv3; // Invariant when called
-    // Open /open  unify
-    if(  _open &&  that._open ) return _unify_impl_open (that);
-    // close/close unify
-    if( !_open && !that._open ) return _unify_impl_close(that);
-    // open /close unify
-    return _open ? _unify_impl_mix_open(that) : _unify_impl_mix_close(that);
-  }
+    TVStruct lhs = this;
+    TVStruct rhs = (TVStruct)tv3; // Invariant when called
+    assert !lhs.unified() && !rhs.unified();
+    // Either no CLZ or it is in slot 0
+    assert lhs.idx(TypeFld.CLZ) <= 0 && rhs.idx(TypeFld.CLZ) <= 0;
+    // Open classes to add open fields as needed
+    TVStruct lhsOpenSelf = lhs.openClz();
+    TVStruct rhsOpenSelf = rhs.openClz();
+    TVStruct lhsOpenClz = lhs.pclz() == null ? null : lhs.pclz().load().openClz();
+    // Record _open values, then close rhs if needed
+    boolean lhsOpen = lhs._open;
+    boolean rhsOpen = rhs._open;
+    if( !lhsOpen && rhsOpen ) rhs.close();
 
-  private boolean _unify_impl_open( TVStruct that ) {
-    assert (pclz() == null) == (that.pclz() == null); // No CLZ on open
-    // Walk left, search right
-    // If found, unify
-    // else add right
-    for( int i=0; i<_max; i++ ) { // Walk left
-      assert !unified() && !that.unified();
-      TV3 fthat = that.arg(_flds[i]); // Search right
-      if( fthat != null )             // If found
-        arg(i)._unify(fthat,false);   // Unify
-      else
-        that.add_fld(_flds[i],arg(i)); // Not found so add
-      assert !unified() && !that.unified();
-    }
-    return ptrue();
-  }
-
-  private boolean _unify_impl_close( TVStruct that ) {
-    // Both have CLZ (or both are STRCLZ analogs)
-    //assert (_max==0 && that._max==0) || (pclz()!=null && that.pclz()!=null); 
-    // Walk left, search right (local no CLZ)
-    // If found, unify
-    // else ignore (del right) & assert not in CLZ
-    for( int i=0; i<_max; i++ ) {     // Walk left
-      assert !unified() && !that.unified();
-      TV3 fthat = that.arg(_flds[i]); // Search right no CLZ
-      if( fthat != null )             // If found
-        find().arg(i)._unify(fthat,false);   // Unify
-      // Else ignore (del right)
-      assert !unified() && !that.unified();
-    }
-    // Walk right, search left (local no CLZ)
-    // if not found, del right
-    for( int i=0; i<that._max; i++ ) { // Walk right
-      TV3 fthis = ((TVStruct)find()).arg(that._flds[i]);  // Search left no CLZ
-      if( fthis == null )              // If not found
-        that.del_fld(i--);             // Remove extras right
-    }
-    return ptrue();
-  }
-
-  // LHS/this is open, RHS/that is closed.
-  private boolean _unify_impl_mix_open( TVStruct that ) {
-    assert _open && pclz()==null;
-    //assert !that._open && (that._max==0 || that.pclz()!=null);
-    // walk left (open), search right plus CLZ
-    //  if found, unify
-    //  else ignore (del right)
-    TVStruct thsi = this;
-    for( int i=0; i<thsi._max; i++ ) { // Walk left
-      TV3 fthat = that.arg_clz(thsi._flds[i]); // Search right plus CLZ
-      if( fthat != null )                      // If found
-        thsi.arg(i)._unify(fthat,false);       // Unify
-      else
-        ; // del_fld but already missing rhs //arg(i)._unify_err("Missing field "+_flds[i],null,null,false);
-      if( thsi.unified() ) { thsi = (TVStruct)thsi.find(); i=-1; }
-      assert !that.unified();
-    }
-    return ptrue();
-  }
-
-  // LHS/this is closed, RHS/that is open.
-  private boolean _unify_impl_mix_close( TVStruct that ) {
-    //assert !_open && (_max==0 || pclz()!=null);
-    assert that._open && that.pclz()==null;
-    that.close();
-    // walk left (close), search right
-    // if found, already unified
-    // else add field
-    for( int i=0; i<_max; i++ ) {        // Walk LHS
-      assert !unified() && !that.unified();
-      TV3 fthat = that.arg(_flds[i]);    // Search left
-      if( fthat == null )                // If not found
-        that.add_fld(_flds[i],arg(i));
-      assert !unified() && !that.unified();
-    }
-    //assert that.pclz()!=null; // RHS is closed, has clz
-    // walk right (open), search left plus CLZ
-    //  if found, unify
-    //  else ERROR missing field
-    for( int i=0; i<that._max; i++ ) {    // Walk RHS
-      assert !unified() && !that.unified();
-      TV3 fthis = arg_clz(that._flds[i]); // Search left plus CLZ
-      if( fthis != null )                 // If found
-        that.arg(i)._unify(fthis,false);  // Unify
-      else
-        that.del_fld(i--); //that.arg(i)._unify_err("Missing field "+this._flds[i],null,null,false);
-      assert !unified() && !that.unified();
+    // Walk left, search right including RHS CLZ
+    // If found, unify.
+    // Else if open in any CLZ, add
+    // Else ignore
+    for( int i=0; i<lhs._max; i++ ) { // Walk left
+      assert !lhs.unified() && !rhs.unified();
+      String fld = lhs._flds[i];
+      TV3 frhs = lhsOpen ? rhs.arg_clz(lhs._flds[i]) : rhs.arg(fld); // Search right
+      if( frhs != null ) {               // Found RHS
+        // Unify the two fields
+        lhs.arg(i)._unify(frhs,false);
+        // It can be the case that recursive LHS unifies.  If it does, the
+        // result might have a different field layout, in which case the
+        // ordered visit might miss fields.  Restart unifying field by field.
+        // Since unification is invariant, ok to unify some fields extra times.
+        if( lhs.unified() )     // LHS changed?  Restart loop from scratch
+          { lhs = lhs.find(); i = -1; }
+        assert !rhs.unified();
+      } else if( rhsOpenSelf!=null ) {
+        rhs.add_fld(fld,lhs.arg(i));
+      } else {
+        // if we would delete because missing & closed on RHS and open on LHS,
+        // instead push LHS field "uphill" to next open class as a way to
+        // delete it here.
+        if( lhsOpenClz != null )
+          throw TODO();
+        /*ignore del field RHS, because already not there*/
+      }
     }
 
-    return ptrue();
+    // Walk RHS, search LHS.
+    for( int i=0; i<rhs._max; i++ ) { // Walk left
+      assert !lhs.unified() && !rhs.unified();
+      String fld = rhs._flds[i];
+      int idx = lhs.idx(fld);   // Field is in LHS directly
+      if( idx != -1 ) continue; // Already unified via prior loop
+      TV3 flhs = rhsOpen ? lhs.arg_clz(fld) : null; // Search LHS (always fails locally since already checked)
+      if( flhs != null ) {  // Found LHS
+        throw TODO();       // Must have found in some superclazz
+      } else if( lhsOpenSelf != null ) {
+        /*ignore add field LHS, because LHS will union away */
+      } else {
+        rhs.del_fld(i--);       // Remove extras right, shuffles trailing order
+      }
+    }
+        
+    return true;
   }
   
   // -------------------------------------------------------------
@@ -313,7 +280,7 @@ public class TVStruct extends TVExpanding {
       if( fthat != null ) {
         progress |= fthat.vcrisscross(test);
         progress |= arg(i)._fresh_unify(fthat,test);
-        that = (TVStruct)that.find();
+        that = that.find();
       }
     }
     // Walk right, search left (local no CLZ)
@@ -351,7 +318,7 @@ public class TVStruct extends TVExpanding {
       TV3 fthat = that.arg(_flds[i]); // Search right 
       if( fthat != null ) {
         arg(i)._fresh_unify(fthat,test);
-        that = (TVStruct)that.find();
+        that = that.find();
       } else {
         that.add_fld(_flds[i],arg(i)._fresh());
       }
@@ -440,22 +407,25 @@ public class TVStruct extends TVExpanding {
   boolean is_str_clz() { return idx("#_"  ) >= 0; }
   boolean is_math_clz(){ return idx("pi"  ) >= 0; }
   boolean is_top_clz() { return idx("math") >= 0; }
+  private boolean is_prim0() {
+    return is_int_clz() || is_flt_clz() || is_str_clz() || is_math_clz() || is_top_clz();
+  }
   boolean is_prim() {
-    return _max==2 && idx(TypeFld.CLZ)!= -1 && idx(TypeFld.PRIM)!= -1;
+    return _max==2 && idx(TypeFld.CLZ)!= -1 && idx(TypeFld.PRIM)!= -1 &&  is_prim0();
   }
 
   @Override public VBitSet _get_dups_impl(VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
-    TV3 clz = debug_arg(TypeFld.CLZ);
     if( !prims && is_int_clz() ) return dups;
     if( !prims && is_flt_clz() ) return dups;
     if( !prims && is_str_clz() ) return dups;
     if( !prims && is_math_clz()) return dups;
     if( !prims && is_top_clz() ) return dups;
     
-    if( !debug && clz instanceof TVPtr zptr && _flds.length==2 && Util.eq(_flds[1],"0") ) {
+    TV3 clz = debug_arg(TypeFld.CLZ);
+    if( !debug && clz instanceof TVPtr zptr && _max==2 && debug_arg(TypeFld.PRIM)!=null ) {
       TVStruct zts = zptr.load();
       if( zts.is_int_clz() || zts.is_flt_clz() || zts.is_str_clz() )
-        return _args[1]._get_dups(visit,dups,debug,prims);
+        return zts._get_dups(visit,dups,debug,prims);
     }
     for( int i=0; i<len(); i++ )
       _args[i]._get_dups(visit,dups,debug,prims);
@@ -473,7 +443,7 @@ public class TVStruct extends TVExpanding {
 
     // Special hack to print "int:(2)" as "2"
     TV3 clz = debug_arg(TypeFld.CLZ);
-    if( clz instanceof TVPtr zptr && _max==2 && debug_arg(TypeFld.PRIM)!=null ) {
+    if( !debug && clz instanceof TVPtr zptr && _max==2 && debug_arg(TypeFld.PRIM)!=null ) {
       TVStruct zts = zptr.load();
       if( zts.is_int_clz() || zts.is_flt_clz() || zts.is_str_clz() ) {
         zts._str(sb,visit,dups,debug,prims);

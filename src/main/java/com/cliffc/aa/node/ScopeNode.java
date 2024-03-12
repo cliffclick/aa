@@ -1,12 +1,10 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 
 import java.util.HashMap;
 import java.util.Set;
-import java.util.function.Predicate;
 
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
@@ -45,7 +43,7 @@ public class ScopeNode extends Node {
   public void mem(Node st) {
     // Remove the scope use of old memory, so the store becomes the ONLY use of
     // old memory, allowing the store to fold immediately.
-    setDef(MEM_IDX,null);
+    //setDef(MEM_IDX,null);
     setDef(MEM_IDX,st);
   }
 

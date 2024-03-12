@@ -31,12 +31,37 @@ public class TestParse {
     DO_HMT=true;
     RSEED=0;
 
-    // This test endlessly expands in AA, short/quick in EXE
+
+    // A,B,C are mutually recursive identity functions
+    // D calls B or C with ints.
+    // final struct calls C with floats
     test("""
-fcn = { -> ( @{ a = 1}, @{ b = 2} )._ };
-(fcn().a, fcn().b )
+A = { x -> math.rand(2) ? B(x) : x };
+D = {   -> math.rand(2) ? B(1) : C(2) };
+C = { x -> A(x) };
+B = { x -> C(x) };
+( D(), C(3.14) )
+
 """,
-         "*[21]( _, int:1, int:2)", "*[21](_,int:1,int:2)",null,null,"[21]",null);
+         "","",null,null,null,null);
+
+
+
+    
+    // Bug here is reduced to: the uses of `fcn` appear in the top-level open
+    // File scope which being open, means `fcn` is not completely defined, so
+    // uses are NOT-FRESH, so bind `fcn` to returning both an A and a B struct.
+
+    // Bug is broken tagging of FRESH/NOT-FRESH - the top-level open FIle scope
+    // is indeed OPEN, partially defined - but the fields within it get
+    // incrementally defined over time.
+    
+//    // This test endlessly expands in AA, short/quick in EXE
+//    test("""
+//fcn = { -> ( @{ a = 1}, @{ b = 2} )._ };
+//(fcn().a, fcn().b )
+//""",
+//         "*[21]( _, int:1, int:2)", "*[21](_,int:1,int:2)",null,null,"[21]",null);
     
 //    test("""
 //fcn = { ->

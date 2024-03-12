@@ -45,7 +45,7 @@ public class TVPtr extends TV3 {
   // -------------------------------------------------------------
   @Override boolean _fresh_unify_impl(TV3 that, boolean test) {
     boolean progress = false;
-    TVPtr ptr = (TVPtr)that.find();    // Invariant when called
+    TVPtr ptr = that.find();    // Invariant when called
     BitsAlias aliases = _aliases.meet( ptr._aliases );
     
     // Update aliases
@@ -89,7 +89,7 @@ public class TVPtr extends TV3 {
     // No rollups unless asked for
     TV3 tv0 = debug ? debug_arg(0) : arg(0);
     if( _args[0]==tv0 && tv0 instanceof TVStruct str ) {
-      if( is_nil(str) || (is_0clz(str) && !debug) || is_prim(str) ) {
+      if( is_nil(str) || (is_0clz(str) && !debug) || (!prims && is_prim(str)) ) {
         // Fully replicate a nil, empty clazz, or prim; no dups
         visit.clear(_uid);
         return dups;

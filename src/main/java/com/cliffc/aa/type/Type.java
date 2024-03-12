@@ -250,6 +250,17 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     //assert t==this;
     return rez;
   }
+  
+  public final String toString(boolean debug, boolean indent, boolean mem) {
+    PENV P = new PENV(debug,indent,mem);
+    _str_dups(P);
+    P.visit.clr();
+    String rez = _str(P).sb.toString();
+    // Uncomment to test bi-jections
+    //Type t = _valueOf(rez);
+    //assert t==this;
+    return rez;
+  }
 
   // The debug printer must have good handling of dups and cycles - on
   // partially-built types.  It can depend on the UID but not on, e.g., all
