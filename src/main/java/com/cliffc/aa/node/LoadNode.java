@@ -16,21 +16,30 @@ public class LoadNode extends Node {
   public       String _fld;
   // Where to report errors
   private final Parse _bad;
+  // When doing HM, treat this Load as a identifier load and allow the type
+  // LET-polymorphism.  When false, this Load could be a struct field load,
+  // OR it could be self-recursive definition, OR it could be unknown.
+  private boolean _fresh;
+  // When false, the _fresh field is unknown; the Load is known as a identifier
+  // (not a field load) but we do not (yet) know if it is part of a self-
+  // recursive definition or not.
+  private boolean _known;
+
   // Prevent recursive expansion during ideal_grow
   private boolean _mid_grow;
 
   // A struct using just the field; just a cache for faster live-use
   private final TypeStruct _live_use;
 
-  public LoadNode( Node mem, Node adr, String fld, Parse bad ) {
+  public LoadNode( Node mem, Node adr, String fld, boolean fresh, boolean known, Parse bad ) {
     super(null,mem,adr);
     _fld = fld;
     _bad = bad;
     _live_use = TypeStruct.UNUSED.add_fldx(TypeFld.make(_fld,Type.ALL));
   }
   // A plain "_" field is a resolving field
-  @Override public String label() { return "."+_fld; }   // Self short name
-  
+  @Override public String label() { return ("."+_fld).intern(); }   // Self short name
+
   Node mem() { return in(MEM_IDX); }
   Node adr() { return in(DSP_IDX); }
   private Node set_mem(Node a) { return setDef(MEM_IDX,a); }
@@ -62,7 +71,7 @@ public class LoadNode extends Node {
 
   // Field lookup, might check superclass
   static Type lookup( TypeStruct ts, TypeMem mem, String fld ) {
-    
+
     // Check for direct field
     int idx = ts.find(fld);
     if( idx != -1 ) return ts.at(idx);
@@ -78,7 +87,7 @@ public class LoadNode extends Node {
     return lookup(ts,mem,fld);
   }
 
-  
+
   // The only memory required here is what is needed to support the Load.
   // If the Load is alive, so is the address.
   @Override public Type live_use( int i ) {
@@ -92,23 +101,23 @@ public class LoadNode extends Node {
     // def is ALSO adr().def() which the normal deps_add asserts prevent.
     adr().deps_add_live(def);
     if( adr.above_center() ) return Type.ANY; // Nothing is demanded
-    
+
     // Demand everything not killed at this field.
     if( !(adr instanceof TypeNil ptr) || // Not a ptr, assume it becomes one
         ptr._aliases==BitsAlias.NALL )   // All aliases, then all mem needed
       return RootNode.removeKills(def);  // All mem minus KILLS
-  
+
     // TODO: Liveness for generic clazz fields
     //if( ptr instanceof TypeMemPtr tmp && !tmp.is_simple_ptr() ) {
     //  tmp._obj.get(TypeFld.CLZ);
     //}
-    
+
     if( ptr._aliases.is_empty() ) return Type.ANY; // Nothing is demanded still
 
     // Demand field "_fld" be "ALL", which is the default
     return TypeMem.make(ptr._aliases,_live_use);
   }
-  
+
   // Strictly reducing optimizations
   @Override public Node ideal_reduce() {
     boolean progress = false;
@@ -141,7 +150,7 @@ public class LoadNode extends Node {
           return val;
         deps_add(this);         // Self-add if updates
         val.deps_add(this);     // Val -add if updates
-        return null;        
+        return null;
       }
     }
 
@@ -312,6 +321,7 @@ public class LoadNode extends Node {
 
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
+    if( !_known ) throw TODO();
     // Load takes a pointer
     TV3 ptr0 = adr().set_tvar();
     TVPtr ptr;
@@ -320,7 +330,7 @@ public class LoadNode extends Node {
     } else {
       ptr0.unify(new TVPtr(BitsAlias.EMPTY, new TVStruct(true) ),false);
       ptr = ptr0.find().as_ptr();
-    } 
+    }
 
     // Struct needs to have the named field
     TVStruct str = ptr.load();
@@ -331,7 +341,7 @@ public class LoadNode extends Node {
     } else {
       self.unify(fld,false);
     }
-    
+
     return self.find();
   }
 
@@ -342,7 +352,7 @@ public class LoadNode extends Node {
     if( ptr0 instanceof TVErr ) throw TODO();
     TVPtr ptr = ptr0.as_ptr();
     TVStruct tstr = ptr.load();
-    
+
     // If the field is in the struct, unify and done
     TV3 fld = tstr.arg(_fld);
     if( fld!=null ) return do_fld(fld,test);
@@ -371,8 +381,10 @@ public class LoadNode extends Node {
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
-    if( !(o instanceof LoadNode fld) ) return false;
-    return Util.eq(_fld,fld._fld);
+    if( !(o instanceof LoadNode ld) ) return false;
+    if( !_known || !ld._known ) return false; // Assume the fresh field will differ
+    if( _fresh != ld._fresh ) return false;   // Fresh field does differ
+    return Util.eq(_fld,ld._fld);
   }
 
 }

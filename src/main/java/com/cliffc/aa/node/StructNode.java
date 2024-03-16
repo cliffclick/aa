@@ -87,11 +87,11 @@ public class StructNode extends Node {
     if( _flds._len>0 ) sb.unchar(2);
     return sb.p("}").toString().intern();
   }
-  
+
   // Only if closed
   @Override public boolean shouldCon() { return _closed && super.shouldCon(); }
 
-  
+
   // Structs with the same inputs and same field names are the same.
   @Override int hash() {
     return _flds.hashCode() ^ _accesses.hashCode();
@@ -102,7 +102,7 @@ public class StructNode extends Node {
         // Open structs can expand in different ways, never equal
         !_closed || !rec._closed || !super.equals(o) )
       return false;
-    return 
+    return
       _flds.equals(rec._flds) &&
       _accesses.equals(rec._accesses);
   }
@@ -180,7 +180,7 @@ public class StructNode extends Node {
           assert !parent.isPrim();
           parent.stk().add_fld(fref._name,TypeFld.Access.RW,fref,_fld_starts.at(i)).xval();
           // Stomp field locally to load from parent
-          LoadNode fld = new LoadNode(parent.mem(),parent.ptr(),fref._name,_fld_starts.at(i)).init();
+          LoadNode fld = new LoadNode(parent.mem(),parent.ptr(),fref._name,false,false,_fld_starts.at(i)).init();
           setDef(i,fld);
           parent.mem().xval();
           Env.GVN.add_work_new(fld);

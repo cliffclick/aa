@@ -194,7 +194,7 @@ public class Parse implements Comparable<Parse> {
 
   // List of Nodes mid-construction, not allowed to peephole away (yet)
   private final Ary<Node> _keeps;
-  
+
   // Fields strictly for Java number parsing
   private final NumberFormat _nf;
   private final ParsePosition _pp;
@@ -461,7 +461,7 @@ public class Parse implements Comparable<Parse> {
       // unrelated variables.
       stk.add_fld (tok,Access.RW, Node.con(Type.ANY),badf); // Create at top of scope as undefined
     }
-    
+
     // Assert type if asked for
     if( t!=null )
       ifex = new AssertNode(mem(), ifex, t, badf).peep();
@@ -504,7 +504,7 @@ public class Parse implements Comparable<Parse> {
     Node ifex = keep(new IfNode(ctrl(),expr).peep());
     // KEEP: {MEM, IFEX}
     ctrl(new CProjNode(ifex,1).peep()); // Control for true branch
-    
+
     // True side
     ScopeNode t_scope, f_scope;
     try( Env e = _e = new Env(_e, null, -1, ctrl(), mem(), scope().ptr(), null) ) { // Nest an environment for the local vars
@@ -524,9 +524,9 @@ public class Parse implements Comparable<Parse> {
       // KEEP:{TSCOPE}
       _e = e._par;            // Pop nested environment
     }
-    
+
     mem(omem);           // Reset memory to before the IF for the other arm
-    ctrl(new CProjNode(ifex,0).peep()); // Control for false branch    
+    ctrl(new CProjNode(ifex,0).peep()); // Control for false branch
 
     // False side
     try( Env e = _e = new Env(_e, null, -1, ctrl(), mem(), scope().ptr(), null) ) { // Nest an environment for the local vars
@@ -550,7 +550,7 @@ public class Parse implements Comparable<Parse> {
     StructNode f_stk = f_scope.stk();
     StructNode t_stk = t_scope.stk();
     Parse bad = errMsg();
-    
+
     // Merge results.
     // KEEP: NO PEEPS ON REGION -- vvvvvvvvvvvvvvvvvvvv
     ctrl(new RegionNode(null,t_scope.ctrl(),f_scope.ctrl()).init());
@@ -561,7 +561,7 @@ public class Parse implements Comparable<Parse> {
       scope().stk().add_fld(fld,Access.RW,Env.ANY,null); // Promote name to top level
       if( t_stk.find(fld)== -1 ) {
         Node err = new ErrNode(f_scope.ctrl(),bad,"'"+fld+"' not defined on "+true+" arm of trinary").init();
-        t_scope.mem(new StoreNode(t_scope.mem(),t_scope.ptr(),err,fld,Access.RW,bad).peep());        
+        t_scope.mem(new StoreNode(t_scope.mem(),t_scope.ptr(),err,fld,Access.RW,bad).peep());
       }
     }
 
@@ -570,7 +570,7 @@ public class Parse implements Comparable<Parse> {
       if( t_stk.find(fld)== -1 ) {
         scope().stk().add_fld(fld,Access.RW,Env.ANY,null); // Promote name to top level
         Node err = new ErrNode(t_scope.ctrl(),bad,"'"+fld+"' not defined on "+false+" arm of trinary").init();
-        f_scope.mem(new StoreNode(f_scope.mem(),f_scope.ptr(),err,fld,Access.RW,bad).peep());        
+        f_scope.mem(new StoreNode(f_scope.mem(),f_scope.ptr(),err,fld,Access.RW,bad).peep());
       }
     }
 
@@ -590,8 +590,8 @@ public class Parse implements Comparable<Parse> {
     assert bal == _keeps._len;  // Balanced keep-alives
     return rez;
   }
-  
-  
+
+
   /** Parse a lisp-like function application.  To avoid the common bug of
    *  forgetting a ';', these must be on the same line.
       apply = expr
@@ -657,7 +657,7 @@ public class Parse implements Comparable<Parse> {
       Parse err = errMsg(opx);
       // Load against LHS pointer.  If this is a primitive, the Load loads
       // against the primitive clazz.
-      Node over= new LoadNode(mem(),lhs,binop._name,err).peep();
+      Node over= new LoadNode(mem(),lhs,binop._name,false,true,err).peep();
       // DynTable to call
       Node dyn = keep(dynCall());
       // Resolve the set of primitive choices
@@ -698,7 +698,7 @@ public class Parse implements Comparable<Parse> {
     keep(fun);                          // Keep alive
     fun.xval();
     NewNode outer_dsp = scope().ptr();
-    
+
     // Build Parms for system incoming values
     Node rpc = new ParmNode(CTL_IDX,fun,null,TypeRPC.ALL_CALL).init();
     Node dsp = new ParmNode(DSP_IDX,fun,null,outer_dsp._tptr ).init();
@@ -714,14 +714,14 @@ public class Parse implements Comparable<Parse> {
       // Parse body
       Node rez = _expr_higher_require(op);
       if( rez==null ) throw TODO();
-      // Normal exit 
+      // Normal exit
       frame.close();
 
       // Merge normal exit into all early-exit paths.
       // TODO: this exits from the thunk, not the whole function
       assert frame.is_closure();
       rez = merge_exits(rez);
-      
+
       // Standard return; function control, memory, result, RPC.  Plus a hook
       // to the function for faster access.
       unkeep(fun);
@@ -784,7 +784,7 @@ public class Parse implements Comparable<Parse> {
       Node dyn = keep(dynCall());
       // Load against e0 pointer.  If e0 is a primitive, the Load is a no-op;
       // otherwise this converts a reference to a value.
-      Node over= new LoadNode(mem(),e0,op._name,err).peep();
+      Node over= new LoadNode(mem(),e0,op._name,false,true,err).peep();
       // Resolve the correct function from the overload choices
       Node fun = new DynLoadNode(mem(),over,((AFieldNode)dyn).in(0),err).peep();
       // Call the operator
@@ -825,13 +825,13 @@ public class Parse implements Comparable<Parse> {
           mem( new StoreNode(mem(),n,keep(val),tok,fin,bad).peep());
           return unkeep(val); // Return the value stored
         } else {
-          Parse bad = errMsg(fld_start);          
+          Parse bad = errMsg(fld_start);
           Node adr = keep(n);   // Save address for bind
           n = Util.eq(tok,"_")
-            // Using a plain underscore for the field name is a Resolving field.
+            // Using a plain underscore for the field name
             ? new DynLoadNode(mem(),n,dynLoad(),bad).peep()
             // Normal non-oper load
-            : new    LoadNode(mem(),n,tok      ,bad).peep();
+            : new    LoadNode(mem(),n,tok,false,false,bad).peep();
           // Bind after load
           n = new BindFPNode(n, unkeep(adr), Oper.is_oper(tok) ? 1 : 0).peep();
         }
@@ -917,15 +917,16 @@ public class Parse implements Comparable<Parse> {
     // Now properly load from the display.
     Parse bad = errMsg();
     Node ptr = get_display_ptr(scope);
-    Node fd = new LoadNode(mem(),ptr,tok,bad).peep();
+    Node fd = new LoadNode(mem(),ptr,tok,false,true,bad).peep();
     if( fd.is_forward_ref() )    // Prior is actually a forward-ref
       return err_ctrl1(ErrMsg.forward_ref(this,(FunPtrNode)fd));
-    Node n = new FreshNode(fd,_e).peep();
+    //Node n = new FreshNode(fd,_e).peep();
+    Node n = fd;
     keep(n);
     // Do a full lookup on "+", and execute the function
     // Get the overloaded operator field, always late binding
-    Node overplus = new LoadNode(mem(),n,"_+_",bad).peep();
-    
+    Node overplus = new LoadNode(mem(),n,"_+_",false,true,bad).peep();
+
     Node dyn = keep(dynCall());
     // Resolve primitive choices
     Node plus = new DynLoadNode(mem(),overplus,((AFieldNode)dyn).in(0),bad).peep();
@@ -1017,33 +1018,33 @@ public class Parse implements Comparable<Parse> {
 
     // Display/struct/scope containing the field
     Node dsp = get_display_ptr(scope);
-    
-    // Load the resolve field from the display/scope structure
-    Node fd = new LoadNode(mem(),dsp,tok, bad).peep();
 
-    // If in the middle of a definition (e.g. a HM Let, or recursive assign)
-    // then no Fresh per normal HM rules.  If loading from normal Lambda
-    // arguments, again no Fresh per normal HM rules.
-    Node frsh = fd.is_forward_ref() || scope.stk().is_nongen(tok)
-      ? fd
-      : new FreshNode(fd,_e).peep();
-    return frsh;
+    // Load the resolve field from the display/scope structure
+    Node fd = new LoadNode(mem(),dsp,tok,false,false,bad).peep();
+
+    //// If in the middle of a definition (e.g. a HM Let, or recursive assign)
+    //// then no Fresh per normal HM rules.  If loading from normal Lambda
+    //// arguments, again no Fresh per normal HM rules.
+    //Node frsh = fd.is_forward_ref() || scope.stk().is_nongen(tok)
+    //  ? fd
+    //  : new FreshNode(fd,_e).peep();
+    return fd;
   }
 
-  // A fact hardware to "$dyn".
+  // A fact hardwired to "$dyn".
   private Node dynLoad() {
     ScopeNode scope = lookup_scope("$dyn",false);
     // Display/struct/scope containing the field
-    Node dsp = get_display_ptr(scope);    
+    Node dsp = get_display_ptr(scope);
     // Load the resolve field from the display/scope structure
-    return new LoadNode(mem(),dsp,"$dyn", null).peep();
+    return new LoadNode(mem(),dsp,"$dyn",true,true,null).peep();
   }
   private Node dynCall() {
     Node ld = dynLoad();
     // Load a Call/Apply field out of a DynTable
     return new AFieldNode(ld).peep();
   }
-  
+
 
   /** Parse a tuple; first stmt but not the ',' parsed.
    *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
@@ -1185,7 +1186,7 @@ public class Parse implements Comparable<Parse> {
       // to the function for faster access.
       unkeep(fun);
       RetNode ret = (RetNode)(new RetNode(ctrl(),mem(),rez,fun.parm(CTL_IDX),fun).peep());
-      
+
       _e = e._par;            // Pop nested environment; pops nongen also
       Node fptr = new FunPtrNode(ret).peep();
       // Anonymous functions early-bind.  Functions in structs become "methods" and late-bind.
@@ -1428,7 +1429,7 @@ public class Parse implements Comparable<Parse> {
     ts.push(ret);
     return TypeTuple.fun_sig(ts);
   }
-  
+
 
   // Type-id or type-var parse.
   // TODO: type-vars done as function syntax?
@@ -1439,7 +1440,7 @@ public class Parse implements Comparable<Parse> {
   // Less parens; A is captured in the 'MyType' type, and B is captured in the 'map' type
   // Example: MyType = :   A => @{ table:A[]; map:  B => { MyType {A->B} -> MyType B }  ; ... }
   // More parens; A is captured in the 'MyType' type, and B is captured in the 'map' type
-  // Example: MyType = : { A => @{ table:A[]; map:{ B => { MyType {A->B} -> MyType B } }; ... } }  
+  // Example: MyType = : { A => @{ table:A[]; map:{ B => { MyType {A->B} -> MyType B } }; ... } }
   private Type tvar() {
     int oldx = _x;
     String tok = token();
@@ -1461,10 +1462,10 @@ public class Parse implements Comparable<Parse> {
     while( e._scope.test_if() ) e = e._par;
     StructNode stk = e._scope.stk();
     stk.add_fld(tok,Access.Final,fref,null);
-    Node frsh = new FreshNode(fref,_e).peep();
-    return frsh;
+    //Node frsh = new FreshNode(fref,_e).peep();
+    return fref;
   }
-  
+
   // Create a type forward-reference.  Must be type-defined later.  Called when
   // seeing a name in a type context for the first time.  Builds an empty type
   // NewNode and returns it.
@@ -1588,7 +1589,7 @@ public class Parse implements Comparable<Parse> {
     Node mmem = mem();
     while( true ) {
       if( scope == e._scope ) return ptr;
-      ptr = new LoadNode(mmem,ptr,"^",null).peep(); // Gen linked-list walk code, walking display slot
+      ptr = new LoadNode(mmem,ptr,"^",false,true,null).peep(); // Gen linked-list walk code, walking display slot
       e = e._par;               // Walk linked-list in parser also
     }
   }
@@ -1674,11 +1675,11 @@ public class Parse implements Comparable<Parse> {
   // keep a node alive
   <N extends Node> N keep(N n) { _keeps.push(n); return n.keep(); }
   <N extends Node> N unkeep(N n) { Node k = _keeps.pop(); assert k==n;  return n.unkeep(); }
-  
+
   // Handy for the debugger to print
   @Override public String toString() { return new String(_buf,_x,_buf.length-_x); }
 
-  // 
+  //
   @Override public boolean equals(Object loc) {
     if( this==loc ) return true;
     if( !(loc instanceof Parse p) ) return false;

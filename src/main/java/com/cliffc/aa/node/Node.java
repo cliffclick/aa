@@ -34,7 +34,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     return CNT++;
   }
   @Override public int getAsInt() { return _uid; }
-  
+
   // Utility during debugging to find a reachable Node by _uid
   public  Node find( int uid ) { return find(uid,new VBitSet()); }
   private Node find( int uid, VBitSet bs ) {
@@ -46,7 +46,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     return null;
   }
 
-  
+
   public static int _PRIM_CNT = 99999;
   // Initial state after loading e.g. primitives.
   public static void initPrim() { _PRIM_CNT=CNT; }
@@ -79,7 +79,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   public boolean isMultiHead() { return false; }
   // Phis, Parms, Projs
   public boolean isMultiTail() { return false; }
-  
+
   // Region, Fun, If, Return, Call, CallEpi
   public boolean isCFG() { return false; }
 
@@ -91,7 +91,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   abstract String label();
 
   // Debugger Printing.
-    
+
   // {@code toString} is what you get in the debugger.  It has to print 1 line
   // (because this is what a debugger typically displays by default) and has to
   // be robust with broken graph/nodes.
@@ -139,13 +139,13 @@ public abstract class Node implements Cloneable, IntSupplier {
   }
 
   public String p(int d) { return NodePrinter.prettyPrint(this,d,isPrim()); }
-  
+
 
   // TODO: Graphic print e.g. greek letter Phi for PhiNodes
-  
+
   // --------------------------------------------------------------------------
   // Primitive edge management.  Add and remove edges in a single direction.
-  
+
   // Defs.  Generally fixed length, ordered, nulls allowed, no unused trailing
   // space.  Zero is Control.
   private Node[] _defs;         // Array of defs
@@ -178,7 +178,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     _defs[_len-2] = _defs[_len-1];
     _defs[_len-1] = tmp;
   }
-  
+
   // Uses.  Generally variable length, unordered, nulls allowed as a "keep
   // alive" flag.
   private Node[] _uses;         // Array of uses
@@ -223,12 +223,12 @@ public abstract class Node implements Cloneable, IntSupplier {
   public <N extends Node> N unkeep() { _delUse(null); return (N)this;  }
   boolean isKeep() { return findUse(null) != -1; }
 
-  
+
   // --------------------------------------------------------------------------
   // Bi-directional edge management, including hash changes forcing GVN
-  
+
   // Edge-lock: cannot modify edges because messes up hashCode & GVN
-  private boolean _elock; 
+  private boolean _elock;
 
   // Global expressions, to remove redundant Nodes
   public static final ConcurrentHashMap<Node,Node> VALS = new ConcurrentHashMap<>();
@@ -252,7 +252,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     VALS.put(this,this);
     return this;
   }
-  
+
   // Add def/use edge.  Updates both sides of the graph, and since the hash
   // changes removes 'this' from the GVN VALS table.
   public Node addDef(Node n) {
@@ -261,7 +261,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( n!=null ) n._addUse(this);
     return this;
   }
-  
+
   // Replace def/use edge.  Updates both sides of the graph, and since the hash
   // changes removes 'this' from the GVN VALS table.  The old def loses a use
   // and may be recursively deleted.  Returns 'this'.
@@ -293,12 +293,12 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( n != null ) n._delUse(this);
     return n;
   }
-  
+
   // Delete 1st instanceof named def; error if not found.
   // Does not preserve order.
   public void del( Node def ) { del(findDef(def)); }
 
-  
+
   // Replace, but do not delete this.  Really used to insert a node in front of
   // this.   Does graph-structure changes, making pointers-to-this point to nnn.
   // Changes neither 'this' nor 'nnn'.  Does not enforce any monotonicity nor
@@ -358,7 +358,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   private int _hash;
   @Override public final int hashCode() {
     if( _hash!=0 ) return _hash;
-    int sum = label().hashCode() + hash();
+    int sum = getClass().hashCode() + hash();
     for( Node def : defs() ) if( def != null ) sum ^= def._uid;
     if( sum==0 ) sum = 0xDEADBEEF;
     return (_hash=sum);
@@ -374,10 +374,10 @@ public abstract class Node implements Cloneable, IntSupplier {
     for( int i=0; i<_len; i++ ) if( _defs[i] != n._defs[i] ) return false;
     return Util.eq( label(), n.label() );
   }
- 
+
   // --------------------------------------------------------------------------
   // Forward flow type tracking
-  
+
   public Type _val;     // Value; starts at ALL and lifts towards ANY.
 
   // Compute the current best Type for this Node, based on the types of its
@@ -402,10 +402,10 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Shortcut for input value
   public Type val(int idx) { return in(idx)._val; }
 
-  
+
   // --------------------------------------------------------------------------
   public Type _live;    // Liveness; assumed live in gvn.iter(), assumed dead in gvn.gcp().
-  
+
   // Compute the current best liveness for this Node, based on the liveness of
   // its uses.  If basic_liveness(), returns a simple DEAD/ALIVE.  Otherwise,
   // computes the alive memory set down to the field level.  May return
@@ -462,7 +462,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Type-equivalence (JOIN of unified Types), and includes gross structure
   // (functions, structs, pointers, or simple Types).
   TV3 _tvar;
-  
+
   // H-M Type-Variables
   public TV3 tvar() {
     TV3 tv = _tvar.find();                  // Do U-F step
@@ -479,7 +479,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     assert _tvar==null; // Still a null: this is a recursive check that _tvar is not assigned twice
     return (_tvar=tvar);        // Assign and return
   }
-  
+
   // Initial default compute of type variables.  No set, no smarts.  Overridden.
   TV3 _set_tvar() { return new TVLeaf(); }
 
@@ -492,7 +492,7 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Unify this Proj with the matching TV2 part from the multi-TV2-producing
   public TV3 unify_proj( ProjNode proj ) { throw TODO(); }
-  
+
   // --------------------------------------------------------------------------
 
   // Dependents.  Changes to 'this' adds these to the worklist, and clears the list.
@@ -513,7 +513,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       _deps.push(dep);
     }
   }
-  
+
   // Add dependents to the flow & reduce lists, and clear the deps.
   public final void deps_work_clear() {
     if( _deps == null ) return;
@@ -559,7 +559,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // (yet), so liveness is meaningless.  Cannot do HM TVs either, until the
   // program is complete.  Only sets value.
   public final <N extends Node> N init() { _val = value(); GVN.add_flow_reduce(this); return (N)this; }
-  
+
   // Graph rewriting.  Strictly reducing Nodes or Edges.  Cannot make a new
   // Node, save that for the expanding ideal calls.
   // Returns null if no-progress or a better version of 'this'.  The
@@ -574,14 +574,14 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Things like inserting MemSplit/MemJoin (which strictly increase graph
   // parallelism).  Returns null for no-progress.
   public Node ideal_grow() { return null; }
-  
+
   public void add_flow_defs() { GVN.add_flow_defs(this); }
   public void add_flow_uses() { GVN.add_flow_uses(this); }
   public void add_work     () { GVN.add_flow(this); }
   //public void add_reduce_uses() { GVN.add_reduce_uses(this); }
 
 
-  
+
   // Run peepholes are a recently parsed Node; Node has no uses (yet).
   // Node can be idealized and reduced to other Nodes.
   private boolean _peeped;      // One-shot assert only
@@ -593,7 +593,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     assert _val.isa(old);  // Monotonic
     assert _ulen==0;       // No uses yet, so can use what is returned directly
     Node x = _do_reduce(); // Find a reduced version, if any
-    return x==null ? this : kill(x);  // Always return a not-null
+    return x==null ? _elock() : kill(x);  // Always return a not-null
   }
 
   // Compute a new replacement for 'this' that is generally "better" -
@@ -606,6 +606,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     // Try CSE
     if( !_elock ) {             // Not in VALS and can still replace
       Node x = VALS.get(this);  // Try VALS
+      _hash=0;                  // Clear hash; not yet in hash table
       if( x != null )           // Hit
         return merge(x);        // Graph replace with x
     }
@@ -647,7 +648,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       tvar().unify(x.tvar(),false);
     return GVN.add_flow(x);
   }
-  
+
   // Change values at this Node directly.
   public Node do_flow() {
     Node progress=null;
@@ -718,7 +719,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     return new ConNode<>(t).peep();
   }
 
-  
+
   // --------------------------------------------------------------------------
 
   // Do One Step of forwards-dataflow analysis.  Assert monotonic progress.
@@ -756,7 +757,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( old==null ) return;
     //if( _val == Type.ANY ) { /*tvar().deps_add_deep(this); */ return; } // No HM progress on untyped code
     // No HM progress on dead code, except for Call uses; required to unify calls.
-    if( _live== Type.ANY && !has_call_use() ) 
+    if( _live== Type.ANY && !has_call_use() )
       return;
     if( unify(false) ) {
       assert !_tvar.find().unify(old.find(),true);// monotonic: unifying with the result is no-progress
@@ -832,7 +833,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Return any type error message, or null if no error
   public ErrMsg err( boolean fast ) { return null; }
 
-  
+
   // --------------------------------------------------------------------------
   // Generic Visitor Pattern
 
@@ -842,7 +843,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     _walk(map);
     WVISIT.clear();
   }
-  
+
   private void _walk( NodeMap map ) {
     if( WVISIT.tset(_uid) ) return; // Been there, done that
     map.map(this);
@@ -860,7 +861,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     WVISIT.clear();
     return rez;
   }
-  
+
   private int _walkR( NodeMapR map, int x ) {
     if( WVISIT.tset(_uid) ) return x; // Been there, done that
     int x2 = map.map(this,x);
@@ -871,7 +872,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   }
 
   // --------------------------------------------------------------------------
-  
+
   // Easy assertion check
   boolean check_solo_mem_writer(Node memw) {
     boolean found=false;
@@ -887,7 +888,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // For loads and stores only
   boolean ld_st_check(StoreAbs st) { throw AA.TODO(); }
 
-  
+
   // Shortcut
   public Type sharptr( Node mem ) { return mem._val.sharptr(_val); }
 
