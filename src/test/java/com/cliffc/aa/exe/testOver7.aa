@@ -1,12 +1,12 @@
 // One DynLoad, fcn needs DynTable
-// Type: int64
-// Eval: 8
+// Type: *[8]( _, 2, 3.300000011920929)
+// Eval: *[8]( _, 2, 3.300000011920929f)
 
 fcn = { ->
   @{
-     qi ={ x -> (+1  x) }; // i -> i
-     qf ={ x -> (f2i x) }; // f -> i
+     qi ={ x -> x.a };
+     qf ={ x -> x.b };
   }._    // Which of {q*} should be picked?
 };
 bar = { x -> ((fcn) x) };
-if 1 ? (bar 7) : (bar 3.9f)
+(pair (bar @{a =2;}) (bar @{b =3.3f;}) )

@@ -11,15 +11,15 @@ import static com.cliffc.aa.AA.DSP_IDX;
 public class CEProjNode extends CProjNode {
   public CEProjNode( Node call ) { super(call); }
   public CEProjNode( RootNode root, int fidx ) { super(root,fidx); }
-  @Override public String xstr() { return "CEProj"; }
+  @Override public String label() { return "CEProj"; }
 
   @Override public Type value() {
-    if( _uses._len<1 ) return Type.CTRL; // Dead
+    if( nUses()<1 ) return Type.CTRL; // Dead
     assert !(in(0) instanceof ScopeNode);
-    if( in(0).is_copy(0) != null ) return Type.CTRL;
-    if( is_keep() ) return Type.CTRL;
+    if( in(0).isCopy(0) != null ) return Type.CTRL;
+    if( isKeep() ) return Type.CTRL;
     // Expect a call here
-    return Type.XCTRL.oob(good_call(val(0),(FunNode)_uses.at(0)));
+    return Type.XCTRL.oob(good_call(val(0),(FunNode)use0()));
   }
 
   // Never equal to another CEProj, since Call-Graph *edges* are unique

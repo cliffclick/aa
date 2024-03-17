@@ -41,10 +41,6 @@ public class Env implements AutoCloseable {
   public static CProjNode CTL_0; // Program start value control
   public static MProjNode MEM_0; // Program start value memory
 
-  // KeepNode represents future un-parsed users of a Node.  Removed after parsing.
-  // Semantically, it represents a conservative approximation of ALL uses.
-  public static final KeepNode KEEP_ALIVE;
-
   // Short-cuts for common constants Nodes.
   public static final ConNode ANY;   // Common ANY / used for dead
   public static final ConNode ALL;   // Common ALL / used for errors
@@ -69,30 +65,28 @@ public class Env implements AutoCloseable {
   // to the prototype obj.
   public static final NonBlockingHashMap<String,StructNode> PROTOS;
 
-  // Add a permanent edge use to all these Nodes, keeping them alive forever.
-  @SuppressWarnings("unchecked")
-  private static <N extends Node> N keep(N n) {
-    N xn = GVN.init(n);
-    KEEP_ALIVE.add_def(xn);
-    return xn;
-  }
-
+  public static final int NODE_LO;
+  
   static {
-    // The Keep-Alive
-    KEEP_ALIVE = new KeepNode();
+    // The Universe outside the parse program
+    ROOT  = new RootNode(null,null,null,null);
+    // Initial control & memory
+    CTL_0 = new CProjNode(ROOT,CTL_IDX).init();
+    MEM_0 = new MProjNode(ROOT,MEM_IDX).init();
+    NODE_LO = MEM_0._uid+1;
     
     // Top-level or common default values
-    ANY   = keep(new ConNode<>(Type.ANY   ));
-    ALL   = keep(new ConNode<>(Type.ALL   ));
-    XCTRL = keep(new ConNode<>(Type.XCTRL ));
-    XNIL  = keep(new ConNode<>(TypeNil.XNIL));
-    NIL   = keep(new ConNode<>(TypeNil. NIL));
-    XSCALAR=keep(new ConNode<>(TypeNil.XSCALAR));
-    THUNK = keep(new ConNode<>(TypeFunPtr.THUNK));
-    UNUSED= keep(new ConNode<>(TypeStruct.UNUSED));
-    ALLMEM= keep(new ConNode<>(TypeMem.ALLMEM));
-    ANYMEM= keep(new ConNode<>(TypeMem.ANYMEM));
-    XMEM  = keep(new ConNode<>(TypeMem.EXTMEM));
+    ANY   = new ConNode<>(Type.ANY         ).keep();
+    ALL   = new ConNode<>(Type.ALL         ).keep();
+    XCTRL = new ConNode<>(Type.XCTRL       ).keep();
+    XNIL  = new ConNode<>(TypeNil.XNIL     ).keep();
+    NIL   = new ConNode<>(TypeNil. NIL     ).keep();
+    XSCALAR=new ConNode<>(TypeNil.XSCALAR  ).keep();
+    THUNK = new ConNode<>(TypeFunPtr.THUNK ).keep();
+    UNUSED= new ConNode<>(TypeStruct.UNUSED).keep();
+    ALLMEM= new ConNode<>(TypeMem.ALLMEM   ).keep();
+    ANYMEM= new ConNode<>(TypeMem.ANYMEM   ).keep();
+    XMEM  = new ConNode<>(TypeMem.EXTMEM   ).keep();
 
     PROTOS = new NonBlockingHashMap<>();
 
@@ -100,8 +94,10 @@ public class Env implements AutoCloseable {
     PRIM = new Env();
     SCP_0 = PRIM._scope;
     STK_0 = SCP_0.stk();
-    PrimNode.PRIMS();           // Initialize
+    PrimNode.PRIMS();           // Initialize prims
     Type.init0(SCP_0._types);
+    STK_0.close();
+    ROOT.setPrimMem(PRIM._scope.mem());
     record_for_reset();         // Record for reset between tests
   }
 
@@ -114,11 +110,10 @@ public class Env implements AutoCloseable {
   Env( Env par, FunNode fun, int nargs, Node ctrl, Node mem, Node dsp_ptr, StructNode fref ) {
     _par = par;
     _fun = fun;
-    StructNode dsp = fref==null ? new StructNode(nargs,false,null ).init() : fref;
-    dsp.add_fld("^",TypeFld.Access.Final,dsp_ptr,null);
-    NewNode ptr = new NewNode(BitsAlias.new_alias(),par==null).init();  GVN.add_flow(ptr);
+    StructNode dsp = fref==null ? new StructNode(nargs,false,null) : fref;
+    dsp.add_fld("^",TypeFld.Access.Final,dsp_ptr,null).init();
+    NewNode ptr = new NewNode("ENV",BitsAlias.new_alias(),par==null).init();
     mem = new StoreXNode(mem,ptr,dsp,null).init();
-    mem.in(1).xliv();
     // Install a top-level prototype mapping
     if( fref!=null ) {          // Forward ref?
       //String fname = fref._ts._name;
@@ -127,13 +122,11 @@ public class Env implements AutoCloseable {
       throw TODO();
     }
     _scope = new ScopeNode(new HashMap<>(),ctrl,mem,XNIL,ptr,dsp).init();
-    KEEP_ALIVE.add_def(_scope);
-    GVN.iter();
   }
 
   // Top-level Env.  Contains, e.g. the primitives.
   // Above any file-scope level Env.
-  private Env( ) { this(null,null,0,ALL,ANYMEM,NIL,null); }
+  private Env( ) { this(null,null,0,ALL,ANYMEM,PrimNode.PCLZ,null); }
 
   // Gather and report errors and typing
   TypeEnv gather_errors(ErrMsg err) {
@@ -154,9 +147,6 @@ public class Env implements AutoCloseable {
     return new TypeEnv(val,     // GCP result
                        fidxs,   // Escaping FIDXS
                        aliases, // Escaping ALIASES
-                       // Fix printing/parsing
-                       (TypeMemPtr)mem.sharptr(TypeMemPtr.INTPTR),
-                       (TypeMemPtr)mem.sharptr(TypeMemPtr.FLTPTR),
                        tval,
                        errs0.isEmpty() ? null : errs0);
   }
@@ -168,9 +158,10 @@ public class Env implements AutoCloseable {
   // active display aliases (which are otherwise available to all function
   // definitions getting parsed).
   @Override public void close() {
-    // Promote forward refs to the next outer scope
+    // Make sure current display us closed
     StructNode stk = _scope.stk();
     assert stk.is_closed();
+    // Promote forward refs to the next outer scope
     stk.promote_forward( _par._scope);
     for( String tname : _scope.typeNames() ) {
       TypeNil t = _scope.get_type(tname);
@@ -179,10 +170,9 @@ public class Env implements AutoCloseable {
       throw TODO();
     }
 
-    Node xscope = KEEP_ALIVE.pop();// Unhook scope
-    assert _scope==xscope;
     GVN.add_flow_defs(_scope);  // Recompute liveness of scope inputs
-    GVN.iter();
+    if( _scope.nUses() == 0 )
+      _scope.kill();
   }
 
   // Wire up an early function exit.  Hunts through all scopes until it finds a closure.
@@ -192,10 +182,9 @@ public class Env implements AutoCloseable {
 
   // Record global static state for reset
   private static void record_for_reset() {
-    Node.init0(); // Record end of primitives
+    Node.initPrim(); // Record end of primitives
     TV3.init0();
     GVN.init0();
-    FunNode.init0();
     NewNode.init0();
     BitsAlias.init0();
     BitsFun  .init0();
@@ -205,26 +194,21 @@ public class Env implements AutoCloseable {
   // Reset all global statics for the next parse.  Useful during testing when
   // many top-level parses happen in a row.
   public static void top_reset() {
-    if( Env.ROOT!=null ) {
-      while( Env.ROOT.len()>0 ) Env.ROOT.pop();
-      Env.ROOT=null;
-    }
-    TV3.reset_to_init0();
+    RootNode.reset_to_init0();
     Node.VALS.clear();          // Clean out hashtable
     GVN.reset_to_init0();
-    KEEP_ALIVE.walk(Node::walk_reset); // Clean out any wired prim calls
-    GVNGCM.KEEP_ALIVE.walk(Node::walk_reset);
+    Env.ROOT.walk(Node::walk_reset); // Clean out any wired prim calls
     Combo.reset();
-    assert KEEP_ALIVE.more_work() == 0; // Initial conditions are correct
+    assert NodeUtil.more_work(Env.ROOT) == 0; // Initial conditions are correct
     AA.reset();
     Node      .reset_to_init0();
     GVN       .reset_to_init0();
     FunNode   .reset_to_init0();
     NewNode   .reset_to_init0();
-    RootNode  .reset_to_init0();
     BitsAlias .reset_to_init0();
     BitsFun   .reset_to_init0();
     BitsRPC   .reset_to_init0();
+    Env.ROOT.walk( n -> { assert n.isResetKeep(); } );
   }
 
   // Return Scope for a name, so can be used to determine e.g. mutability

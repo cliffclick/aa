@@ -1,6 +1,6 @@
 // Function composition
-// Type: { - { - A -> B } { - B -> C } -> { - A -> C } }
-// Eval: K1[LAMBDA,()]
+// Type: { A:*[2]@{ $dyn=-;  ..., } - B:{ - - C -> D } E:{ - - D -> F } -> { *[CLZ]@{ A; $dyn=G; f=B; g=E;  ..., } - C -> F } }
+// Eval: <*[2]@{ _ $dyn=-; },LAM4>
 { f g ->
   { arg ->
     (g (f arg))

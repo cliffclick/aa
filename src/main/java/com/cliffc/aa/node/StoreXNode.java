@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
@@ -16,6 +17,8 @@ public class StoreXNode extends StoreAbs {
     super(mem,adr,val,bad);
   }
 
+  @Override public String label() { return "Store"; }
+  
   StructNode struct() { return (StructNode)in(3); }
 
   @Override Type _value( TypeMem tm, TypeMemPtr tmp ) {
@@ -47,11 +50,13 @@ public class StoreXNode extends StoreAbs {
   }
 
   // Is this Store alive, based on given liveness?
-  @Override boolean _is_live( TypeStruct live ) {  return live==TypeStruct.ISUSED; }
+  @Override boolean _is_live( TypeStruct live ) {  return live!=TypeStruct.UNUSED; }
 
   @Override boolean st_st_check( StoreAbs sta ) {
     return sta instanceof StoreXNode st;
   }
+  
+  @Override boolean ld_st_check(StoreAbs st) { throw AA.TODO(); }
  
   @Override public TV3 _set_tvar() {
     assert rez()!= Env.ANY; // Did not clear out during iter; return mem().tvar()
@@ -68,13 +73,14 @@ public class StoreXNode extends StoreAbs {
     return null;
   }
 
-  @Override public boolean unify( boolean test ) {
-    TVPtr   ptr = (TVPtr   )adr().tvar();
-    TVStruct ts = (TVStruct)rez().tvar();
-    if( Combo.pre() )
-      return unify(ptr.aliases(),ts,test);
-    return ptr.load().unify(ts,test);
-  }
+  //@Override public boolean unify( boolean test ) {
+  //  TVPtr   ptr = (TVPtr   )adr().tvar();
+  //  TVStruct ts = (TVStruct)rez().tvar();
+  //  if( Combo.pre() )
+  //    return unify(ptr.aliases(),ts,test);
+  //  return ptr.load().unify(ts,test);
+  //}
+
   public static boolean unify( BitsAlias aliases, TVStruct ts, boolean test ) {
     assert aliases!=BitsAlias.NALL;
     boolean progress = false;

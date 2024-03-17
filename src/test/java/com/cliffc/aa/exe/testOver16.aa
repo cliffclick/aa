@@ -1,5 +1,5 @@
-// Type: ( ( int64, str), ( int64, str))
-// Eval: ( ( 124, "litered"), ( 457, "liteblue"))
+// Type: *[8]( _, *[3]( _, int64, str), *[3]( _, int64, str))
+// Eval: *[8]( _, *[3]( _, 124, "litered"), *[3]( _, 457, "liteblue"))
 color = { hex name -> (pair hex name )};
 red  = (color 123 "red" );
 blue = (color 456 "blue");

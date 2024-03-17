@@ -34,7 +34,7 @@ endif
 
 # Fun Args to javac.  Mostly limit to java8 source definitions, and fairly
 # aggressive lint warnings.
-JAVAC_ARGS = -g -XDignore.symbol.file -Xlint:-deprecation
+JAVAC_ARGS = -XDignore.symbol.file -Xlint:-deprecation -Xlint:-unchecked
 
 # Source code
 # Note that BuildVersion is not forced to be rebuilt here - so incremental
@@ -53,19 +53,18 @@ libs = $(wildcard lib/*jar)
 jars = $(subst $(space),$(SEP),$(libs))
 
 
-default_targets := build/aa.jar
+# Default to building java classes and not the jar
+#default_targets := build/aa.jar
+default_targets := $(main_classes)
 # Optionally add ctags to the default target if a reasonable one was found.
 ifneq ($(CTAGS),)
-default_targets += tags
+default_targets += TAGS_AGE
 endif
 
 default: $(default_targets)
 
 # Just the classes, no jarring step
 classes: $(classes)
-
-# Build the test classes
-test:	$(test_classes)
 
 # Compile just the out-of-date files
 $(main_classes): build/classes/main/%class: $(SRC)/%java
@@ -76,7 +75,7 @@ $(main_classes): build/classes/main/%class: $(SRC)/%java
 $(test_classes): $(CLZDIR)/test/%class: $(TST)/%java $(main_classes)
 	@echo "compiling " $@ " because " $?
 	@[ -d $(CLZDIR)/test ] || mkdir -p $(CLZDIR)/test
-	javac $(JAVAC_ARGS) -cp "$(CLZDIR)/test$(SEP)$(CLZDIR)/main$(SEP)$(jars)" -sourcepath $(TST) -d $(CLZDIR)/test $(test_javas)
+	@javac $(JAVAC_ARGS) -cp "$(CLZDIR)/test$(SEP)$(CLZDIR)/main$(SEP)$(jars)" -sourcepath $(TST) -d $(CLZDIR)/test $(test_javas)
 
 # Note the tabs - not spaces - in the grep and cut commands
 PROJECT_VERSION=0.0.1
@@ -89,7 +88,9 @@ BUILD_BY=      (whoami | cut -d\\ -f2-)
 # Build the version file anytime anything would trigger the build/aa.jar.
 # i.e., identical dependencies to aa.jar, except aa.jar also includes the test
 # files and the BuildVersion file.
-$(CLZDIR)/main/$(AA)/BuildVersion.java: $(main_classes) src/main/manifest.txt lib
+# Turn OFF build-all-the-time, to lower edit/debug/build cycle times.
+#$(CLZDIR)/main/$(AA)/BuildVersion.java: $(main_classes) src/main/manifest.txt lib
+$(CLZDIR)/main/$(AA)/BuildVersion.java: src/main/manifest.txt lib
 	@echo "vrsioning " $@ " because " $?
 	@rm -f $@
 	@mkdir -p $(dir $@)
@@ -130,7 +131,7 @@ sandbox/tests.txt:	$(test_classes)
 	@(cd ${TST}; /usr/bin/find . -name '*.java' | cut -c3- | sed "s/.....$$//" | sed -e 's/\//./g') | grep -v TestUtil | /usr/bin/sort > sandbox/tests.txt
 
 # Base launch line for JVM tests
-JVM=nice java -Xms1g -Xms1g -ea -cp "build/aa.jar${SEP}${jars}${SEP}$(CLZDIR)/test"
+JVM=java -ea -cp "build/aa.jar${SEP}${jars}${SEP}$(CLZDIR)/test"
 
 # Build the AA-test jar and run the junit tests.
 # Actually makes jvm_cmd.txt and status.0 along with out.0
@@ -153,6 +154,12 @@ hm_tests:	$(test_classes) build/aa.jar
 	$(JVM) org.junit.runner.JUnitCore com.cliffc.aa.HM.TestHM
 
 
+# Run standard tests
+test:	build/aa.jar
+	@echo "  testing"
+	@$(JVM) org.junit.runner.JUnitCore com.cliffc.aa.type.TestType com.cliffc.aa.TestTVar com.cliffc.aa.exe.TestEXE
+
+
 # EXE, a standalone lambda calc interpreter
 exec_javas   := $(wildcard $(SRC)/$(AA)/exe/*java)
 etst_javas   := $(wildcard $(TST)/$(AA)/exe/*java)
@@ -166,8 +173,8 @@ etst_classes := $(patsubst $(TST)/%java,$(CLZDIR)/test/%class,$(etst_javas))
 test_aas   := $(wildcard $(TST)/$(AA)/exe/*aa)
 
 exe:	$(main_classes) $(exec_classes) $(etst_classes) build/aa.jar
-	echo testing EXE
-	$(JVM) org.junit.runner.JUnitCore com.cliffc.aa.exe.TestEXE
+	@echo testing EXE
+	@$(JVM) org.junit.runner.JUnitCore com.cliffc.aa.exe.TestEXE
 
 
 
@@ -201,6 +208,9 @@ lib/annotations-16.0.2.jar:
 	@(cd lib; wget https://repo1.maven.org/maven2/org/jetbrains/annotations/16.0.2/annotations-16.0.2.jar)
 
 # Build emacs tags (part of a tasty emacs ide experience)
-tags:	$(main_javas) $(test_javas) $(exec_javas)
+tags:	TAGS
+TAGS:	$(main_javas) $(test_javas) $(exec_javas)
+	echo building tags and tags_age
 	@rm -f TAGS
 	@$(CTAGS) -e --recurse=yes --extra=+q --fields=+fksaiS $(SRC) $(TST)
+	@touch "--date=next hour" TAGS_AGE

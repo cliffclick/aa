@@ -15,31 +15,35 @@ import static com.cliffc.aa.Env.GVN;
 // in and out, and is especially targeting non-inlined calls.
 public class MemJoinNode extends Node {
 
-  public MemJoinNode( MProjNode mprj ) { super(OP_JOIN,mprj);  assert mprj.in(0) instanceof MemSplitNode;  }
+  public MemJoinNode( MProjNode mprj ) { super(mprj);  assert mprj.in(0) instanceof MemSplitNode;  }
 
+  @Override public String label() { return "MemJoin"; }
+  @Override public boolean isMem() { return true; }
+  
   MemSplitNode msp() {  // The MemSplit
     Node n = in(0).in(0);
     return n instanceof MemSplitNode ? (MemSplitNode)n : null;
   }
-  @Override public boolean is_mem() { return true; }
 
   @Override public Node ideal_reduce() {
     MemSplitNode msp = msp();
     // If the split count is lower than 2, then the split serves no purpose
-    if( _defs._len == 2 && val(1).isa(_val) ) {
+    if( len() == 2 && val(1).isa(_val) ) {
       msp._is_copy=true;
-      GVNGCM.retype_mem(null,msp(),in(1), false);
-      for( Node use : msp()._uses ) GVN.add_reduce(use);
-      return in(1);             // Just become the last split
+      //GVNGCM.retype_mem(null,msp(),in(1), false);
+      //for( Node use : msp()._uses ) GVN.add_reduce(use);
+      //return in(1);             // Just become the last split
+      throw TODO();
     }
 
     // If some Split/Join path clears out, remove the (useless) split.
-    for( int i=1; i<_defs._len; i++ )
-      if( in(i) instanceof MProjNode && in(i).in(0)==msp && in(i)._uses._len==1 ) {
+    for( int i=1; i<len(); i++ )
+      if( in(i) instanceof MProjNode && in(i).in(0)==msp && in(i).nUses()==1 ) {
         in(0).xval();        // Update the default type
         msp.remove_alias(i);
         GVN.add_dead(in(i));
-        return remove(i);
+        //return remove(i);
+        throw TODO();
       }
 
     return null;
@@ -83,7 +87,7 @@ public class MemJoinNode extends Node {
   private Node combine_splits( MemSplitNode head ) {
     MemSplitNode msp = msp();
     MemJoinNode mjn = (MemJoinNode)msp.mem();
-    if( _defs._len==1 ) return null; // Nothing to move
+    if( len()==1 ) return null; // Nothing to move
     if( true )
       // TODO: Fails right now because types get OOO when removing a Split/Join
 
@@ -99,21 +103,22 @@ public class MemJoinNode extends Node {
     msp._escs.set(0,msp._escs.at(0).subtract(esc));
     int idx = head.add_alias(esc);
     assert idx!=0; // No partial overlaps; actually we could just legit bail here, no assert
-    if( idx == mjn._defs._len ) // Add edge Join->Split as needed
-      mjn.add_def(GVN.xform(new MProjNode(head,idx))); // Add a new MProj from MemSplit
+    if( idx == mjn.len() ) // Add edge Join->Split as needed
+      mjn.addDef(GVN.xform(new MProjNode(head,idx))); // Add a new MProj from MemSplit
     // Move SESE region from lower Split/Join to upper Split/Join
     ProjNode prj = ProjNode.proj(msp,msp._escs._len);
     prj.subsume(mjn.in(idx));
-    mjn.set_def(idx,in(_defs._len-1));
-    remove(_defs._len-1);
-
-    // Moving this can *lower* the upper Join type, if an allocation moves up.
-    Type tt = mjn.xval();
-    msp.xval();
-    for( Node use : msp._uses )
-      use._val = tt;
-
-    return this;
+    mjn.setDef(idx,last());
+    //remove(_defs._len-1);
+    //
+    //// Moving this can *lower* the upper Join type, if an allocation moves up.
+    //Type tt = mjn.xval();
+    //msp.xval();
+    //for( Node use : msp.uses() )
+    //  use._val = tt;
+    //
+    //return this;
+    throw TODO();
   }
 
   @Override public Type value() {
@@ -122,8 +127,8 @@ public class MemJoinNode extends Node {
 
     // "Shortcut" is all memories are the same (or any/all)
     boolean diff=false;
-    TypeMem[] mems = new TypeMem[_defs._len];
-    for( int i=0; i<_defs._len; i++ ) {
+    TypeMem[] mems = new TypeMem[len()];
+    for( int i=0; i<len(); i++ ) {
       Type t = val(i);
       if( t == Type.ANY ) t = TypeMem.ANYMEM;
       if( t == Type.ALL ) t = TypeMem.ALLMEM;
@@ -172,21 +177,21 @@ public class MemJoinNode extends Node {
   // Move the given SESE region just behind of the join into the join/split
   // area.  The head node has the escape-set.
   void add_alias_below( Node head, BitsAlias head1_escs, Node base ) {
-    assert head.is_mem() && base.is_mem();
+    assert head.isMem() && base.isMem();
     GVN.add_unuse(this);
     MemSplitNode msp = msp();
     int idx = msp.add_alias(head1_escs); // Add escape set, find index
     Node mspj;
-    if( idx == _defs._len ) {         // Escape set added at the end
-      add_def(mspj = GVN.init(new MProjNode(msp,idx)));
+    if( idx == len() ) {        // Escape set added at the end
+      addDef(mspj = new MProjNode(msp,idx).peep());
     } else {             // Inserted into prior region
       mspj = in(idx);
       assert idx!=0;     // No partial overlap; all escape sets are independent
     }
     // Reset edges to move SESE region inside
-    head.set_def(MEM_IDX,in(idx));
+    head.setDef(MEM_IDX,in(idx));
     base.insert(this);
-    set_def(idx,base);
+    setDef(idx,base);
   }
 
   MemJoinNode add_alias_below_new(Node nnn, Node old ) {

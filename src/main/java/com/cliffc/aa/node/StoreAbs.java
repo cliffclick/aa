@@ -5,23 +5,23 @@ import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 
-import static com.cliffc.aa.AA.TODO;
 import static com.cliffc.aa.AA.MEM_IDX;
+import static com.cliffc.aa.AA.TODO;
 
 // Store a value into a named struct field.  Does it's own nil-check and value
 // testing; also checks final field updates.
 public abstract class StoreAbs extends Node {
   private final Parse _bad;
   public StoreAbs( Node mem, Node adr, Node val, Parse bad ) {
-    super(OP_STORE,null,mem,adr,val);
+    super(null,mem,adr,val);
     _bad = bad;
   }
   
-  @Override public boolean is_mem() { return true; }
+  @Override public boolean isMem() { return true; }
 
-  Node mem() { return in(1); }
-  Node adr() { return in(2); }
-  Node rez() { return in(3); }
+  public Node mem() { return in(1); }
+  public Node adr() { return in(2); }
+  public Node rez() { return in(3); }
 
   @Override public final Type value() {
     if( !(mem()._val instanceof TypeMem    tm ) ) return mem()._val.oob(TypeMem.ALLMEM);
@@ -55,21 +55,22 @@ public abstract class StoreAbs extends Node {
       // Kill specific structs or fields
       return _live_kill(tmp);
     }
-    adr().deps_add(in(i));
+    adr().deps_add_live(in(i));
     
     // Liveness as a TypeMem.  If current liveness is the default ALL, go ahead
     // an upgrade to RootNodes global default - which globally excludes kills.
-    TypeMem live0 = _live== Type.ALL ? RootNode.def_mem(this) : (TypeMem)_live;
+    TypeMem live0 = RootNode.removeKills(in(i),_live);
     // Specific live-use varies from field-vs-struct
     return _live_use(live0,tmp,i);
   }
   abstract Type _live_use( TypeMem live0, TypeMemPtr tmp, int i );
   abstract TypeMem _live_kill(TypeMemPtr tmp);
 
+  // Can 'this' Store wipe out or fold into a prior store
   abstract boolean st_st_check( StoreAbs st );
   
   @Override public Node ideal_reduce() {
-    if( is_prim() ) return null;
+    if( isPrim() ) return null;
     if( _live == Type.ANY ) return null; // Dead from below; nothing fancy just await removal
     
     Node mem = mem();
@@ -79,21 +80,15 @@ public abstract class StoreAbs extends Node {
     // Address is high, nothing is stored
     if( adr._val.above_center() )
       return kill_rez_stall_till_live();
-    adr.deps_add(this);
-
     
     // Is this Store dead from below?
     if( adr._val instanceof TypeMemPtr tmp && _live instanceof TypeMem lmem &&
         !_is_live(lmem.ld(tmp)) )
       return kill_rez_stall_till_live();
-    mem.deps_add(this);   // Input address changes, check reduce
-    deps_add(this);       // Our   address changes, check reduce
 
     // Store of a Store, same address
-    if( mem instanceof StoreNode st ) {
+    if( mem instanceof StoreAbs st ) {
       Node adr0 = st.adr();
-//      if( adr  instanceof FreshNode f ) adr  = f.id();
-//      if( adr0 instanceof FreshNode f ) adr0 = f.id();
       if( adr == adr0 && st_st_check(st) ) {
         // Do not bypass a parallel writer
         if( st.check_solo_mem_writer(this) &&
@@ -101,17 +96,27 @@ public abstract class StoreAbs extends Node {
             st._live.isa(st.mem()._live) ) {
           // Storing same-over-same, just use the first store
           if( rez()==st.rez() ) return st;
-          // If not wiping out an error, wipe out the first store
-          if( st.rez()==null || st.rez().err(true)==null ) {
-//            set_def(1,st.mem());
-//            return this;
-            throw TODO();
+          // Store field over struct
+          if( this instanceof StoreNode sfld && st instanceof StoreXNode snew ) {
+            StructNode str = snew.struct();
+            assert str.nUses()==1; // Need to either clone the struct or profit metric
+            if( str.set_fld(sfld._fld,sfld._fin,rez(),false) ) {
+              str.xval();
+              // Delete self
+              return snew;
+            }
+            // Can fail to wipe out a final field
+          } else {
+            // If not wiping out an error, wipe out the first store
+            // Works for a StoreX wiping out a prior Store or StoreX.
+            // Works for a Store  wiping out a prior Store same field.
+            if( st.rez()==null || st.rez().err(true)==null ) {
+              //            set_def(1,st.mem());
+              //            return this;
+              throw TODO();
+            }
           }
-        } else {
-          mem.deps_add(this);    // If become solo writer, check again
         }
-      } else {
-        st.adr().deps_add(this);      // If address changes, check again
       }
     }
 
@@ -129,10 +134,9 @@ public abstract class StoreAbs extends Node {
   // Still until live-ness alives, then kill self
   private Node kill_rez_stall_till_live() {
     // No need for rez
-    if( rez()!=Env.ANY ) Env.GVN.add_reduce(set_def(3,Env.ANY));
+    if( rez()!=Env.ANY ) Env.GVN.add_reduce(setDef(3,Env.ANY));
     // Remove when liveness aligns
     if( _live.isa(mem()._live) ) return mem();
-    mem().deps_add(this);
     return null;
   }
 

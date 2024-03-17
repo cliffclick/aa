@@ -1,14 +1,14 @@
 // Gen counters
 // Simple test of captured environment
-// Type: ( int64, int64)
-// Eval: ( 2, 1)
+// Type: *[8]( _, int64, int64)
+// Eval: *[8]( _, 2, 1)
 gen = { ->
   inc = { cnt ->
    (pair cnt { -> (inc (+ cnt 1))} )
   };
   (inc 0)
 };
-// Make 2 hidden countes
+// Make 2 hidden counters
 cntX0 =(gen);
 cntY0 =(gen);
 // Increment both to 1

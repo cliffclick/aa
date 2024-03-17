@@ -8,23 +8,22 @@ import static com.cliffc.aa.AA.MEM_IDX;
 // Proj control
 public class CProjNode extends ProjNode {
   public CProjNode( Node ifn ) { this(ifn,AA.CTL_IDX); }
-  public CProjNode( Node ifn, int idx ) { super(OP_CPROJ,ifn,idx); }
-  @Override public String xstr() {
-    if( !is_dead() && in(0) instanceof IfNode )
+  public CProjNode( Node ifn, int idx ) { super(ifn,idx); }
+  @Override public String label() {
+    if( !isDead() && in(0) instanceof IfNode )
       return _idx==0 ? "False" : "True";
     return "CProj"+_idx;
   }
-  @Override boolean is_CFG() { return in(0).is_CFG(); }
+  @Override public boolean isCFG() { return in(0).isCFG(); }
   @Override public Type value() {
-    if( in(0)._op==OP_ROOT ) return Type.CTRL; // Program Start
+    if( in(0) instanceof RootNode ) return Type.CTRL; // Program Start
     // Normal projection, except pinch to CTRL.
     return super.value().oob(Type.CTRL);
   }
-  @Override Type live_use( int i ) { return i==MEM_IDX ? TypeMem.ANYMEM : Type.ALL; }
 
   // Strictly reducing
   @Override public Node ideal_reduce() {
-    Node c = in(0).is_copy(_idx);
+    Node c = in(0).isCopy(_idx);
     if( c != null ) {
       if( c==this ) return null; // Dead self-loop
       // Folding IF control flow against a half CopyCal, might need to fold again

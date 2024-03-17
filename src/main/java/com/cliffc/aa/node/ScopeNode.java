@@ -1,11 +1,10 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 
 import java.util.HashMap;
 import java.util.Set;
-import java.util.function.Predicate;
 
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
@@ -20,32 +19,32 @@ public class ScopeNode extends Node {
   public final HashMap<String,TypeNil> _types; // user-typing type names
 
   public ScopeNode( HashMap<String,TypeNil> types,  Node ctl, Node mem, Node rez, Node ptr, StructNode dsp) {
-    super(OP_SCOPE,ctl,mem,rez,ptr,dsp);
+    super(ctl,mem,rez,ptr,dsp);
     _types = types;
-    _live = RootNode.def_mem(this);
+    _live = RootNode.defMem(this);
   }
-  @Override boolean is_CFG() { return true; }
-  @Override public boolean is_mem() { return true; }
+  @Override public String label() {
+    if( Parse.PARSE != null && Parse.PARSE.scope()==this )
+      return "CURSCOP";
+    return "Scope";
+  }
+  @Override public boolean isCFG() { return true; }
+  @Override public boolean isMem() { return true; }
 
   public       Node ctrl() { return in(CTL_IDX); }
   public       Node mem () { return in(MEM_IDX); }
   public       Node rez () { return in(REZ_IDX); }
   public    NewNode ptr () { return (   NewNode)in(ARG_IDX  ); }
   public StructNode stk () { return (StructNode)in(ARG_IDX+1); }
-  public <N extends Node> N set_ctrl( N    n) { set_def(CTL_IDX,n); return n; }
-  public void               set_rez ( Node n) { set_def(REZ_IDX,n);           }
-  public void               set_ptr ( Node n) { set_def(ARG_IDX,n);           }
+  public <N extends Node> N ctrl( N n) { setDef(CTL_IDX,n); return n; }
+  public void set_rez ( Node n) { setDef(REZ_IDX,n); }
+  public void set_ptr ( Node n) { setDef(ARG_IDX,n); }
 
-  // Set a new deactive GVNd memory, ready for nested Node.ideal() calls.
-  public void set_mem(Node n) {
-    assert n._val instanceof TypeMem || n._val ==Type.ANY || n._val ==Type.ALL;
-    set_def(MEM_IDX,n);
-  }
-  public void replace_mem(Node st) {
+  public void mem(Node st) {
     // Remove the scope use of old memory, so the store becomes the ONLY use of
     // old memory, allowing the store to fold immediately.
-    set_def(MEM_IDX,null);
-    set_def(MEM_IDX,Env.GVN.xform(st));
+    //setDef(MEM_IDX,null);
+    setDef(MEM_IDX,st);
   }
 
   public Node get(String name) { return stk().in(name); }
@@ -56,11 +55,11 @@ public class ScopeNode extends Node {
   public RegionNode early_ctrl() { return (RegionNode)in(ARG_IDX+2); }
   public    PhiNode early_mem () { return (   PhiNode)in(ARG_IDX+3); }
   public    PhiNode early_val () { return (   PhiNode)in(ARG_IDX+4); }
-  public void       early_kill() { set_def(ARG_IDX+2,null); set_def(ARG_IDX+3,null); set_def(ARG_IDX+4,null); }
+  public void       early_kill() { setDef(ARG_IDX+2,null); setDef(ARG_IDX+3,null); setDef(ARG_IDX+4,null); }
   public void make_early_exit_merge() {
-    set_def(ARG_IDX+2, new RegionNode((Node)null))._val = Type.CTRL;
-    set_def(ARG_IDX+3, new PhiNode(TypeMem.ALLMEM, null,(Node)null));
-    set_def(ARG_IDX+4, new PhiNode(TypeNil.SCALAR, null,(Node)null));    
+    setDef(ARG_IDX+2, new RegionNode((Node)null))._val = Type.CTRL;
+    setDef(ARG_IDX+3, new PhiNode(TypeMem.ALLMEM, null,(Node)null));
+    setDef(ARG_IDX+4, new PhiNode(TypeNil.SCALAR, null,(Node)null));
   }
 
   // Name to type lookup, or null
@@ -80,7 +79,7 @@ public class ScopeNode extends Node {
 
   @Override public TypeMem live() {
     //assert is_keep() || Combo.pre() || is_prim();
-    return RootNode.def_mem(this);
+    return RootNode.removeKills(this);
   }
 
   @Override public Type live_use( int i ) {
@@ -97,15 +96,15 @@ public class ScopeNode extends Node {
     //return def._live;
     throw TODO();             // TODO Test me
   }
-  
-  @Override public int hashCode() { return 123456789; }
+
+  @Override int hash() { return 123456789; }
   // ScopeNodes are never equal
   @Override public boolean equals(Object o) { return this==o; }
   // End of dominator tree; do not walk past
-  @Override Node walk_dom_last(Predicate<Node> P) { return P.test(this) ? this : null; }
+  //@Override Node walk_dom_last(Predicate<Node> P) { return P.test(this) ? this : null; }
 
   @Override public boolean has_tvar() { return false; }
-  
+
   // Test for being inside a ?: expression
   public boolean test_if() { return stk()._nargs==-1; }
 }

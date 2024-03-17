@@ -68,32 +68,31 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     return _obj == t2._obj || _obj.cycle_equals(t2._obj);
   }
 
-  @Override public void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt, boolean indent ) {
-    if( visit.tset(_uid) ) {
-      if( !dups.containsKey(_uid) )
-        dups.put(_uid,"P"+(char)('A'+ucnt._tmp++));
+  @Override public void _str_dups( PENV P ) {
+    if( P.visit.tset(_uid) ) {
+      if( !P.dups.containsKey(_uid) )
+        P.dups.put(_uid,"P"+(char)('A'+P._tmp++));
       return;
     }
-    _obj._str_dups(visit,dups,ucnt, indent);
+    _obj._str_dups(P);
   }
 
-  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    if( _any ) sb.p('~');
+  @Override PENV _str0( PENV P ) {
+    if( _any ) P.p('~');
     // Shortcut for printing boxed primitives
     if( is_prim() && _aliases==BitsAlias.EMPTY ) {
-      if( _obj.at(0)==INTPTR ) return _obj.at(1)._str(visit,dups,sb.p("int:"),debug,indent);
-      if( _obj.at(0)==FLTPTR ) return _obj.at(1)._str(visit,dups,sb.p("flt:"),debug,indent);      
+      if( _obj.at(0)==INTPTR ) return _obj.at(1)._str(P.p("int:"));
+      if( _obj.at(0)==FLTPTR ) return _obj.at(1)._str(P.p("flt:"));      
     }
-    if( is_clz_ptr() ) return sb.p("*CLZ");
-    sb.p(_is_con ? '$' : '*');
-    if( debug ) _aliases.str(sb);
-    sb = _obj._str(visit,dups, sb, debug, indent);
-    return _str_nil(sb);
+    if( is_clz_ptr() ) return P.p("*CLZ");
+    P.p(_is_con ? '$' : '*');
+    if( P.debug ) _aliases.str(P.sb);
+    return _obj._str(P).p(_str_nil());
   }
 
-  @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return _obj._str_complex(visit,dups); }
+  @Override boolean _str_complex0(PENV P) { return _obj._str_complex(P); }
 
-  boolean is_clz_ptr() { return _obj==TypeStruct.UNUSED && _aliases.abit()==BitsAlias.CLZX; }
+  boolean is_clz_ptr() { return this==Cons.CLZ_TMP; }
   
   static TypeMemPtr valueOf(Parse P, String cid, boolean any, boolean is_con) {
     P.require(is_con ? '$' : '*');
@@ -146,12 +145,11 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public TypeMemPtr make_from( BitsAlias aliases ) { return _aliases==aliases ? this : make(aliases.test(0),aliases.clear(0),_obj); }
 
   // Legacy constructor for legacy HM tests
-  public static final int STR_ALIAS = 4; // Legacy str ptr value
-  public static TypeMemPtr make_str(String s) { return make_str(TypeInt.con( s.isEmpty() ? 0 : s.charAt(0))); }
-  public static TypeMemPtr make_str(Type t) { return make_str(BitsAlias.make0(STR_ALIAS),t); }
-  public static TypeMemPtr make_str(BitsAlias aliases, Type t) {
+  public static TypeMemPtr make_str(String s) { return make_str(TypeInt.con(s.length()),TypeInt.con( s.isEmpty() ? 0 : s.charAt(0))); }
+  public static TypeMemPtr make_str(TypeInt len, TypeInt char0) { return make_str(BitsAlias.make0(BitsAlias.STRX),len,char0); }
+  public static TypeMemPtr make_str(BitsAlias aliases, TypeInt len, TypeInt char0) {
     // Make a string object
-    TypeStruct ts = TypeStruct.make_prim(TypeFld.make_clz(TypeStruct.XSTRZ()),TypeFld.make_prim(t));
+    TypeStruct ts = TypeStruct.make_prim(TypeFld.make_clz(TypeStruct.XSTRZ()),TypeFld.make_prim(len));
     return TypeMemPtr.make(aliases.test(0),aliases.clear(0),ts);
   }
   public boolean is_str() { return _obj.is_str(); }
@@ -181,7 +179,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public  static final TypeMemPtr DISP_SIMPLE= make(false,BitsAlias.NALL,TypeStruct.ISUSED); // closed display
   public  static final TypeMemPtr INTPTR = TypeMemPtr.make_con(BitsAlias.INT,true,TypeStruct.ISUSED);   // Simple ptr-to-wrapped int
   public  static final TypeMemPtr FLTPTR = TypeMemPtr.make_con(BitsAlias.FLT,true,TypeStruct.ISUSED);   // Simple ptr-to-wrapped flt
-  public  static final TypeMemPtr STRPTR = make_str(TypeInt.INT8);
+  public  static final TypeMemPtr STRPTR = make_str(TypeInt.INT8,TypeInt.con('A'));
 
   static final Type[] TYPES = new Type[]{ISUSED0,EMTPTR,DISPLAY,DISPLAY_PTR};
   public static void init1( HashMap<String,TypeNil> types ) {
@@ -300,10 +298,8 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   }
 
   @Override public Type sharptr2( TypeMem mem ) {
-    // Primitives are boxed, and so not immediately shallow (but their clazz is
-    // shallow, so sharpen it).
     if( is_prim() )
-      return make_from(_obj.sharptr2(mem));
+      return this;
     
     return mem.sharpen(this);
   }
@@ -318,9 +314,9 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     return fidxs;
   }
 
+  // Only a constant if the pointer AND object is a constant; we might have
+  // dulled a precise constant object and the result is not a constant.
   @Override public boolean is_con() { return _is_con && _obj.is_con(); }
-
-  @Override public Type widen() { return this; }
 
   // Used for assertions
   @Override boolean intern_check1() { return _obj.intern_get()!=null; }

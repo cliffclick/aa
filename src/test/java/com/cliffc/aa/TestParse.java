@@ -1,4 +1,4 @@
-  package com.cliffc.aa;
+package com.cliffc.aa;
 
 import com.cliffc.aa.node.PrimNode;
 import com.cliffc.aa.tvar.TV3;
@@ -27,112 +27,52 @@ public class TestParse {
   }
   @Ignore @Test public void testJig() {
     JIG=true;
-
     DO_GCP=true;
     DO_HMT=true;
     RSEED=0;
 
-    // One DynLoad, one Fresh, Function in-between
-    test("noinline_f={(2,3.14)._}; noinline_f().sin()","flt:0.0015926529164868282","flt:flt64", null, null, null, null);
 
-    // No DynLoad
-    test("1", "int:1", "int:1");
-    // One DynLoad, no Fresh, resolves local
-    test("!3", "nil", "nil");
-    // Simpler overload tests
-    test("!(2,3.14)._","nil","int:int1", null, null, null, null);
-    test("(2,3.14)._.sin()","flt:0.0015926529164868282","flt:flt64", null, null, null, null);
-    // Two DynLoads, no Fresh
-    test("q=(2,3.14); (!q._,q._.sin())","*[16](_, nil, flt:0.0015926529164868282)","*[16](_,int:int1,flt:flt64)", null, null, "[16]", null);
-    // One DynLoad, one Fresh, Function in-between
-    test("noinline_f={(2,3.14)._}; noinline_f().sin()","flt:0.0015926529164868282","flt:flt64", null, null, null, null);
-    // One DynLoad, one Fresh, Function in-between, plus 2nd DynLoad on Bang
-    test("noinline_f={(2,3.14)._}; !noinline_f()","nil","int:int1", null, null, null, null);
-    // One DynLoad but Freshed twice plus 2nd DynLoad on Bang
-    test("noinline_f={(2,3.14)._}; (!noinline_f(),noinline_f().sin())","*[16](_, nil, flt:0.0015926529164868282)","*[16](_,int:int1,flt:flt64)", null, null, "[16]", null);
-
-    // Simpler test, just return a struct with 1 field, and pick the struct/field
+    // A,B,C are mutually recursive identity functions
+    // D calls B or C with ints.
+    // final struct calls C with floats
     test("""
-            noinline_foo = {
-                    ( @{ a=1 },
-                      @{ b=2 }
-              )._
-            };
-            math.rand(2) ? noinline_foo().a : noinline_foo().b
-            """,
-            "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
+A = { x -> math.rand(2) ? B(x) : x };
+D = {   -> math.rand(2) ? B(1) : C(2) };
+C = { x -> A(x) };
+B = { x -> C(x) };
+( D(), C(3.14) )
 
-    // Simpler test, just X no Y
-    test("""
-            noinline_foo = { x ->
-                    ( { x -> !x },
-                      { x -> x.sin() }
-              )._(x)
-            };
-            math.rand(2) ? noinline_foo(3) : noinline_foo(3.3)
-            """,
-            "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
-
-    // open bugs: return from foo is int:%[][5,6] - a mix of int & float
-    // but the clazz is INT not a blend of INT/FLT
-
-    // bug store of noinline_foo does not replace the prior store of ANY in
-    // the new field slot
-    test("""
-            noinline_foo = { x y ->
-                    ( { x y -> !x * !y },
-                      { x y -> x.sin() * !y }
-              )._(x,y)
-            };
-            math.rand(2) ? noinline_foo(3,5) : noinline_foo(3.3,5)
-            """,
-            "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
-
-    // Open bug: foo inlines here but not in the next case below.
-    // Surprised foo inlines.
-    test("""
-            foo = { x y ->
-                    ( { x y -> !x * !y },
-                      { x y -> x.sin() * !y }
-              )._(x,y)
-            };
-            math.rand(2) ? foo(3,5) : foo(3.3,5)
-            """,
-            "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
-
-    test("""
-            foo = { x y ->
-                    ( { x y -> !x * !y },
-                      { x y -> x.sin() * !y }
-              )._(x,y)
-            };
-            baz = { x -> foo(x,5) };
-            math.rand(2) ? baz(3) : baz(3.3)
-            """,
-            "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
-
-
-    test(
-"""
-foo = { x y ->
-        ( { x y -> !x * !y },
-          { x y -> !x *  y.sin(3.14) },
-          { x y -> x.sin(3.14) * !y },
-          { x y -> x.sin(3.14) *  y.sin(3.14) }
-  )._(x,y)
-};
-baz = { x -> math.rand(2) ? foo(x,2) : foo(x,2.2) };
-bar = {   -> math.rand(2) ? baz(  3) : baz  (3.3) };
-bar()
 """,
-         "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
+         "","",null,null,null,null);
 
-    // Overload is exposed to Root
-    test("{ x y -> !x *  y.sin() }","[11]{any,5 -> %[2][2,11]? }","{A *[]int *[]flt -> B }", null, null, null, "[11]");
 
-    test("sq = { x -> x*x }; (sq(2),sq(2.2))","*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
-    test("sq = { x -> x*x }; (sq(2),sq(3))","*[13](_,int:4,int:9)","*[15](int64,flt64)", null, null, "[14]", null);
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(2),fact(2.2))","*[14](nil,1,2)","*[14](int64,int64,int64)", null, null, "[14]", null);
+
+    
+    // Bug here is reduced to: the uses of `fcn` appear in the top-level open
+    // File scope which being open, means `fcn` is not completely defined, so
+    // uses are NOT-FRESH, so bind `fcn` to returning both an A and a B struct.
+
+    // Bug is broken tagging of FRESH/NOT-FRESH - the top-level open FIle scope
+    // is indeed OPEN, partially defined - but the fields within it get
+    // incrementally defined over time.
+    
+//    // This test endlessly expands in AA, short/quick in EXE
+//    test("""
+//fcn = { -> ( @{ a = 1}, @{ b = 2} )._ };
+//(fcn().a, fcn().b )
+//""",
+//         "*[21]( _, int:1, int:2)", "*[21](_,int:1,int:2)",null,null,"[21]",null);
+    
+//    test("""
+//fcn = { ->
+//  @{ qi = { x -> x.a };
+//     qf = { x -> x.b };
+//  }._
+//};
+//bar = { x -> fcn() x };
+//(bar @{a=2}, bar @{b=3.3})
+//""",
+//         "*[23](_, 0=PA:$[]@{^=$[5,6](...); _=%[5,6][]; $nil}?, 1=PA)", "*[23](_,int:2,flt:3.3)",null,null,"[23]",null);
   }
 
   static private void assertTrue(boolean t) {
@@ -154,90 +94,13 @@ bar()
   // Some HM related type tests
   @Test public void testParse99() {
     test("1", "int:1", "int:1");
-    // Simple primitive expansion, pre-combo
-    test("1+2", "3", "3");
-    // Big enough that the primitives do not all inline before Combo, so Combo
-    // has to deal with primitive expansions.
-    test("1+2 * 3+4 *5", "27", "27");
-    // Simple no-arg anonymous function, being called
-    test("{5}()", "5", "5");
-    // TestHM.a_basic_01
-    test("{ x -> ( 3, x )}", "[%f0]{all,4 -> *[%a2](3, %[2,%a2][2,%f0]?) }", "{ A B -> *[%a2](3, B) }", null, null, "[%a2]", "[%f0]");
-    // TestHM.a_basic_02
-    test("{ z -> ((z 0), (z \"abc\")) }", "[%f0]{all,4 -> *[%a3](%[2,%a2,%a3][2,%f0]?, %[2,%a2,%a3][2,%f0]?) }",
-         "{A {B *[%a2]str:(97)? -> C } -> *[%a3](C,C) }",
-         null, null,
-         "[%a2,%a3]", "[%f0]" );
-
-
-    // TestHM.a_basic_05
-    // example that demonstrates generic and non-generic variables:
-    // 'g' is not-fresh in function 'f'.
-    // 'f' IS fresh in the body of 'g' pair.
-    test("{ g -> f = { ignore -> g }; (f 3, f \"abc\")}",
-         "[%f0]{---,4 -> *[%a4](%[2,%a4][2,%f0]?, %[2,%a4][2,%f0]?) }",
-         "{ A B -> *[%a4]( B, B) }",
-         null,null,"[%a4]","[%f0]");
-
-    // TestParse.g_overload_err_00
-    testerr("( { x -> x*2 }, { x -> x*3 })._ 4",
-            "Ambiguous, matching choices { A 4 -> B } vs ({ C D -> E }, { F G -> H })",30);
-
-    // Variations on a simple wrapped add.  Requires full annotations to type -
-    // because in fact it is all ambiguous and cannot be typed without seeing all
-    // the usages.
-    test("{ x -> x+1 }","[%f0]{---,4 -> %[2][2,%f0]? }",
-         "{A B -> C }", // Something with an '+' operator
-         null, null, null,"[%f0]");
-
-    test("{ x -> 1+x }","[%f0]{---,4 -> %[4,5][]?}",
-         "{A B -> C }", // Something that 1+ works on
-         null, null, null,"[%f0]");
-
-    test("{ x -> x+y }","[%f0]{---,4 -> any}",
-         "{A *[]@{_+_=@{...};...} -> B }", // Something with an '+' operator
-         null, null, null,"[%f0]");
-
-    testerr("@{x=7}.y",  "Unknown field '.y' in @{x= A}: ",7); // LHS is known, not a clazz, field not found in instance
-    testerr("\"abc\".y", "Unknown field '.y' in str:(A): ",6);  // LHS is known, has clazz, field not found in either, field is not oper (not pinned)
-    testerr("\"abc\"&1", "Unknown operator '_&_' in str:(97): @{ ...}",5); // LHS is known, has clazz, field not found in either, field it oper (pinned, so report clazz)
-    test("{x:flt y:int -> x+y}", "[%f0]{any,5 -> flt64 }", "{ A flt64 int64 -> flt64 }", null, null, null, "[%f0]");
-
-    // error, missing a comma
-    testerr("{ x -> ( 3 x )}", "A function is being called, but 3 is not a function",11);
-
-    // TestHM.b_recursive_01
-    test("{ f -> (f f) }", "[%f0]{any,4 -> %[2][2,%f0]? }", "{A B:{C B -> D } -> D }", null, null, "[]", "[%f0]" );
-
-    // TestHM.b_recursive_05, Y combinator
-    test("{ f -> ({ x -> (f (x x))} { x -> (f (x x))})}",
-         "[%f0]{any,4 -> %[2][2,%f0]? }", "{ A { B C -> C } -> C }",
-         null, null,
-         null, "[%f0]" );
-
-    // TestHM.b_recursive_06
-    test("fun = { fx -> math.rand(2) ? 1 : fx(fun(fx),2) }; fun",
-         "[%f0]{any,4 -> %[2][2,%f0]? }",
-         // Currently allowing 'fun' display to stay alive.
-         "A:{ *[]@{fun=A} {B int64 int64 -> int64 } -> int64 }",
-         null, null,
-         null,"[%f0]");
-
-    // TestHM.b_recursive_02.  The expression "x-1" cannot resolve the operator
-    // "_-_" because "x" is a free variable.  It binds in its one use.
-    test("fun = { fx x -> x ? fx( fun(fx,x-1) ) : 1 }; fun(2._*_._, 99)",
-            "1",
-            "1");
-
-    // Build a cyclic type using a function
-    test("a = (1,b(1));  b = { x -> (1,a) }; b(1);", "PA:*[13](FA:0=1, *[11](FA, 1=PA))","A:*[13](1,*[11](1,A)?)", null, null, "[11,13]", null);
   }
 
   @Test public void testParse00() {
     test("1", "1", "1");
     // Unary operator
     test("-1", "-1", "-1");
-    test("!1", "nil", "*[0](...)?");
+    test("!1", "nil", "nil");
     // Binary operators
     test("1+2", "3", "3");
     test("1-2", "-1",  "-1");
@@ -359,6 +222,113 @@ bar()
     test("math.rand(2) && (x=2;x*x) || 3 && 4", "int8", "int64"); // local use of x in short-circuit; requires unzip to find 4
   }
 
+  @Test public void testParseOver() {
+
+    // One DynLoad, one Fresh, Function in-between
+    test("noinline_f={(2,3.14)._}; noinline_f().sin()","flt:0.0015926529164868282","flt:flt64", null, null, null, null);
+
+    // No DynLoad
+    test("1", "int:1", "int:1");
+    // One DynLoad, no Fresh, resolves local
+    test("!3", "nil", "nil");
+    // Simpler overload tests
+    test("!(2,3.14)._","nil","int:int1", null, null, null, null);
+    test("(2,3.14)._.sin()","flt:0.0015926529164868282","flt:flt64", null, null, null, null);
+    // Two DynLoads, no Fresh
+    test("q=(2,3.14); (!q._,q._.sin())","*[16](_, nil, flt:0.0015926529164868282)","*[16](_,int:int1,flt:flt64)", null, null, "[16]", null);
+    // One DynLoad, one Fresh, Function in-between
+    test("noinline_f={(2,3.14)._}; noinline_f().sin()","flt:0.0015926529164868282","flt:flt64", null, null, null, null);
+    // One DynLoad, one Fresh, Function in-between, plus 2nd DynLoad on Bang
+    test("noinline_f={(2,3.14)._}; !noinline_f()","nil","int:int1", null, null, null, null);
+    // One DynLoad but Freshed twice plus 2nd DynLoad on Bang
+    test("noinline_f={(2,3.14)._}; (!noinline_f(),noinline_f().sin())","*[16](_, nil, flt:0.0015926529164868282)","*[16](_,int:int1,flt:flt64)", null, null, "[16]", null);
+
+    // Simpler test, just return a struct with 1 field, and pick the struct/field
+    test("""
+            noinline_foo = {
+                    ( @{ a=1 },
+                      @{ b=2 }
+              )._
+            };
+            math.rand(2) ? noinline_foo().a : noinline_foo().b
+            """,
+            "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
+
+    // Simpler test, just X no Y
+    test("""
+            noinline_foo = { x ->
+                    ( { x -> !x },
+                      { x -> x.sin() }
+              )._(x)
+            };
+            math.rand(2) ? noinline_foo(3) : noinline_foo(3.3)
+            """,
+            "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
+
+    // open bugs: return from foo is int:%[][5,6] - a mix of int & float
+    // but the clazz is INT not a blend of INT/FLT
+
+    // bug store of noinline_foo does not replace the prior store of ANY in
+    // the new field slot
+    test("""
+            noinline_foo = { x y ->
+                    ( { x y -> !x * !y },
+                      { x y -> x.sin() * !y }
+              )._(x,y)
+            };
+            math.rand(2) ? noinline_foo(3,5) : noinline_foo(3.3,5)
+            """,
+            "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
+
+    // Open bug: foo inlines here but not in the next case below.
+    // Surprised foo inlines.
+    test("""
+            foo = { x y ->
+                    ( { x y -> !x * !y },
+                      { x y -> x.sin() * !y }
+              )._(x,y)
+            };
+            math.rand(2) ? foo(3,5) : foo(3.3,5)
+            """,
+            "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
+
+    test("""
+            foo = { x y ->
+                    ( { x y -> !x * !y },
+                      { x y -> x.sin() * !y }
+              )._(x,y)
+            };
+            baz = { x -> foo(x,5) };
+            math.rand(2) ? baz(3) : baz(3.3)
+            """,
+            "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
+
+
+    test(
+"""
+foo = { x y ->
+        ( { x y -> !x * !y },
+          { x y -> !x *  y.sin(3.14) },
+          { x y -> x.sin(3.14) * !y },
+          { x y -> x.sin(3.14) *  y.sin(3.14) }
+  )._(x,y)
+};
+baz = { x -> math.rand(2) ? foo(x,2) : foo(x,2.2) };
+bar = {   -> math.rand(2) ? baz(  3) : baz  (3.3) };
+bar()
+""",
+         "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
+
+    // Overload is exposed to Root
+    test("{ x y -> !x *  y.sin() }","[11]{any,5 -> %[2][2,11]? }","{A *[]int *[]flt -> B }", null, null, null, "[11]");
+
+    test("sq = { x -> x*x }; (sq(2),sq(2.2))","*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
+    test("sq = { x -> x*x }; (sq(2),sq(3))","*[13](_,int:4,int:9)","*[15](int64,flt64)", null, null, "[14]", null);
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(2),fact(2.2))","*[14](nil,1,2)","*[14](int64,int64,int64)", null, null, "[14]", null);
+  }
+
+
+  
   @Test public void testParse02() {
     // Anonymous function definition.  Note: { x -> x&1 }; 'x' can be any struct with an operator '_&_'.
     test("{x:int -> x&1}","[55]{any,4 -> int1 }","{A int64 -> int64}",null,null,null,"[55]");
@@ -1081,7 +1051,7 @@ HashTable = {@{
       Type actual = te._t;      // Sharpen any memory pointers
       String gcp_a = format_alias(gcp);
       String gcp_b = format_fidx(gcp_a);
-      Type expect = Type.valueOf(gcp_b, te._intclz, te._fltclz);
+      Type expect = Type.valueOf(gcp_b);
       assertEquals(expect,actual);
     }
     // Check HMT result
@@ -1148,15 +1118,15 @@ HashTable = {@{
 
   // Run a program in all 3 modes, yes function returns, no errors
   // Short form test: simple GCP, no formal args
-  private void test( String program, String gcp, String hmt ) {
+  static void test( String program, String gcp, String hmt ) {
     _test2(program,gcp,hmt,gcp,hmt,null,null,null,0);
   }
   // Short form test: simple GCP, no formal args
-  static private void test( String program, String gcp, String hmt, String gcp_both, String hmt_both ) {
+  static void test( String program, String gcp, String hmt, String gcp_both, String hmt_both ) {
     _test2(program,gcp,hmt,gcp_both,hmt_both,null,null,null,0);
   }
 
-  static private void test( String program, String gcp, String hmt, String gcp_both, String hmt_both, String esc_ptrs, String esc_funs ) {
+  static void test( String program, String gcp, String hmt, String gcp_both, String hmt_both, String esc_ptrs, String esc_funs ) {
     _test2(program,gcp,hmt,gcp_both,hmt_both,esc_ptrs,esc_funs,null,0);
   }
 

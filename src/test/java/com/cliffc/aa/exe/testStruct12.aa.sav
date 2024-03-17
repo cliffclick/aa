@@ -1,0 +1,50 @@
+
+// Type: *[]( _, 1, 2)
+// Eval: *[]( _, 1, 2)
+
+// Displays are closed & defined def-by-def.  So prior partial displays in the gen set.
+
+// So AA does something EXE does not - AA can/will allow fcns to forward-ref other fcns.
+// This allows mutual recursion (is_even/is_odd).
+// To do this in AA, I need the display to allow self-references.
+
+
+//// This version works, because the loads of dsp1 outside the def of dsp1 allow
+//// a Fresh effect on "bound", so each call can resolve separate dyntables.
+//dsp1 = @{
+//  // factorial, is_even/is_odd, mutually recursive defined in same display chunk
+//  fcn = { somedsp1 -> { -> (pair @{a =1;} @{b =2;})._ } }; // Takes an instanceof dsp1 for display
+//  
+//  // Reference to display before the 'let dsp1=' finishes, so 'dsp1' is in the
+//  // nongen set.
+//  bound = (dsp1.fcn dsp1); // Bind
+//};
+//// dsp2 goes here, for things defined after fcn
+//// but on last stanza so no need?
+//(pair (dsp1.bound).a (dsp1.bound).b);
+
+
+top_dsp = %{ // Flag as Closure; field refs allowed to hit with Fresh
+  dsp = nil; // 
+  zpi = 3.1f;
+
+  file_dsp = %{ // Flag as Closure
+
+    // So AA, vs EXE, inserts Fresh from closure/display loads.
+
+    // Function is declared curried, then bound to file_dsp
+    fcn = ({ somedsp1 -> { -> (pair @{a =1;} @{b =2;})._ } } // Takes an instanceof dsp1 for display
+           // fresh hit in top_dsp.  file_dsp is not fully defined during
+           // Parse, but will be fully defined when "fresh" is called.
+           file_dsp);
+
+    // Fresh hit in file_dsp 
+    rez = (pair (fcn).a (fcn).b);
+
+    // AA, vs EXE, directly returns "rez", not a Fresh copy
+  };
+
+};
+// Fresh hit on top_dsp using normal rules.
+// The ".file_dsp.rez" are just loads, no Fresh.
+top_dsp.file_dsp.rez

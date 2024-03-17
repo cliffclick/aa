@@ -1,6 +1,6 @@
 // The type shows "M32:0=..." is pre-bound to the correct field
-// Type: { [[  A27: A, A45: B, D33: 0=C:{ D:- int64 -> int64 }, A37: D, D40: 1=E:{ F:- flt64 -> flt64 }, A44: F]] G -> ( int64, flt64) }
-// Eval: K1[LAMBDA,()]
+// Type: { *[2]@{ $dyn=-;  ..., } A:[[  27Call: B, 45Call: C, 33Load: 0=D:{ E:*[11]@{ *[2]@{ $dyn=-;  ..., }; $dyn=A; fx=F:*[3]( _, D, { E - flt64 -> flt64 }); pred=G;  ..., } H:- int64 -> int64 }, 37Call: H, 40Load: 1=I:{ J:*[11]@{ *[2]@{ $dyn=-;  ..., }; $dyn=A; fx=K:*[3]( _, { J - int64 -> int64 }, I); pred=G;  ..., } L:- flt64 -> flt64 }, 44Call: L]] G -> *[10]( _, int64, flt64) }
+// Eval: <*[2]@{ _ $dyn=-; },LAM11>
 { pred ->
   fx = (pair if pred ? { x -> (* x 2)} : { x -> (* x 3)}
              { x -> (f* x 0.5f) }

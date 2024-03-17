@@ -8,22 +8,23 @@ import static com.cliffc.aa.AA.TODO;
 
 // Split control
 public class IfNode extends Node {
-  public IfNode( Node ctrl, Node pred ) { super(OP_IF,ctrl,pred); }
+  public IfNode( Node ctrl, Node pred ) { super(ctrl,pred); }
   
-  @Override boolean is_CFG() { return is_copy(0)==null; }
+  @Override public String label() { return "If"; }
+  @Override public boolean isCFG() { return true; }
+  @Override public boolean isMultiHead() { return true; }
 
   @Override public Node ideal_reduce() {
-    if( is_prim() ) return null;
-    Node cc = fold_ccopy();
+    if( isPrim() ) return null;
+    Node cc = NodeUtil.fold_ccopy(this);
     if( cc!=null ) return cc;
     Node ctl = in(0);
     Node tst = in(1);
     if( ctl._val == Type.XCTRL && tst!=Env.ANY )
-      return set_def(1,Env.ANY); // Kill test; control projections fold up other ways
-    else ctl.deps_add(this);
-    
+      return setDef(1,Env.ANY); // Kill test; control projections fold up other ways
+
     // Binary test vs 0?
-    if( tst._defs._len==3 &&
+    if( tst.len()==3 &&
         (tst.val(1)==TypeNil.NIL || tst.val(2)==TypeNil.NIL) ) {
       // Remove leading test-vs-0
       if( tst instanceof PrimNode.EQ_I64 ) throw AA.TODO();
@@ -36,17 +37,17 @@ public class IfNode extends Node {
       if( tst instanceof PrimNode.NE_OOP ) throw AA.TODO();
     }
 
-    if( tst instanceof PrimNode.NotI64 && tst._uses._len==1 )
+    if( tst instanceof PrimNode.NotI64 && tst.nUses()==1 )
       //return flip(Env.GVN.xreduce(new IfNode(ctl,tst.in(ARG_IDX))));
       throw TODO();
 
     return null;
   }
   Node flip(Node that) {
-    ProjNode p0 = (ProjNode)_uses.atX(0);
-    ProjNode p1 = (ProjNode)_uses.atX(1);
-    if( p0==null || p1==null ) return null; // Not well-formed
-    if( p0._idx==1 ) { ProjNode tmp=p0; p0=p1; p1=tmp; }
+    //ProjNode p0 = (ProjNode)_uses.atX(0);
+    //ProjNode p1 = (ProjNode)_uses.atX(1);
+    //if( p0==null || p1==null ) return null; // Not well-formed
+    //if( p0._idx==1 ) { ProjNode tmp=p0; p0=p1; p1=tmp; }
     //Node x0 = Env.GVN.xreduce(new CProjNode(that,0));
     //Node x1 = Env.GVN.xreduce(new CProjNode(that,1));
     //p0.subsume(x1);
@@ -92,14 +93,12 @@ public class IfNode extends Node {
 
   @Override public boolean has_tvar() { return false; }
 
-  @Override public Node is_copy(int idx) {
-    if( is_prim() ) return null;
+  @Override public Node isCopy(int idx) {
+    if( isPrim() ) return null;
     if( !(_val instanceof TypeTuple tt) ) return null;
     if( tt.above_center() ) return Env.XCTRL;
     if( tt==TypeTuple.IF_TRUE  && idx==1 ) return in(0);
     if( tt==TypeTuple.IF_FALSE && idx==0 ) return in(0);
-    Node proj = ProjNode.proj(this,idx);
-    if( proj!=null ) deps_add(proj);
     return null;
   }
 }

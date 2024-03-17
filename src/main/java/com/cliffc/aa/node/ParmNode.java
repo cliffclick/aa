@@ -18,17 +18,19 @@ public class ParmNode extends Node {
   public final Parse _bad;
 
   public ParmNode( int idx, FunNode fun, Parse bad, Type t ) {
-    super(OP_PARM,fun);
+    super(fun);
     assert idx>=0;
     _idx=idx;
     _t = t;
     _bad = bad;
   }
-  @Override public boolean is_mem() { return _t instanceof TypeMem; }
+  @Override public String label() { return "Parm:"+_idx; }
+  @Override public boolean isMem() { return _t instanceof TypeMem; }
+  @Override public boolean isMultiTail() { return true; }
   public FunNode fun() { return (FunNode) in(0); }
-  @Override public String xstr() { return "Parm:"+_idx; }
 
   @Override public Type value() {
+    if( isPrim() ) return _t;   // Prims, executed or not, always conservative
     // Not executing?
     Type ctl = val(0);
     if( ctl.above_center() ) return Type.ANY;
@@ -38,12 +40,12 @@ public class ParmNode extends Node {
     // itself is still pending)
     Type t = Type.ANY;
     int len = fun.len();
-    boolean wired_root = fun._defs.last() instanceof RootNode;
-    if( wired_root || fun.unknown_callers(this) ) {
+    boolean wired_root = fun.last() instanceof RootNode;
+    if( wired_root || fun.unknown_callers() ) {
       if( wired_root ) len--;
       // During/after Combo, use the HM type for the GCP type instead of the given default
       if( _idx==MEM_IDX ) {
-        t = Combo.pre() ? RootNode.def_mem(this) : Env.ROOT.rmem(this);
+        t = Combo.pre() ? RootNode.defMem(this) : Env.ROOT.rmem(this);
       } else if( Combo.pre() ) {
         t = _t==TypeNil.SCALAR ? Env.ROOT.ext_scalar(this) : _t;
       } else if( has_tvar() ) {
@@ -75,10 +77,10 @@ public class ParmNode extends Node {
 
   @Override public Node ideal_reduce() {
     if( !(in(0) instanceof FunNode) )
-      return in(0).is_copy(_idx); // Dying, or thunks
+      return in(0).isCopy(_idx); // Dying, or thunks
     FunNode fun = fun();
     if( fun._val == Type.XCTRL ) return null; // All dead, c-prop will fold up
-    Node cp = fun.is_copy(0);
+    Node cp = fun.isCopy(0);
     if( cp!=null ) {            // FunNode is a Copy
       if( _idx==0 ) return null; // RPC vs a CopyCall, is dead, no semantics
       Node xcp = cp.in(_idx);
@@ -91,11 +93,11 @@ public class ParmNode extends Node {
     return null;
   }
 
-  @Override public boolean has_tvar() { return !(_t instanceof TypeRPC) && !is_mem(); }
+  @Override public boolean has_tvar() { return !(_t instanceof TypeRPC) && !isMem(); }
 
   @Override public TV3 _set_tvar() {
-    if( is_prim() && _t==TypeInt.INT64 ) return PrimNode.PINT.tvar();
-    if( is_prim() && _t==TypeFlt.FLT64 ) return PrimNode.PFLT.tvar();
+    if( isPrim() && _t==TypeInt.INT64 ) return PrimNode.PINT.tvar();
+    if( isPrim() && _t==TypeFlt.FLT64 ) return PrimNode.PFLT.tvar();
     TV3 tv = new TVLeaf();
     tv.deps_add(this);          // with Root input, value depends on tvar
     return tv;
@@ -106,7 +108,7 @@ public class ParmNode extends Node {
   // "fresh" TVars for every input path.
   @Override public boolean unify( boolean test ) { return false; }
 
-  @Override public int hashCode() { return super.hashCode()+(int)_t._hash+_idx; }
+  @Override int hash() { return (int)_t._hash+_idx; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;

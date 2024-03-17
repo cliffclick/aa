@@ -5,24 +5,23 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.type.*;
 
-import java.util.function.Predicate;
-
 // Constant value nodes; no computation needed.  Hashconsed for unique
 // constants, except for XNIL.  XNIL allows for a TV3 typevar Nilable-Leaf with
 // each Leaf unifying on its own.
 public class ConNode<T extends Type> extends Node {
   public T _t;                  // Not final for testing
   public ConNode( T t ) {
-    super(OP_CON,Env.ROOT);
+    super(Env.ROOT);
     _t=t;
-    _live = is_mem() ? TypeMem.ALLMEM : Type.ALL;
     if( !Combo.pre() && has_tvar() )
       _tvar = TV3.from_flow(_t);
   }
-  @Override public String xstr() {
+  @Override public String label() {
     return _t==null ? "(null)" : _t.toString();
   }
-  @Override public boolean is_mem() { return _t instanceof TypeMem; }
+  @Override public boolean isMem() { return _t instanceof TypeMem; }
+  // Already a constant
+  @Override public boolean shouldCon() { return false; }
 
   @Override public Type value() { return _t; }
 
@@ -39,16 +38,12 @@ public class ConNode<T extends Type> extends Node {
     tv.deps_add_deep(this);     // Constant hash depends on tvar      
     return tv;
   }
-  
-  @Override public boolean unify( boolean test ) { return false; }
-
-  @Override public String toString() { return str(); }
 
   private boolean equals_uses_tvar() {
     return _t==TypeNil.NIL || _t instanceof TypeMemPtr || _t instanceof TypeFunPtr;
   }
-  @Override public int hashCode() {
-    // In theory also slot 0, but slot 0 is always Start.
+  @Override int hash() {
+    // In theory also slot 0, but slot 0 is always Root.
     int hash = _t.hashCode();
     // Two NILs are typically different because their TV3s are different.
     // Also, vary two TMPs or TFPs might vary (but not e.g. Scalar)
@@ -67,5 +62,5 @@ public class ConNode<T extends Type> extends Node {
     return !has_tvar();
   }
   
-  @Override Node walk_dom_last( Predicate<Node> P) { return null; }
+  //@Override Node walk_dom_last( Predicate<Node> P) { return null; }
 }

@@ -1,7 +1,6 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.SB;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
@@ -24,9 +23,9 @@ public class TestType {
     Ary<Type> ts = Type.ALL_TYPES();
     String[] ss = new String[ts.len()];
     for( int i=0; i<ts.len(); i++ )
-      ss[i] = ts.at(i).str(new SB(), true, false).toString();
+      ss[i] = ts.at(i).toString(true,false,true);
     for( int i=0; i<ts.len(); i++ ) {
-      Type t = Type._valueOf(ss[i],null,null);
+      Type t = Type._valueOf(ss[i]);
       assertSame(ts.at(i),t);
     }
   }
@@ -54,13 +53,13 @@ public class TestType {
       "flt64",                  // Class Float range
       "%[CLZ][]",               // BitsAlias.CLZ no nil
       "%[CLZ][]?",              // BitsAlias.CLZ yes nil
-      "*[17](_, 1, ~Scalar)",   // Bare ~type as a field
+      "*[17]( _, 1, ~Scalar)",  // Bare ~type as a field
       "[23]{any,3 -> *[7](3, Scalar) }", // Function returning a struct
-      "*[3](_, 0=PA:*[3]@{_; _*_=*[nALL](); f=flt64}, *[](), 2=PA)", // Struct with self-references
-      "PA:*[7]@{_; add=[23]{any,4 -> PA }; i=int64}", // Struct with function return self-reference
-      "PA:*[18]@{_; n1=*[17]@{_; n1=PA; FB:v1=7}; FB}", // DUP Field
-      "*[18](_, 0=PA:*[17](_, *[4,5]@{_; x=nScalar}, nScalar), 1=PA)",
-      "@{FA:head=*[17]@{_; FA}?}", // Shared field in unrelated structs
+      "*[3]( _, 0=PA:*[3]@{ _; _*_=*[nALL]CLZ; f=flt64}, *[]CLZ, 2=PA)", // Struct with self-references
+      "PA:*[7]@{ _; add=[23]{any,4 -> PA }; i=int64}", // Struct with function return self-reference
+      "PA:*[18]@{ _; n1=*[17]@{ _; n1=PA; FB:v1=7}; FB}", // DUP Field
+      "*[18]( _, 0=PA:*[17]( _, *[4,5]@{ _; x=nScalar}, nScalar), 1=PA)",
+      "@{FA:head=*[17]@{ _; FA}?}", // Shared field in unrelated structs
       "{Ctrl,[[_all_]],int64,int64}", // Label on a wrapped int
     };
     for( String s : ss ) {
@@ -303,7 +302,7 @@ public class TestType {
     tos[alias0] = TypeStruct.ISUSED;
     tos[alias1] = TypeStruct.POINT;
     tos[alias2] = TypeStruct.POINT3D;
-    TypeMem MEM = TypeMem.make0(false,tos);
+    TypeMem MEM = TypeMem.make0(tos);
     TypeMem ABC = TypeMem.make(alias2,TypeStruct.POINT3D.dual());
 
     // "~str+0" or "*[~0+4+]~str?" includes a nil, but nothing can fall to a nil
@@ -380,7 +379,7 @@ public class TestType {
     tos.setX(alias1,a1);
     tos.setX(alias2,a2);
     tos.setX(alias3,a3);
-    TypeMem mem = TypeMem.make0(false,tos.asAry()); // [7:@{c==nil},8:{c=*[0,9]},9:@{x==1}]
+    TypeMem mem = TypeMem.make0(tos.asAry()); // [7:@{c==nil},8:{c=*[0,9]},9:@{x==1}]
     // *[1]? join *[2] ==> *[1+2]?
     // {~0+7+8} -> @{ c== [~0] -> @{x==1}} // Retain precision after nil
     Type ptr12 = TypeNil.XNIL.join(TypeMemPtr.make(-alias1,a1.dual())).join( TypeMemPtr.make(-alias2,a2.dual()));
@@ -486,7 +485,7 @@ public class TestType {
     tos[alias2]=ta2;
     tos[alias3]=ta3;
     tos[alias4]=ta4;
-    TypeMem mem234 = TypeMem.make0(false,tos);
+    TypeMem mem234 = TypeMem.make0(tos);
     TypeMemPtr ptr34 = (TypeMemPtr)TypeMemPtr.make(alias3,TypeStruct.ISUSED).meet(TypeMemPtr.make(alias4,TypeStruct.ISUSED));
 
     // Since hacking ptrs about from mem values, no cycles so instead...
@@ -592,7 +591,7 @@ public class TestType {
     tos[alias0] = TypeStruct.ISUSED;
     tos[alias1] = TypeStruct.POINT;
     tos[alias2] = TypeStruct.POINT3D;
-    TypeMem mem = TypeMem.make0(false,tos);
+    TypeMem mem = TypeMem.make0(tos);
     TypeMem abc = TypeMem.make(alias2,TypeStruct.POINT3D.dual());
     TypeMem[] tmems = new TypeMem[]{
       TypeMem.ANYMEM,             // [1:~obj,3:~obj,5:~obj ]

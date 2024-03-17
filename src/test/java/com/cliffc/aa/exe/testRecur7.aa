@@ -1,6 +1,6 @@
 // Newtons method, solving for some square roots
-// Type: ( int64, int64)
-// Eval: ( 4, 6)
+// Type: *[9]( _, int64, int64)
+// Eval: *[9]( _, 4, 6)
 solve = { guess n ->
   new = (/ (+ ( / n guess) guess) 2);
   if (== new guess) ? new : (solve new n)

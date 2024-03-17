@@ -173,7 +173,7 @@ public class HM {
     // Initialize the primitives
     for( PrimSyn prim : new PrimSyn[]{ new If(), new Pair(), new EQ(), new EQ0(), new IMul(), new FMul(), new I2F(), new Add(), new Dec(), new IRand(), new Str(), new Triple(), new Factor(), new IsEmpty(), new NotNil()} )
       PRIMSYNS.put(prim.name(),prim);
-    new EXTStruct(T2.make_str(TypeMemPtr.STRPTR),TypeMemPtr.STR_ALIAS);
+    new EXTStruct(T2.make_str(TypeMemPtr.STRPTR),BitsAlias.STRX);
 
     // Parse
     Work<Syntax> work = WORK = new Work<>(rseed);
@@ -555,7 +555,7 @@ public class HM {
     final SB p0(SB sb, VBitSet visit, VBitSet dups) {
       p1(sb.i(),dups).p('#').p(_uid);
       if( DO_HM  ) _hmt .str(sb.p(", HMT="), visit,dups,false);
-      if( DO_GCP ) _flow.str(sb.p(", GCP="), true, false );
+      if( DO_GCP ) _flow._str(new Type.PENV(sb.p(", GCP="), true, false,false) );
       sb.nl();
       return p2(sb.ii(2),visit,dups).di(2);
     }
@@ -588,7 +588,7 @@ public class HM {
           default -> throw TODO();
           }).p('"');
 
-      return _con.str(sb,true,false);
+      return _con._str(new Type.PENV(sb,true,false,false)).sb;
     }
     @Override SB p2(SB sb, VBitSet visit, VBitSet dups) { return sb; }
     @Override boolean hm(Work<Syntax> work) { return false; }
@@ -1455,7 +1455,7 @@ public class HM {
       Alloc a = ALIASES.at(i);
       if( a!= null ) ts[i] = a.tmp()._obj;
     }
-    ASIG_MEM = TypeMem.make0(false,ts);
+    ASIG_MEM = TypeMem.make0(ts);
     return add_sig(t);
   }
   private static Type add_sig(Type t) {

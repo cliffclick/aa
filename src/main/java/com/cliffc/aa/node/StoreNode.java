@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
@@ -22,7 +23,7 @@ public class StoreNode extends StoreAbs {
     _fld = fld;
     _fin = fin;
   }
-  @Override public String xstr() { return "."+_fld+"="; }   // Self short name
+  @Override public String label() { return "."+_fld+"="; }   // Self short name
 
   
   @Override Type _value( TypeMem tm, TypeMemPtr tmp ) {
@@ -55,9 +56,11 @@ public class StoreNode extends StoreAbs {
   }
 
   @Override boolean st_st_check( StoreAbs sta ) {
-    return sta instanceof StoreNode st && Util.eq(_fld,st._fld);
+    return (sta instanceof StoreNode st && Util.eq(_fld,st._fld)) ||
+      sta instanceof StoreXNode;
   }
 
+  @Override boolean ld_st_check(StoreAbs st) { throw AA.TODO(); }
   
 //  @Override public Node ideal_reduce() {
 //    if( is_prim() ) return null;
@@ -165,7 +168,7 @@ public class StoreNode extends StoreAbs {
     // Add/unify field into struct
     TV3 fld = rez().set_tvar();
     TV3 xfld = ts.arg(_fld);
-    if( xfld==null ) ts.add_fld(_fld,fld,false);
+    if( xfld==null ) ts.add_fld(_fld,fld );
     else             fld.unify(xfld,false);
     return null;
   }
@@ -173,7 +176,7 @@ public class StoreNode extends StoreAbs {
   @Override public boolean unify( boolean test ) {
     TVPtr ptr = (TVPtr)adr().tvar();
     TV3 self_fld = rez().tvar();
-    assert !is_prim();
+    assert !isPrim();
     TVStruct ts = ptr.load();
     TV3 ptr_fld = ts.arg(_fld);
     return self_fld.unify(ptr_fld,test);

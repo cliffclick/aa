@@ -9,12 +9,9 @@ import static com.cliffc.aa.AA.MEM_IDX;
 public class MProjNode extends ProjNode {
 
   public MProjNode( Node head ) { this(head, MEM_IDX); }
-  public MProjNode( Node head, int idx ) {
-    super(head,idx);
-    _live=RootNode.def_mem(null);
-  }
-  @Override public String xstr() { return "MProj"+_idx; }
-  @Override public boolean is_mem() { return true; }
+  public MProjNode( Node head, int idx ) { super(head,idx); }
+  @Override public String label() { return "MProj"+_idx; }
+  @Override public boolean isMem() { return true; }
   @Override public Type value() {
     Type c = val(0);
     if( c instanceof TypeTuple ct && _idx < ct._ts.length )
@@ -23,12 +20,12 @@ public class MProjNode extends ProjNode {
     return c.oob(TypeMem.ALLMEM);
   }
 
-  @Override public Type live_use( int i ) { return _live; }
+  @Override public Type live_use( int i ) { return _live==Type.ALL ? TypeMem.ALLMEM : _live; }
 
   @Override public Node ideal_reduce() {
-    if( is_prim() ) return null;
+    if( isPrim() ) return null;
     // Fold dying calls
-    Node mem = in(0).is_copy(MEM_IDX);
+    Node mem = in(0).isCopy(MEM_IDX);
     if( mem != null && _live.isa(mem._live))
       return mem==this ? Env.ANY : mem;
 

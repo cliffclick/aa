@@ -1,0 +1,12 @@
+// Evil test, showing AA use of display.
+// Type: 17
+// Eval: 17
+
+dsp = %{
+  fcn = { somedsp -> { -> 17 } };
+  bound = (fcn dsp);  // Bind 
+  // Display is never complete until end of program
+  // But stuff here gets executed...
+  rez = (bound);
+};
+dsp.rez

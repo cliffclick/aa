@@ -16,25 +16,33 @@ public class LoadNode extends Node {
   public       String _fld;
   // Where to report errors
   private final Parse _bad;
+  // When doing HM, treat this Load as a identifier load and allow the type
+  // LET-polymorphism.  When false, this Load could be a struct field load,
+  // OR it could be self-recursive definition, OR it could be unknown.
+  private boolean _fresh;
+  // When false, the _fresh field is unknown; the Load is known as a identifier
+  // (not a field load) but we do not (yet) know if it is part of a self-
+  // recursive definition or not.
+  private boolean _known;
+
   // Prevent recursive expansion during ideal_grow
   private boolean _mid_grow;
 
   // A struct using just the field; just a cache for faster live-use
   private final TypeStruct _live_use;
 
-  public LoadNode( Node mem, Node adr, String fld, Parse bad ) {
-    super(OP_LOAD,null,mem,adr);
+  public LoadNode( Node mem, Node adr, String fld, boolean fresh, boolean known, Parse bad ) {
+    super(null,mem,adr);
     _fld = fld;
     _bad = bad;
     _live_use = TypeStruct.UNUSED.add_fldx(TypeFld.make(_fld,Type.ALL));
   }
   // A plain "_" field is a resolving field
-  @Override public String xstr() { return "."+_fld; }   // Self short name
-  String  str() { return xstr(); } // Inline short name
-  
+  @Override public String label() { return ("."+_fld).intern(); }   // Self short name
+
   Node mem() { return in(MEM_IDX); }
   Node adr() { return in(DSP_IDX); }
-  private Node set_mem(Node a) { return set_def(MEM_IDX,a); }
+  private Node set_mem(Node a) { return setDef(MEM_IDX,a); }
 
   @Override public Type value() {
     Type tadr = adr()._val;
@@ -47,11 +55,13 @@ public class LoadNode extends Node {
     if( ta==TypeNil.NIL || ta==TypeNil.XNIL )
       ta = (TypeNil)ta.meet(PrimNode.PINT._val);
 
+    // Exactly only prior Operator Binds produce Deep Ptrs, and these do
+    // field-selects from the struct instead of loads.
     TypeStruct ts = ta instanceof TypeMemPtr tmp && !tmp.is_simple_ptr()
       ? tmp._obj
       : tm.ld(ta);
 
-    Type t = lookup(ts,ta,tm,_fld);
+    Type t = lookup(ts,tm,_fld);
     if( t!=null ) return t;
 
     // Did not find field
@@ -60,8 +70,8 @@ public class LoadNode extends Node {
 
 
   // Field lookup, might check superclass
-  static Type lookup( TypeStruct ts, TypeNil ptr, TypeMem mem, String fld ) {
-    
+  static Type lookup( TypeStruct ts, TypeMem mem, String fld ) {
+
     // Check for direct field
     int idx = ts.find(fld);
     if( idx != -1 ) return ts.at(idx);
@@ -71,13 +81,13 @@ public class LoadNode extends Node {
       return ts._def.above_center() ? TypeNil.XSCALAR : null;
 
     // Miss on closed structs looks at superclass.
-    ptr = (TypeNil)ts.fld(0)._t; // Load clazz ptr
+    TypeNil ptr = (TypeNil)ts.fld(0)._t; // Load clazz ptr
     // Load the clazz struct type from memory
     ts = mem.ld(ptr);
-    return lookup(ts,ptr,mem,fld);
+    return lookup(ts,mem,fld);
   }
 
-  
+
   // The only memory required here is what is needed to support the Load.
   // If the Load is alive, so is the address.
   @Override public Type live_use( int i ) {
@@ -87,31 +97,45 @@ public class LoadNode extends Node {
     if( i!=MEM_IDX ) return Type.ALL;
     // Memory demands
     Node def=mem();
-    adr().deps_add(def);
+    // If adr() value changes, the def liveness changes; this is true even if
+    // def is ALSO adr().def() which the normal deps_add asserts prevent.
+    adr().deps_add_live(def);
     if( adr.above_center() ) return Type.ANY; // Nothing is demanded
-    if( !(adr instanceof TypeNil ptr) )  // Demand everything not killed at this field
-      return RootNode.def_mem(def);
-  
-    if( ptr._aliases.is_empty() )  return Type.ANY; // Nothing is demanded still
 
-    // Demand memory produce the desired field from a struct
-    if( ptr._aliases==BitsAlias.NALL )
-      return RootNode.def_mem(def);
+    // Demand everything not killed at this field.
+    if( !(adr instanceof TypeNil ptr) || // Not a ptr, assume it becomes one
+        ptr._aliases==BitsAlias.NALL )   // All aliases, then all mem needed
+      return RootNode.removeKills(def);  // All mem minus KILLS
+
+    // TODO: Liveness for generic clazz fields
+    //if( ptr instanceof TypeMemPtr tmp && !tmp.is_simple_ptr() ) {
+    //  tmp._obj.get(TypeFld.CLZ);
+    //}
+
+    if( ptr._aliases.is_empty() ) return Type.ANY; // Nothing is demanded still
+
     // Demand field "_fld" be "ALL", which is the default
     return TypeMem.make(ptr._aliases,_live_use);
   }
-  
+
   // Strictly reducing optimizations
   @Override public Node ideal_reduce() {
+    boolean progress = false;
     Node adr = adr();
     Type tadr = adr._val;
 
     // Dunno about other things than pointers
     if( !(tadr instanceof TypeNil tn) ) return null;
     //if( adr instanceof FreshNode frsh ) adr = frsh.id();
-    // If we can find an exact previous store, fold immediately to the value.
     Node ps = find_previous_struct(this, mem(), adr, tn._aliases);
-    if( ps instanceof StoreAbs sta ) {
+    // Move memory higher, bypassing unrelated memory ops
+    if( ps != mem() ) {
+      set_mem(ps);
+      progress = true;
+    }
+
+    // If we can find an exact previous store, fold immediately to the value.
+    if( ps instanceof StoreAbs sta && sta.adr()==adr ) {
       if( sta instanceof StoreNode st ) {
         if( Util.eq(_fld,st._fld) ) // match field in store
           return st.rez();
@@ -126,11 +150,11 @@ public class LoadNode extends Node {
           return val;
         deps_add(this);         // Self-add if updates
         val.deps_add(this);     // Val -add if updates
-        return null;        
+        return null;
       }
     }
 
-    return null;
+    return progress ? this : null;
   }
 
   // Changing edges to bypass, but typically not removing nodes nor edges
@@ -145,12 +169,12 @@ public class LoadNode extends Node {
     if( mem instanceof MProjNode mprj ) {
       if( mprj.in(0) instanceof CallEpiNode cepi && !cepi._is_copy ) {
         if( adr instanceof NewNode nnn && !nnn.escaped(this) ) {
-    //      Env.GVN.add_reduce(this); // Re-run reduce
-    //      return set_mem(cepi.call().mem());
+          //Env.GVN.add_reduce(this); // Re-run reduce
+          //return set_mem(cepi.call().mem());
           throw TODO();
-        } else adr.deps_add(this);
+        }
       }
-    } else mem.deps_add(this);
+    }
 
     // Load can move past a Join if all aliases align.
     if( mem instanceof MemJoinNode && aliases != null ) {
@@ -170,19 +194,19 @@ public class LoadNode extends Node {
     // TODO: Hoist out of loops.
     if( !_mid_grow && mem() instanceof PhiNode mphi && split_load_profit() ) {
       _mid_grow=true;           // Prevent recursive trigger when calling nested xform
-      Node adr = adr();
-      Node[] ns = new Node[mphi.len()];
-      for( int i=1; i<mphi.len(); i++ ) {
-        ns[i] = Env.GVN.xform(new LoadNode(mphi.in(i),adr,_fld,_bad));
-        ns[i].push();
-      }
-      Node.pops(mphi.len()-1);
-      Node lphi = new PhiNode(TypeStruct.ISUSED,mphi._badgc,mphi.in(0));
-      for( int i=1; i<mphi.len(); i++ )
-        lphi.add_def(ns[i]);
-      lphi._live = _live;
-      lphi.xval();
-      return lphi;
+      //Node adr = adr();
+      //Node[] ns = new Node[mphi.len()];
+      //for( int i=1; i<mphi.len(); i++ ) {
+      //  ns[i] = new LoadNode(mphi.in(i),adr,_fld,_bad).peep();
+      //  ns[i].push();
+      //}
+      //Node.pops(mphi.len()-1);
+      //Node lphi = new PhiNode(TypeStruct.ISUSED,mphi._badgc,mphi.in(0));
+      //for( int i=1; i<mphi.len(); i++ )
+      //  lphi.addDef(ns[i]);
+      //lphi._live = _live;
+      //return lphi.peep();
+      throw TODO();
     }
 
     return null;
@@ -194,13 +218,23 @@ public class LoadNode extends Node {
     // Only split if the address is known directly
     if( !(adr instanceof NewNode) ) return false;
     // Do not split if we think a following store will fold already
-    if( _uses._len==1 && _uses.at(0) instanceof StoreNode st && st.adr()==adr )
+    if( nUses()==1 && use0() instanceof StoreNode st && st.adr()==adr )
       return false;
     return true;
   }
 
-  // Find a matching prior Store - matching address.
-  // Returns null if highest available memory does not match address.
+  // If true, can bypass.
+  @Override boolean ld_st_check(StoreAbs st) {
+    assert adr()==st.adr();
+    // Check if fld hits in a StoreX or direct StoreNode.fld
+    if( st instanceof StoreNode stf )
+      return !Util.eq(stf._fld,_fld);
+    // Assume the StoreX hits the field in question
+    return false;
+  }
+
+
+  // Bypasses as much memory as possible, returning the highest memory possible.
   static Node find_previous_struct(Node ldst, Node mem, Node adr, BitsAlias aliases ) {
     if( mem==null ) return null;
     // Walk up the memory chain looking for an exact matching Store or New
@@ -208,15 +242,19 @@ public class LoadNode extends Node {
     while(true) {
       cnt++; assert cnt < 100; // Infinite loop?
       if( mem instanceof StoreAbs st ) {
-        if( st.adr()==adr ) return st.err(true)== null ? st : null; // Exact matching store
-        st.adr().deps_add(ldst); // If store address changes
-        if( mem == st.mem() ) return null; // Parallel unrelated stores
-        // Wrong address.  Look for no-overlap in aliases
-        Type tst = st.adr()._val;
-        if( !(tst instanceof TypeMemPtr tmp) ) return null; // Store has weird address
-        BitsAlias st_alias = tmp._aliases;
-        if( aliases.join(st_alias) != BitsAlias.EMPTY )
-          return null;        // Aliases not disjoint, might overlap but wrong address
+        if( st.adr()==adr ) {
+          if( !ldst.ld_st_check(st)  )
+            return mem; // Exact matching store
+        } else {
+          st.adr().deps_add(ldst); // If store address changes
+          if( mem == st.mem() ) return mem; // Parallel unrelated stores
+          // Wrong address.  Look for no-overlap in aliases
+          Type tst = st.adr()._val;
+          if( !(tst instanceof TypeMemPtr tmp) ) return mem; // Store has weird address
+          BitsAlias st_alias = tmp._aliases;
+          if( aliases.join(st_alias) != BitsAlias.EMPTY )
+            return mem;        // Aliases not disjoint, might overlap but wrong address
+        }
         // Disjoint unrelated store.
         mem = st.mem(); // Advance past
 
@@ -225,13 +263,13 @@ public class LoadNode extends Node {
         switch( mem0 ) {
         case MemSplitNode node -> mem = node.mem(); // Lifting out of a split/join region
         case CallNode     node -> mem = node.mem(); // Lifting out of a Call
-        case RootNode     node -> { return null; }
-        case PrimNode     prim -> { return null; }
+        case RootNode     node -> { return mem; }
+        case PrimNode     prim -> { return mem; }
         case CallEpiNode  cepi -> {
-          mem = cepi.is_copy(MEM_IDX); // Skip thru a copy
-          if( mem == null ) {
+          Node copymem = cepi.isCopy(MEM_IDX); // Skip thru a copy
+          if( copymem == null ) {
             CallNode call = cepi.call();
-            assert call.is_copy(0)==null;
+            assert call.isCopy(0)==null;
             // The load is allowed to bypass the call if the alias is not killed.
             // Conservatively: the alias is not available to any called function,
             // so it's not in the reachable argument alias set and not globally escaped.
@@ -239,7 +277,7 @@ public class LoadNode extends Node {
             // Collides, might be use/def by call
             if( aliases.overlaps(esc_aliases) ) {
               Env.ROOT.deps_add(ldst); // Revisit if fewer escapes
-              return null;
+              return mem;
             }
             // Compute direct call argument set
             BitsAlias as = BitsAlias.EMPTY;
@@ -252,10 +290,12 @@ public class LoadNode extends Node {
             TypeMem cmem = CallNode.emem((TypeTuple)call._val);
             if( aliases.overlaps(as) || aliases.overlaps(cmem.all_reaching_aliases(as)) ) {
               call.deps_add(ldst); // Revisit if fewer escapes
-              return null;
+              return mem;
             }
             // Peek through call
             mem = call.mem();
+          } else {
+            mem = copymem;
           }
         }
 
@@ -272,7 +312,7 @@ public class LoadNode extends Node {
       } else if( mem instanceof  PhiNode ||  // Would have to match on both sides, and Phi the results'
                  mem instanceof ParmNode ||  // Would have to match all callers, after all is wired
                  mem instanceof  ConNode) {
-        return null;
+        return mem;
       } else {
         throw TODO(); // decide cannot be equal, and advance, or maybe-equal and return null
       }
@@ -281,6 +321,7 @@ public class LoadNode extends Node {
 
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
+    if( !_known ) throw TODO();
     // Load takes a pointer
     TV3 ptr0 = adr().set_tvar();
     TVPtr ptr;
@@ -289,39 +330,41 @@ public class LoadNode extends Node {
     } else {
       ptr0.unify(new TVPtr(BitsAlias.EMPTY, new TVStruct(true) ),false);
       ptr = ptr0.find().as_ptr();
-    } 
+    }
 
     // Struct needs to have the named field
     TVStruct str = ptr.load();
     TV3 fld = str.arg_clz(_fld);
     TV3 self = new TVLeaf();
     if( fld==null ) {
-      str.add_fld(_fld,self,false);
+      str.add_fld(_fld,self );
     } else {
       self.unify(fld,false);
     }
-    
+
     return self.find();
   }
 
   // All field loads against a pointer.
   @Override public boolean unify( boolean test ) {
-    boolean progress = false;
     TV3 ptr0 = adr().tvar();
-    Type ta = adr()._val;
 
     if( ptr0 instanceof TVErr ) throw TODO();
     TVPtr ptr = ptr0.as_ptr();
     TVStruct tstr = ptr.load();
 
+    // If the field is in the struct, unify and done
+    TV3 fld = tstr.arg(_fld);
+    if( fld!=null ) return do_fld(fld,test);
+    // If the struct is open, add field here and done.
+    if( tstr.is_open() ) return test || tstr.add_fld(_fld,tvar() );
+
     // Search up the super-clazz chain
-    for( ; tstr!=null; tstr = tstr.pclz().load() ) {
+    for( ; tstr.len()>0; tstr = tstr.pclz().load() ) {
+      assert !tstr.is_open();  // Invariant: superclazzes not open
       // If the field is in the struct, unify and done
-      TV3 fld = tstr.arg(_fld);
+      fld = tstr.arg(_fld);
       if( fld!=null ) return do_fld(fld,test);
-      // If the struct is open, add field here and done.
-      // Field is not pinned, because it might belong in a superclazz
-      if( tstr.is_open() ) return tstr.add_fld(_fld,tvar(),false);
     }
 
     // struct is end-of-super-chain, miss_field
@@ -334,12 +377,14 @@ public class LoadNode extends Node {
     return tvar().unify(fld,test);
   }
 
-  @Override public int hashCode() { return super.hashCode()+_fld.hashCode(); }
+  @Override int hash() { return _fld.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
-    if( !(o instanceof LoadNode fld) ) return false;
-    return Util.eq(_fld,fld._fld);
+    if( !(o instanceof LoadNode ld) ) return false;
+    if( !_known || !ld._known ) return false; // Assume the fresh field will differ
+    if( _fresh != ld._fresh ) return false;   // Fresh field does differ
+    return Util.eq(_fld,ld._fld);
   }
 
 }

@@ -1,4 +1,4 @@
 // y is the self-recursive function, so never returns
-// Type: { - A:{ - A -> A } -> B }
-// Eval: K1[LAMBDA,( e3=K1),()]
+// Type: A:{ *[2]@{ $dyn=-; x=A;  ..., } - B:{ - - B -> B } -> C }
+// Eval: A:<*[2]@{ _ $dyn=-; x=A; },LAM3>
 x = { y -> (x (y y))}; x

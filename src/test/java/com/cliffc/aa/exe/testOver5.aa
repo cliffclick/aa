@@ -1,6 +1,6 @@
 // One DynLoad, fcn needs DynTable
-// Type: ( 1, 2)
-// Eval: ( 1, 2)
+// Type: *[7]( _, 1, 2)
+// Eval: *[7]( _, 1, 2)
 
 fcn = { ->
   (pair

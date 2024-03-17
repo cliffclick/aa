@@ -1,7 +1,10 @@
 package com.cliffc.aa.tvar;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.node.FreshNode;
 import com.cliffc.aa.util.Ary;
+
+import java.util.Arrays;
 
 import static com.cliffc.aa.AA.TODO;
 
@@ -74,7 +77,7 @@ abstract public class TVExpanding extends TV3 {
       return true;
     }
     @Override public String toString() {
-      return "delayed_fresh_unify["+_lhs+" to "+_rhs+", "+_nongen+"]";
+      return "delayed_fresh_unify["+_lhs+" to "+_rhs+", "+ Arrays.toString( _nongen ) +"]";
     }
   }
   
@@ -90,12 +93,20 @@ abstract public class TVExpanding extends TV3 {
 
   // Called from Combo after a Node unification; allows incremental update of
   // Fresh unification.
+  // TODO: PRETTY SURE I CAN REMOVE THIS ENTIRELY.
+  // JUST USE THE NORMAL WORKLIST.
   public static void do_delay_fresh() {
     int cnt=0;
     while( DELAY_FRESH.len() > 0 ) {
       DelayFresh df = DELAY_FRESH.pop();
-      boolean progress = df.lhs().fresh_unify(df._frsh,df.rhs(),df._nongen,false);
-      df._frsh.add_flow();
+      // TODO: Drop fancy stuff, and just _frsh.unify
+      // TODO TODO: Drop do_delay_fresh and just use worklist
+      assert df._frsh.id().tvar()==df.lhs();
+      assert df._frsh     .tvar()==df.rhs();
+      assert df._frsh._nongen==df._nongen;
+      //boolean progress = df._frsh.unify(false);
+      boolean progress = df.lhs().fresh_unify(df._frsh,df._nongen,df.rhs(),false);
+      Env.GVN.add_flow(df._frsh);
       assert cnt++ < 20;
     }
   }
@@ -143,7 +154,10 @@ abstract public class TVExpanding extends TV3 {
 
   // Record that on the delayed fresh list and return that.  If `this` ever
   // unifies to something, we need to Fresh-unify the something with `that`.
-  @Override void add_delay_fresh() { if( FRESH_ROOT!=null ) add_delay_fresh(FRESH_ROOT); }
+  @Override void add_delay_fresh() {
+    if( FRESH_ROOT!=null && FRESH_ROOT._rhs!=null && FRESH_ROOT._frsh!=null )
+      add_delay_fresh(FRESH_ROOT);
+  }
   private boolean add_delay_fresh( DelayFresh df ) {
     df.update();
     // Lazy make a list to hold
@@ -164,7 +178,7 @@ abstract public class TVExpanding extends TV3 {
         return false;           // Dup, do not insert
     }
     _delay_fresh.push(df);
-    assert _delay_fresh.len()<=10; // Switch to worklist format
+    assert _delay_fresh.len()<=15; // Switch to worklist format
     return true;
   }
 

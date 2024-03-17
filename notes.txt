@@ -1,4 +1,272 @@
 =======================================
+03/17/2024
+
+Fought this for a long time.  Problem is that var uses can't tell if they're in
+the definition (recursively) or not, at parse-time.  So there's no breadcrumb
+left-over from the Parsers' use to say if any given use should be "Fresh" or
+"NonGen".
+
+In my example below, when I parse A's expression and find "B", I don't know
+(yet) if A and B are intertwined or not.  Again when parsing D's expression and
+find B, again don't know if D and B are intertwined.
+
+Ponding building a variant Parser than makes an AST for stack frames (like
+EXE), then discovered mut-let-rec sets, perhaps reordering the Frame AST to
+topo sort mut-let-rec, THEN walks the AST for a SoN.
+
+
+=======================================
+03/17/2024
+
+BUG: $dyn not counted in StructNode._nargs, but it IS an argument
+
+ForwardRef states
+- not scoped; var might promote to outer scopes
+- scoped; var is defined in this scope, but mid-def
+- self-defined; var is defined, but not MUTUALLY defined, e.g. is_even/is_odd examples
+- mut-defined; all mutual let-rec vars are defined.
+
+FRefs are tied to their scope/struct/frame as the direct input for that var name.
+They have a defined edge, null till self-defined.
+They have more mutual dependence edges to other FRefs.  These extra FRef edges
+are cycle-detected as self-def gets set.
+
+
+Example:
+A = { x -> rand ? B(x) : x };
+D = {   -> rand ? B(1) : C(2) };
+C = { x -> A(x) };
+B = { x -> C(x) };
+
+Parse token A
+- Set A FRef, scoped, not self-defined.  Scope:{A-scoped}
+- Parse A expr
+- Discover B; insert B FRef, not-scoped  Scope:{A-scoped, B-not-scoped}
+- Use a FRef; add edge A-FRef to B-FRef  Scope:{A-scoped(B), B-not-scoped}
+- Finish A expr parse
+- Change A-FRef to self-defined; has a B-FRef edge so NOT mut-defined (yet); Scope: {A-self(B),B-not}
+
+Parse token D
+- Set D FRef, scoped, not self-defined.  Scope:{A-self(B), B-not, D-scoped}
+- Parse D expr
+- Use B FRef, add edge D-FRef to B-FRef. Scope:{A-self(B), B-not, D-scoped(B)}
+- Discover C; insert C FRef, not-scoped  Scope:{A-self(B), B-not, D-scoped(B), C-not}
+- Use C FRef, add edge D-FRef to C-FRef. Scope:{A-self(B), B-not, D-scoped(B,C), C-not}
+- Finish D expr parse
+- Change D-FRef to self-defined; Scope:{A-self(B), B-not, D-self(B,C), C-not}
+
+Parse token C
+- Change C FRef to scoped: Scope:{A-self(B), B-not, D-self(B,C), C-scoped}
+- Parse C expr
+- Use A FRef, add edge C-FRef to A-FRef. Scope:{A-self(B), B-not, D-scoped(B,C), C-scoped(A)}
+- Finish C expr parse
+- CHange C-FRef to self-defined: Scope:{A-self(B), B-not, D-self(B,C), C-self(A)}
+
+Parse token B
+- Change B FRef to scoped: Scope:{A-self(B), B-scoped, D-self(B,C), C-self(A)}
+- Parse B expr
+- Use C FRef, add edge B-FRef to C-FRef.  Scope: {A-self(B), B-scoped(C), D-self(B,C), C-self(A)}
+- FInish B expr parse
+- Change B-FRef to self-defined: Scope: {A-self(B), B-self(C), D-self(B,C), C-self(A)}
+- - Walk B->C->A, all self/mutual.
+- - Flip all to Mutual.
+- - Walk backwards from {A,B,C} looking for not-mut-FRefs.
+- - If so, cycle-find again on D: D->B(mut), D->C(mut) - Flip all D to mutual.
+
+
+=======================================
+03/12/2024
+
+Thinking that not inserting Fresh during parse doesn't work, because lost NONGEN inputs.
+
+Thinking instead of removing extra FRESH, but this probably requires a global pre-pass.
+
+See testRecur12.aa.sav, TestParse.jig for examples.
+
+So...
+
+Parsing A= definition.  Find forward ref B.  GO up scope, find mid-def of A,
+add "B" as a dependence.
+
+Parsing D= def.  Find fref B; go up scope; find mid-def of D, add "B" as a
+dependence.  Repeat for fref C; D ends up with deps {B,C}
+
+Parsing C= def.  Find fref A; add "A" as a dep.
+
+Parsing B= def.  Find fref C; add "C" as a dep.
+
+End of struct, topo-sort by deps and find cycle.  Declare {A,B,C} mutual let-rec.
+Revisit Fresh loads inserted by FREF resolve, and kill extra Fresh.
+
+Leave them in for D's
+
+
+
+=======================================
+03/10/2024
+
+When defining a top-level frame, it is defined in parts and each part may (or
+may not) be "let/in" complete.
+
+Example, hidden/assumed top-level display/frame:
+  fact = {.../*fact is mid-def, NOT FRESH here */... };
+  x = e0; // fact is complete here, but x is not
+  fact(x) // fact uses let-polymorphism here
+
+Same Example, explicit top-level frame:
+  FILE_SCOPE = @{
+    fact = {.../*fact is mid-def, NOT FRESH here */... };
+    x = e0; // fact is complete here, but x is not
+    fact(x) // fact uses let-polymorphism here, but FILE_SCOPE is not complete
+    ...     // FILE_SCOPE carries on with more variable
+  }
+  
+Indeed FILE_SCOPE carries on to the program end, adding vars.
+Same is true for all nested scopes.
+
+BUG: Currently finding FILE_SCOPE in the non-gen set, which recursively
+     includes 'fact' when fact is being used: `fact(x)` which blows its
+     polymorphic flavor.
+
+So from a typing perspective looking at something like:
+  FILE_SCOPE_CURRENT = @{
+    actve, in-progress defs.
+    includes e.g. is_even until is_odd defines
+  };
+  FILE_SCOPE_DONE = @{
+    fact = {...fact...};
+    x = e0;
+    blah = fact(x);
+    .. more added
+  }
+
+Or maybe TOP/FILE_SCOPE NOT in non-gen, but instead their parts go in non-gen
+on a case by case basis.
+
+FILE_SCOPE = @{
+  x = e0; // forward-ref set is empty
+  fact = { ...fref(fact)...}; // remove fact from fref-set, so empty, so done.
+  ...fact(3)... // fact is done, not in non-gen so FRESH
+  is_even = { ...fref(is_odd)... }; // fref(is_odd, not done);
+  blah = {...baz...}; // fref is empty, so done
+  ...blah... // Done, non-in-nongen, so FRESH
+  is_odd  = { ...is_even/not done so NOT FRESH...}// picks up is_even fref set, then removes is_odd, so both are done
+  ...
+}
+
+
+Issue is building up a topo DAG-sort of sets, names are not-fresh in the same
+initial create, and ARE fresh in later uses.
+Set: {A,B,C} // A calls B calls C calls A
+Set: {D,E}   // These can poly call A,B,C but not each other, D,E
+Set: {F,G}   // These can poly call A,B,C but not each other, F,G
+Set: {H,I}   // These can poly call any of the above...
+
+Theory: late-add Fresh???
+For each Closure Store, track f-ref names.
+At end of closure, build SCCs and top-sort DAGS.
+Within SCC, replace frefs with direct Loads, no fresh.
+Not-replaced frefs replace with a Load/Fresh pair.
+
+
+Nasty example; listing fref-sets:
+FILE: @{
+  A = {B};
+  H = {I,A,D};
+  D = {E,C};
+  C = {A}
+  I = {H,E}
+  E = {D,C}
+  B = {C}
+}
+During parse:
+  If outer scope, assume Load/Def always complete here.
+  If current scope, ask if Load/Def is complete & flag it.
+          If not complete, flag Load as unknown.  Add to fref-set for current scope def.
+  When current def completes, gather & reset fref-set.          
+After struct finishes, walk fref-sets, make SCCs.
+  Walk by SCC, all Loads in same SCC not-complete-not-fresh
+  Loads not in current SCC as Fresh
+
+More Nasty Example:
+Done parsing A = {B    }; keep fref-set.  A not defined (yet), missing B.
+Done parsing H = {I,A,D}; keep fref-set.  H not defined (yet), missing I,D.
+Done parsing D = {E,C  }; keep fref-set.  D not defined (yet), missing E,C.
+Done parsing C = {A    }; keep fref-set.  C not defined (yet), has A, but A missing B.
+Done parsing I = {H,E  }; keep fref-set.  I not defined (yet), has I,H,A,D, missing E.
+Done parsing E = {D,C  }; keep fref-set.  E not defined (yet), has everything except B.
+Done parsing B = {C    }; C uses A, A uses B.  Declare mut-rec {A,B,C}.
+Don't see any shortcuts here.
+
+I still think, in the end, I'm gonna visit all fields as part of the "promote"
+logic, and have to do a topo-sort with SCC discovery.  All fref uses get broken
+down into uses from inside the SCC and uses outside the SCC.  
+
+
+=======================================
+12/25/2023
+
+Pondering a "reboot" of AA Node class.
+
+The Type classes seems to be stable; complex but very usable with strong
+theoretical foundations.
+
+The TVar classes seems to be stable; complex but very usable with strong
+theoretical foundations.
+
+Node:
+
+- Needs better IR printing, and moved out of Node (too large).
+  See Simple Node printing for a better 1-line per node print.
+
+- Folding the edge Ary<Node>s back into Node - for easier debugging experience.
+  Its 1-layer less, 1-click less every time I chase node edges.
+
+- Lots of stuff in the Node class proper, I just want a chance to filter it down.
+
+- Drop the opcode as not really helpful.  Just add Yet Another Virtual call.
+
+- Stick with the recursive peepholes during parsing; no worklist.
+
+- Post-parse, pre-combo & post-combo, normal worklist.
+
+- A bunch of Node bits seem suspiscous - not sure I need them, or would be
+  better of if moved to somewhere else.  Also, there's a lot of walkers, makes
+  me wonder if I should use a generic walker more often.
+
+- Looking at the walkers, I have a generic walker but its too hard to use.  I
+  want cheap&easy input/output walkers.  See TypeStruct for such walkers; I
+  pull one from a list, walk, return it.  Have to be careful with leaks on
+  early exit.
+
+- Ponder a NodeUtils for lots of stuff that's only sorta tangential to Node
+
+- Ponder a nicer way for Parse to handle keeping partially built nodes around
+- - addDef(null) use as a in-progress flag; delDef(null) to unwind
+- - But still call keep/unkeep so can assert more.
+- - try/resources/autoclose to wrap assertion that add/del is balanced?
+- - OR: `int bal; assert bal = pushBalancedKeeps();`
+- -     `assert popBalancedKeeps(bal);`
+- - `try(BalanceCheck b = BalanceCheck.get(); ) { ... }`
+
+
+Example for problem walkers; walkerr_def:
+- Passed some "Env" for collecting stuff
+- visit self-check
+- walk just the defs, pre-order
+- - skip if def is null, XCTRL, or a FunPtr
+- - pre-order walk
+- POST WORK:
+- - revisit defs, check no ALL on defs
+- - adderr(Env) collects errors in Env
+- - updates each ErrMsg order
+
+Issues for generic pre-order walker: its not a pre-order walk!  Must have a
+special cutout during walking, which means calling a generic walker with
+specialized per-edge-walk, which makes it much less useful.
+
+
+=======================================
 12/12/2023
 
 Overloads (finally) appear to be typing/running in the EXE branch.
@@ -12,12 +280,15 @@ General theory:
   (string, which at compile time turns into a constant) OR the map is from an
   Apply/Call site to a new DynTable used for this call.
 - All Lambdas are passed an extra DynTable argument.
-- All Apply/Calls pass this argument.
+- All Apply/Calls pass this argument, which they load from the extant DynTable
+  at a call-site specific offset.
 - All DynLoads load at a fixed offset from the table, getting their offset, which they then load ptr+offset
 - So the runtime cost is a load-per-call, an extra reg argument, and a 2nd load-per-DynLoad.
-
-- The type of a DynTable is the TVDynTable, which is a wrapper over a TVStruct
-- DynTables can be empty, and will be if no DynLoad is involved.
+- The type of a DynTable is the TVDynTable, which is similar to a TVStruct, in
+  that it has a variable number of fields, but uses Node IDs instead of labels.  
+- DynTables can be empty, and will be if no DynLoad is involved.  They can have
+  nested DynTables, which can be recursively empty.  For recursive functions
+  (e.g. 'factorial'), the nested DynTable can refer to itself.
 
 
 =======================================

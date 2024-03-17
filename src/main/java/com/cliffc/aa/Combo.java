@@ -4,6 +4,8 @@ import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.NonBlockingHashMapLong;
 
+import java.util.HashSet;
+
 /** Combined Global Constant Propagation and Hindly-Milner with extensions.
 
 See HM/HM.java for a complete stand-alone research version.
@@ -136,24 +138,31 @@ public abstract class Combo {
   public static boolean during() { return !AA.LIFTING              ; }
   public static boolean post  () { return  AA.LIFTING &&  HM_FREEZE; }
 
+
+  static final HashSet<DynLoadNode> DYNS = new HashSet<>();
+  
   public static void opto() {
-    assert !PrimNode.post_init() || Env.GVN.work_is_clear();
+    assert Env.GVN.work_is_clear();
     // This pass LIFTS not FALLs
     AA.LIFTING = false;
 
     // Set all values to ANY and lives to DEAD, their most optimistic types.
     // Set all type-vars to Leafs.
-    RootNode.combo_def_mem();
-    Env.KEEP_ALIVE.walk( (n,ignore) -> {
-        if( n.is_prim() ) return 0;
+    RootNode.resetDefMemHigh();
+    Env.ROOT.walk( n -> {
+        if( n.isPrim() ) return;
         n._val = n._live = Type.ANY;  // Highest value
         if( n.has_tvar() ) n.set_tvar();
-        n.add_flow();
-        if( n instanceof FunNode fun && !n.always_prim() )
+        Env.GVN.add_flow(n);
+        if( n instanceof FunNode fun )
           fun.set_unknown_callers();
-        return 0;
-      });
-    assert Env.KEEP_ALIVE.more_work()==0; // Initial conditions are correct
+        if( n instanceof DynLoadNode dyn )
+          DYNS.add(dyn);
+    });
+    Env.ROOT.xval();
+    Env.ROOT.xliv();
+
+    assert NodeUtil.more_work(Env.ROOT)==0; // Initial conditions are correct
 
     // Init
     HM_NEW_LEAF = false;
@@ -166,27 +175,27 @@ public abstract class Combo {
 
     // Pass 2: Potential new Leafs quit lifting GCP in Apply
     add_new_leaf_work();
-    assert Env.KEEP_ALIVE.more_work()==0;
+    assert NodeUtil.more_work(Env.ROOT)==0;
     work_cnt += main_work_loop(2);
 
     // Pass 3: Unresolved Fields are ambiguous; propagate errors
     HM_AMBI = true;
     add_ambi_work();
-    assert Env.KEEP_ALIVE.more_work()==0;
+    assert NodeUtil.more_work(Env.ROOT)==0;
     work_cnt += main_work_loop(3);
 
     // Pass 4: H-M types freeze, escaping function args are assumed called with lowest H-M compatible
     // GCP types continue to run downhill.
     HM_FREEZE = true;
     add_freeze_work();
-    assert Env.KEEP_ALIVE.more_work()==0;
+    assert NodeUtil.more_work(Env.ROOT)==0;
     work_cnt += main_work_loop(4);
 
     // Take advantage of results
-    Env.KEEP_ALIVE.walk( (n,ignore) -> {
-        Env.GVN.add_work_new(n);
-        return 0;
-      });
+    Env.ROOT.walk( Env.GVN::add_work_new );
+
+    AA.LIFTING = true;
+    assert !NodeUtil.leak();
   }
 
   static int main_work_loop( int pass ) {
@@ -221,15 +230,15 @@ public abstract class Combo {
       //    r.trial_resolve(false); // Do delayed resolve
 
       // Very expensive assert: everything that can make progress is on worklist
-      assert Env.KEEP_ALIVE.more_work()==0;
+      assert NodeUtil.more_work(Env.ROOT)==0;
     }
     return cnt;
   }
 
   private static void add_new_leaf_work() { }
   private static void add_ambi_work() {
-    //for( Resolvable r : Resolvable.RESOLVINGS.values() )
-    //  throw AA.TODO();
+    for( DynLoadNode dyn : DYNS )
+      Env.GVN.add_flow(dyn);
   }
 
   private static final NonBlockingHashMapLong<Node> FREEZE_WORK = new NonBlockingHashMapLong<>();
@@ -239,9 +248,9 @@ public abstract class Combo {
   }
   private static void add_freeze_work()   {
     for( Node dep : FREEZE_WORK.values() )
-      dep.add_flow();
+      Env.GVN.add_flow(dep);
     FREEZE_WORK.clear();
   }
 
-  static void reset() { HM_NEW_LEAF = HM_AMBI = HM_FREEZE=false; FREEZE_WORK.clear(); }
+  static void reset() { HM_NEW_LEAF = HM_AMBI = HM_FREEZE=false; FREEZE_WORK.clear(); DYNS.clear(); }
 }

@@ -1,6 +1,7 @@
 package com.cliffc.aa.exe;
 
 import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.util.Util;
 import org.junit.Test;
 
 import java.io.File;
@@ -14,9 +15,9 @@ public class TestEXE {
   @Test public void testAll() throws IOException {
     File folder = new File("src/test/java/com/cliffc/aa/exe");
     File[] tests = folder.listFiles(file -> file.getName().endsWith("aa") /*&& !file.getName().contains("Over")*/);
-    Arrays.sort(tests);
+    Arrays.sort(tests, (s0,s1) -> Util.alphanumCompare(s0.toString(),s1.toString()));
+    //tests = new File[]{new File("src/test/java/com/cliffc/aa/exe/testStruct13.aa")};
     for( File f : tests ) {
-      System.out.println(f);
       String prog = Files.readString( f.toPath());
       String extype = get_expected(prog,"// Type: ");
       String exeval = get_expected(prog,"// Eval: ");
@@ -24,25 +25,26 @@ public class TestEXE {
       try {
         EXE.Root root = EXE.compile(prog,0,true,true);
         TV3 tv = root.tvar();
-        assertEquals(extype,tv.p());
+        assertEquals(f.toString(),extype,tv.p());
       
         try {
           EXE.Val rez = root.eval(null);
-          assertEquals(exeval,rez.toString());
+          assertEquals(f.toString(),exeval,rez.toString());
         } catch( NullPointerException npe ) {
-          assertEquals(exeval,"CRASH"); // Some are expected
+          assertEquals(f.toString(),exeval,"CRASH"); // Some are expected
         }
         
       } catch( IllegalArgumentException iae ) {
         // Compile fails as expected
-        assertEquals(extype,iae.getMessage());
+        assertEquals(f.toString(),extype,iae.getMessage());
       }      
     }
   }
 
   private static String get_expected(String prog, String marker) {
     int idx = prog.indexOf(marker);
-    if( idx == -1 ) throw new RuntimeException("Test file lacks a "+marker+" comment");
+    if( idx == -1 )
+      throw new RuntimeException("Test file lacks a "+marker+" comment");
     int eol = prog.indexOf('\n', idx+1);
     return prog.substring(idx+marker.length(),eol).trim();
   }

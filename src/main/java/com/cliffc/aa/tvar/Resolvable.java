@@ -1,6 +1,7 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.AA;
+import com.cliffc.aa.Env;
 import com.cliffc.aa.node.DynLoadNode;
 import com.cliffc.aa.util.Util;
 
@@ -93,7 +94,7 @@ public class Resolvable {
     if( Util.eq(lab,_label) ) return false; // Already resolved this way, no progress
     assert _label==null;
     if( test ) return TV3.ptrue();
-    _dyn.add_flow();            // Value call makes progress
+    Env.GVN.add_flow(_dyn);     // Value call makes progress
     _label = lab;    
     TV3 prior = match().arg(lab); // Get prior matching match label, if any
     if( prior==null ) {

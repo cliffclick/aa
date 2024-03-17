@@ -1,0 +1,8 @@
+// Mutual recursion with mutual let-rec auto discovered
+// Type: int64
+// Eval: 1
+A = { x -> (rnd) ? (B x) :  x    };
+D = {   -> (rnd) ? (B 1) : (C 2) };
+C = { x -> (A x) };
+B = { x -> (C x) };
+(pair (D), (C 3.14f) )

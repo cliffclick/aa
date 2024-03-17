@@ -26,7 +26,7 @@ public class UQNodes extends NonBlockingHashMapLong<Node> {
 
   // Make a unique set of 1 node
   public static UQNodes make( Node tn ) {
-    assert !tn.is_dead();
+    assert !tn.isDead();
     assert KEY.isEmpty();
     KEY.put(tn._uid,tn);
     return intern();
@@ -36,10 +36,10 @@ public class UQNodes extends NonBlockingHashMapLong<Node> {
   public UQNodes add( Node tn ) {
     assert KEY.isEmpty();
     if( tn==null ) return this;
-    assert !tn.is_dead();
+    assert !tn.isDead();
     if( get(tn._uid)!=null ) return this; // Already in there
     // Fold them together
-    for( Node n : values() ) if( !n.is_dead() ) KEY.put(n._uid,n);
+    for( Node n : values() ) if( !n.isDead() ) KEY.put(n._uid,n);
     KEY.put(tn._uid,tn);
     return intern();
   }
@@ -56,13 +56,13 @@ public class UQNodes extends NonBlockingHashMapLong<Node> {
     // See if all of smaller is in larger
     boolean progress=false;
     for( Node n : uq0.values() )
-      if( !n.is_dead() && uq1.get(n._uid)!=n )
+      if( !n.isDead() && uq1.get(n._uid)!=n )
         { progress = true; break; }
     if( !progress ) return uq1;
 
     // Fold them together
-    for( Node n : uq0.values() ) if( !n.is_dead() ) KEY.put(n._uid,n);
-    for( Node n : uq1.values() ) if( !n.is_dead() ) KEY.put(n._uid,n);
+    for( Node n : uq0.values() ) if( !n.isDead() ) KEY.put(n._uid,n);
+    for( Node n : uq1.values() ) if( !n.isDead() ) KEY.put(n._uid,n);
 
     return intern();
   }
@@ -71,7 +71,7 @@ public class UQNodes extends NonBlockingHashMapLong<Node> {
   public UQNodes rename(HashMap<Node,Node> map) {
     assert KEY.isEmpty();
     for( Node n : values() )
-      if( !n.is_dead() ) {
+      if( !n.isDead() ) {
         Node c = map.get(n);
         if( c==null ) c = n;
         KEY.put(c._uid,c);

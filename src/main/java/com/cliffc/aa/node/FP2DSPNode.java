@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
@@ -12,8 +13,8 @@ import com.cliffc.aa.type.*;
 // Inverse of BindFP.
 public class FP2DSPNode extends Node {
   final Parse _bad;
-  public FP2DSPNode( Node fp, Parse bad ) { super(OP_FP2DSP,fp); _bad=bad; }
-  @Override public String xstr() {return "FP2DSP"; }
+  public FP2DSPNode( Node fp, Parse bad ) { super(fp); _bad=bad; }
+  @Override public String label() {return "FP2DSP"; }
 
   Node fp() { return in(0); }
   @Override public Type value() {
@@ -22,7 +23,8 @@ public class FP2DSPNode extends Node {
     if( fpt.above_center() ) return Type.ANY;
     if( fpt instanceof TypeFunPtr tfp )
       return tfp.has_dsp() ? tfp.dsp() : Type.ANY;
-    return TypeMemPtr.make_con(Env.ROOT.ralias(),false,TypeStruct.ISUSED);
+    // Very weak, since input is not a function ptr.
+    return TypeMemPtr.ISUSED0;
   }
 
   private static final Type DSP_LIVE = TypeStruct.UNUSED.add_fldx(TypeFld.make("dsp",Type.ALL));
@@ -33,33 +35,32 @@ public class FP2DSPNode extends Node {
     // Note: cannot bypass Fresh nodes here; might need to Fresh a display.
     if( fp instanceof BindFPNode bind )
       return bind.dsp();
-    // Replace FP2DSP/Fresh/Bind/display with Fresh/display
-    if( fp instanceof FreshNode frsh ) {
-      if( frsh.id() instanceof BindFPNode bind ) {
-        Node frsh2 = frsh.copy(true).set_def(0,bind.dsp());
-        frsh2._val = bind.dsp()._val;
-        frsh2._live = _live;
-        return frsh2;
-      }
-      frsh.deps_add(this);
-    }
-    fp.deps_add(this);
     return null;
   }
 
   
   @Override public boolean has_tvar() { return true; }
 
-  // Implements class HM.Lambda unification.
-  @Override public boolean unify( boolean test ) {
-    TV3 tv = tvar(0);
+  @Override public TV3 _set_tvar() {
+    TV3 tv = fp().set_tvar();
     if( tv instanceof TVLambda fun )
-      return tvar().unify(fun.dsp(),test); // Unify against display
-    // Revisit if we unify to a TVLambda
-    if( tv instanceof TVLeaf ) tv.deps_add_deep(this);
-    // Also, we should force TVLambda here except we've no idea of nargs
-    return false;               // No progress until lambda
+      return fun.dsp();
+    
+    _tvar=new TVLeaf();
+    new TVLambda(TVLambda.UNKNOWN_NARGS,_tvar,new TVLeaf());
+    return _tvar;
   }
+  
+  //// Implements class HM.Lambda unification.
+  //@Override public boolean unify( boolean test ) {
+  //  TV3 tv = tvar(0);
+  //  if( tv instanceof TVLambda fun )
+  //    return tvar().unify(fun.dsp(),test); // Unify against display
+  //  // Revisit if we unify to a TVLambda
+  //  if( tv instanceof TVLeaf ) tv.deps_add_deep(this);
+  //  // Also, we should force TVLambda here except we've no idea of nargs
+  //  return false;               // No progress until lambda
+  //}
 
   @Override public ErrMsg err( boolean fast ) {
     Type fdx = fp()._val;

@@ -4,11 +4,10 @@ import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVLambda;
+import com.cliffc.aa.tvar.TVLeaf;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.AryInt;
-
-import java.util.function.Predicate;
 
 import static com.cliffc.aa.AA.*;
 
@@ -27,11 +26,16 @@ import static com.cliffc.aa.AA.*;
 // ]
 
 public class RootNode extends Node {
-  public RootNode(Node... defs) { super(OP_ROOT, defs); }
+  public RootNode(Node... defs) { super(defs); }
 
-  @Override boolean is_CFG() { return true; }
-  @Override public boolean is_mem() { return true; }
+  @Override public String label() { return "Root"; }
+  @Override public boolean isCFG() { return true; }
+  @Override public boolean isMem() { return true; }
+  @Override public boolean isMultiHead() { return true; }
 
+  public void setPrimMem(Node mem) { setDef(ARG_IDX,mem); }
+  public TypeMem primMem() { return (TypeMem)val(ARG_IDX); }
+  
   TypeMem rmem(Node dep) {
     deps_add(dep);
     return _val instanceof TypeTuple tt ? (TypeMem)tt.at(MEM_IDX) : TypeMem.ALLMEM.oob(_val.above_center());
@@ -65,18 +69,18 @@ public class RootNode extends Node {
   }
 
   // Output value is:
-  // [Ctrl, All_Mem_Minus_Dead, Rezult, global_escaped_[fidxs, aliases]]
-  @Override public TypeTuple value() {    
-    //TypeMem tmem = mem._val instanceof TypeMem tmem0 ? tmem0 : mem._val.oob(TypeMem.ALLMEM);
-    //// Primitive memory
-    ////tmem = PrimNode.primitive_memory(this,tmem);
-    //tmem = (TypeMem)tmem.meet(val(ARG_IDX));
+  // [Ctrl, [EXT memory, escaped locals, minus Dead], Rezult, global_escaped_[fidxs, aliases]]
+  @Override public TypeTuple value() {
+    // If computing for primitives, pre- any program, then max conservative value
+    if( in(ARG_IDX) == null ) return TypeTuple.ROOT;
+    
+    // Primitive memory
     TypeMem tmem = (TypeMem)val(ARG_IDX);
+
     // Conservative final result.  Until Combo external calls can still wire, and escape arguments
     if( Combo.pre() )
-      return TypeTuple.make(Type.CTRL,tmem.make_from(BitsAlias.EXTX,TypeStruct.ISUSED),TypeNil.SCALAR,TypeNil.SCALAR);
+      return CACHE_DEF;
     
-
     // Walk the 'rez', all Call args (since they call Root, their args escape)
     // and function rets (since called from Root, their return escapes).
     AryInt awork = new AryInt();
@@ -200,47 +204,95 @@ public class RootNode extends Node {
   }
 
   // Default memory during initial Iter, before Combo: all memory minus the
-  // kills.  Many things produce def_mem, and in general it has to be used
+  // kills.  Many things produce defMem, and in general it has to be used
   // until Combo finishes the Call Graph.
   static BitsAlias KILL_ALIASES = BitsAlias.EMPTY;
   static void kill_alias( int alias ) {
     if( KILL_ALIASES.test_recur(alias) ) return;
     KILL_ALIASES = KILL_ALIASES.set(alias);
-    CACHE_DEF_MEM = CACHE_DEF_MEM.set(alias,TypeStruct.UNUSED);
-    Env.ROOT.add_flow();
+    TypeMem tmem = CACHE_DEF_MEM.set(alias,TypeStruct.UNUSED);
+    setCacheDef(tmem);
+    Env.GVN.add_flow(Env.ROOT);
     // Re-flow all dependents
     Env.GVN.add_flow(PROGRESS);
     PROGRESS.clear();
   }
   private static TypeMem CACHE_DEF_MEM = TypeMem.ALLMEM;
+  private static TypeTuple CACHE_DEF;
+  
   private static final Ary<Node> PROGRESS = new Ary<>(new Node[1],0);
-  public static TypeMem def_mem(Node n) {
+  public static TypeMem defMem(Node n) {
     if( n!=null && PROGRESS.find(n)==-1 ) PROGRESS.push(n);
     return CACHE_DEF_MEM;
   }
-  // Lift default memory to "nothing except external"
-  public static void combo_def_mem() {
-    CACHE_DEF_MEM = CACHE_DEF_MEM.set(1,TypeStruct.UNUSED);
+  
+  public static TypeMem removeKills(Node n) { return removeKills(n,null); }
+  public static TypeMem removeKills(Node n, Type t) {
+    if( n!=null && PROGRESS.find(n)==-1 ) PROGRESS.push(n);
+    TypeMem mem = (t==null||t==Type.ALL) ? TypeMem.ALLMEM : (TypeMem)t;
+    for( int alias : KILL_ALIASES )
+      mem = mem.set(alias,TypeStruct.UNUSED);
+    return mem;
+  }
+  
+  // Set mem for Combo: its all low minus kills, used to JOIN away the kills
+  public static void resetDefMemHigh() {
+    TypeMem tmem = Env.ROOT.primMem();
+    // Reset memory; all is unused - except externals, primitives.
+    assert tmem.at(BitsAlias.ALLX)==TypeStruct.UNUSED;
+    assert tmem.at(BitsAlias.LOCX)==TypeStruct.UNUSED;
+    tmem = tmem.make_from(BitsAlias.ALLX,TypeStruct.ISUSED);
+    // Remove all kills
+    for( int alias : KILL_ALIASES )
+      tmem = tmem.set(alias,TypeStruct.UNUSED);
+    setCacheDef(tmem);
   }
 
+  // Default values for Nodes reading from maximally unknown memory - e.g.
+  // functions escaped to external callers.
+  public static void resetDefMemLow() {
+    TypeMem tmem = Env.ROOT.primMem();
+    tmem = tmem.make_from(BitsAlias.ALLX,TypeStruct.ISUSED); // All aliases not prim mem, both internal and external
+    // Remove all kills, but none at reset
+    assert KILL_ALIASES==BitsAlias.EMPTY;
+    setCacheDef(tmem);
+  }
+
+  public static void setCacheDef(TypeMem tmem) {
+    CACHE_DEF_MEM = tmem;
+    CACHE_DEF = TypeTuple.make(Type.CTRL,tmem,TypeNil.SCALAR,TypeNil.SCALAR);
+  }
 
   @Override public Type live() {
     // Pre-combo, all memory is alive, except kills
-    // During/post combo, check external Call users
-    Type live = Combo.pre() ? TypeMem.ALLMEM : super.live(false);
-    if( live==Type.ANY ) return TypeMem.ANYMEM;
-    TypeMem mem = (TypeMem)live;
-    // Kill the killables
+    if( Combo.pre() )
+      return removeKills(null);
+    
+    // During/post combo, check external Call users.
+    // There is e.g. a Control user and many Constant users.
+    // We're just trying to track memory flow.
+    TypeMem live = TypeMem.ANYMEM;
+    for( int j=0; j<nUses(); j++ ) {       // Computed across all uses
+      live = switch( use(j) ) {
+      case CProjNode use -> live;   // No implied live memory
+      case   ConNode use -> live;   // No implied live memory
+      case DefDynTableNode use -> live; // No implied live memory
+      case MProjNode use -> (TypeMem)live.meet(use._live);
+      default -> throw TODO();  // Handle escaping calls, rturns.  Also null not expected
+      };
+    }
+    
+    // Killables never become alive
     for( int kill : KILL_ALIASES )
-      mem = mem.set(kill,TypeStruct.UNUSED);
-    if( Combo.pre() ) return mem;
+      live = live.set(kill,TypeStruct.UNUSED);
+    
     // Liveness for return value: All reaching aliases plus their escapes are alive.
     BitsAlias ralias = ralias();
-    if( ralias==BitsAlias.EMPTY ) return mem;
-    if( ralias.above_center() ) return mem;
-    if( ralias.test(BitsAlias.ALLX) ) return TypeMem.ALLMEM;
+    assert ralias!=BitsAlias.EMPTY; // At least external escapes
+    assert !ralias.test(BitsAlias.ALLX); // No escape-all-internals
+    assert !ralias.above_center(); // TODO: Could be too strong?
     TypeMem rlive = TypeMem.make(ralias,TypeStruct.ISUSED);
-    return mem.meet(rlive);
+    return live.meet(rlive);
   }
 
   @Override public Type live_use( int i ) {
@@ -255,9 +307,13 @@ public class RootNode extends Node {
             !ralias().overlaps(tmp.aliases()) )
           return CallNode.FP_LIVE;
       }
-      deps_add(in(REZ_IDX));
       return Type.ALL;
     }
+    // inputs CTL,MEM,REZ are spoken for.
+    // input 4 is primitive memory
+    if( i==3 )
+      return TypeMem.ALLMEM;
+    // inputs 5 and up are all global calls and returns
     assert in(i) instanceof CallNode || in(i) instanceof RetNode;
     return _live;               // Global calls take same memory as me
   }
@@ -269,13 +325,13 @@ public class RootNode extends Node {
     // All currently wired Calls and Rets are sensible
     for( int i=ARG_IDX+1; i<len(); i++ ) {
       if( in(i) instanceof RetNode ret ) {
-        if( !ret.is_prim() ) non_prim_rets++;
+        if( !ret.isPrim() ) non_prim_rets++;
         FunNode fun = ret.fun();
-        if( fun._defs.last() != this ) return false;
+        if( fun.last() != this ) return false;
         if( !rfidxs().test_recur(ret._fidx) ) return false;
       } else {
         CallNode call = (CallNode)in(i);
-        if( call.cepi()._defs.last()!=this ) return false;
+        if( call.cepi().last()!=this ) return false;
       }
     }
     // During pre-Combo and lifting, if escapes is NALL then all edges are
@@ -288,7 +344,7 @@ public class RootNode extends Node {
     if( precise )
       for( int fidx : fidxs )
         if( fidx != BitsFun.EXTX && // External fidxs cannot be wired
-            _defs.find(RetNode.get(fidx)) < ARG_IDX )
+            findDef(RetNode.get(fidx)) < ARG_IDX )
           return false;         // Has unwired fidx
     return true;
   }
@@ -303,12 +359,12 @@ public class RootNode extends Node {
       for( int fidx : fidxs ) {
         if( fidx == BitsFun.EXTX ) continue; // No wiring external functions
         RetNode ret = RetNode.get(fidx);
-        if( _defs.find(ret) >= ARG_IDX ) continue; // Already wired
+        if( findDef(ret) >= ARG_IDX ) continue; // Already wired
         // Wire escaping
-        ret.fun().add_def(this).add_flow();
-        add_def(ret);
-        add_flow(); // Recompute root values to include function return memory
-        ret.add_flow();
+        ret.fun().addDef(this);
+        addDef(ret);
+        Env.GVN.add_flow(this); // Recompute root values to include function return memory
+        Env.GVN.add_flow(ret);
         progress = true;
       }
     }
@@ -318,14 +374,14 @@ public class RootNode extends Node {
 
   @Override public Node ideal_reduce() {
     if( in(0)==null ) return null;
-    Node cc = fold_ccopy();
+    Node cc = NodeUtil.fold_ccopy(this);
     if( cc!=null ) return cc;
 
     // See if we can unescape some functions
     for( int i=ARG_IDX; i<len(); i++ )
       if( in(i) instanceof RetNode ret && ret.funptr()==null ) {
         del(i--);
-        if( ret._uses._len==0 ) ret.kill();
+        if( ret.nUses()==0 ) ret.kill();
       }
 
     // Turned off, since int/flt constant returns actually have a TVClz with a
@@ -353,10 +409,11 @@ public class RootNode extends Node {
     return !(t0==mt || t1==mt);
   }
 
-  @Override Node walk_dom_last( Predicate<Node> P) { return null; }
+  //@Override Node walk_dom_last( Predicate<Node> P) { return null; }
 
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
+    if( in(REZ_IDX)==null ) return new TVLeaf(); // Happens on primitives
     TV3 tv3 = in(REZ_IDX).set_tvar().find();
     tv3.widen((byte)1,false);   // Widen result, since escaping
     return tv3;
@@ -366,15 +423,25 @@ public class RootNode extends Node {
 
   // Unify trailing result ProjNode with RootNode results; but no unification
   // with anything from Root, all results are independent.
-  @Override public boolean unify_proj( ProjNode proj, boolean test ) { return false; }
+  @Override public TV3 unify_proj( ProjNode proj ) { return null; }
 
-  @Override public int hashCode() { return 123456789+1; }
+  @Override int hash() { return 123456789+1; }
   @Override public boolean equals(Object o) { return this==o; }
 
   // Reset for next test
   public static void reset_to_init0() {
     KILL_ALIASES = BitsAlias.EMPTY;
     CACHE_DEF_MEM = TypeMem.ALLMEM;
+    CACHE_DEF = null;
     PROGRESS.clear();
+    while( Env.ROOT.len()>4 ) Env.ROOT.pop();
+    Env.ROOT.setDef(CTL_IDX,Env.CTL_0);
+    Env.ROOT.setDef(MEM_IDX,Env.MEM_0);
+    Env.ROOT.setDef(REZ_IDX,Env.ALL);
+    RootNode.resetDefMemLow();
+    Env.ROOT._val  = CACHE_DEF;
+    Env.ROOT._live = TypeMem.ALLMEM;
+    Env.MEM_0._val = CACHE_DEF_MEM;
+    Env.MEM_0._live= TypeMem.ALLMEM;
   }
 }

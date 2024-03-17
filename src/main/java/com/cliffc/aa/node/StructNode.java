@@ -3,9 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.TV3;
-import com.cliffc.aa.tvar.TVErr;
-import com.cliffc.aa.tvar.TVStruct;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
@@ -34,8 +32,6 @@ import static com.cliffc.aa.AA.TODO;
 
 // Holds argument-starts for argument tuples, for eventual error reporting.
 
-// Inputs are sorted in the same order as a canonicalizing TypeStruct (alpha
-// within lexical scope; shadowing requires another scope; deBruin numbers).
 public class StructNode extends Node {
 
   // Number of args in the enclosing function scope.  Inputs up to this count
@@ -59,6 +55,9 @@ public class StructNode extends Node {
   // Only modify if !_closed
   final Ary<TypeFld.Access> _accesses;
 
+  // During the definition of this field, the following fields...
+
+
   // Parser helper for error reports on arg tuples, start of tuple/struct is in
   // _paren_start, and the args are in _fld_starts.
   // Example: "  ( x,y)\n"
@@ -70,7 +69,7 @@ public class StructNode extends Node {
   private final Ary<Parse> _fld_starts;
 
   public StructNode(int nargs, boolean forward_ref, Parse paren_start ) {
-    super(OP_STRUCT);
+    super();
     _nargs = nargs;
     _forward_ref = forward_ref;
     _flds = new Ary<>(new String[1],0);
@@ -80,19 +79,25 @@ public class StructNode extends Node {
     _live = TypeStruct.ISUSED;
   }
 
-  @Override String str() {
+  @Override String label() {
+    if( is_closure() )
+      return _closed ? "FRAME" : "FRAME?";
     SB sb = new SB().p("@{");
     for( int i=0; i<_flds._len; i++ ) {
       if( i==_nargs ) sb.p("| ");
       sb.p(_flds.at(i)).p("; ");
     }
     if( _flds._len>0 ) sb.unchar(2);
-    return sb.p("}").toString();
+    return sb.p("}").toString().intern();
   }
 
+  // Only if closed
+  @Override public boolean shouldCon() { return _closed && super.shouldCon(); }
+
+
   // Structs with the same inputs and same field names are the same.
-  @Override public int hashCode() {
-    return super.hashCode() ^ _flds.hashCode() ^ _accesses.hashCode();
+  @Override int hash() {
+    return _flds.hashCode() ^ _accesses.hashCode();
   }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
@@ -100,7 +105,7 @@ public class StructNode extends Node {
         // Open structs can expand in different ways, never equal
         !_closed || !rec._closed || !super.equals(o) )
       return false;
-    return 
+    return
       _flds.equals(rec._flds) &&
       _accesses.equals(rec._accesses);
   }
@@ -122,8 +127,7 @@ public class StructNode extends Node {
     assert _nargs <= _flds._len;
     unelock();                  // Changes hash
     _closed=true;
-    Env.GVN.add_reduce(this);   // Rehash
-    add_flow();
+    Env.GVN.add_flow_reduce(this);
     return this;
   }
 
@@ -140,11 +144,12 @@ public class StructNode extends Node {
   // Add a field
   public Node add_fld( String fld, TypeFld.Access access, Node val, Parse badt ) {
     assert !_closed;
-    add_def(val);               // Node in node array
+    assert _flds.find(fld)== -1;
+    addDef(val);                // Node in node array
     _flds.push(fld);            // Field name
     _accesses.push(access);     // Access rights to field
     _fld_starts.push(badt);     // Parser offset for errors
-    add_flow();
+    Env.GVN.add_flow(this);
     return this;
   }
 
@@ -153,7 +158,7 @@ public class StructNode extends Node {
   public boolean set_fld(String id, TypeFld.Access access, Node val, boolean force ) {
     int idx = find(id);
     if( !force && _accesses.at(idx) == TypeFld.Access.Final ) return false;
-    set_def(idx,val);
+    setDef(idx,val);
     _accesses.set(idx,access);
     return true;
   }
@@ -164,21 +169,23 @@ public class StructNode extends Node {
   // according to use.
   public void promote_forward( ScopeNode parent ) {
     assert parent != null;
-    for( int i=0; i<_defs._len; i++ ) {
+    for( int i=0; i<len(); i++ ) {
       if( in(i) instanceof ForwardRefNode fref && Util.eq(fref._name,fld(i))) {
         // Is this ForwardRef defined in this scope, or some outer scope?
-        if( fref.is_scoped() ) {
+        if( fref.isScoped() ) {
           // Definitely defined here
           //    fref.define();
           throw TODO();        // TODO: Access input by field name
+        } else if( fref.isSelf() ) {
+          // Already defined
+          throw TODO();        // TODO: Access input by field name
         } else {
           // Make field in the parent
-          assert !parent.is_prim();
+          assert !parent.isPrim();
           parent.stk().add_fld(fref._name,TypeFld.Access.RW,fref,_fld_starts.at(i)).xval();
           // Stomp field locally to load from parent
-          LoadNode fld = new LoadNode(parent.mem(),parent.ptr(),fref._name,_fld_starts.at(i)).init();
-          fld._val = val(i);
-          set_def(i,fld);
+          LoadNode fld = new LoadNode(parent.mem(),parent.ptr(),fref._name,false,false,_fld_starts.at(i)).init();
+          setDef(i,fld);
           parent.mem().xval();
           Env.GVN.add_work_new(fld);
         }
@@ -189,20 +196,18 @@ public class StructNode extends Node {
   // Remove a non-prim field, preserving order.  For resetting primitives for
   // multi-testing
   @Override void walk_reset0( ) {
-    Node c;
-    if( _defs._len>0 )
-      while( !(c=_defs.last()).is_prim() ) {
+    if( len()>0 )
+      while( !last().isPrim() ) {
         _flds.pop();
         _accesses.pop();
         _fld_starts.pop();
-        _defs.pop();
-        c._uses.del(this);
+        pop();
       }
   }
 
   // Gather inputs into a TypeStruct.
   @Override public Type value() {
-    assert _defs._len==_flds.len();
+    assert len()==_flds.len();
     TypeFld[] flds = TypeFlds.get(_flds.len());
     for( int i=0; i<_flds.len(); i++ )
       flds[i] = TypeFld.make(_flds.at(i),val(i),_accesses.at(i));
@@ -224,7 +229,7 @@ public class StructNode extends Node {
   @Override boolean assert_live(Type live) { return live instanceof TypeStruct; }
 
   @Override public Node ideal_reduce() {
-    if( is_prim() ) return null;
+    if( isPrim() ) return null;
     // Kill dead fields
     if( _live instanceof TypeStruct live ) {
       deps_add(this);           // If self-live lifts, self reduce makes progress
@@ -232,7 +237,7 @@ public class StructNode extends Node {
       for( int i=0; i<_flds._len; i++ )
         if( in(i)!=Env.ANY && live.at_def(_flds.at(i)).above_center() &&
             !Util.eq(_flds.at(i),TypeFld.CLZ) )  // Leave a dead CLZ for error messages
-          progress = set_def(i,Env.ANY);
+          progress = setDef(i,Env.ANY);
       if( progress!=null ) return this;
     }
     return null;
@@ -244,20 +249,27 @@ public class StructNode extends Node {
 
   // Self is always @{flds...}
   @Override public TV3 _set_tvar() {
-    if( _tvar==null )
+    if( _tvar==null ) {
       // Must set _tvar before recursively calling set_tvar.  The primitive
       // ClzClz gets a specific type which triggers asserts for everybody else,
       // so uses a special constructor.
-      _tvar = this==PrimNode.ZCLZ ? TVStruct.make_clzclz() : new TVStruct(_flds);
+      if( this==PrimNode.ZCLZ ) return TVStruct.STRCLZ;
+      _tvar = new TVStruct(_flds);
+    }
     TVStruct ts = (TVStruct)_tvar;
     // Unify all fields
     for( int i=0; i<len(); i++ )
       ts.arg(i).unify(in(i).set_tvar(),false); // Unify (possible cycle)
+    // Force slot 0 to be a sensible CLZ for all but CLZCLZ
+    if( this!=PrimNode.ZCLZ ) {
+      assert Util.eq(ts.fld(0),TypeFld.CLZ);
+      if( ts.arg(0) instanceof TVLeaf leaf ) {
+        TypeMemPtr tmp = (TypeMemPtr)val(0); // Expect this to always be known display ptr
+        leaf.unify(new TVPtr(tmp._aliases,new TVStruct(true)),false);
+      }
+    }
     return _tvar;
   }
-
-  // Structs are pre-unified in set_tvar
-  @Override public boolean unify( boolean test ) { return false; }
 
   @Override public ErrMsg err( boolean fast ) {
     if( _tvar==null ) return null;

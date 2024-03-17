@@ -1,5 +1,5 @@
 // Combo of simple
-// Type: ( nint8, { - A -> nint8 })
-// Eval: ( 5, K1[LAMBDA,( e3=K1),()])
+// Type: *[CLZ]( _, nint8, A:{ *[2]@{ $dyn=-; fun=A;  ..., } - B -> nint8 })
+// Eval: *[4]( _, 5, A:<*[2]@{ _ $dyn=-; fun=A; },LAM3>)
 fun = { p -> if p ? 4 : 5 };
 (pair (fun 0) fun)

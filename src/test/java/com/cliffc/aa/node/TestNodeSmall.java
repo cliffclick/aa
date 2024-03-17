@@ -250,9 +250,9 @@ public class TestNodeSmall {
     FunPtrNode aint = (FunPtrNode)fp_add.in(1);
     FunPtrNode astr = (FunPtrNode)fp_add.in(2);
     // Make a flt/int combo, drops off string.
-    ConNode mem  = gvn.init(new ConNode<>(TypeMem.ALLMEM));
-    ConNode arg1 = gvn.init(new ConNode<>(TypeNil.SCALAR));
-    ConNode arg2 = gvn.init(new ConNode<>(TypeNil.SCALAR));
+    ConNode mem  = new ConNode<>(TypeMem.ALLMEM).init();
+    ConNode arg1 = new ConNode<>(TypeNil.SCALAR).init();
+    ConNode arg2 = new ConNode<>(TypeNil.SCALAR).init();
     Node dsp = gvn.xform(new ConNode<>(TypeNil.NO_DSP));
     CallNode call = (CallNode)gvn.xform(new CallNode(true, null, ctrl, mem, dsp, arg1, arg2, fp_mul));
     CallEpiNode cepi = (CallEpiNode)gvn.xform(new CallEpiNode(call)); // Unwired
@@ -399,11 +399,11 @@ public class TestNodeSmall {
     ConNode ctrl = (ConNode)gvn.xform(new ConNode<>(Type.CTRL));
     ConNode mem  = (ConNode)gvn.xform(new ConNode<>(TypeMem.ALLMEM));
     ConNode dsp  = (ConNode)gvn.xform(new ConNode<>(TypeNil.NO_DSP));
-    ConNode arg3 = gvn.init(new ConNode<>(TypeNil.SCALAR));
-    ConNode arg4 = gvn.init(new ConNode<>(TypeNil.SCALAR));
-    ConNode fdx  = gvn.init(new ConNode<>(fp_add._val));
-    CallNode call = gvn.init(new CallNode(true, null, ctrl, mem, dsp, arg3, arg4, fdx));
-    CallEpiNode cepi = gvn.init(new CallEpiNode(call)); // Unwired
+    ConNode arg3 = new ConNode<>(TypeNil.SCALAR).init();
+    ConNode arg4 = new ConNode<>(TypeNil.SCALAR).init();
+    ConNode fdx  = new ConNode<>(fp_add._val).init();
+    CallNode call= new CallNode(true, null, ctrl, mem, dsp, arg3, arg4, fdx).init();
+    CallEpiNode cepi = new CallEpiNode(call).init(); // Unwired
 
     // Types we see on inputs, choosen to walk across the sample space
     Type i32 = TypeInt.INT32;   // Subsets both int64 and flt64
@@ -488,26 +488,26 @@ public class TestNodeSmall {
     // yet built.
     ConNode dsp_prims = new ConNode<>(TypeMemPtr.DISP_SIMPLE).init();
     StructNode dsp_file = new StructNode(1,false,null ).add_fld("^",Access.Final,dsp_prims,null).init();
-    NewNode dsp_file_ptr = new NewNode().init();
+    NewNode dsp_file_ptr = new NewNode("DSP").init();
     Node dsp_file_mem = new StoreXNode(mem,dsp_file_ptr,dsp_file,null).init();
     // Function header with nargs
-    FunNode fun = new FunNode("fact",ARG_IDX).add_def(ctl).init();
+    FunNode fun = new FunNode("fact",ARG_IDX).addDef(ctl).init();
     // Parms for the Fun.  Note that the default type is "weak" because the
     // file-level display can not yet know about "fact".
-    ParmNode parm_mem     = new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM).add_def(dsp_file_mem).init();
-    ParmNode parm_dsp_ptr = new ParmNode(DSP_IDX,fun,null,dsp_file_ptr._val).add_def(dsp_file_ptr).init();
+    ParmNode parm_mem     = new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM).addDef(dsp_file_mem).init();
+    ParmNode parm_dsp_ptr = new ParmNode(DSP_IDX,fun,null,dsp_file_ptr._val).addDef(dsp_file_ptr).init();
     // Close the function up
     RetNode ret = new RetNode(fun,parm_mem,parm_dsp_ptr,rpc,fun).init();
     FunPtrNode fptr = new FunPtrNode(ret).init();
     fptr._name = "fact";
-    BindFPNode bind = new BindFPNode(fptr,dsp_file_ptr,false);
+    BindFPNode bind = new BindFPNode(fptr,dsp_file_ptr);
     // Close the cycle
     dsp_file.add_fld("fact",Access.Final,bind,null);
     dsp_file.close();
     // Return the fptr to keep all alive
     ScopeNode env = new ScopeNode(null,ctl,mem,bind,dsp_file_ptr,dsp_file).init();
-    Env.ROOT.set_def(AA.MEM_IDX,Env.MEM_0);
-    Env.ROOT.set_def(AA.REZ_IDX,dsp_file);
+    Env.ROOT.setDef(AA.MEM_IDX,Env.MEM_0);
+    Env.ROOT.setDef(AA.REZ_IDX,dsp_file);
 
     Node[] nodes = new Node[]{ctl,mem,rpc,dsp_prims,dsp_file,dsp_file_ptr,dsp_file_mem,fun,parm_mem,parm_dsp_ptr,ret,fptr,bind,env};
 
@@ -662,14 +662,14 @@ public class TestNodeSmall {
   private static Type[] check( GVNGCM gvn, TypeFunPtr tsig, TypeMem tmem, Type targ1, Type targ2 ) {
     assert targ1.simple_ptr()==targ1;
     assert targ2.simple_ptr()==targ2;
-    ConNode ctl = gvn.init(new ConNode<>(Type.CTRL));
+    ConNode ctl = new ConNode<>(Type.CTRL).init();
     ConNode cmem= (ConNode)gvn.xform(new ConNode<>(TypeMem.ALLMEM));
-    CallNode call = gvn.init(new CallNode(true, null, ctl, cmem, null/*fidx*/, null/*x*/, null/*y*/));
-    CallEpiNode cepi = gvn.init(new CallEpiNode(call)); // Unwired
-    Node    cpj = gvn.init(new CProjNode(call,0));
-    ConNode mem = gvn.init(new ConNode<>(tmem ));
-    ConNode arg1= gvn.init(new ConNode<>(targ1));
-    ConNode arg2= gvn.init(new ConNode<>(targ2));
+    CallNode call = new CallNode(true, null, ctl, cmem, null/*fidx*/, null/*x*/, null/*y*/).init();
+    CallEpiNode cepi = new CallEpiNode(call).init(); // Unwired
+    Node    cpj = new CProjNode(call,0).init();
+    ConNode mem = new ConNode<>(tmem ).init();
+    ConNode arg1= new ConNode<>(targ1).init();
+    ConNode arg2= new ConNode<>(targ2).init();
 
     //// Make nodes
     //FunNode fun = new FunNode(null,-1).unkeep();

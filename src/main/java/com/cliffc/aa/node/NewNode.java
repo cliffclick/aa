@@ -1,8 +1,9 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.tvar.*;
+import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.TVPtr;
+import com.cliffc.aa.tvar.TVStruct;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
@@ -25,24 +26,30 @@ public class NewNode extends Node {
   // Alias is dead for all time
   private boolean _killed;
 
+  public final String _hint;
+  
   // Just TMP.make(_alias,ISUSED)
   public TypeMemPtr _tptr;
 
-  public NewNode( int alias, boolean is_con ) {
-    super(OP_NEW);
+  public NewNode( String hint, int alias, boolean is_con ) {
+    super();
     _reset0_alias = alias;       // Allow a reset, if this alias splits and then we want to run a new test
     set_alias(alias,is_con);
     NEWS.setX(alias,this);
+    _hint = hint;
   }
-  public NewNode( ) { this(BitsAlias.new_alias(),false); }
+  public NewNode( String hint ) { this(hint,BitsAlias.new_alias(),false); }
+
+  @Override public String label() {
+    return  (_killed ? "X" : "")+_hint+"*"+_alias;
+  } 
 
   private void set_alias(int alias, boolean is_con) {
-    if( _elock ) unelock();    // Unlock before changing hash
+    unelock();                  // Unlock before changing hash
     _alias = alias;
     _tptr = TypeMemPtr.make_con(BitsAlias.make0(alias),is_con,TypeStruct.ISUSED);
   }
-  @Override public String xstr() { return "New"+"*"+_alias; } // Self short name
-  @Override void walk_reset0() { set_alias(_reset0_alias,_tptr.is_con()); super.walk_reset0(); }
+  @Override void walk_reset0() { set_alias(_reset0_alias,_tptr._is_con); super.walk_reset0(); }
 
   @Override public Type value() { return _killed ? _tptr.dual() : _tptr; }
   
@@ -51,12 +58,8 @@ public class NewNode extends Node {
       _killed = true;
       RootNode.kill_alias(_alias);
       Env.GVN.add_reduce_uses(this);
+      Env.GVN.add_reduce(this);
       Env.GVN.add_flow(this);
-      Env.GVN.add_flow(Env.KEEP_ALIVE);
-      Env.GVN.add_flow(GVNGCM.KEEP_ALIVE);
-      for( Node use : Env.KEEP_ALIVE._defs )
-        if( use instanceof ScopeNode )
-          Env.GVN.add_flow(use);
       return this;
     }
     return null;
@@ -65,9 +68,9 @@ public class NewNode extends Node {
   // If all uses are store addresses only, then this is a write-only memory and
   // is not used.
   private boolean used() {
-    if( is_prim() ) return true;
-    for( Node use : _uses )
-      if( !(use instanceof StoreAbs sta) ||
+    if( isPrim() ) return true;
+    for( int i=0; i<nUses(); i++ )
+      if( !(use(i) instanceof StoreAbs sta) ||
           ( sta instanceof StoreNode st && st.rez()==this) )
         return true;
     return false;
@@ -76,20 +79,22 @@ public class NewNode extends Node {
   // If all uses are load/store addresses, then the memory does not escape and
   // loads can bypass calls.
   boolean escaped(Node dep) {
-    if( is_prim() ) return true;
-    for( Node use : _uses )
+    if( isPrim() ) return true;
+    for( int i=0; i<nUses(); i++ ) {
+      Node use = use(i);
       if( !(use instanceof LoadNode ld ||
             (use instanceof StoreNode st && st.rez()!=this) )) {
         use.deps_add(dep);
         return true;
       }
+    }
     return false;
   }
   
   @Override public boolean has_tvar() { /*assert used(); */ return true; }
 
   @Override public TV3 _set_tvar() {
-    return new TVPtr(BitsAlias.make0(_alias), new TVStruct(true) );
+    return this==PrimNode.PCLZ ? TVPtr.PTRCLZ : new TVPtr(BitsAlias.make0(_alias), new TVStruct(true) );
   }
 
   // clones during inlining all become unique new sites
@@ -106,7 +111,7 @@ public class NewNode extends Node {
     return nnn;
   }
 
-  @Override public int hashCode() { return super.hashCode()+ _alias; }
+  @Override int hash() { return _alias; }
   // Only ever equal to self, because of unique _alias.  We can collapse equal
   // NewNodes and join alias classes, but this is not the normal CSE and so is
   // not done by default.

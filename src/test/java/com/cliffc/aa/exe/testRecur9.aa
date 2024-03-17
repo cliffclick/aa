@@ -1,6 +1,6 @@
 // Wrapped ints
-// Type: A:@{ add={ - B:@{ add={ - @{ i=int64;  ..., } @{ i=int64;  ..., } -> B }; i=int64; } C:@{ add={ - @{ i=int64;  ..., } @{ i=int64;  ..., } -> C }; i=int64; } -> A }; i=int64; }
-// Eval: @{ add=K5[LAMBDA,( $dyn=0,e3=7),( e3=K1[LAMBDA,( e3=K1),()]),()]; i=7; }
+// Type: A:*[3]@{ add={ *[FLT]@{ B:*[2]@{ $dyn=-; int={ B - int64 -> A }; x=A;  ..., }; $dyn=C; i=int64;  ..., } - D:*[3]@{ add={ *[FLT]@{ E:*[2]@{ $dyn=-; int={ E - int64 -> D }; x=D;  ..., }; $dyn=F; i=int64;  ..., } - *[]@{ i=int64;  ..., } *[]@{ i=int64;  ..., } -> D }; i=int64; } G:*[3]@{ add={ *[FLT]@{ H:*[2]@{ $dyn=-; int={ H - int64 -> G }; x=I:*[3]@{ add={ *[FLT]@{ J:*[2]@{ $dyn=-; int={ J - int64 -> I }; x=I;  ..., }; $dyn=K; i=int64;  ..., } - *[]@{ i=int64;  ..., } *[]@{ i=int64;  ..., } -> I }; i=int64; }; y=G;  ..., }; $dyn=L; i=int64;  ..., } - *[]@{ i=int64;  ..., } *[]@{ i=int64;  ..., } -> G }; i=int64; } -> A }; i=int64; }
+// Eval: *[3]@{ add=<*[6]@{ _ $dyn=0; i=7; },LAM5>; i=7; }
 int = { i ->        // An integer is a struct...
   @{ add = { x y -> // With an 'add' field which is a fcn
        (int (+ x.i y.i)) // ... which unwraps to ints and adds and rewraps

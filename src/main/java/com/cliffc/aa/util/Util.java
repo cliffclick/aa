@@ -188,5 +188,32 @@ public class Util {
       throw com.cliffc.aa.AA.TODO(); // Compact
     return xs;
   }
-  
+
+
+  // Compare two strings, lexically if alpha and numerically if digits.
+  // e.g. "test1.aa" < "test10.aa" and
+  //      "taaa1.aa" > "test10.aa"
+  public static int alphanumCompare( String x, String y ) {
+    int xi=0, yi=0;
+    while( xi<x.length() && yi<y.length() ) {
+      char xc = x.charAt(xi++);
+      char yc = y.charAt(yi++);
+      if( Character.isDigit(xc) && 
+          Character.isDigit(yc) ) {
+        xi--;  yi--;
+        long xq = 0, yq = 0;
+        while( Character.isDigit(xc=x.charAt(xi++)) )
+          xq = xq*10 + (xc-'0');
+        while( Character.isDigit(yc=y.charAt(yi++)) )
+          yq = yq*10 + (yc-'0');
+        if( xq != yq )
+          return (int)(xq-yq);
+      }
+      if( xc != yc )
+        return xc - yc;
+    }
+    // Shorter wins
+    return xi<x.length() ? -1 : (yi<y.length() ? 1 : 0);
+  }
+
 }

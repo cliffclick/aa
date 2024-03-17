@@ -44,11 +44,13 @@ public class TypeFlt extends TypeNil<TypeFlt> {
     return super.equals(o) && _z==t2._z && _con==t2._con;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    if( _z==0 )      return ((float)_con)==_con ? sb.p((float)_con).p('f') : sb.p(_con);
-    return _strn(sb).p("flt").p(_z);
+  
+  @Override PENV _str0( PENV P ) {
+    return _z==0
+      ? P.p(_con).p(((float)_con)==_con ? "f" : "")
+      : P.p(_strn()).p("flt").p(_z);
   }
-
+  
   static TypeFlt valueOfFlt(String cid) {
     if( cid==null ) return null;
     return switch(cid) {
@@ -131,10 +133,7 @@ public class TypeFlt extends TypeNil<TypeFlt> {
   @Override public boolean is_con() { return _z==0; }
   
   // Shallow wrap
-  public TypeMemPtr wrap() { return wrap_deep(null); }
-  // Deep wrap
-  public TypeMemPtr wrap_deep(TypeMemPtr clz) {
-    if( clz == null ) clz = TypeMemPtr.FLTPTR;
-    return TypeMemPtr.make(false,false,false,true,BitsAlias.EMPTY,TypeStruct.make_prim(TypeFld.make_clz(clz),TypeFld.make_prim(this))); // Wrapped primitive
+  public TypeMemPtr wrap() {
+    return TypeMemPtr.make(false,false,false,is_con(),BitsAlias.EMPTY,TypeStruct.make_prim(TypeFld.make_clz(TypeMemPtr.FLTPTR),TypeFld.make_prim(this))); // Wrapped primitive
   }
 }

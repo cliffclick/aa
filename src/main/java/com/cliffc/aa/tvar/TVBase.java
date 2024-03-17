@@ -27,12 +27,6 @@ public class TVBase extends TVExpanding {
     throw TODO(); //
   }
 
-  @Override TV3 strip_nil() {
-    _t = _t.join(TypeNil.NSCALR);
-    _may_nil = false;
-    return this;
-  }
-
   public TVPtr clz() {
     if( _t instanceof TypeInt ) return (TVPtr)PrimNode.PINT.tvar();
     if( _t instanceof TypeFlt ) return (TVPtr)PrimNode.PFLT.tvar();

@@ -74,14 +74,14 @@ public class TestNames {
 
     // Print all fields in this, and their matching field in that
     SB meet0( S s ) {
-      SB sb = new SB();
+      Type.PENV P = new Type.PENV(true,false,false);
       Type sdef = s._flds.get("_");
       for( String k : _flds.keySet() ) {
-        _flds.get(k).str(sb.p(_clz).p(k).p('='),true,false).p("  ");
+        _flds.get(k)._str(P.p(_clz).p(k).p('=')).p("  ");
         // Matching field: _clz has to be a prefix of s._clz and the field has to exist
-        s.get(_clz,k).str(sb,true,false).nl();
+        s.get(_clz,k)._str(P).sb.nl();
       }
-      return sb;
+      return P.sb;
     }
 
     static String prefix( String s0, String s1 ) {
@@ -131,13 +131,13 @@ public class TestNames {
     }
 
     // Pretty print
-    @Override public String toString() { return str(new SB()).toString(); }
-    private SB str(SB sb) {
-      sb.p(_clzany?"~":"").p(_clz).p('{');
-      _def.str(sb,true,false);
+    @Override public String toString() { return str(new Type.PENV(true,false,false)).sb.toString(); }
+    private Type.PENV str(Type.PENV P) {
+      P.p(_clzany?"~":"").p(_clz).p('{');
+      _def._str(P);
       for( String k : _flds.keySet() )
-        _flds.get(k).str(sb.p(", ").p(k).p('='),true,false);
-      return sb.p('}');
+        _flds.get(k)._str(P.p(", ").p(k).p('='));
+      return P.p('}');
     }
 
     @Override public boolean equals( Object o ) {

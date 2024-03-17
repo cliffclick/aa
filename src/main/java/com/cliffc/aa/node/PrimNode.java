@@ -8,7 +8,6 @@ import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
-import java.lang.Math;
 
 // Primitives are nodes to do primitive operations.  Internally they carry a
 // '_formals' to type their arguments.  Similar to functions and FunNodes and
@@ -36,7 +35,6 @@ public abstract class PrimNode extends Node {
   Parse[] _badargs;             // Filled in when inlined in CallNode
   public PrimNode( String name, TypeTuple formals, TypeNil ret ) { this(name,false,formals,ret); }
   public PrimNode( String name, boolean is_lazy, TypeTuple formals, TypeNil ret ) {
-    super(OP_PRIM);
     _name = name;
     _is_lazy = is_lazy;
     int fidx = BitsFun.new_fidx(BitsFun.INTX);
@@ -47,6 +45,7 @@ public abstract class PrimNode extends Node {
     _badargs=null;
   }
 
+  @Override public String label() { return _name; }
 
   // Int/Float/String primitives.
   public static final StructNode ZCLZ = new StructNode(0,false,null );
@@ -54,22 +53,21 @@ public abstract class PrimNode extends Node {
   public static final StructNode ZFLT = new StructNode(0,false,null );
   public static final StructNode ZSTR = new StructNode(0,false,null );
   public static final StructNode ZMATH= new StructNode(0,false,null );
-  public static final NewNode PCLZ = new NewNode(BitsAlias.CLZX,true);
-  public static final NewNode PINT = new NewNode(BitsAlias.INTX,true);
-  public static final NewNode PFLT = new NewNode(BitsAlias.FLTX,true);
-  public static final NewNode PSTR = new NewNode(BitsAlias.STRX,true); // String clazz, not strings
-  public static final NewNode PMATH= new NewNode(BitsAlias.new_alias(BitsAlias.LOCX),true);
+  public static final NewNode PCLZ = new NewNode("TOP",BitsAlias.CLZX,true);
+  public static final NewNode PINT = new NewNode("INT",BitsAlias.INTX,true);
+  public static final NewNode PFLT = new NewNode("FLT",BitsAlias.FLTX,true);
+  public static final NewNode PSTR = new NewNode("STR",BitsAlias.STRX,true); // String clazz, not strings
+  public static final NewNode PMATH= new NewNode("MATH",BitsAlias.new_alias(BitsAlias.LOCX),true);
   public static TV3 IINT, IBOOL, IFLT, INFLT; // Integer, float instances
 
   private static PrimNode[] PRIMS = null; // All primitives
-  public  static boolean post_init() { return PRIMS!=null; }
 
   public static PrimNode[] PRIMS() {
     if( PRIMS!=null ) return PRIMS;
 
     // int opers
     PrimNode[][] INTS = new PrimNode[][]{
-      //{ new AddI64(), new AddIF64() },
+      { new AddI64(), new AddIF64() },
       //{ new SubI64(), new SubIF64() },
       { new MulI64(), new MulIF64() },
       //{ new DivI64(), new DivIF64() },
@@ -86,7 +84,7 @@ public abstract class PrimNode extends Node {
     };
 
     PrimNode[][] FLTS = new PrimNode[][]{
-      //{ new AddF64(), new AddFI64() },
+      { new AddF64(), new AddFI64() },
       //{ new SubFI64(), new SubF64() },
       { new MulFI64(), new MulF64() },
       //{ new DivF64(), new DivFI64() },
@@ -121,17 +119,15 @@ public abstract class PrimNode extends Node {
       //new MemPrimNode.ReadPrimNode.LValueLength(), // The other array ops are "balanced ops" and use term() for precedence
     };
 
-    Env.KEEP_ALIVE.add_def(ZCLZ);
-    Env.KEEP_ALIVE.add_def(ZINT);
-    Env.KEEP_ALIVE.add_def(ZFLT);
-    Env.KEEP_ALIVE.add_def(ZSTR);
+    ZCLZ.keep();
+    ZINT.keep();
+    ZFLT.keep();
+    ZSTR.keep();
 
     // ClazzClazz
     ZCLZ.close();
     PCLZ.init();
-    StoreXNode mem = new StoreXNode(Env.SCP_0.mem(),PCLZ.add_flow(),ZCLZ,null).init();
-    mem._live = TypeMem.ALLMEM;
-    Env.SCP_0.set_mem(mem);
+    Env.SCP_0.mem(new StoreXNode(Env.SCP_0.mem(),Env.GVN.add_flow(PCLZ),ZCLZ,null));
     ZCLZ.set_tvar();
 
     // Gather
@@ -156,12 +152,17 @@ public abstract class PrimNode extends Node {
     IFLT  = new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.set_tvar(),new TVBase(TypeFlt. FLT64)},false));
     INFLT = new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.set_tvar(),new TVBase(TypeFlt.NFLT64)},false));
 
+    Env.ROOT.setDef(CTL_IDX,Env.CTL_0);
+    Env.ROOT.setDef(MEM_IDX,Env.MEM_0);
+    Env.ROOT.setDef(REZ_IDX,Env.ALL);
+
+
     // Set all TVars
-    Env.KEEP_ALIVE.walk( (n,ignore) -> {
+    Env.ROOT.walk( n -> {
+        Env.GVN.add_flow(n);
         if( n.has_tvar() ) n.set_tvar();
-        return 0;
       });
-    
+
     // Loop, setting initial types for all primitives
     Node n0;
     while( (n0=Env.GVN.pop_flow())!= null ) {
@@ -172,7 +173,7 @@ public abstract class PrimNode extends Node {
         n0.add_flow_uses();
       }
     }
-    assert Env.KEEP_ALIVE.walk((n,x) -> chk(n) ? x : x+1 )==0;
+    assert Env.ROOT.walkReduce((n,x) -> chk(n) ? x : x+1 )==0;
 
     // Used for test cases
     MAX_PRIM_ALIAS = BitsAlias.NALL.tree().next_available_bit();
@@ -207,7 +208,7 @@ public abstract class PrimNode extends Node {
     ParmNode rpc = new ParmNode(0,fun,null,TypeRPC.ALL_CALL).init();
     // Make a Parm for every formal
     for(int i = DSP_IDX; i<_formals.len(); i++ )
-      add_def(_formals.at(i)==Type.ANY ? null : new ParmNode(i,fun,null,wrap(_formals.at(i))).init());
+      addDef(_formals.at(i)==Type.ANY ? null : new ParmNode(i,fun,null,wrap(_formals.at(i))).init());
     // The primitive, working on and producing wrapped prims
     init();
     // Return the result
@@ -226,10 +227,10 @@ public abstract class PrimNode extends Node {
     FunNode fun = new FunNode(this,_name).init();
     ParmNode rpc = new ParmNode(0      ,fun,null,TypeRPC.ALL_CALL).init();
     ParmNode mem = new ParmNode(MEM_IDX,fun,null,TypeMem.STRMEM  ).init();
-    add_def(mem);
+    addDef(mem);
     // Make a Parm for every formal
     for(int i = DSP_IDX; i<_formals.len(); i++ )
-      add_def(new ParmNode(i,fun,null,wrap(_formals.at(i))).init());
+      addDef(new ParmNode(i,fun,null,wrap(_formals.at(i))).init());
     // The primitive, working on and producing wrapped prims
     init();
     // Return the result
@@ -253,6 +254,7 @@ public abstract class PrimNode extends Node {
         // arguments may vary, and the correct primitive is picked using
         // overload resolution.
         StructNode over = new StructNode(0,false,null );
+        over.add_fld(TypeFld.CLZ,Access.Final,PCLZ,null);
         int cnt=0;
         for( PrimNode prim : prims ) {
           String fld = (""+cnt++).intern();
@@ -260,27 +262,27 @@ public abstract class PrimNode extends Node {
         }
         over.init();
         over.close();
-        ptr0 = new NewNode(BitsAlias.new_alias(BitsAlias.LOCX),true).init();
-        scp.set_mem(new StoreXNode(scp.mem(),ptr0,over,null).init());
+        // Some hacky name for the overload group; "f*" or "i!"
+        String p = prims[0]._name;
+        char op = p.charAt(0)=='_' ? p.charAt(1) : p.charAt(0);
+        ptr0 = new NewNode(""+clzname.charAt(0)+op+":",BitsAlias.new_alias(BitsAlias.LOCX),true).init();
+        scp.mem(new StoreXNode(scp.mem(),ptr0,over,null));
       }
       clz.add_fld(prims[0]._name,Access.Final,ptr0,null);
     }
     clz.close();
     Env.PROTOS.put(clzname,clz); // global mapping
-    scp.set_mem(new StoreXNode(scp.mem(),ptr.add_flow(),clz,null).init());
+    scp.mem(new StoreXNode(scp.mem(),Env.GVN.add_flow(ptr),clz,null));
   }
 
-  // Build and install match package
+  // Build and install math package
   private static NewNode make_math(PrimNode rand) {
     ZMATH.add_fld(TypeFld.CLZ,Access.Final,PCLZ,null);
     Node pi = con(TypeFlt.PI.wrap());
     ZMATH.add_fld("pi",Access.Final,pi,null);
     ZMATH.add_fld(rand._name,Access.Final,rand.as_fun(),null);
     ZMATH.close().init();
-    Env.GVN.add_flow(PMATH); // Type depends on uses
-    StoreXNode mem = new StoreXNode(Env.SCP_0.mem(),PMATH,ZMATH,null).init();
-    mem._live = TypeMem.ALLMEM;
-    Env.SCP_0.set_mem(mem);
+    Env.SCP_0.mem(new StoreXNode(Env.SCP_0.mem(),PMATH,ZMATH,null));
     return PMATH;
   }
 
@@ -293,10 +295,9 @@ public abstract class PrimNode extends Node {
   // str:{int     -> str }  ==>>  str:int
   // str:{flt     -> str }  ==>>  str:flt
   // == :{ptr ptr -> int1}  ==>>  == :ptr
-  @Override public String xstr() { return _name; }
   private static final TypeNil[] TS = new TypeNil[ARG_IDX+1];
   @Override public Type value() {
-    if( is_keep() ) return _val;
+    if( isKeep() ) return _val;
     // If all inputs are constants we constant-fold.  If any input is high, we
     // return high otherwise we return low.
     boolean is_con = true, has_high = false;
@@ -324,12 +325,12 @@ public abstract class PrimNode extends Node {
   // Wrap the PrimNode basic Type in a TMP->TS(.=ZINT, _=t).
   // Basically convert a `int` to a `Integer`
   public static TypeNil wrap( Type t ) {
-    switch( t ) {
-    case TypeInt ti: return ti.wrap();
-    case TypeFlt tf: return tf.wrap();
-    case TypeNil tn: return tn;
-    default: throw TODO();
-    }
+    return switch( t ) {
+      case TypeInt ti -> ti.wrap();
+      case TypeFlt tf -> tf.wrap();
+      case TypeNil tn -> tn;
+      default -> throw TODO();
+    };
   }
   public static TypeNil unwrap( Type t ) {
     if( !(t instanceof TypeMemPtr tmp) ) return null;
@@ -346,9 +347,16 @@ public abstract class PrimNode extends Node {
   @Override TV3 _set_tvar() {
     // All arguments are pre-unified to unique bases, wrapped in a primitive
     // with a clazz reference
-    for( int i=DSP_IDX; i<_formals.len(); i++ )
-      if( _formals.at(i)!=Type.ANY )
-        in(i-DSP_IDX).set_tvar().unify(wrap_base(_formals.at(i)),false);
+    if( in(0) != null )
+      in(0).set_tvar().unify(wrap_base(_formals.at(DSP_IDX)),false);
+    // Skip dyntable, dead in all primitives
+    assert in(1) == null;
+    // 2-arg primitive sets next arg
+    if( len()>2 ) {
+      in(2).set_tvar().unify(wrap_base(_formals.at(ARG_IDX+1)),false);
+      assert len()==3;
+    }
+      
     // Return is some primitive
     return wrap_base(_ret);
   }
@@ -394,7 +402,7 @@ public abstract class PrimNode extends Node {
   // Prims are equal for same-name-same-signature (and same inputs).
   // E.g. float-minus of x and y is NOT the same as int-minus of x and y
   // despite both names being '-'.
-  @Override public int hashCode() { return super.hashCode()+_name.hashCode()+(int)_formals._hash; }
+  @Override int hash() { return (int)_formals._hash; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
@@ -450,7 +458,7 @@ public abstract class PrimNode extends Node {
   // 2Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim2OpF64 extends PrimNode {
     Prim2OpF64( String name ) { super(name,TypeTuple.FLT64_FLT64,TypeFlt.FLT64); }
-    @Override TypeFlt apply( TypeNil[] args ) { return TypeFlt.con(op(args[0].getd(),args[1].getd())); }
+    @Override TypeFlt apply( TypeNil[] args ) { return TypeFlt.con(op(args[0].getd(),args[2].getd())); }
     abstract double op( double x, double y );
   }
 
@@ -491,7 +499,7 @@ public abstract class PrimNode extends Node {
   // 2Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim2OpI64 extends PrimNode {
     Prim2OpI64( String name ) { super(name,TypeTuple.INT64_INT64,TypeInt.INT64); }
-    @Override public TypeNil apply( TypeNil[] args ) { return TypeInt.con(op(args[0].getl(),args[1].getl())); }
+    @Override public TypeNil apply( TypeNil[] args ) { return TypeInt.con(op(args[0].getl(),args[2].getl())); }
     abstract long op( long x, long y );
   }
 
@@ -503,7 +511,7 @@ public abstract class PrimNode extends Node {
 
   abstract static class Prim2OpIF64 extends PrimNode {
     Prim2OpIF64( String name ) { super(name,TypeTuple.INT64_NFLT64,TypeFlt.FLT64); }
-    @Override public TypeFlt apply( TypeNil[] args ) { return TypeFlt.con(op(args[0].getl(),args[1].getd())); }
+    @Override public TypeFlt apply( TypeNil[] args ) { return TypeFlt.con(op(args[0].getl(),args[2].getd())); }
     abstract double op( long x, double y );
   }
   static class AddIF64 extends Prim2OpIF64 { AddIF64() { super("_+_"); } double op( long l, double r ) { return l+r; } }
@@ -671,7 +679,7 @@ public abstract class PrimNode extends Node {
 
 
   public static class RandI64 extends PrimNode {
-    public RandI64() { super("rand",TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, Type.ANY, TypeInt.INT64),TypeInt.INT64); }
+    public RandI64() { super("rand",TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, Type.ANY, Type.ANY, TypeInt.INT64),TypeInt.INT64); }
     @Override boolean is_oper() { return false; }
     @Override public TypeNil apply( TypeNil[] args ) { return TypeInt.INT64;  }
     // Rands have hidden internal state; 2 Rands are never equal

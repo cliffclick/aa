@@ -1,8 +1,8 @@
 // Looking at when tvars are duplicated ("fresh" copies made).
 // This is the "map" problem with a scalar instead of a collection.
 // Takes a '{a->b}' and a 'a' for a couple of different prims.
-// Type: ( int64, 3)
-// Eval: ( 6, 3)
+// Type: *[INT]( _, int64, 3)
+// Eval: *[5]( _, 6, 3)
 map = { fun ->
   { x -> (fun x)}
 };
