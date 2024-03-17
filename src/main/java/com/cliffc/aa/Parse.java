@@ -363,6 +363,36 @@ public class Parse implements Comparable<Parse> {
    *   tstmt = id =:type  // type variable decl, type assignment
    *
    *  The ':=' is the re-assignment token, no spaces allowed.
+   *
+   * To handle "mutual let rec" we record enough information to detect
+   * definition cycles as we go.  When we first start parsing an assignment
+   * for A, we set A as a "scoped" forward ref:
+   *    A = scoped_fref...
+   * then we parse A's definition.  At the end of parsing, we change A's
+   * forward ref to "defined" and replace it in-place in the struct.
+   *
+   * If, during the parsing of A's definition, we discover an unknown variable
+   * B, we add that as an UNscoped forward ref in the scope.  We also record
+   * that A's def depends on B - a possible mut let rec.  We might also
+   * discover prior unscoped defs or previous cyclic defs; in any case we
+   * record on A all those (possibly cyclic) defs.
+   *
+   * If we start a def for a prior-unscoped def, we go ahead and move it to
+   * "scoped", and then parse as normal.
+   *
+   * Example:
+   * A = { x -> rand ? B(x) : x };
+   * D = {   -> rand ? B(1) : C(2) };
+   * C = { x -> A(x) };
+   * B = { x -> C(x) };
+   *
+   * Here {A,B,C} make a mutual let rec, and the cycle is all an big identity
+   * function: any type can be passed into any of {A,B,C}.  Whereas D is NOT
+   * part of this cycle and always returns an int.
+   *
+   * The representation of a *scoped forward-ref* is either the `null` or an
+   * actual scoped ForwardRefNode.  We can use `null` normally if there's no
+   * cyclic defs.
    */
   private Node stmt(boolean lookup_current_scope_only) {
     if( peek('^') ) {           // Early function exit
@@ -424,6 +454,25 @@ public class Parse implements Comparable<Parse> {
       badts.add(badt);
     }
 
+    // * Create new local fields for new tokens, in case of mut-let-rec
+    // * Parse the `ifex`, uses of the new or unknown fields may add to mut-let-rec sets.
+    // * Assign to previous defs with stores
+    // * Assign to new local fields, changing unscope-to-scoped, and scoped-to-defined
+    ScopeNode escope = scope();
+
+    // Create new local fields for new tokens, in case of mut-let-rec
+    for( int i=0; i<toks._len; i++ ) {
+      String tok = toks.at(i);               // Token being assigned
+      Access mutable = rs.get(i) ? Access.RW : Access.Final;  // Assignment is mutable or final
+      ScopeNode scope = lookup_scope(tok,lookup_current_scope_only);
+      if( scope==null ) {        // Create new tokens with null fields - shortcut for scoped frefs
+        ForwardRefNode fref = new ForwardRefNode(tok,badfs.at(i)).init();
+        fref.scope();
+        escope.stk().add_fld(tok,mutable,fref,badts.at(i));
+      }
+    }
+
+
     // Normal statement value parse
     Node ifex = default_nil ? Env.NIL : ifex(); // Parse an expression for the statement value
     // Check for no-statement after start of assignment, e.g. "x = ;"
@@ -432,7 +481,7 @@ public class Parse implements Comparable<Parse> {
       ifex = err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
     }
 
-    // Assign tokens to value
+    // Assign
     for( int i=0; i<toks._len; i++ ) {
       String tok = toks.at(i);               // Token being assigned
       Access mutable = rs.get(i) ? Access.RW : Access.Final;  // Assignment is mutable or final
@@ -449,28 +498,21 @@ public class Parse implements Comparable<Parse> {
     Node debug = ifex instanceof BindFPNode bind ? bind.fp() : ifex;
     if( debug instanceof FunPtrNode fptr )
       fptr.bind(tok);           // Debug only: give name to function
-    // Find scope for token.  If not defining struct fields, look for any
-    // prior def.  If defining a struct, tokens define a new field in this scope.
-    boolean create = scope==null;
-    if( create ) {              // Token not already bound at any scope
-      scope = scope();          // Create in the current scope
-      StructNode stk = scope.stk();
-      // Here we make a private Env.ANY copy, so Combo gets a private Leaf for
-      // each initial variable set.  If we somehow skipped this setting
-      // (e.g. using null for ANY), then Combo could figure out not to unify
-      // unrelated variables.
-      stk.add_fld (tok,Access.RW, Node.con(Type.ANY),badf); // Create at top of scope as undefined
-    }
 
     // Assert type if asked for
     if( t!=null )
       ifex = new AssertNode(mem(), ifex, t, badf).peep();
 
+    // Find initial set
+    StructNode stk = scope.stk();
+    int idx = stk.find(tok);
+
     // See if assigning over a forward-ref.
-    int idx = scope().stk().find(tok);
-    if( idx != -1 && scope().stk().in(idx) instanceof ForwardRefNode fref ) {
-      fref.assign( ifex, tok ); // Define & assign the forward-ref
-      return ifex; // No need to re-assign; was already assigned at initial ref point
+    if( stk.in(idx) instanceof ForwardRefNode fref ) {
+      assert Util.eq(tok,fref._name);
+      // Now set in this scope
+      if( fref.isNotScoped() ) fref.scope();
+      return fref.assign( ifex, _e ); // Define & assign the forward-ref
     }
 
     // Save across display load
@@ -905,8 +947,9 @@ public class Parse implements Comparable<Parse> {
     ScopeNode scope = lookup_scope(tok=tok.intern(),false); // Find prior scope of token
     // Need a load/call/store sensible options
     if( scope==null ) {         // Token not already bound to a value
-      do_store(null,con(TypeNil.NIL),Access.RW,tok,null,null,null);
-      scope = scope();
+      //do_store(null,con(TypeNil.NIL),Access.RW,tok,null,null,null);
+      //scope = scope();
+      return err_ctrl2("Val not defined in increment");
     } else {                    // Check existing token for mutable
       if( !scope.is_mutable(tok) )
         return err_ctrl2("Cannot re-assign final val '"+tok+"'");
@@ -918,7 +961,7 @@ public class Parse implements Comparable<Parse> {
     Parse bad = errMsg();
     Node ptr = get_display_ptr(scope);
     Node fd = new LoadNode(mem(),ptr,tok,false,true,bad).peep();
-    if( fd.is_forward_ref() )    // Prior is actually a forward-ref
+    if( fd instanceof ForwardRefNode )    // Prior is actually a forward-ref
       return err_ctrl1(ErrMsg.forward_ref(this,(FunPtrNode)fd));
     //Node n = new FreshNode(fd,_e).peep();
     Node n = fd;
@@ -1001,34 +1044,74 @@ public class Parse implements Comparable<Parse> {
     if( tok == null || Util.eq("_",tok)) { _x = oldx; return null; }
     if( Util.eq(tok,"=") || Util.eq(tok,"^") )
       { _x = oldx; return null; } // Disallow '=' as a fact, too easy to make mistakes
+    // Normal identifier
+    return do_ident(tok, oldx);
+  }
+
+  // Handle normal identifiers.  They might exist in some upper scope as a
+  // normal variable; we'll need to lookup the scope and build the needed
+  // display ptr chain to Load them.
+
+  // The identifier might be missing, and declared a forward reference here and
+  // now.  It might already be a forward reference.  In either case, all in-
+  // progress definitions depend on this new forward reference.  In turn, we
+  // might end up with mutual self-recursion (imagine is_even and is_odd
+  // defined in terms of each other).
+  private Node do_ident(String tok, int oldx) {
+    // TODO: Just return the enclosing Env
+    Env e = _e;
     ScopeNode scope = lookup_scope(tok,false);
     Parse bad = errMsg(oldx);
     if( scope == null ) { // Assume any unknown id is a forward-ref of a recursive function
       // Ops cannot be forward-refs, so are just 'not a fact'.  Cannot declare
-      // them as a undefined forward-ref right now, because the op might be the
+      // them as an undefined forward-ref right now, because the op might be the
       // tail-half of a balanced-op, which is parsed by term() above.
       if( isOp(tok) ) { _x = oldx; return null; }
-      // Must be a forward reference
-      return val_fref(tok,bad);
+
+      // Create a value forward-reference.  Must turn into a function call later.
+      // Called when seeing a name for the first time without a prior def.
+      ForwardRefNode fref = new ForwardRefNode(tok,bad).init();
+      // Place in nearest enclosing closure scope, this will keep promoting until we find the actual scope
+      while( e._scope.test_if() ) e = e._par;
+      scope = e._scope;
+      scope.stk().add_fld(tok,Access.Final,fref,null);
+
+    } else {
+      // Find the env defining the scope.
+      // TODO: Just use the prior found enclosing Env.
+      while( e._scope != scope )
+        e = e._par;
     }
 
-    // Must load against most recent display update, in case some prior store
-    // is in-error.  Directly loading against the display would bypass the
-    // (otherwise alive) error store.
+    // See if this is a forward ref.  All in-progress defs pick up a dependency
+    if( scope.get(tok) instanceof ForwardRefNode fref ) {
+      assert !fref.isClosed();  // Closed already optimizes away
+      for( ; e != null ; e = e._par )
+        for( Node n : e._scope.stk().defs() )
+          if( n != fref &&
+              // Looking for in-progress defs
+              n instanceof ForwardRefNode fref2 &&
+              // Not-closed means fref2 *might* depend on fref
+              !fref2.isClosed() &&
+              // Filter dups
+              fref2.findDef(fref)== -1 )
+            fref2.addDef(fref);
 
-    // Display/struct/scope containing the field
-    Node dsp = get_display_ptr(scope);
+      // And use the Forward Ref as the Node
+      return fref;
+    } else {
 
-    // Load the resolve field from the display/scope structure
-    Node fd = new LoadNode(mem(),dsp,tok,false,false,bad).peep();
+      // Must load against most recent display update, in case some prior store
+      // is in-error.  Directly loading against the display would bypass the
+      // (otherwise alive) error store.
 
-    //// If in the middle of a definition (e.g. a HM Let, or recursive assign)
-    //// then no Fresh per normal HM rules.  If loading from normal Lambda
-    //// arguments, again no Fresh per normal HM rules.
-    //Node frsh = fd.is_forward_ref() || scope.stk().is_nongen(tok)
-    //  ? fd
-    //  : new FreshNode(fd,_e).peep();
-    return fd;
+      // Display/struct/scope containing the field
+      Node dsp = get_display_ptr(scope);
+
+      // Load the resolve field from the display/scope structure.
+      // Known normal identifier load, so always a "fresh" tvar.
+      return new LoadNode(mem(),dsp,tok,true,true,bad).peep();
+    }
   }
 
   // A fact hardwired to "$dyn".
@@ -1448,22 +1531,6 @@ public class Parse implements Comparable<Parse> {
     Type t = _e.lookup_type(tok.intern());
     if( t==null ) { _x=oldx; return null; }
     return t;
-  }
-
-  // Create a value forward-reference.  Must turn into a function call later.
-  // Called when seeing a name for the first time, in a function-call context,
-  // OR when defining a type constructor.  Not allowed to forward-ref normal
-  // variables, so this is a function variable, not yet defined.  Use an
-  // ForwardRef until it gets defined.
-  private Node val_fref(String tok, Parse bad) {
-    ForwardRefNode fref = new ForwardRefNode(tok,bad).init();
-    // Place in nearest enclosing closure scope, this will keep promoting until we find the actual scope
-    Env e = _e;
-    while( e._scope.test_if() ) e = e._par;
-    StructNode stk = e._scope.stk();
-    stk.add_fld(tok,Access.Final,fref,null);
-    //Node frsh = new FreshNode(fref,_e).peep();
-    return fref;
   }
 
   // Create a type forward-reference.  Must be type-defined later.  Called when

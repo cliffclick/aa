@@ -96,6 +96,7 @@ public class Env implements AutoCloseable {
     STK_0 = SCP_0.stk();
     PrimNode.PRIMS();           // Initialize prims
     Type.init0(SCP_0._types);
+    STK_0.close();
     ROOT.setPrimMem(PRIM._scope.mem());
     record_for_reset();         // Record for reset between tests
   }

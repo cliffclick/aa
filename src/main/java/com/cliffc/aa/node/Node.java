@@ -66,8 +66,6 @@ public abstract class Node implements Cloneable, IntSupplier {
   // on the ProjNode index
   public Node isCopy(int idx) { return null; }
 
-  // Only true for Unresolved
-  public boolean is_forward_ref() { return false; }
   // Only true for a bare StructNode
   public boolean is_forward_type() { return false; }
 

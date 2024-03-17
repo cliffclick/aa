@@ -1,4 +1,80 @@
 =======================================
+03/17/2024
+
+Fought this for a long time.  Problem is that var uses can't tell if they're in
+the definition (recursively) or not, at parse-time.  So there's no breadcrumb
+left-over from the Parsers' use to say if any given use should be "Fresh" or
+"NonGen".
+
+In my example below, when I parse A's expression and find "B", I don't know
+(yet) if A and B are intertwined or not.  Again when parsing D's expression and
+find B, again don't know if D and B are intertwined.
+
+Ponding building a variant Parser than makes an AST for stack frames (like
+EXE), then discovered mut-let-rec sets, perhaps reordering the Frame AST to
+topo sort mut-let-rec, THEN walks the AST for a SoN.
+
+
+=======================================
+03/17/2024
+
+BUG: $dyn not counted in StructNode._nargs, but it IS an argument
+
+ForwardRef states
+- not scoped; var might promote to outer scopes
+- scoped; var is defined in this scope, but mid-def
+- self-defined; var is defined, but not MUTUALLY defined, e.g. is_even/is_odd examples
+- mut-defined; all mutual let-rec vars are defined.
+
+FRefs are tied to their scope/struct/frame as the direct input for that var name.
+They have a defined edge, null till self-defined.
+They have more mutual dependence edges to other FRefs.  These extra FRef edges
+are cycle-detected as self-def gets set.
+
+
+Example:
+A = { x -> rand ? B(x) : x };
+D = {   -> rand ? B(1) : C(2) };
+C = { x -> A(x) };
+B = { x -> C(x) };
+
+Parse token A
+- Set A FRef, scoped, not self-defined.  Scope:{A-scoped}
+- Parse A expr
+- Discover B; insert B FRef, not-scoped  Scope:{A-scoped, B-not-scoped}
+- Use a FRef; add edge A-FRef to B-FRef  Scope:{A-scoped(B), B-not-scoped}
+- Finish A expr parse
+- Change A-FRef to self-defined; has a B-FRef edge so NOT mut-defined (yet); Scope: {A-self(B),B-not}
+
+Parse token D
+- Set D FRef, scoped, not self-defined.  Scope:{A-self(B), B-not, D-scoped}
+- Parse D expr
+- Use B FRef, add edge D-FRef to B-FRef. Scope:{A-self(B), B-not, D-scoped(B)}
+- Discover C; insert C FRef, not-scoped  Scope:{A-self(B), B-not, D-scoped(B), C-not}
+- Use C FRef, add edge D-FRef to C-FRef. Scope:{A-self(B), B-not, D-scoped(B,C), C-not}
+- Finish D expr parse
+- Change D-FRef to self-defined; Scope:{A-self(B), B-not, D-self(B,C), C-not}
+
+Parse token C
+- Change C FRef to scoped: Scope:{A-self(B), B-not, D-self(B,C), C-scoped}
+- Parse C expr
+- Use A FRef, add edge C-FRef to A-FRef. Scope:{A-self(B), B-not, D-scoped(B,C), C-scoped(A)}
+- Finish C expr parse
+- CHange C-FRef to self-defined: Scope:{A-self(B), B-not, D-self(B,C), C-self(A)}
+
+Parse token B
+- Change B FRef to scoped: Scope:{A-self(B), B-scoped, D-self(B,C), C-self(A)}
+- Parse B expr
+- Use C FRef, add edge B-FRef to C-FRef.  Scope: {A-self(B), B-scoped(C), D-self(B,C), C-self(A)}
+- FInish B expr parse
+- Change B-FRef to self-defined: Scope: {A-self(B), B-self(C), D-self(B,C), C-self(A)}
+- - Walk B->C->A, all self/mutual.
+- - Flip all to Mutual.
+- - Walk backwards from {A,B,C} looking for not-mut-FRefs.
+- - If so, cycle-find again on D: D->B(mut), D->C(mut) - Flip all D to mutual.
+
+
+=======================================
 03/12/2024
 
 Thinking that not inserting Fresh during parse doesn't work, because lost NONGEN inputs.

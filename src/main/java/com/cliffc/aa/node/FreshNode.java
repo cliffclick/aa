@@ -15,18 +15,16 @@ public class FreshNode extends Node {
   // This includes all lambda arguments inside the lambda, plus any
   // variables used mid-definition.  The only variables used mid-definition are
   // forward-refs.
-  public final TV3[] _nongen;   // Set of visible non-generative type vars
-  
+  public TV3[] _nongen;   // Set of visible non-generative type vars
+
   public FreshNode( Node id, Env e ) {
     super(id);
-    // Copy the set of NONGEN variables.
-    addDef(e._scope.ptr());
+    // Copy the set of NONGEN variables in the current lexical tree
     for( ; e!=null; e=e._par ) {
       StructNode stk = e._scope.stk();
       for( int i=0; i<stk._nargs; i++ )
         addDef(stk.in(i));
     }
-    _nongen = len()>1 ? new TV3[len() - 1] : null;
   }
 
   @Override public String label() { return "Fresh"; }
@@ -63,7 +61,7 @@ public class FreshNode extends Node {
     }
     return tv;
   }
-    
+
   @Override public boolean unify( boolean test ) {
     TV3 fresh = id().tvar(), that = tvar();
     //return fresh.fresh(this,_nongen).unify(that,test);

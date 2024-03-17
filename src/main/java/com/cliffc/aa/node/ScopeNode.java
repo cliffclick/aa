@@ -59,7 +59,7 @@ public class ScopeNode extends Node {
   public void make_early_exit_merge() {
     setDef(ARG_IDX+2, new RegionNode((Node)null))._val = Type.CTRL;
     setDef(ARG_IDX+3, new PhiNode(TypeMem.ALLMEM, null,(Node)null));
-    setDef(ARG_IDX+4, new PhiNode(TypeNil.SCALAR, null,(Node)null));    
+    setDef(ARG_IDX+4, new PhiNode(TypeNil.SCALAR, null,(Node)null));
   }
 
   // Name to type lookup, or null
@@ -96,7 +96,7 @@ public class ScopeNode extends Node {
     //return def._live;
     throw TODO();             // TODO Test me
   }
-  
+
   @Override int hash() { return 123456789; }
   // ScopeNodes are never equal
   @Override public boolean equals(Object o) { return this==o; }
@@ -104,7 +104,7 @@ public class ScopeNode extends Node {
   //@Override Node walk_dom_last(Predicate<Node> P) { return P.test(this) ? this : null; }
 
   @Override public boolean has_tvar() { return false; }
-  
+
   // Test for being inside a ?: expression
   public boolean test_if() { return stk()._nargs==-1; }
 }

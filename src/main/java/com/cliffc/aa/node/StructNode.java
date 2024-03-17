@@ -55,6 +55,9 @@ public class StructNode extends Node {
   // Only modify if !_closed
   final Ary<TypeFld.Access> _accesses;
 
+  // During the definition of this field, the following fields...
+
+
   // Parser helper for error reports on arg tuples, start of tuple/struct is in
   // _paren_start, and the args are in _fld_starts.
   // Example: "  ( x,y)\n"
@@ -169,12 +172,13 @@ public class StructNode extends Node {
     for( int i=0; i<len(); i++ ) {
       if( in(i) instanceof ForwardRefNode fref && Util.eq(fref._name,fld(i))) {
         // Is this ForwardRef defined in this scope, or some outer scope?
-        if( fref.is_scoped() ) {
+        if( fref.isScoped() ) {
           // Definitely defined here
           //    fref.define();
           throw TODO();        // TODO: Access input by field name
-        } else if( fref.is_defined() ) {
+        } else if( fref.isSelf() ) {
           // Already defined
+          throw TODO();        // TODO: Access input by field name
         } else {
           // Make field in the parent
           assert !parent.isPrim();
