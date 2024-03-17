@@ -58,7 +58,7 @@ jars = $(subst $(space),$(SEP),$(libs))
 default_targets := $(main_classes)
 # Optionally add ctags to the default target if a reasonable one was found.
 ifneq ($(CTAGS),)
-default_targets += TAGS_AGE
+#default_targets += TAGS_AGE
 endif
 
 default: $(default_targets)
@@ -135,7 +135,7 @@ JVM=java -ea -cp "build/aa.jar${SEP}${jars}${SEP}$(CLZDIR)/test"
 
 # Build the AA-test jar and run the junit tests.
 # Actually makes jvm_cmd.txt and status.0 along with out.0
-sandbox/out.0:	sandbox/tests.txt $(test_classes) build/aa.jar 
+sandbox/out.0:	sandbox/tests.txt $(test_classes) build/aa.jar
 	@echo "  testing " $@ " because " $?
 	@echo $(JVM) org.junit.runner.JUnitCore `cat sandbox/tests.txt` > sandbox/jvm_cmd.txt
 	@($(JVM) org.junit.runner.JUnitCore `cat sandbox/tests.txt`  2>&1 ; echo $$? > sandbox/status.0) 1> sandbox/out.0 2>&1
@@ -157,7 +157,7 @@ hm_tests:	$(test_classes) build/aa.jar
 # Run standard tests
 test:	build/aa.jar
 	@echo "  testing"
-	@$(JVM) org.junit.runner.JUnitCore com.cliffc.aa.type.TestType com.cliffc.aa.TestTVar com.cliffc.aa.exe.TestEXE
+	@$(JVM) org.junit.runner.JUnitCore com.cliffc.aa.type.TestType com.cliffc.aa.TestTVar com.cliffc.aa.TestAST com.cliffc.aa.exe.TestEXE
 
 
 # EXE, a standalone lambda calc interpreter

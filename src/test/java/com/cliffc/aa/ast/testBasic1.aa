@@ -1,0 +1,5 @@
+// Ignore f and make a pair of 5s
+// Type: 5
+// Eval: 5
+g = {f -> 5};
+g g

@@ -629,7 +629,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       GVN.add_flow_defs(this);  // Defs  of change should recheck liveness
       if( nnn!=this ) {         // Replacement
         GVN.add_reduce_uses(this); // New chances for V-N
-        GVN.add_reduce_defs(this); // Unused NewNode kills
+        //GVN.add_reduce_defs(this); // Unused NewNode kills
         subsume(nnn);           // Replace
       }
       return nnn._elock();      // Put progress in VALs and return change

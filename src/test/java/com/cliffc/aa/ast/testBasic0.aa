@@ -1,0 +1,4 @@
+// Parse a comment and a number
+// GCP: int:3
+// Eval: 3
+3

@@ -1,0 +1,5 @@
+// Simple recursive
+// Type: A
+// Eval: 2
+fact = { x -> rnd() ? fact(x) : x }
+fact(2)

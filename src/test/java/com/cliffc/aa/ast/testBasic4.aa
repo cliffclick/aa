@@ -1,0 +1,4 @@
+// Simple if/else
+// Type: int1
+// Eval: 3
+rnd() ? 2 : 3
