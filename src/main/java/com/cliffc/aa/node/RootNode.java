@@ -35,7 +35,7 @@ public class RootNode extends Node {
 
   public void setPrimMem(Node mem) { setDef(ARG_IDX,mem); }
   public TypeMem primMem() { return (TypeMem)val(ARG_IDX); }
-  
+
   TypeMem rmem(Node dep) {
     deps_add(dep);
     return _val instanceof TypeTuple tt ? (TypeMem)tt.at(MEM_IDX) : TypeMem.ALLMEM.oob(_val.above_center());
@@ -73,14 +73,14 @@ public class RootNode extends Node {
   @Override public TypeTuple value() {
     // If computing for primitives, pre- any program, then max conservative value
     if( in(ARG_IDX) == null ) return TypeTuple.ROOT;
-    
+
     // Primitive memory
     TypeMem tmem = (TypeMem)val(ARG_IDX);
 
     // Conservative final result.  Until Combo external calls can still wire, and escape arguments
     if( Combo.pre() )
       return CACHE_DEF;
-    
+
     // Walk the 'rez', all Call args (since they call Root, their args escape)
     // and function rets (since called from Root, their return escapes).
     AryInt awork = new AryInt();
@@ -101,7 +101,6 @@ public class RootNode extends Node {
       } else {
         // If function may be reached from Root, the return escapes.
         assert in(i) instanceof RetNode;
-        in(i).deps_add(this);
         Type t = in(i)._val;
         escs = _add_all(escs,awork,fwork,t);
         if( t instanceof TypeTuple tt ) { // ANY is OK
@@ -130,7 +129,6 @@ public class RootNode extends Node {
           FunPtrNode fptr = ret.funptr();
           if( fptr != null ) {
             // fptr.tvar().widen((byte)1,false); // HMT widen
-            fptr.deps_add(this); // Un-escaping by deleting FunPtr will trigger Root recompute
             escs = _add_all(escs,awork,fwork,ret._val);
           } else throw TODO(); // Untested, can i get a null here post-combo?
         }
@@ -219,13 +217,13 @@ public class RootNode extends Node {
   }
   private static TypeMem CACHE_DEF_MEM = TypeMem.ALLMEM;
   private static TypeTuple CACHE_DEF;
-  
+
   private static final Ary<Node> PROGRESS = new Ary<>(new Node[1],0);
   public static TypeMem defMem(Node n) {
     if( n!=null && PROGRESS.find(n)==-1 ) PROGRESS.push(n);
     return CACHE_DEF_MEM;
   }
-  
+
   public static TypeMem removeKills(Node n) { return removeKills(n,null); }
   public static TypeMem removeKills(Node n, Type t) {
     if( n!=null && PROGRESS.find(n)==-1 ) PROGRESS.push(n);
@@ -234,7 +232,7 @@ public class RootNode extends Node {
       mem = mem.set(alias,TypeStruct.UNUSED);
     return mem;
   }
-  
+
   // Set mem for Combo: its all low minus kills, used to JOIN away the kills
   public static void resetDefMemHigh() {
     TypeMem tmem = Env.ROOT.primMem();
@@ -267,7 +265,7 @@ public class RootNode extends Node {
     // Pre-combo, all memory is alive, except kills
     if( Combo.pre() )
       return removeKills(null);
-    
+
     // During/post combo, check external Call users.
     // There is e.g. a Control user and many Constant users.
     // We're just trying to track memory flow.
@@ -278,14 +276,15 @@ public class RootNode extends Node {
       case   ConNode use -> live;   // No implied live memory
       case DefDynTableNode use -> live; // No implied live memory
       case MProjNode use -> (TypeMem)live.meet(use._live);
+      case FunNode fun -> live; // Direct function escape, no implied memory
       default -> throw TODO();  // Handle escaping calls, rturns.  Also null not expected
       };
     }
-    
+
     // Killables never become alive
     for( int kill : KILL_ALIASES )
       live = live.set(kill,TypeStruct.UNUSED);
-    
+
     // Liveness for return value: All reaching aliases plus their escapes are alive.
     BitsAlias ralias = ralias();
     assert ralias!=BitsAlias.EMPTY; // At least external escapes
@@ -306,7 +305,8 @@ public class RootNode extends Node {
         if( tfp.dsp() instanceof TypeMemPtr tmp &&
             !ralias().overlaps(tmp.aliases()) )
           return CallNode.FP_LIVE;
-      }
+      } else if( val(REZ_IDX).isa(TypeFunPtr.GENERIC_FUNPTR) )
+        return CallNode.FP_LIVE;
       return Type.ALL;
     }
     // inputs CTL,MEM,REZ are spoken for.
@@ -364,6 +364,7 @@ public class RootNode extends Node {
         ret.fun().addDef(this);
         addDef(ret);
         Env.GVN.add_flow(this); // Recompute root values to include function return memory
+        Env.GVN.add_flow(ret.fun());
         Env.GVN.add_flow(ret);
         progress = true;
       }

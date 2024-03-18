@@ -2,6 +2,8 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.Util;
+import com.cliffc.aa.tvar.TV3;
+
 import org.junit.Test;
 
 import java.io.File;
@@ -32,15 +34,22 @@ public class TestAST {
 
     TypeEnv te = Exec.test("test",prog,rseed,true,true);
     if( te._errs == null ) {
-      String exgcp = get_expected(prog,"// GCP: ",false);
-      Type expect = Type.valueOf(exgcp);
-      Type actual = te._t;
-      assertEquals(expect,actual);
-      // TODO: Get expected HMT
+      // Check the GCP type
+      String expectGCPStr  = get_expected(prog,"// GCP: ",false);
+      Type   expectGCPType = Type.valueOf(expectGCPStr);
+      Type   actualGCPType = te._t;
+      assertEquals(expectGCPType,actualGCPType);
+
+
+      // Check the HM type
+      String expectHMTStr  = get_expected(prog,"// HMT: ",false);
+      TV3    actualHMTType = te._hmt;
+      String actualHMTStr  = actualHMTType.p();
+      assertEquals(stripIndent(expectHMTStr),stripIndent(actualHMTStr));
 
       //Type rez = root.eval(null);
       //assertEquals(f.toString(),exeval,rez.toString());
-      throw AA.TODO();
+      //throw AA.TODO();
 
     } else {
       throw AA.TODO();
@@ -56,5 +65,6 @@ public class TestAST {
     int eol = prog.indexOf('\n', idx+1);
     return prog.substring(idx+marker.length(),eol).trim();
   }
+  private static String stripIndent(String s){ return s.replace("\n","").replace(" ",""); }
 
 }

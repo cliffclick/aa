@@ -1,16 +1,17 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.ast.*;
-import com.cliffc.aa.node.*;
+import com.cliffc.aa.node.PrimNode;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.*;
+import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.Util;
 
 import java.text.NumberFormat;
 import java.text.ParsePosition;
 import java.util.BitSet;
 
-import static com.cliffc.aa.AA.*;
-import static com.cliffc.aa.type.TypeFld.Access;
+import static com.cliffc.aa.AA.ARG_IDX;
+import static com.cliffc.aa.AA.TODO;
 
 /*** an implementation of language AA
  */
@@ -42,23 +43,29 @@ public class ASTParse {
     AST rez = stmts();
     if( rez == null )
       return ErrMsg.syntax(null,"Not a program?");
-    return skipWS() == -1 ? null : ErrMsg.trailingjunk(null);
+    if( skipWS() != -1 ) return ErrMsg.trailingjunk(null);
+    // Walk for Nodes
+    Root prog = new Root(rez);
+    prog.nodes(e);
+    // Close file scope; no more program text in this file, so no more fields to add.
+    e._scope.stk().close();
+    return null;
   }
 
   /** Parse a list of statements; final semicolon is optional.
    *  stmts= [tstmt or stmt] [; stmts]*[;]?
    */
   private AST stmts() {
-    AST stmt = tstmt(), last=null;
-    if( stmt == null ) stmt = stmt();
+    LetRec stmt = stmt(), last=null;
     while( stmt != null ) {
       if( !peek(';') ) return stmt;
       last = stmt;
-      stmt = tstmt();
-      if( stmt == null ) stmt = stmt();
+      stmt = stmt();
+      last.addBody(stmt);
       if( stmt == null ) {
-        if( peek(';') ) { _x--; stmt=last; }   // Ignore empty statement
+        if( peek(';') ) { _x--; }   // Ignore empty statement
       }
+      stmt = last;
     }
     return last;
   }
@@ -69,24 +76,60 @@ public class ASTParse {
   }
 
   /** A statement is a list of variables to final-assign or re-assign... */
-  private AST stmt() {
+  private LetRec stmt() {
     if( peek('^') ) {           // Early function exit
       throw TODO();
     }
 
     // Gather ids in x = y = z = ....
     Ary<String> toks = new Ary<>(new String[1],0);
+    Ary<Type  > ts   = new Ary<>(new Type  [1],0);
+    Ary<ASTParse > badfs= new Ary<>(new ASTParse [1],0);
+    Ary<ASTParse > badts= new Ary<>(new ASTParse [1],0);
+    BitSet rs = new BitSet();
+    boolean default_nil = false;
     while( true ) {
       skipWS();
       int oldx = _x;            // Unwind token parse point
       ASTParse badf = errMsg(); // Capture location in case of field error
       String tok = token();     // Scan for 'id = ...'
       if( tok == null ) break;  // Out of ids
-      throw TODO();
-    }
+      if( !isAlpha0((byte)tok.charAt(0)) ) { _x=oldx; break; } // not a "[id]* ->"
+      int oldx2 = _x;           // Unwind assignment flavor point
+      Type t = null;
+      // x  =: ... type  assignment, handled before we get here
+      // x  =  ... final assignment
+      // x :=  ... var   assignment
+      // x : type  = ... typed final assignment
+      // x : type := ... typed var   assignment
+      // x : nontype = ... error, missing type
+      // p? x : nontype ... part of trinary
+      ASTParse badt = errMsg();  // Capture location in case of type error
+      if( peek(":=") ) _x=oldx2; // Avoid confusion with typed assignment test
+      else if( peek(':') && (t=type())==null ) { // Check for typed assignment
+        if( testIf() ) _x = oldx2; // Grammar ambiguity, resolve p?a:b from a:int
+        else err_ctrl0("Missing type after ':'");
+      }
+      if( peek(":=") ) rs.set(toks._len);              // Re-assignment parse
+      else if( !peek_not('=','=') ) {                  // Not any assignment
+        // For structs, allow a bare id as a default def of nil
+        if( false /*lookup_current_scope_only && ts.isEmpty() && (peek(';') || peek('}') ||
+        // These next two tokens are syntactically invalid, but a semi-common error situation:
+        //   @{ fld;fld;fld;...  fld );  // Incorrect closing paren.  Go ahead and allow a bare id.
+                                                                  peek(']') || peek(')' )) */) {
+          _x--;                 // Push back statement end
+          default_nil=true;     // Shortcut def of nil
+          rs.set(toks._len);    // Shortcut mutable
+        } else {
+          _x = oldx; // Unwind the token parse, and try an expression parse
+          break;     // Done parsing assignment tokens
+        }
+      }
 
-    for( int i=0; i<toks._len; i++ ) {
-      throw TODO();
+      toks .add(tok.intern());
+      ts   .add(t);
+      badfs.add(badf);
+      badts.add(badt);
     }
 
     // Normal statement value parse
@@ -97,13 +140,17 @@ public class ASTParse {
       ifex = err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
     }
 
-    // Assign
-    for( int i=0; i<toks._len; i++ ) {
-      throw TODO();
-    }
+    if( toks._len==0 ) return new LetRec(ifex);
 
-    return ifex;
+    // Assign
+    return new LetRec(toks,ifex);
   }
+
+  // Ignore the half-scope inside of trinarys
+  private boolean testIf() {
+    return false;
+  }
+
 
 
 
@@ -127,8 +174,15 @@ public class ASTParse {
   private AST apply() {
     AST expr = expr();
     if( expr == null ) return null;
-    throw TODO();
+    while( true ) {
+      skipWS();
+      int oldx = _x;
+      AST arg = expr();
+      if( arg==null ) return expr;
+      expr = new Call(null,null,null,dynCall(),arg,expr);
+    }
   }
+
 
 
   /** Parse an expression, a series of terms separated by binary operators.
@@ -267,7 +321,7 @@ public class ASTParse {
     }
     // Anonymous function
     if( peek1(c,'{') )
-      throw TODO(); // return func();
+      return func();
 
     // Anonymous struct
     if( peek2(c,"@{") )
@@ -284,7 +338,69 @@ public class ASTParse {
   }
 
   private AST do_ident( String tok, int oldx ) {
-    throw TODO();
+    return new Ident(tok);
+  }
+
+  // A fact hardwired to "$dyn".
+  private AST dynLoad() { return new Ident("$dyn");  }
+  // Load a Call/Apply field out of a DynTable
+  private AST dynCall() { return new AField(dynLoad()); }
+
+
+  /** Parse an anonymous function; the opening '{' already parsed.  After the
+   *  '{' comes an optional list of arguments and a '->' token, and then any
+   *  number of statements separated by ';'.
+   *  func = { [[id]* ->]? stmts }
+   */
+  private AST func() {
+    int oldx = _x;              // Past opening '{'
+
+    // Incrementally build up the formals, starting with the display
+    Ary<Type  > formals= new Ary<>(new Type  []{null,null,null,null});
+    Ary<ASTParse> bads = new Ary<>(new ASTParse[ARG_IDX+1]);
+    Ary<String> ids    = new Ary<>(new String[]{null,null,"^","$dyn"});
+
+    // Parse arguments
+    while( true ) {
+      skipWS();
+      String tok = token();
+      if( tok == null ) { _x=oldx; break; } // not a "[id]* ->"
+      if( Util.eq((tok=tok.intern()),"->") ) break; // End of argument list
+      if( !isAlpha0((byte)tok.charAt(0)) ) { _x=oldx; break; } // not a "[id]* ->"
+      Type t = TypeNil.SCALAR; // Untyped, most generic type
+      ASTParse bad = errMsg(); // Capture location in case of type error
+      if( peek(':') &&         // Has type annotation?
+          (t=type())==null ) { // Get type
+        // If no type, might be "{ x := ...}" or "{ fun arg := ...}" which can
+        // be valid stmts, hence this may be a no-arg function.
+        if( bads._len-1 <= 2 ) { _x=oldx; break; }
+        else {
+          // Might be: "{ x y z:bad -> body }" which cannot be any stmt.  This
+          // is an error in any case.  Treat as a bad type on a valid function.
+          err_ctrl0(peek(',') ? "Bad type arg, found a ',' did you mean to use a ';'?" : "Missing or bad type arg");
+          t = TypeNil.SCALAR;
+          skipNonWS();         // Skip possible type sig, looking for next arg
+        }
+      }
+      if( ids.find(tok) != -1 ) {
+        ASTParse badp = errMsg(oldx); // Capture location in case of parameter error
+        err_ctrl3("Duplicate parameter name '" + tok + "'", badp);
+        tok = (tok+" dup").intern();
+      }
+      ids.push(tok);
+      formals.push(t); // Accumulate args
+      bads.add(bad);
+    }
+    // If this is a no-arg function, we may have parsed 1 or 2 tokens as-if
+    // args, and then reset.  Also reset to just the mem & display args.
+    if( _x == oldx ) { formals.set_len(ARG_IDX+1);  ids.set_len(ARG_IDX+1); bads.set_len(ARG_IDX+1); }
+
+    // Parse function body
+    AST rez = stmts();          // Parse function body
+    if( rez == null ) rez = err_ctrl2("Missing function body");
+    require('}',oldx-1);      // Matched with opening {}
+
+    return new Lambda(ids,rez);
   }
 
   // ------------ ERROR RECORDING -----------------------------------------------
@@ -300,7 +416,8 @@ public class ASTParse {
   ASTParse errMsg() { return errMsg(_x); }
   ASTParse errMsg(int x) { ASTParse P = new ASTParse(this); P._x=x; return P; }
 
-  private AST err_ctrl2( String msg ) { throw TODO(); }
+  private void err_ctrl0(String s) { err_ctrl3(s,errMsg()); }
+  private AST  err_ctrl2( String msg ) { throw TODO(); }
   private void err_ctrl3(String s, ASTParse open) {
     throw TODO();
   }
@@ -351,7 +468,7 @@ public class ASTParse {
   }
 
   private AST con( TypeNil t ) {
-    return new ConAST(PrimNode.wrap(t));
+    return new Const(PrimNode.wrap(t));
   }
 
   // Parse a small positive integer; WS already skipped and sitting at a digit.
@@ -366,6 +483,9 @@ public class ASTParse {
     }
     return sum;
   }
+
+  Type type() { return null; }
+
 
   // Require a closing character (after skipping WS) or polite error
   private void require( char c, int oldx ) {

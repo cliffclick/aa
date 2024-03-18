@@ -66,7 +66,7 @@ public class Env implements AutoCloseable {
   public static final NonBlockingHashMap<String,StructNode> PROTOS;
 
   public static final int NODE_LO;
-  
+
   static {
     // The Universe outside the parse program
     ROOT  = new RootNode(null,null,null,null);
@@ -74,7 +74,7 @@ public class Env implements AutoCloseable {
     CTL_0 = new CProjNode(ROOT,CTL_IDX).init();
     MEM_0 = new MProjNode(ROOT,MEM_IDX).init();
     NODE_LO = MEM_0._uid+1;
-    
+
     // Top-level or common default values
     ANY   = new ConNode<>(Type.ANY         ).keep();
     ALL   = new ConNode<>(Type.ALL         ).keep();
@@ -107,7 +107,7 @@ public class Env implements AutoCloseable {
   public final FunNode _fun;     // Matching FunNode for this lexical environment
 
   // Shared Env constructor.
-  Env( Env par, FunNode fun, int nargs, Node ctrl, Node mem, Node dsp_ptr, StructNode fref ) {
+  public Env( Env par, FunNode fun, int nargs, Node ctrl, Node mem, Node dsp_ptr, StructNode fref ) {
     _par = par;
     _fun = fun;
     StructNode dsp = fref==null ? new StructNode(nargs,false,null) : fref;
@@ -241,4 +241,5 @@ public class Env implements AutoCloseable {
     if( _scope.stk().is_closure() || _par==null ) return false;
     return _par.test_if();
   }
+
 }

@@ -67,12 +67,12 @@ default: $(default_targets)
 classes: $(classes)
 
 # Compile just the out-of-date files
-$(main_classes): build/classes/main/%class: $(SRC)/%java
+$(main_classes): $(CLZDIR)/main/%class: $(SRC)/%java
 	@echo "compiling " $@ " because " $?
 	@[ -d $(CLZDIR)/main ] || mkdir -p $(CLZDIR)/main
 	@javac $(JAVAC_ARGS) -cp "$(CLZDIR)/main$(SEP)$(jars)" -sourcepath $(SRC) -d $(CLZDIR)/main $(main_javas)
 
-$(test_classes): $(CLZDIR)/test/%class: $(TST)/%java $(main_classes)
+$(test_classes): $(CLZDIR)/test/%class: $(TST)/%java
 	@echo "compiling " $@ " because " $?
 	@[ -d $(CLZDIR)/test ] || mkdir -p $(CLZDIR)/test
 	@javac $(JAVAC_ARGS) -cp "$(CLZDIR)/test$(SEP)$(CLZDIR)/main$(SEP)$(jars)" -sourcepath $(TST) -d $(CLZDIR)/test $(test_javas)
@@ -131,7 +131,9 @@ sandbox/tests.txt:	$(test_classes)
 	@(cd ${TST}; /usr/bin/find . -name '*.java' | cut -c3- | sed "s/.....$$//" | sed -e 's/\//./g') | grep -v TestUtil | /usr/bin/sort > sandbox/tests.txt
 
 # Base launch line for JVM tests
-JVM=java -ea -cp "build/aa.jar${SEP}${jars}${SEP}$(CLZDIR)/test"
+JVM =java -ea -cp "build/aa.jar${SEP}${jars}${SEP}$(CLZDIR)/test"
+JVM2=java -ea -cp "$(CLZDIR)/main${SEP}${jars}${SEP}$(CLZDIR)/test"
+
 
 # Build the AA-test jar and run the junit tests.
 # Actually makes jvm_cmd.txt and status.0 along with out.0
@@ -155,9 +157,13 @@ hm_tests:	$(test_classes) build/aa.jar
 
 
 # Run standard tests
-test:	build/aa.jar
+test:	$(main_classes) $(test_classes) lib
 	@echo "  testing"
-	@$(JVM) org.junit.runner.JUnitCore com.cliffc.aa.type.TestType com.cliffc.aa.TestTVar com.cliffc.aa.TestAST com.cliffc.aa.exe.TestEXE
+	$(JVM2) org.junit.runner.JUnitCore com.cliffc.aa.type.TestType com.cliffc.aa.TestTVar com.cliffc.aa.TestAST com.cliffc.aa.exe.TestEXE
+
+ast:	$(main_classes) $(test_classes) lib
+	@echo "  testing"
+	$(JVM2) org.junit.runner.JUnitCore com.cliffc.aa.TestAST
 
 
 # EXE, a standalone lambda calc interpreter

@@ -642,7 +642,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // At least as alive
   private Node merge(Node x) {
     x._live = x._live.meet(_live);
-    if( Combo.post() && tvar() != x.tvar() )
+    if( Combo.post() && has_tvar() && tvar() != x.tvar() )
       tvar().unify(x.tvar(),false);
     return GVN.add_flow(x);
   }

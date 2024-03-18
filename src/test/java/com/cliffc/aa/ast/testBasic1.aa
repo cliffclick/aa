@@ -1,5 +1,6 @@
-// Ignore f and make a pair of 5s
-// Type: 5
-// Eval: 5
+// Ignore f and make a 5
+// GCP: int:5
+// HMT: int:5
+// Eval: int:5
 g = {f -> 5};
 g g

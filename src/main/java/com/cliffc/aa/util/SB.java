@@ -46,6 +46,17 @@ public final class SB {
   public SB di( int i) { _indent -= i; return this; }
 
   public SB nl( ) { return p(System.lineSeparator()); }
+  // Last printed a nl
+  public boolean was_nl() {
+    int len = _sb.length();
+    String nl = System.lineSeparator();
+    int nlen = nl.length();
+    if( len < nlen ) return false;
+    for( int i=0; i<nlen; i++ )
+      if( _sb.charAt(len-nlen+i)!=nl.charAt(i) )
+        return false;
+    return true;
+  }
 
   // Delete last char.  Useful when doing string-joins and JSON printing and an
   // extra seperater char needs to be removed:

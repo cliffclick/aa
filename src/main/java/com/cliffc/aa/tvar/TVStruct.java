@@ -411,7 +411,7 @@ public class TVStruct extends TVExpanding {
     return is_int_clz() || is_flt_clz() || is_str_clz() || is_math_clz() || is_top_clz();
   }
   boolean is_prim() {
-    return _max==2 && idx(TypeFld.CLZ)!= -1 && idx(TypeFld.PRIM)!= -1 &&  is_prim0();
+    return _max==2 && idx(TypeFld.CLZ)!= -1 && idx(TypeFld.PRIM)!= -1 &&  arg(0).as_ptr().load().is_prim0();
   }
 
   @Override public VBitSet _get_dups_impl(VBitSet visit, VBitSet dups, boolean debug, boolean prims) {

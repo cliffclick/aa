@@ -56,7 +56,7 @@ import static com.cliffc.aa.AA.TODO;
 public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   int _nargs;            // Number of formals, including the ctrl, mem, display
   public Type _ret;      // Return scalar type
-  
+
   private Type _dsp;     // Display; basically a hidden 0th argument
 
   private TypeFunPtr init(boolean any, boolean nil, boolean sub, BitsFun fidxs, int nargs, Type dsp, Type ret ) {
@@ -85,7 +85,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     return Cyclic.Link.min(dsplk,retlk);
   }
 
-  public static boolean has_dsp(Type dsp) { return dsp!=Type.ALL; }
+  public static boolean has_dsp(Type dsp) { return dsp!=Type.ANY; }
   public boolean has_dsp() { return has_dsp(_dsp); }
   public Type dsp() { return _dsp; }
 
@@ -338,7 +338,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     return make(false,BitsFun.make0(fidx),nargs,dsp,ret);
   }
   public static TypeFunPtr make_no_dsp( int fidx, int nargs, Type ret ) {
-    return make(false,BitsFun.make0(fidx),nargs,Type.ALL,ret);
+    return make(false,BitsFun.make0(fidx),nargs,Type.ANY,ret);
   }
   public static TypeFunPtr make_new_fidx( int parent, int nargs, Type dsp, Type ret ) {
     return make(BitsFun.new_fidx(parent),nargs,dsp,ret);
