@@ -3,6 +3,7 @@ package com.cliffc.aa;
 import com.cliffc.aa.ast.*;
 import com.cliffc.aa.node.PrimNode;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.type.TypeFld.Access;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.Util;
 
@@ -56,12 +57,13 @@ public class ASTParse {
    *  stmts= [tstmt or stmt] [; stmts]*[;]?
    */
   private AST stmts() {
-    LetRec stmt = stmt(), last=null;
+    AST stmt = stmt(), last=null;
     while( stmt != null ) {
       if( !peek(';') ) return stmt;
       last = stmt;
       stmt = stmt();
-      last.addBody(stmt);
+      if( last instanceof LetRec let )
+        let.addBody(stmt);
       if( stmt == null ) {
         if( peek(';') ) { _x--; }   // Ignore empty statement
       }
@@ -76,7 +78,7 @@ public class ASTParse {
   }
 
   /** A statement is a list of variables to final-assign or re-assign... */
-  private LetRec stmt() {
+  private AST stmt() {
     if( peek('^') ) {           // Early function exit
       throw TODO();
     }
@@ -140,10 +142,10 @@ public class ASTParse {
       ifex = err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
     }
 
-    if( toks._len==0 ) return new LetRec(ifex);
+    if( toks._len==0 ) return ifex;
 
     // Assign
-    return new LetRec(toks,ifex);
+    return new LetRec(toks.at(0),ifex);
   }
 
   // Ignore the half-scope inside of trinarys
@@ -163,7 +165,9 @@ public class ASTParse {
     AST expr = apply();
     if( expr == null ) return null; // Expr is required, so missing expr implies not any ifex
     if( !peek('?') ) return expr;   // No if-expression
-    throw TODO();
+    AST t = stmt();
+    AST f = peek(':') ? stmt() : con(TypeNil.NIL);
+    return new Iff(expr,t,f);
   }
 
   /** Parse a lisp-like function application.  To avoid the common bug of
@@ -258,21 +262,40 @@ public class ASTParse {
     while( true ) {             // Repeated application or field lookup is fine
       skipWS();                 //
       if( peek('.') ) {         // Field?
-        throw TODO();
-      } else if( peek('(') ) {  // Attempt a function-call
-        throw TODO();
-      } else {
-        // Check for balanced op with a leading term, e.g. "ary [ idx ]" or
-        // "ary [ idx ]= val".
-        oldx = _x;                         // Token start
-        String tok0 = token0();
-        if( tok0!=null && Oper.is_open(tok0) ) {
-          throw TODO();
+        if( peek('(') ) throw TODO(); // Start of e0.( e1 ) syntax, TODO: bind instance fcn e1 with 'self' e0, producing a bound TFP
+        tok = field_label();
+        if( tok == null )
+          return err_ctrl2("Missing field name after '.'");
+
+        // Store or load against memory
+        if( peek(":=") || peek_not('=','=')) {
+          Access fin = _buf[_x-2]==':' ? Access.RW : Access.Final;
+          AST val = stmt();
+          if( val == null )
+            return err_ctrl2("Missing stmt after assigning field '."+tok+"'");
+          throw TODO();         // Field store
+        } else {
+          // Field load
+          n = new Field(tok,n);
         }
+
+      } else if( peek('(') ) {  // Attempt a function-call
+        oldx = _x-1;
+        var args = new Ary<>(AST.class);
+        args.add(null).add(null).add(null).add(dynCall());
+        AST arg1 = stmts();
+        if( arg1 != null ) {
+          args.add(arg1);
+          while( peek(',') ) // Final comma is optional
+            args.add(stmts());
+        }
+        require(')',oldx);
+        n = new Call(args.add(n)); // Function last
+      } else {
+        break;
+        // Check for balanced op with a leading term
+        //throw TODO();
       }
-      // Not a field, not a function call, not a balanced op, so not a term
-      _x = oldx;                // Roll back
-      break;
     }
 
     return n;
@@ -284,7 +307,10 @@ public class ASTParse {
   private AST tfact() {
     AST fact = fact();
     if( fact==null ) return null;
+    int oldx = _x;
     if( !peek(':') ) return fact;
+    Type t = type();
+    if( t==null ) { _x = oldx; return fact; } // No error for missing type, because can be ?: instead
     throw TODO();
   }
 
@@ -325,7 +351,7 @@ public class ASTParse {
 
     // Anonymous struct
     if( peek2(c,"@{") )
-      throw TODO(); // return struct();
+      return struct();
 
     // Check for a valid 'id'
     String tok = token0();
@@ -346,6 +372,36 @@ public class ASTParse {
   // Load a Call/Apply field out of a DynTable
   private AST dynCall() { return new AField(dynLoad()); }
 
+  ///** Parse a tuple; first stmt but not the ',' parsed.
+  // *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
+  // */
+  //private Node tuple(int oldx, Node s, int first_arg_start) {
+  //  // First stmt is parsed already
+  //  StructNode nn = new StructNode(0,false,errMsg(oldx) ).init();
+  //  Parse bad = errMsg(first_arg_start);
+  //  keep(nn);
+  //  nn.add_fld(TypeFld.CLZ,Access.Final, PrimNode.PCLZ, null);
+  //  _tuple(oldx,s,bad,nn,0);
+  //  Node ptr = new NewNode("NEW").init();
+  //  Node nn0 = unkeep(nn).peep(); assert nn0==nn;
+  //  mem(new StoreXNode(mem(),keep(ptr),nn0,bad).peep());
+  //  return unkeep(ptr);
+  //}
+
+
+  /** Parse anonymous struct; the opening "@{" already parsed.  A lexical scope
+   *  is made and new variables are defined here.  Next comes statements, with
+   *  each assigned value becoming a struct member, then the closing "}".
+   *    struct = \@{ stmts }
+   *  Field syntax:
+   *    id [:type] [amod [expr]]  // missing amod defaults to "id := 0"; missing expr defaults to "0"
+   */
+  private AST struct() {
+    int oldx = _x-1;              // Opening @{
+    LetRec let = (LetRec)stmts(); // Create local vars-as-fields
+    require('}',oldx);            // Matched closing }
+    return new Struct(let);
+  }
 
   /** Parse an anonymous function; the opening '{' already parsed.  After the
    *  '{' comes an optional list of arguments and a '->' token, and then any
@@ -483,6 +539,17 @@ public class ASTParse {
     }
     return sum;
   }
+
+  private String field_label() {
+    String tok = token0();      // Field name
+    if( tok == null ) {         // Not a token, check for a field number
+      int fldnum = field_number();
+      if( fldnum == -1 ) return null;
+      tok = ""+fldnum;          // Convert to a field name
+    }
+    return tok.intern();
+  }
+
 
   Type type() { return null; }
 

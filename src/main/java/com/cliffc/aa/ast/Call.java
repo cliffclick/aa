@@ -3,22 +3,29 @@ package com.cliffc.aa.ast;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.Ary;
 
 import static com.cliffc.aa.AA.*;
 
 
 public class Call extends AST {
-  public Call( AST... kids ) { super(kids); }
+  // 0 CTL - null
+  // 1 MEM - null
+  // 2 DSP - null
+  // 3 DYN - $dyn
+  // 4 ARGS- ...
+  // n FCN -
+  public Call( AST...   kids ) { super(kids); }
+  public Call( Ary<AST> kids ) { super(kids); }
 
   // fcn( . . args)
   @Override public SB str(SB sb) {
     AST fcn = _kids.last();
     fcn.str(sb);
-    assert sb.was_nl();
-    sb.unchar(2).p("(").nl().ii(1);
+    sb.p("(  ");
     for( int i=ARG_IDX+1; i<_kids._len-1; i++ )
-      _kids.at(i).str(sb);
-    return sb.di(1).ip(")").nl();
+      _kids.at(i).str(sb).p(", ");
+    return sb.unchar(2).p(")");
   }
 
   @Override public void nodes( Env e ) {
@@ -39,7 +46,6 @@ public class Call extends AST {
     Node cepi = new CallEpiNode(call).peep().keep();
     scope.ctrl(new CProjNode(cepi).peep());
     scope.mem (new MProjNode(cepi).peep()); // Return memory from all called functions
-    Node r = new ProjNode(cepi.unkeep(),REZ_IDX).peep();
-    scope.set_rez(r);
+    scope.rez (new  ProjNode(cepi.unkeep(),REZ_IDX).peep());
   }
 }

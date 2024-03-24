@@ -1,4 +1,4 @@
 // Simple if/else
-// Type: int1
-// Eval: 3
-rnd() ? 2 : 3
+// GCP: int:nint8
+// HMT: int:nint8
+math.rand(2) ? 3 : 4

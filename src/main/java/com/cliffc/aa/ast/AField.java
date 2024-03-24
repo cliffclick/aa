@@ -10,10 +10,10 @@ import static com.cliffc.aa.AA.TODO;
 
 public class AField extends AST {
   public AField( AST dyn ) { super(dyn); }
-  @Override public SB str(SB sb) { return _str(sb); }
+  @Override public SB str(SB sb) { return _kids.at(0).str(sb).p(".afield"); }
   @Override public void nodes( Env e ) {
     _kids.at(0).nodes(e);
     Node dyn = e._scope.rez();
-    e._scope.set_rez(new AFieldNode(dyn).peep());
+    e._scope.rez(new AFieldNode(dyn).peep());
   }
 }

@@ -1,4 +1,4 @@
 // Simple struct test
-// Type: *[3]@{ a=1; }
-// Eval: *[3]@{ a=1; }
-@{ a =1; }
+// GCP: *[17]@{ _; a=int:1; b=int:2; ...}
+// HMT: *[17]@{ _; a=int:1; b=int:2; }
+@{ a=1; b=2; }

@@ -17,12 +17,12 @@ public class Lambda extends AST {
   AST body() { return _kids.at(0); }
 
   @Override public SB str(SB sb) {
-    sb.ip("{ ");
+    sb.p("{ ");
     for( int i=ARG_IDX+1; i<_ids._len; i++ )
       sb.p(_ids.at(i)).p(" ");
-    sb.p("->").nl().ii(1);
-    body().str(sb);
-    return sb.di(1).ip("}").nl();
+    sb.p("->").nl();
+    body().str(sb.ii(1).i()).nl().di(1);
+    return sb.ip("}");
   }
 
   @Override public void nodes( Env outer ) {
@@ -63,7 +63,7 @@ public class Lambda extends AST {
 
       Node fptr = new FunPtrNode(ret).peep();
       // Anonymous functions early-bind.  Functions in structs become "methods" and late-bind.
-      outScope.set_rez(outScope.stk().is_closure() ? new BindFPNode(fptr,outScope.ptr()).peep() : fptr);
+      outScope.rez(outScope.stk().is_closure() ? new BindFPNode(fptr,outScope.ptr()).peep() : fptr);
     }
   }
 }

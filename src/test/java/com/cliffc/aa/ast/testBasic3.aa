@@ -1,4 +1,4 @@
 // Simple random
-// Type: int1
-// Eval: 0
-rnd
+// GCP: [14]{any,5 -> int:int64 }
+// HMT: { - - A -> int:int64 }
+math.rand

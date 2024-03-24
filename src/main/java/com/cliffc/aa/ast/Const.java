@@ -10,10 +10,10 @@ public class Const extends AST {
   public final Type _t;
   public Const( Type t ) { _t = t; }
   @Override public SB str(SB sb) {
-    return sb.ip(_t.toString()).nl();
+    return sb.p(_t.toString());
   }
 
   @Override public void nodes( Env e ) {
-    e._scope.set_rez( new ConNode(_t) );
+    e._scope.rez( new ConNode(_t) );
   }
 }

@@ -1,5 +1,5 @@
 // Simple recursive
-// Type: A
-// Eval: 2
-fact = { x -> rnd() ? fact(x) : x }
+// GCP: int:2
+// HMT: int:2
+fact = { x -> math.rand(2) ? fact(x) : x };
 fact(2)

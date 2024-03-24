@@ -14,6 +14,10 @@ import java.util.Arrays;
 import static org.junit.Assert.assertEquals;
 
 public class TestAST {
+  @Test public void testJig() throws IOException {
+    testOne(0,new File("src/test/java/com/cliffc/aa/ast/testBasic5.aa"));
+  }
+
   @Test public void testAll() throws IOException {
     testBasic();
   }
