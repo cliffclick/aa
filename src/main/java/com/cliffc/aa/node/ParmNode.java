@@ -58,7 +58,7 @@ public class ParmNode extends Node {
     // Merge all live paths
     for( int i=1; i<len; i++ ) {
       if( fun.in(i) instanceof CallNode call ) {
-        call.deps_add(this);
+        call.deps_add_live(this);
         Type tcall = call._val, t2;
         // Parm RPC grabs the RPC from the Call directly, not any Call value
         if( _idx==0 ) t2 = TypeRPC.make(call._rpc);

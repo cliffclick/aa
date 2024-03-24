@@ -37,7 +37,7 @@ public class MProjNode extends ProjNode {
         for( int i=0; i<cepi.nwired(); i++ ) {
           Node w = cepi.wired(i);
           if( w instanceof RetNode ret ) {
-            if( ret.mem()!=null ) { ret.deps_add(this); pure=false;  break; }
+            if( ret.mem()!=null ) { pure=false;  break; }
           } else { pure=false;  break; }
         }      
         if( pure )

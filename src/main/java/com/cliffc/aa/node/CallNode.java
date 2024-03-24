@@ -218,7 +218,7 @@ public class CallNode extends Node {
     // Call can skip a direct BindFP to the source of the FP itself
     if( fdx() instanceof BindFPNode bind && bind.fp()._val instanceof TypeFunPtr  )
       return GVN.add_reduce(set_fdx(bind.fp()));
-    
+
     // Have some sane function choices?
     TypeFunPtr tfp  = ttfp(tcall);
     BitsFun fidxs = tfp.fidxs();
@@ -247,7 +247,6 @@ public class CallNode extends Node {
             for( Node fuse : fun.uses() )
               if( fuse instanceof ParmNode parm ) {
                 abits &= ~(1<<parm._idx); // Arg is used
-                parm.deps_add(this);      // Arg dies, then this call improves
               }
           } else abits=0; // Root uses all
           if( abits==0 ) break;
@@ -385,7 +384,6 @@ public class CallNode extends Node {
       // Find argument getting liveness computed
       ParmNode parm = fun.parm(i);
       if( parm!=null ) {    // Parm is in use?
-        parm.deps_add(def);
         t = t.meet(parm._live); // As alive as the using Parm
         if( t == Type.ALL ) return Type.ALL;
       }

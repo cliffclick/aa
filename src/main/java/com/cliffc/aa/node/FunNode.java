@@ -210,7 +210,7 @@ public class FunNode extends Node {
     assert def instanceof CallNode;
     ParmNode pmem = parm(MEM_IDX);
     if( pmem==null ) return TypeMem.ANYMEM; // No mem parm, so pure function
-    pmem.deps_add(def);
+    pmem.deps_add_live(def);
     if( !(pmem._live instanceof TypeMem mem) ) return Type.ANY;
     // Pass through mem liveness
     return mem.kill(RootNode.KILL_ALIASES);
