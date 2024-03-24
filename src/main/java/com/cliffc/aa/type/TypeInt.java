@@ -75,7 +75,7 @@ public class TypeInt extends TypeNil<TypeInt> {
     }
     return this;
   }
-  
+
   public static TypeInt con(long con) { return make(false,false,true,0,con); }
 
   public  static final TypeInt NINT64= make(false,false, true,64,0);
@@ -153,6 +153,6 @@ public class TypeInt extends TypeNil<TypeInt> {
   public TypeInt maxsize(TypeInt ti) { return (TypeInt)meet(ti);  }
   // Shallow wrap
   public TypeMemPtr wrap() {
-    return TypeMemPtr.make(false,false,false,is_con(),BitsAlias.EMPTY,TypeStruct.make_prim(TypeFld.make_clz(TypeMemPtr.INTPTR),TypeFld.make_prim(this))); // Wrapped primitive
+    return TypeMemPtr.make(false,false,false,false,BitsAlias.EMPTY,TypeStruct.make_prim(TypeFld.make_clz(TypeMemPtr.INTPTR),TypeFld.make_prim(this))); // Wrapped primitive
   }
 }

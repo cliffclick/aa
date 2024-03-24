@@ -44,13 +44,13 @@ public class TypeFlt extends TypeNil<TypeFlt> {
     return super.equals(o) && _z==t2._z && _con==t2._con;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  
+
   @Override PENV _str0( PENV P ) {
     return _z==0
       ? P.p(_con).p(((float)_con)==_con ? "f" : "")
       : P.p(_strn()).p("flt").p(_z);
   }
-  
+
   static TypeFlt valueOfFlt(String cid) {
     if( cid==null ) return null;
     return switch(cid) {
@@ -131,9 +131,9 @@ public class TypeFlt extends TypeNil<TypeFlt> {
     return make(false,_nil,_sub,aliases,_fidxs);
   }
   @Override public boolean is_con() { return _z==0; }
-  
+
   // Shallow wrap
   public TypeMemPtr wrap() {
-    return TypeMemPtr.make(false,false,false,is_con(),BitsAlias.EMPTY,TypeStruct.make_prim(TypeFld.make_clz(TypeMemPtr.FLTPTR),TypeFld.make_prim(this))); // Wrapped primitive
+    return TypeMemPtr.make(false,false,false,false,BitsAlias.EMPTY,TypeStruct.make_prim(TypeFld.make_clz(TypeMemPtr.FLTPTR),TypeFld.make_prim(this))); // Wrapped primitive
   }
 }
