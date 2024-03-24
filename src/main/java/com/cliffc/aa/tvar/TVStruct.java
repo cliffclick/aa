@@ -8,7 +8,7 @@ import java.util.Arrays;
 
 import static com.cliffc.aa.AA.TODO;
 
-/** A type struct.  
+/** A type struct.
  *
  * Has (recursive) fields with labels.  A struct can be open or closed; open
  * structs allow more fields to appear.  Open structs come from FieldNodes
@@ -37,16 +37,16 @@ public class TVStruct extends TVExpanding {
   public static final String[] FLDS0 = new String[0];
   public static final TV3   [] TVS0  = new TV3   [0];
   public static final TVStruct STRCLZ = new TVStruct(false);
-  
+
   // True if more fields can be added.  Generally false for a known Struct, and
   // true for a Field reference to an unknown struct.
   boolean _open;
-  
+
   // The set of field labels, 1-to-1 with TV3 field contents.  Most field
   // operations are UNORDERED, so we generally need to search the fields by
   // string
   protected String[] _flds;       // Field labels
-  
+
   private int _max;             // Max set of in-use flds/args
 
   // No fields
@@ -77,7 +77,7 @@ public class TVStruct extends TVExpanding {
     _deps_work_clear();
   }
 
-  @Override public int len() { return _max; }  
+  @Override public int len() { return _max; }
 
   // Common accessor not called 'find' which already exists
   public int idx( String fld ) {
@@ -87,7 +87,7 @@ public class TVStruct extends TVExpanding {
 
   public String fld( int i ) { assert !unified();  return _flds[i]; }
   public void fld(int i,String fld) { assert !unified();  _flds[i]=fld; }
-  
+
   // Return the TV3 for field 'fld' or null if missing
   public TV3 arg(String fld) {
     assert !unified();
@@ -110,20 +110,20 @@ public class TVStruct extends TVExpanding {
     return pclz==null ? null : pclz.load().openClz();
   }
 
-  
+
   // Return the TV3 for field 'fld' or null if missing, with OUT rollups
   public TV3 debug_arg(String fld) {
     int i = idx(fld);
     return i>=0 ? debug_arg(i) : null;
   }
-  
+
   // Clazz for this struct, or null if none
   public TVPtr pclz() {
     return _max>0 && Util.eq(_flds[0],TypeFld.CLZ) ? (TVPtr)arg(0) : null;
   }
 
   @Override boolean can_progress() { throw TODO(); }
-  
+
   public boolean add_fld(String fld, TV3 tvf ) {
     assert !unified();
     boolean is_clz = Util.eq(fld,TypeFld.CLZ);
@@ -149,7 +149,7 @@ public class TVStruct extends TVExpanding {
     move_delay();
     return true;
   }
-  
+
   boolean del_fld(int idx) {
     assert !unified();
     assert !Util.eq(_flds[idx],TypeFld.CLZ); // Never remove clazz
@@ -201,9 +201,9 @@ public class TVStruct extends TVExpanding {
         // result might have a different field layout, in which case the
         // ordered visit might miss fields.  Restart unifying field by field.
         // Since unification is invariant, ok to unify some fields extra times.
-        if( lhs.unified() )     // LHS changed?  Restart loop from scratch
-          { lhs = lhs.find(); i = -1; }
-        assert !rhs.unified();
+        if( lhs.unified() )  i = -1; // LHS changed?  Restart loop from scratch
+        lhs = lhs.find();
+        rhs = rhs.find();
       } else if( rhsOpenSelf!=null ) {
         rhs.add_fld(fld,lhs.arg(i));
       } else {
@@ -231,13 +231,13 @@ public class TVStruct extends TVExpanding {
         rhs.del_fld(i--);       // Remove extras right, shuffles trailing order
       }
     }
-        
+
     return true;
   }
-  
+
   // -------------------------------------------------------------
 
-  
+
   // Fresh-Unify this into that.  Ultimately a clone of "this" will be U-F'd
   // into "that" and so all structure changes go into "that".
   @Override boolean _fresh_unify_impl(TV3 tv3, boolean test) {
@@ -315,7 +315,7 @@ public class TVStruct extends TVExpanding {
     if( test ) return ptrue();
     that.close();                     // Progress, since closing
     for( int i=0; i<_max; i++ ) {     // Walk left
-      TV3 fthat = that.arg(_flds[i]); // Search right 
+      TV3 fthat = that.arg(_flds[i]); // Search right
       if( fthat != null ) {
         arg(i)._fresh_unify(fthat,test);
         that = that.find();
@@ -357,7 +357,7 @@ public class TVStruct extends TVExpanding {
       if( cmp == 7 ) return cmp;  // Arg failed so trial fails
     }
 
-    if( pat.is_open() )   
+    if( pat.is_open() )
       return 3;            // If pattern is open, it may yet fail on new fields
     // Since pattern is closed, has to have matched all fields
     for( int i=0; i<_max; i++ )
@@ -420,7 +420,7 @@ public class TVStruct extends TVExpanding {
     if( !prims && is_str_clz() ) return dups;
     if( !prims && is_math_clz()) return dups;
     if( !prims && is_top_clz() ) return dups;
-    
+
     TV3 clz = debug_arg(TypeFld.CLZ);
     if( !debug && clz instanceof TVPtr zptr && _max==2 && debug_arg(TypeFld.PRIM)!=null ) {
       TVStruct zts = zptr.load();
@@ -432,7 +432,7 @@ public class TVStruct extends TVExpanding {
     return dups;
   }
 
-  
+
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     if( _args==null  ) return sb.p(_open ? "(...)" : "()");
     if( !prims && is_int_clz() ) return sb.p("int");
@@ -490,7 +490,7 @@ public class TVStruct extends TVExpanding {
       }
     return is;
   }
-  
+
   public static void reset_to_init0() {
     //EMPTY._deps = null;
   }
