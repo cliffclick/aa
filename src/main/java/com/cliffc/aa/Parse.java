@@ -227,7 +227,7 @@ public class Parse implements Comparable<Parse> {
     PARSE = this;               // Helps with debug printing during parsing
     Node res = stmts();
     if( res == null ) res = Env.ANY;
-    scope().set_rez(res);  // Hook result
+    scope().rez(res);           // Hook result
     // Close file scope; no more program text in this file, so no more fields to add.
     scope().stk().close();
     PARSE = null;
