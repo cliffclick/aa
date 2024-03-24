@@ -40,7 +40,7 @@ public class RegionNode extends Node {
     if( len() == 1 ) return null; // No live inputs; dead in value() call
     if( len() == 2 ) {            // Exactly 1 live path
       // If only 1 live path and no Phis then return 1 live path.
-      for( Node phi : uses() ) if( phi instanceof PhiNode ) return null;
+      for( int i=0; i<nUses(); i++ ) if( use(i) instanceof PhiNode ) return null;
       // Self-dead-cycle is dead in value() call
       return in(1)==this ? null : in(1);
     }
@@ -49,7 +49,7 @@ public class RegionNode extends Node {
       Node nif = in(1).in(0);
       if( in(1) instanceof CProjNode && nif==in(2).in(0) && nif instanceof IfNode ) {
         // Must have no phi uses
-        for( Node phi : uses() ) if( phi instanceof PhiNode ) return null;
+        for( int i=0; i<nUses(); i++ ) if( use(i) instanceof PhiNode ) return null;
         return nif.in(0);
       }
     }
