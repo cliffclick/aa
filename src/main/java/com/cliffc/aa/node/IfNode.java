@@ -9,7 +9,7 @@ import static com.cliffc.aa.AA.TODO;
 // Split control
 public class IfNode extends Node {
   public IfNode( Node ctrl, Node pred ) { super(ctrl,pred); }
-  
+
   @Override public String label() { return "If"; }
   @Override public boolean isCFG() { return true; }
   @Override public boolean isMultiHead() { return true; }
@@ -24,8 +24,8 @@ public class IfNode extends Node {
       return setDef(1,Env.ANY); // Kill test; control projections fold up other ways
 
     // Binary test vs 0?
-    if( tst.len()==3 &&
-        (tst.val(1)==TypeNil.NIL || tst.val(2)==TypeNil.NIL) ) {
+    if( tst.len()==5 &&
+        (tst.val(1)==TypeNil.NIL || tst.val(3)==TypeNil.NIL) ) {
       // Remove leading test-vs-0
       if( tst instanceof PrimNode.EQ_I64 ) throw AA.TODO();
       if( tst instanceof PrimNode.EQ_F64 ) throw AA.TODO();
@@ -79,7 +79,7 @@ public class IfNode extends Node {
     // Handle predicates, especially XNIL and wrapped ints (TypeStruct with
     // perhaps constant fields).
     if( pred == TypeNil.NIL    ) return TypeTuple.IF_FALSE; // The One True Zero
-    if( pred == TypeInt.ZERO   ) return TypeTuple.IF_FALSE; // 
+    if( pred == TypeInt.ZERO   ) return TypeTuple.IF_FALSE; //
     if( pred == TypeFlt.con(0) ) return TypeTuple.IF_FALSE; //
     if( pred == TypeNil.XSCALAR) return TypeTuple.IF_ANY;   // TODO: cleanup
     if( pred == Type.ANY       ) return TypeTuple.IF_ANY;   // TODO: cleanup
