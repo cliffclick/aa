@@ -159,7 +159,7 @@ hm_tests:	$(test_classes) build/aa.jar
 # Run standard tests
 test:	$(main_classes) $(test_classes) lib
 	@echo "  testing"
-	$(JVM2) org.junit.runner.JUnitCore com.cliffc.aa.type.TestType com.cliffc.aa.TestTVar com.cliffc.aa.TestAST com.cliffc.aa.exe.TestEXE
+	$(JVM2) org.junit.runner.JUnitCore com.cliffc.aa.type.TestType com.cliffc.aa.TestTVar com.cliffc.aa.exe.TestEXE
 
 ast:	$(main_classes) $(test_classes) lib
 	@echo "  testing"
