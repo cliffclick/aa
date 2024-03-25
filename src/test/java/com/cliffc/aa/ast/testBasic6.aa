@@ -1,8 +1,8 @@
 // Mutually recursive
-// Type: @{ someD=nint, someC=flt }
-// Eval: @{ someD=2, someC=3.14 }
-A = { x -> rnd() ? B(x) : x };
-D = {   -> rnd() ? B(1) : C(2) };
+// GCP: *[17]@{ someD=int:nint, someC=flt:3.14 }
+// HMT: *[17]@{ someD=int:nint, someC=flt:3.14 }
+A = { x -> math.rand(2) ? B(x) : x };
+D = {   -> math.rand(2) ? B(1) : C(2) };
 C = { x -> A(x) };
 B = { x -> C(x) };
-@{ someD=D(); someC=C(3.14) }
+@{ someD=D(); someC=C(3.14); }

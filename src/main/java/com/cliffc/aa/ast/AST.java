@@ -26,6 +26,15 @@ public abstract class AST {
     return sb.di(1);
   }
 
+  // Restrucure the AST to group mutual-let-recs, and allow Idents to
+  // understand the non-gen set when making Fresh types.
+  public void mutLetRec() {
+    for( AST kid : _kids )
+      if( kid != null )
+        kid.mutLetRec();
+  }
+
+
   // "print" your self AST into the Env
   abstract public void nodes( Env e );
 }

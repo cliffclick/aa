@@ -45,8 +45,10 @@ public class ASTParse {
     if( rez == null )
       return ErrMsg.syntax(null,"Not a program?");
     if( skipWS() != -1 ) return ErrMsg.trailingjunk(null);
-    // Walk for Nodes
     Root prog = new Root(rez);
+    // Walk the AST, identify mutual-let-recs
+    prog.mutLetRec();
+    // Walk for Nodes
     prog.nodes(e);
     // Close file scope; no more program text in this file, so no more fields to add.
     e._scope.stk().close();
@@ -57,19 +59,7 @@ public class ASTParse {
    *  stmts= [tstmt or stmt] [; stmts]*[;]?
    */
   private AST stmts() {
-    AST stmt = stmt(), last=null;
-    while( stmt != null ) {
-      if( !peek(';') ) return stmt;
-      last = stmt;
-      stmt = stmt();
-      if( last instanceof LetRec let )
-        let.addBody(stmt);
-      if( stmt == null ) {
-        if( peek(';') ) { _x--; }   // Ignore empty statement
-      }
-      stmt = last;
-    }
-    return last;
+    return stmt();
   }
 
   /** A type-statement assigns a type to a type variable.  */
@@ -145,7 +135,9 @@ public class ASTParse {
     if( toks._len==0 ) return ifex;
 
     // Assign
-    return new LetRec(toks.at(0),ifex);
+    require(';',0);
+    AST body = stmt();
+    return new LetRec(toks.at(0),ifex,body);
   }
 
   // Ignore the half-scope inside of trinarys
