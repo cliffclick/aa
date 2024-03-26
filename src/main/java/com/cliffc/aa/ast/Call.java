@@ -38,7 +38,7 @@ public class Call extends AST {
     }
     args[CTL_IDX] = scope.ctrl();
     args[MEM_IDX] = scope.mem();
-    args[DSP_IDX] = scope.ptr();
+    args[DSP_IDX] = new FP2DSPNode(args[_kids._len-1],null).peep();
     for( int i=ARG_IDX; i<_kids._len; i++ )
       args[i].unkeep();
     // Make the Call

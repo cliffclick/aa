@@ -212,9 +212,11 @@ abstract public class TV3 implements Cloneable {
     that._deps_work_clear();
   }
 
+  static final VBitSet MDVISIT = new VBitSet();
   void merge_delay_fresh(Ary<TVExpanding.DelayFresh>dfs) {
     if( dfs==null || dfs.len()==0 ) return;
     if( _args==null ) return;
+    if( MDVISIT.tset(_uid) ) return;
     for( int i=0; i<len(); i++ )
       if( arg(i) != null )
         arg(i).merge_delay_fresh(dfs);
@@ -312,7 +314,7 @@ abstract public class TV3 implements Cloneable {
   // tik-tok style.  Common work is in _fresh_unify, which then calls subclass
   // specific work in _fresh_unify_impl, which recursively calls back into
   // _fresh_unify.
-  
+
   // Example: 'this' == { A B -> A }, 'that' = { X Y -> Y }
   // After fresh unify 'this' is ALWAYS unchanged, but X and Y are forced to be
   // unified because 'this' return is the same as arg0, and 'that' return is
@@ -321,7 +323,7 @@ abstract public class TV3 implements Cloneable {
   // Also, future changes to either A or B have to be reflected in XY, which is
   // the job of delay_fresh.
 
-  
+
   static private final IdentityHashMap<TV3,TV3> VARS = new IdentityHashMap<>();
   // A per-fresh-unify DelayFresh
   static TVExpanding.DelayFresh FRESH_ROOT;
@@ -431,14 +433,14 @@ abstract public class TV3 implements Cloneable {
       VARS.put(this,val=val.find());
     return val;
   }
-  
+
   boolean vcrisscross(boolean test) {
     // Check for a cycle from the Fresh side to the That side.
     // If found, need to unify (not fresh).
     TV3 cyclic = vget();
     return cyclic !=null && this != cyclic && cyclic._unify(this,test);
   }
-  
+
   // This is fresh, and neither is a TVErr, and they are different classes
   boolean _fresh_unify_err(TV3 that, boolean test) {
     assert !(this instanceof TVErr) && !(that instanceof TVErr);
@@ -478,7 +480,7 @@ abstract public class TV3 implements Cloneable {
     FRESH_ROOT = null;
     return rez;
   }
-  
+
   TV3 _fresh() {
     assert !unified();
     TV3 rez = vget();
@@ -552,7 +554,7 @@ abstract public class TV3 implements Cloneable {
   int _trial_unify_ok(TV3 pat) {
     if( this==pat ) return 1; // hard-yes
     assert !unified() && !pat.unified();
-    
+
     // Symmetric test for trial on a pair; only do the trial once (lest we
     // endlessly recurse), and assume a YES here and let the fail happen
     // elsewhere (if any).  Means trials of matching cycles will be a YES.
@@ -623,7 +625,7 @@ abstract public class TV3 implements Cloneable {
     }
     return true;
   }
-  
+
   // -----------------
 
   // Recursively add 'n' to 'this' and all children.

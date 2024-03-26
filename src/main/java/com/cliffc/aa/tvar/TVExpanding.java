@@ -26,7 +26,7 @@ abstract public class TVExpanding extends TV3 {
 
   TVExpanding() { this(null); }
   TVExpanding( TV3[]tvs ) { super(tvs); }
-  
+
   // -----------------
   static abstract class DelayUpdate {
     TV3 _lhs, _rhs;
@@ -80,8 +80,8 @@ abstract public class TVExpanding extends TV3 {
       return "delayed_fresh_unify["+_lhs+" to "+_rhs+", "+ Arrays.toString( _nongen ) +"]";
     }
   }
-  
-  
+
+
   // Used by FreshNode to mark delay_fresh on all nongen parts
   public void make_nongen_delay(TV3 rhs, TV3[] nongen, FreshNode frsh ) {
     assert !rhs.unified();
@@ -113,7 +113,9 @@ abstract public class TVExpanding extends TV3 {
 
   // Union this into that.  Merge the delay worklist
   @Override public void _union_delay(TV3 that) {
+    assert MDVISIT.isEmpty();
     that.merge_delay_fresh(_delay_fresh);
+    MDVISIT.clear();
     move_delay();
   }
 

@@ -1,8 +1,9 @@
 // Mutually recursive
-// GCP: *[17]@{ someD=int:nint, someC=flt:3.14 }
-// HMT: *[17]@{ someD=int:nint, someC=flt:3.14 }
-A = { x -> math.rand(2) ? B(x) : x };
-D = {   -> math.rand(2) ? B(1) : C(2) };
+// GCP: *[22]@{ _; someC=PA:*[]@{^=$[5,6](...); _=%[5,6][]; $nil}?; someD=PA; ...}
+// HMT: *[22]@{ _; someC= A:*[]@{*[5,6]B:@{_;_*_=*[12,14](_,{C:*[]@{*[5,6]B;_=%[5,6][]?;}-C->C},{C-C->C});_+_=*[11,13](_,{C-C->C},{C-C->C});};_=%[5,6][];}; someD= A; }
+A = { x -> E() ? B(x) : x };
+D = {   -> E() ? B(1) : C(2) };
 C = { x -> A(x) };
 B = { x -> C(x) };
+E = {   -> math.rand(2) };
 @{ someD=D(); someC=C(3.14); }

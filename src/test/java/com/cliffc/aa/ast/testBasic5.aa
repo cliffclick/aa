@@ -1,5 +1,6 @@
-// Simple recursive
-// GCP: int:2
-// HMT: int:2
+// Simple recursive. GCP conflates the two argument types, HMT does not.
+// GCP: *[18]@{ _; a=PA:*[]@{^=$[5,6](...); _=%[5,6][]; $nil}?; b=PA; ...}
+// HMT: *[18]@{ _; a=int:2; b=flt:3.14; }
 fact = { x -> math.rand(2) ? fact(x) : x };
-fact(2)
+@{ a = fact(2); b = fact(3.14); }
+

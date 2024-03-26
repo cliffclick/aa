@@ -7,6 +7,7 @@ import com.cliffc.aa.util.SB;
 public abstract class AST {
   // AST is a Abstract Syntax *TREE*
   public final Ary<AST> _kids;
+  AST _par;                     // Parent
 
   AST(Ary<AST> kids) { _kids = kids; }
   AST(AST... kids) { this(new Ary(kids)); }
@@ -28,10 +29,13 @@ public abstract class AST {
 
   // Restrucure the AST to group mutual-let-recs, and allow Idents to
   // understand the non-gen set when making Fresh types.
-  public void mutLetRec() {
+  public int mutLetRec() {
     for( AST kid : _kids )
-      if( kid != null )
+      if( kid != null ) {
+        kid._par = this;        // Set parents
         kid.mutLetRec();
+      }
+    return 0;
   }
 
 

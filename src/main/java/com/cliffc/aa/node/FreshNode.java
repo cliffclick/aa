@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVExpanding;
@@ -26,6 +25,7 @@ public class FreshNode extends Node {
         addDef(stk.in(i));
     }
   }
+  public FreshNode( Node id ) { super(id); }
 
   @Override public String label() { return "Fresh"; }
   public Node id() { return in(0); } // The HM identifier
@@ -53,6 +53,7 @@ public class FreshNode extends Node {
     TV3 tv = _tvar = new TVLeaf();
     tv.deps_add_deep(this);
     if( len()>1 ) {
+      _nongen = new TV3[len()-1];
       for( int i = 1; i < len(); i++ )
         _nongen[i - 1] = in(i).set_tvar();
       TV3 id = id().set_tvar();
@@ -65,7 +66,7 @@ public class FreshNode extends Node {
   @Override public boolean unify( boolean test ) {
     TV3 fresh = id().tvar(), that = tvar();
     //return fresh.fresh(this,_nongen).unify(that,test);
-    return fresh.fresh_unify(null,_nongen,that,test);
+    return fresh.fresh_unify(this,_nongen,that,test);
   }
   // Two FreshNodes are only equal, if they have compatible TVars
   @Override public boolean equals(Object o) {
