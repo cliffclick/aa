@@ -140,7 +140,7 @@ public abstract class Combo {
 
 
   static final HashSet<DynLoadNode> DYNS = new HashSet<>();
-  
+
   public static void opto() {
     assert Env.GVN.work_is_clear();
     // This pass LIFTS not FALLs
@@ -224,10 +224,6 @@ public abstract class Combo {
         if( n instanceof CallNode call ) call.cepi().CG_wire();
         if( n instanceof RootNode root ) root.CG_wire();
       }
-
-      //if( Env.GVN.flow_len()==0 && !Resolvable.RESOLVINGS.isEmpty() )
-      //  for( Resolvable r : Resolvable.RESOLVINGS.values() )
-      //    r.trial_resolve(false); // Do delayed resolve
 
       // Very expensive assert: everything that can make progress is on worklist
       assert NodeUtil.more_work(Env.ROOT)==0;

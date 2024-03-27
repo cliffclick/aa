@@ -158,7 +158,7 @@ public class FunNode extends Node {
   private boolean all_uses_are_wired(FunPtrNode fptr) {
     for( int i=0; i<fptr.nUses(); i++ ) {
       Node use = fptr.use(i);
-      use.deps_add(this);
+      use.deps_add_live(this);
       if( !use_is_wired(fptr,use) )
         return false;
     }

@@ -64,13 +64,13 @@ public class Lambda extends ASTVars {
       RetNode ret = new RetNode(inScope.ctrl(),inScope.mem(),inScope.rez(),rpc,_fun).init();
 
       Node fptr = new FunPtrNode(ret).peep();
-      // Anonymous functions early-bind.  Functions in structs become "methods" and late-bind.
-      outScope.rez(outScope.stk().is_closure() ? new BindFPNode(fptr,outScope.ptr()).peep() : fptr);
+      // No early bind; callers do a lookup first - which binds AFTER the Fresh.
+      outScope.rez(fptr);
     }
   }
 
   @Override void addNonGen(FreshNode frsh) {
-    for( int i=DSP_IDX; i<_vars._len; i++ )
+    for( int i=ARG_IDX; i<_vars._len; i++ )
       frsh.addDef(_fun.parm(i));
   }
 }

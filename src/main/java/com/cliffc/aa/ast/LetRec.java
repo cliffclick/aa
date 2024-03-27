@@ -195,6 +195,7 @@ public class LetRec extends ASTVars {
         fref.subsume(def);
       }
     }
+    _oldx = _stk.len();
     // Now the body
     body().nodes(e);
   }
