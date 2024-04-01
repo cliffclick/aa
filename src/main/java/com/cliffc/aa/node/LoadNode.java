@@ -321,7 +321,7 @@ public class LoadNode extends Node {
 
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
-    if( !_known ) throw TODO();
+    //if( !_known ) throw TODO();
     // Load takes a pointer
     TV3 ptr0 = adr().set_tvar();
     TVPtr ptr;

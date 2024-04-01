@@ -27,7 +27,7 @@ public abstract class AST {
     return sb.di(1);
   }
 
-  // Restrucure the AST to group mutual-let-recs, and allow Idents to
+  // Restructure the AST to group mutual-let-recs, and allow Idents to
   // understand the non-gen set when making Fresh types.
   public int mutLetRec() {
     for( AST kid : _kids )
@@ -41,4 +41,10 @@ public abstract class AST {
 
   // "print" your self AST into the Env
   abstract public void nodes( Env e );
+
+  // Hunt for a matching LetRec
+  LetRec redef( String var ) {
+    return _par==null ? null : _par.redef(var);
+  }
+
 }

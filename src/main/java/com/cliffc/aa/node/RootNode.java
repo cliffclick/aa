@@ -76,6 +76,8 @@ public class RootNode extends Node {
 
     // Primitive memory
     TypeMem tmem = (TypeMem)val(ARG_IDX);
+    if( val(MEM_IDX) instanceof TypeMem vmem )
+      tmem = (TypeMem)tmem.meet(vmem);
 
     // Conservative final result.  Until Combo external calls can still wire, and escape arguments
     if( Combo.pre() )

@@ -1,11 +1,8 @@
 package com.cliffc.aa.ast;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.node.FreshNode;
-import com.cliffc.aa.node.Node;
+import com.cliffc.aa.node.*;
 import com.cliffc.aa.util.SB;
-
-import static com.cliffc.aa.AA.TODO;
 
 
 public class Ident extends AST {
@@ -23,10 +20,20 @@ public class Ident extends AST {
     return 0;
   }
   @Override public void nodes( Env e ) {
-    Node x = e.lookup(_name);
-    if( x==null ) throw TODO();
+    // Load the ident from the correct scope, issuing a linked list of display
+    // loads along the way.
+    Env e2 = e;
+    Node ptr = e2._scope.ptr();
+    while( e2._scope.stk().find(_name) == -1 ) {
+      assert e2._scope.stk().is_closure(); // TODO: only skip up fcn closures
+      ptr = new LoadNode(e._scope.mem(),ptr,"^",false,true,null).peep();
+      e2 = e2._par;
+    }
+    Node ld = new LoadNode(e._scope.mem(),ptr,_name,false,true,null).peep();
+    Node x  = new BindFPNode(ld,ptr,0).peep();
 
-    // Find a defining LetRec, or null for lambdas and primitives.
+    // Find a defining LetRec, or null for lambdas and primitives.  This loop
+    // crawls all the way up to Root, including past the point of definition.
     for( AST par = _par, old=null; par != null; old = par, par = par._par )
       if( par instanceof LetRec let && let._vars.find(_name) != -1 &&
           // If the ident comes from the body side, needs a Fresh

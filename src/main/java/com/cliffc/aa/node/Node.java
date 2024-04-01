@@ -8,12 +8,10 @@ import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.util.*;
-
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.IntSupplier;
-
 import static com.cliffc.aa.AA.TODO;
 import static com.cliffc.aa.Env.GVN;
 

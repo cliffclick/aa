@@ -56,8 +56,8 @@ public class BindFPNode extends Node {
   // - +1 - always a good Bind
   // -  0 - maybe; good if gets an unbounds DSP on flow during Combo; cant tell during Combo.pre
   // - -1 - BAD; double-bind during Combo, or local double-bind.
-  byte _good;  // 
-  
+  byte _good;  //
+
   public BindFPNode( Node fp, Node dsp ) { this(fp,dsp,1); }
   public BindFPNode( Node fp, Node dsp, int good ) { super(fp,dsp); _good = (byte)good; }
   @Override public String label() {return "BindFP"; }
@@ -70,69 +70,62 @@ public class BindFPNode extends Node {
   boolean isBad  () { return _good==-1; }
   boolean isMaybe() { return _good== 0; }
 
-  
-  // BindFP unifies its display and self.  
+
+  // BindFP unifies its display and self.
   // BindFP must be monotonic!
   // - if input has a display, flow passes display thru, and unifies straight thru.
   // - if input has  !display, flow sets display, and unifies display with the TFP display.
   //   - TFP.DISPLAY  DISPLAY
   //   -   NO_DSP      ANY    - UNKN Pass along no-dsp .
   //   -   NO_DSP      XXX    - BIND Pass along XXX dsp.  Unify TFP.DSP and DSP.
-  //   -  HAS_DSP      ANY    - NOOP Pass along has-dsp.  
-  //   -  HAS_DSP      XXX    - EXTR Pass along has-dsp.  
+  //   -  HAS_DSP      ANY    - NOOP Pass along has-dsp.
+  //   -  HAS_DSP      XXX    - EXTR Pass along has-dsp.
   @Override public Type value() {
-    Type fun = fp ()._val;
-    if( localDoubleBind() ) setBad();
-    // Known bad, awaiting deletion
-    if( isBad() )
-      return fun;
-    
-    // Push Bind down into overloads
-    if( fun instanceof TypeMemPtr tmp ) {
-      if( tmp.is_prim() ) { setBad(); return fun; }
-      // Expect fun to be simple
-      assert tmp.is_simple_ptr();
-      // Get the sharper memory struct
-      TypeMem mem = (TypeMem)in(0).in(AA.MEM_IDX)._val;
-      TypeStruct ts = mem.ld(tmp);
-      // Bind all the functions
-      TypeFld[] tfs = TypeFlds.get(ts.len());
-      for( int i=0; i<ts.len(); i++ ) {
-        TypeFld fld = ts.get(i);
-        tfs[i] = Util.eq(fld._fld,TypeFld.CLZ) ? fld : fld.make_from(bind(fld._t));
-      }
-      return tmp.make_from(ts.make_from(tfs));
-    } else
-      return bind(fun);
+    Type fun = fp()._val;
+    if( localDoubleBind() ) return fun; // Known bad
+
+    //// Push Bind down into overloads
+    //if( fun instanceof TypeMemPtr tmp ) {
+    //  if( tmp.is_prim() ) return fun;
+    //  // Expect fun to be simple
+    //  assert tmp.is_simple_ptr();
+    //  // Get the sharper memory struct
+    //  TypeMem mem = (TypeMem)dsp()._val;
+    //  TypeStruct ts = mem.ld(tmp);
+    //  // Bind all the functions
+    //  TypeFld[] tfs = TypeFlds.get(ts.len());
+    //  for( int i=0; i<ts.len(); i++ ) {
+    //    TypeFld fld = ts.get(i);
+    //    tfs[i] = Util.eq(fld._fld,TypeFld.CLZ) ? fld : fld.make_from(bind(fld._t));
+    //  }
+    //  return tmp.make_from(ts.make_from(tfs));
+    //} else
+    return bind(fun);
   }
 
   Type bind(Type fun) {
     Type dsp = dsp()._val;
     if( fun instanceof TypeMemPtr tmp ) {
-      assert tmp.is_prim();
-      setBad();
+      //assert tmp.is_prim();
       return fun;
     }
-    assert !(fun instanceof TypeMemPtr);
-    if( !(fun instanceof TypeFunPtr tfp) ) {
-      if( !canBeFun(fun) ) setBad();
+    if( !(fun instanceof TypeFunPtr tfp) )
       return fun;
-    }
-    
+
     if( !Combo.pre() ) {
       // Double-bind is bad during and after Combo
-      if( tfp.has_dsp() ) { setBad(); return fun; }
+      if( tfp.has_dsp() ) return fun;
     }
-    // Pre-combo, GOOD binds force DSP, MAYBEs meet
-    return tfp.make_from(isGood() ? dsp : tfp.dsp().meet(dsp));
+    // Pre-combo meet
+    return tfp.make_from(tfp.dsp().meet(dsp));
   }
-  
+
   // Bind-after-Bind is always bad
   private boolean localDoubleBind() {
     return dsp() instanceof BindFPNode;
   }
 
-  
+
   // Displays are always alive, if the Bind is alive.  However, if the Bind is
   // binding an overload the result is a struct-liveness instead just ALL.
   @Override public Type live_use( int i ) {
@@ -140,7 +133,7 @@ public class BindFPNode extends Node {
     // - The funptr  should be a TFP, and liveness flows
     return _live instanceof TypeStruct ts ? ts.at_def(i==0 ? "fp" : "dsp") : _live;
   }
-  
+
   @Override public boolean assert_live(Type live) {
     if( !(live instanceof TypeStruct ts) ) return false;
     // Normal binds allow on fields "fp" and "dsp"
@@ -157,12 +150,12 @@ public class BindFPNode extends Node {
       ? fpv.isa(TypeFunPtr.GENERIC_FUNPTR)
       : TypeFunPtr.GENERIC_FUNPTR.dual().isa(fpv);
   }
-  
+
   @Override public Node ideal_reduce() {
     // Locally broken
     if( localDoubleBind() )
       setBad();
-    
+
     // Check that this is a "maybe Bind"
     if( isMaybe() ) {
       Type fpv = fp()._val;
@@ -188,7 +181,7 @@ public class BindFPNode extends Node {
     } else deps_add(this);      // Liveness changes, recheck
     return null;
   }
-  
+
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
     dsp().set_tvar();
@@ -228,13 +221,13 @@ public class BindFPNode extends Node {
     // Already bound, do not bind again
     return false; // dsp0.unify(dsp1,test);
   }
-  
+
   // Error to double-bind
   @Override public ErrMsg err( boolean fast ) {
     if( fp()._val instanceof TypeFunPtr tfp && tfp.has_dsp() &&
         dsp()._val != Type.ANY )
       throw TODO();
     return null;
-  }  
- 
+  }
+
 }

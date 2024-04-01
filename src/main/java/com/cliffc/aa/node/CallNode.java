@@ -367,8 +367,8 @@ public class CallNode extends Node {
     // use the call input.  Post-Combo, all is wired, but dead Calls might be
     // unwinding.
     if( val(0)==Type.XCTRL ) return Type.ANY;
-    CallEpiNode cepi = cepi();
     deps_add_live(def);
+    CallEpiNode cepi = cepi();
     if( cepi==null || !cepi.is_CG(true) ) {
       return Type.ALL.oob(Combo.post());
     }
@@ -386,6 +386,7 @@ public class CallNode extends Node {
       if( parm!=null ) {    // Parm is in use?
         t = t.meet(parm._live); // As alive as the using Parm
         if( t == Type.ALL ) return Type.ALL;
+        parm.deps_add(def);
       }
     }
     return t;

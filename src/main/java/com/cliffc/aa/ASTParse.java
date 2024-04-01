@@ -137,7 +137,7 @@ public class ASTParse {
     // Assign
     require(';',0);
     AST body = stmt();
-    return new LetRec(toks.at(0),ifex,body);
+    return new LetRec(toks.at(0),rs.get(0),ifex,body);
   }
 
   // Ignore the half-scope inside trinarys

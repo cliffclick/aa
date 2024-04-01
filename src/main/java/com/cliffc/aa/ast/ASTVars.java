@@ -17,4 +17,6 @@ public abstract class ASTVars extends AST {
   abstract int addEdge(int to);
 
   abstract void addNonGen(FreshNode frsh);
+
+  int find(String var) { return _vars.find(var); }
 }

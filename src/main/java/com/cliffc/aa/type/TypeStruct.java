@@ -324,7 +324,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
 
   // Most general dyn table
   public static final TypeStruct DYNTABLE = ISUSED;
-  
+
   // Pile of sample structs for testing
   static final TypeStruct[] TYPES = new TypeStruct[]{ISUSED,POINT,A,C0,D1,ARW};
 
@@ -736,7 +736,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     ts._flds[idx] = nfld;
     return ts.remove_dups_hashcons().hashcons_free();
   }
-  
+
   // Flatten fields for LIVE: only need a per-field any/all indication
   public TypeStruct flatten_live_fields() {
     boolean change=false;
@@ -757,14 +757,14 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     flds[idx] = TypeFld.make(fld,ANY);
     return make_from(flds);
   }
-  
+
   @Override public TypeStruct sharptr2( TypeMem mem ) {
     TypeFld[] flds = TypeFlds.clone(_flds);
     for( int i=0; i<flds.length; i++ )
       flds[i] = flds[i].sharptr2(mem);
     return make_from(flds);
   }
-  
+
   @Override public boolean is_con() {
     if( !_def.is_con() ) return false;
     if( is_prim() )

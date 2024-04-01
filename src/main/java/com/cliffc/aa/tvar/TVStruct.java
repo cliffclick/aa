@@ -152,7 +152,6 @@ public class TVStruct extends TVExpanding {
 
   boolean del_fld(int idx) {
     assert !unified();
-    assert !Util.eq(_flds[idx],TypeFld.CLZ); // Never remove clazz
     _args[idx] = _args[_max-1];
     _flds[idx] = _flds[_max-1];
     _max--;

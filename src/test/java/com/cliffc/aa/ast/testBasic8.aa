@@ -1,0 +1,15 @@
+// Mutually recursive.
+// Uses the display in a meaningful way (sorta).
+// Intended to force keeping the display Parm alive in the functions, while
+// keeping the types of {A,B} still polymorphic
+
+// GCP: *[21]@{ _; init=nil  ; rez0=PA:*[18]@{ _; afld=[20][] ; bfld=nint8; ...}; rez1=PA; ...}
+// HMT: *[21]@{ _; init=nint8; rez0=   *[18]@{ _; afld=flt:1.2; bfld=nint8;    }; rez1=*[18]@{_;afld=*[20]@{_;c=int:3;};bfld=nint8;};}
+
+init := 0;
+A_noinline = { x -> math.rand(2) ? B_noinline(x) : @{afld = x; bfld = init; } };
+B_noinline = { x -> A_noinline(x) };
+rez0 = A_noinline(1.2);
+init := 7;
+rez1 = B_noinline(@{c=3; });
+@{ rez0=rez0; rez1=rez1; init=init; }
