@@ -23,7 +23,7 @@ public abstract class AST {
     sb.p(getClass().getSimpleName()).nl().ii(1);
     for( AST kid : _kids )
       if( kid!=null )
-        kid.str(sb);
+        kid.str(sb.i()).nl();
     return sb.di(1);
   }
 

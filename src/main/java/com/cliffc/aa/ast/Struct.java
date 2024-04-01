@@ -19,7 +19,7 @@ public class Struct extends AST {
 
   // @{ fld0=expr0; ... }
   @Override public SB str(SB sb) {
-    sb.ip("@{").nl().ii(1);
+    sb.p("@{").nl().ii(1);
     for( int i=0; i<_vars._len; i++ )
       _kids.at(i).str(sb.ip(_vars.at(i)).p(" = ")).p(";").nl();
     return sb.di(1).ip("}");

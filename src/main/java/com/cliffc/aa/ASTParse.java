@@ -140,7 +140,7 @@ public class ASTParse {
     return new LetRec(toks.at(0),ifex,body);
   }
 
-  // Ignore the half-scope inside of trinarys
+  // Ignore the half-scope inside trinarys
   private boolean testIf() {
     return false;
   }

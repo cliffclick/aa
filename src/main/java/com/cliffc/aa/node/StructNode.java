@@ -155,8 +155,8 @@ public class StructNode extends Node {
 
   // Set a replacement field in a Struct.  Fails if trying to replace a final
   // field.
-  public boolean set_fld(String id, TypeFld.Access access, Node val, boolean force ) {
-    int idx = find(id);
+  public boolean set_fld(String fld, TypeFld.Access access, Node val, boolean force ) {
+    int idx = find(fld);
     if( !force && _accesses.at(idx) == TypeFld.Access.Final ) return false;
     setDef(idx,val);
     _accesses.set(idx,access);

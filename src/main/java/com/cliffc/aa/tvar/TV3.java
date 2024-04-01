@@ -5,9 +5,7 @@ import com.cliffc.aa.Parse;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
-
 import java.util.IdentityHashMap;
-
 import static com.cliffc.aa.AA.TODO;
 
 /** Type variable base class

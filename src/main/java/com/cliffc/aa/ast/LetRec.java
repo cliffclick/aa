@@ -5,9 +5,7 @@ import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.TypeFld.Access;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
-
 import java.util.Arrays;
-
 import static com.cliffc.aa.AA.TODO;
 
 
@@ -33,8 +31,7 @@ public class LetRec extends ASTVars {
   @Override public SB str(SB sb) {
     for( int i=0; i<_vars._len; i++ ) {
       sb.p(_vars.at(i)).p(" = ");
-      _kids.at(i).str(sb);
-      sb.p(";").nl().i();
+      _kids.at(i).str(sb).p(";").nl().i();
     }
     return body()==null ? sb : body().str(sb);
   }
@@ -180,6 +177,7 @@ public class LetRec extends ASTVars {
     for( String var : _vars ) {
       ForwardRefNode fref = new ForwardRefNode(var,null).init();
       fref.scope();
+      // TODO: Preserve Access mode
       _stk.add_fld(var,Access.Final,fref,null);
     }
     for( int i=0; i<_vars._len; i++ ) {
