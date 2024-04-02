@@ -1,7 +1,6 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
-import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV3;
@@ -87,8 +86,9 @@ public class StoreXNode extends StoreAbs {
     for( int alias : aliases ) {
       // Each alias unifies into the global field state
       TVPtr nptr = (TVPtr)(NewNode.get(alias)).tvar();
-      progress |= nptr.load().unify(ts,test);
+      progress |= nptr.load().fresh_unify(null,null,ts,test);
       if( test && progress ) return true;
+      ts = ts.find();
     }
     return progress;
   }

@@ -190,7 +190,7 @@ abstract public class TV3 implements Cloneable {
     _union_impl(that); // Merge subclass specific bits into that
     that.widen(_widen,false);
 
-    // Move delayed-fresh & delay-resolve updates onto the not-delayed list
+    // Move delayed-fresh updates onto the not-delayed list
     _union_delay(that);
     // Add Node updates to _work_flow list
     that._union_deps(this);
@@ -663,6 +663,8 @@ abstract public class TV3 implements Cloneable {
   private void _reset_deps() {
     if( DEPS_VISIT.tset(_uid) ) return;
     if( _deps!=null ) _deps = null;
+    if( this instanceof TVExpanding tex && tex._delay_fresh != null )
+      tex._delay_fresh.clear();
     if( _args!=null )
       for( int i=0; i<len(); i++ )
         if( _args[i]!=null )

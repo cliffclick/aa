@@ -251,16 +251,15 @@ public class TVStruct extends TVExpanding {
   }
 
   private boolean _fresh_unify_impl_open (TVStruct that, boolean test ) {
-    assert pclz()==null && that.pclz()==null; // No CLZ on open
     // Walk left, search right
     // If found, unify
     // else add right
     boolean progress = false;
-    for( int i=0; i<_max; i++ ) {         // Walk left
-      TV3 fthat = that.arg(_flds[i]);     // Search right
+    for( int i=0; i<_max; i++ ) {         // Walk left (Fresh)
+      TV3 fthat = that.arg(_flds[i]);     // Local search right (that)
       if( fthat != null ) {
-        progress |= fthat.vcrisscross(test);
-        progress |= arg(i)._fresh_unify(fthat,test); // Unify
+        progress |= fthat.vcrisscross(test); // If cross-coss, normal unify
+        progress |= arg(i)._fresh_unify(fthat,test); // Fresh-Unify
       } else {
         progress |= that.add_fld(_flds[i],arg(i)._fresh()); // Not found so add fresh
       }
@@ -269,7 +268,7 @@ public class TVStruct extends TVExpanding {
   }
 
   private boolean _fresh_unify_impl_close(TVStruct that, boolean test) {
-    assert pclz()!=null && that.pclz()!=null; // Both have CLZ (only fails for CLZCLZ which is always EQ so doesn't get here)
+    //assert pclz()!=null && that.pclz()!=null; // Both have CLZ (only fails for CLZCLZ which is always EQ so doesn't get here)
     // Walk left, search right (local no CLZ)
     // If found, fresh_unify
     // else ignore (del right) & assert not in CLZ
@@ -310,7 +309,6 @@ public class TVStruct extends TVExpanding {
 
   // Closed on left, open on right.  Will jam a fresh CLZ into RHS.
   private boolean _fresh_unify_impl_mix_close(TVStruct that, boolean test) {
-    assert pclz()!=null && that.pclz()==null; // Close on left, open on right
     if( test ) return ptrue();
     that.close();                     // Progress, since closing
     for( int i=0; i<_max; i++ ) {     // Walk left

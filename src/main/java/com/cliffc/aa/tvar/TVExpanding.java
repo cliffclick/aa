@@ -184,17 +184,9 @@ abstract public class TVExpanding extends TV3 {
     return true;
   }
 
-  void add_delay_resolve(TVStruct tvs) {
-    //if( _delay_resolve==null ) _delay_resolve = new Ary<>(new TVStruct[1],0);
-    //if( _delay_resolve.find(tvs)== -1 )
-    //  _delay_resolve.push(tvs);
-    throw TODO();
-  }
-
   @Override public TVExpanding copy() {
     TVExpanding tex = (TVExpanding)super.copy();
     tex._delay_fresh = null;
-    //tex._delay_resolve = null;
     return tex;
   }
 

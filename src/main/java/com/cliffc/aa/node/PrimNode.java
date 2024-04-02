@@ -58,7 +58,6 @@ public abstract class PrimNode extends Node {
   public static final NewNode PFLT = new NewNode("FLT",BitsAlias.FLTX,true);
   public static final NewNode PSTR = new NewNode("STR",BitsAlias.STRX,true); // String clazz, not strings
   public static final NewNode PMATH= new NewNode("MATH",BitsAlias.new_alias(BitsAlias.LOCX),true);
-  public static TV3 IINT, IBOOL, IFLT, INFLT; // Integer, float instances
 
   private static PrimNode[] PRIMS = null; // All primitives
 
@@ -145,19 +144,14 @@ public abstract class PrimNode extends Node {
     // Math package
     Env.STK_0.add_fld("math",Access.Final,make_math(rand),null).xval();
 
-    // TVar for wrapped primitive instance
-    String[] ss  = new String[]{TypeFld.CLZ,TypeFld.PRIM};
-    IINT  = new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PINT.set_tvar(),new TVBase(TypeInt. INT64)},false));
-    IBOOL = new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PINT.set_tvar(),new TVBase(TypeInt. BOOL )},false));
-    IFLT  = new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.set_tvar(),new TVBase(TypeFlt. FLT64)},false));
-    INFLT = new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.set_tvar(),new TVBase(TypeFlt.NFLT64)},false));
-
     Env.ROOT.setDef(CTL_IDX,Env.CTL_0);
     Env.ROOT.setDef(MEM_IDX,Env.MEM_0);
     Env.ROOT.setDef(REZ_IDX,Env.ALL);
 
 
     // Set all TVars
+    PINT.set_tvar();
+    PFLT.set_tvar();
     Env.ROOT.walk( n -> {
         Env.GVN.add_flow(n);
         if( n.has_tvar() ) n.set_tvar();
@@ -182,6 +176,14 @@ public abstract class PrimNode extends Node {
     PRIMS = allprims.asAry();
     return PRIMS;
   }
+
+  // Make a fresh HMT wrapped int
+  private static final String[] ss  = new String[]{TypeFld.CLZ,TypeFld.PRIM};
+  final static TVPtr IINT () { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PINT.tvar(),new TVBase(TypeInt. INT64)},false)); }
+  final static TVPtr IBOOL() { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PINT.tvar(),new TVBase(TypeInt. BOOL )},false)); }
+  final static TVPtr  IFLT() { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.tvar(),new TVBase(TypeFlt. FLT64)},false)); }
+  final static TVPtr INFLT() { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.tvar(),new TVBase(TypeFlt.NFLT64)},false)); }
+
 
   static boolean chk(Node n) {
     boolean b0 = n.value()==n._val ;
@@ -337,7 +339,7 @@ public abstract class PrimNode extends Node {
     return (TypeNil)tmp._obj.at(TypeFld.PRIM);
   }
 
-  
+
   @Override public Node ideal_reduce() { return in(0)==this ? Env.ANY : null; }
 
   @Override public boolean has_tvar() { return true; }
@@ -356,17 +358,17 @@ public abstract class PrimNode extends Node {
       in(2).set_tvar().unify(wrap_base(_formals.at(ARG_IDX+1)),false);
       assert len()==3;
     }
-      
+
     // Return is some primitive
     return wrap_base(_ret);
   }
 
   // Make a TV3
   public static TV3 wrap_base(Type rez) {
-    if( rez == TypeInt. INT64 )  return  IINT;
-    if( rez == TypeInt. BOOL  )  return IBOOL;
-    if( rez == TypeFlt. FLT64 )  return  IFLT;
-    if( rez == TypeFlt.NFLT64 )  return INFLT;
+    if( rez == TypeInt. INT64 )  return  IINT();
+    if( rez == TypeInt. BOOL  )  return IBOOL();
+    if( rez == TypeFlt. FLT64 )  return  IFLT();
+    if( rez == TypeFlt.NFLT64 )  return INFLT();
     throw TODO();
   }
 
