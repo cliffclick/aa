@@ -843,8 +843,8 @@ public abstract class Node implements Cloneable, IntSupplier {
   private void _walk( NodeMap map ) {
     if( WVISIT.tset(_uid) ) return; // Been there, done that
     map.map(this);
-    for( Node def : defs() )  if( def != null )  def._walk(map);
-    for( Node use : uses() )  if( use != null )  use._walk(map);
+    for( int i=0; i< _len; i++ ) if( _defs[i] != null ) _defs[i]._walk(map);
+    for( int i=0; i<_ulen; i++ ) if( _uses[i] != null ) _uses[i]._walk(map);
   }
 
   // Map takes and updates/reduces int x.
@@ -862,8 +862,8 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( WVISIT.tset(_uid) ) return x; // Been there, done that
     int x2 = map.map(this,x);
     if( x2 == -1 ) return x;
-    for( Node def : defs() )  if( def != null )  x2 = def._walkR(map,x2);
-    for( Node use : uses() )  if( use != null )  x2 = use._walkR(map,x2);
+    for( int i=0; i< _len; i++ ) if( _defs[i] != null ) x2 = _defs[i]._walkR(map,x2);
+    for( int i=0; i<_ulen; i++ ) if( _uses[i] != null ) x2 = _uses[i]._walkR(map,x2);
     return x2;
   }
 

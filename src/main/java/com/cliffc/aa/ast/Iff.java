@@ -29,6 +29,7 @@ public class Iff extends AST {
     Node trez  = scope.rez ().keep();
 
     scope.ctrl(new CProjNode(iff,0).init());
+    scope.mem (mem);
     _kids.at(2).nodes(e);
     Node fctrl = scope.ctrl();
     Node fmem  = scope.mem();
