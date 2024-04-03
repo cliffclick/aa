@@ -158,7 +158,10 @@ public abstract class Combo {
           fun.set_unknown_callers();
         if( n instanceof DynLoadNode dyn )
           DYNS.add(dyn);
-    });
+      });
+    Env.ROOT.walk( n -> {
+        if( n instanceof FreshNode frsh ) frsh.set_nongen();
+      });
     Env.ROOT.xval();
     Env.ROOT.xliv();
 

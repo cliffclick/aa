@@ -1,8 +1,12 @@
 package com.cliffc.aa.ast;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.node.*;
+import com.cliffc.aa.type.TypeFld;
+import com.cliffc.aa.type.TypeMemPtr;
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.Util;
 
 
 public class Ident extends AST {
@@ -30,7 +34,12 @@ public class Ident extends AST {
       e2 = e2._par;
     }
     Node ld = new LoadNode(e._scope.mem(),ptr,_name,false,true,null).peep();
-    Node x  = new BindFPNode(ld,ptr,0).peep();
+
+    // Bind unknown loads, in case a FP is involved
+    Node x = Util.eq(_name,"$dyn") || Util.eq(_name,TypeFld.CLZ)
+      ? ld
+      : new BindFPNode(ld,ptr,0).peep();
+    }
 
     // Find a defining LetRec, or null for lambdas and primitives.  This loop
     // crawls all the way up to Root, including past the point of definition.

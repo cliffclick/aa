@@ -50,17 +50,19 @@ public class FreshNode extends Node {
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
     unelock();                  // Adding a tvar changes equals
-    TV3 tv = _tvar = new TVLeaf();
+    return new TVLeaf();
+  }
+  public void set_nongen() {
+    TV3 tv = tvar();
     tv.deps_add_deep(this);
     if( len()>1 ) {
       _nongen = new TV3[len()-1];
       for( int i = 1; i < len(); i++ )
-        _nongen[i - 1] = in(i).set_tvar();
-      TV3 id = id().set_tvar();
+        _nongen[i - 1] = in(i).tvar();
+      TV3 id = id().tvar();
       if( id instanceof TVExpanding tex )
         tex.make_nongen_delay(tv,_nongen,this);
     }
-    return tv;
   }
 
   @Override public boolean unify( boolean test ) {

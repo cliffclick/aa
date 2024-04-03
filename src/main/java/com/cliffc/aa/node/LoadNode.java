@@ -220,6 +220,7 @@ public class LoadNode extends Node {
     // Do not split if we think a following store will fold already
     if( nUses()==1 && use0() instanceof StoreNode st && st.adr()==adr )
       return false;
+    if( Util.eq(_fld,"$dyn")) return false; // TODO, unblock this
     return true;
   }
 

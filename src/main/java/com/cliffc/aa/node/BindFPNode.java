@@ -81,7 +81,7 @@ public class BindFPNode extends Node {
   //   -  HAS_DSP      ANY    - NOOP Pass along has-dsp.
   //   -  HAS_DSP      XXX    - EXTR Pass along has-dsp.
   @Override public Type value() {
-    Type fun = fp()._val;
+    Type fun = fp()==null ? TypeFunPtr.GENERIC_FUNPTR.dual() : fp()._val;
     if( localDoubleBind() ) return fun; // Known bad
 
     //// Push Bind down into overloads
@@ -174,7 +174,7 @@ public class BindFPNode extends Node {
     // One or the other input is dead
     if( _live instanceof TypeStruct live ) {
       if( live.at_def("fp" )==Type.ANY )
-        throw TODO(); // return dsp(); // return setDef(0,null);
+        return setDef(0,null);
       if( live.at_def("dsp")==Type.ANY )
         // Assume no users need the dsp, since its dead.
         return fp();
