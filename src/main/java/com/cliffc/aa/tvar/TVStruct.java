@@ -205,7 +205,6 @@ public class TVStruct extends TVExpanding {
     // Record _open values, then close rhs if needed
     boolean lhsOpen = lhs._open;
     boolean rhsOpen = rhs._open;
-    if( !lhsOpen && rhsOpen ) rhs.close();
 
     // Walk left, search right; if LHS open search clz else local.
     // If found, unify.
@@ -256,6 +255,7 @@ public class TVStruct extends TVExpanding {
         }
       }
 
+    if( !lhsOpen && rhsOpen ) rhs.close();
     return true;
   }
 

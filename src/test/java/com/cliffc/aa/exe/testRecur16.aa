@@ -1,0 +1,35 @@
+// Explicit closure style
+// Type: *[12]@{ AD=1; Aflt=0.5f; }
+// Eval: *[12]@{ Aflt=0.5f; AD=1; }
+
+// See https://www.epfl.ch/labs/lamp/wp-content/uploads/2019/01/acc16_05_closure-conversion.pdf
+
+// Inside each code ptr there are NO free variables, instead everything is
+// reached from the dsp/env ptr.
+
+// Here I have AA-style environments, within each I have a Bind of the original
+// code to the enclosing dsp ptr.
+
+envAB = @{
+  A = @{
+    code = { dsp0 x -> if (rnd) ? (dsp0.B.code dsp0 x) : x };
+    env  = envAB;
+  };
+  B = @{
+    code = { dsp0 x -> (dsp0.A.code dsp0 x) };
+    env = envAB;
+  };
+};
+
+envD = @{
+  envAB = envAB;
+  D = @{
+    code = { dsp1 -> (dsp1.envAB.A.code dsp1.envAB 1) };
+    env  = envD;
+  };
+};
+
+@{
+  Aflt = (envAB.A.code envAB 0.5f);
+  AD   = (envD .D.code envD );
+}
