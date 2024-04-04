@@ -1,0 +1,5 @@
+// Type: [Missing field 'x']
+// Eval: CRASH
+
+f = { s -> s.x }; // { @{ x=V1, ... } -> V1 }
+(f @{ y =3; })

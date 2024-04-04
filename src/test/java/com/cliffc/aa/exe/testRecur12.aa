@@ -1,6 +1,6 @@
 // Evil test, showing AA use of display.
-// Type: *[8]@{ AD=1; Aflt=3.100000001490116; }
-// Eval: *[8]@{ Aflt=3.100000001490116f; AD=1; }
+// Type: *[11]@{ AD=1; Aflt=3.100000001490116; }
+// Eval: *[11]@{ Aflt=3.100000001490116f; AD=1; }
 
 // All functions make field-local display loads ONLY, never "look" outside their own scope.
 
@@ -19,8 +19,9 @@
 dsp0 = @{
   // These dsp0 come from LAMBDA, not Fresh.
   // Preserve A as ID function.
-  A = { dsp0 x -> if (rnd) ? (dsp0.A dsp0 x) : x }; // Recursive ID function
+  A0 = { dsp0x x -> if (rnd) ? (dsp0x.A0 dsp0x x) : x }; // Recursive ID function
 };
+
 
 // IMPLICIT_DSP0: { D:*[2]@{ DYN; dsp0=*[3]@{ A={ D DYN I:*[]@{ A={ - - I V264 -> V264 };  ..., } V264 -> V264 }; }; dsp1=E;  ..., } DYN *[]@{ dsp0=F:*[]@{ A={ - - F 1 -> V306 };  ..., };  ..., } -> V306 }
 // NEST_IMPLICIT_DSP0: *[2]@{ DYN; dsp0=G; dsp1=E;  ..., }
@@ -31,8 +32,14 @@ dsp1 = @{
   //     A={ NEST_IMPLICIT_DSP0 DYN H:*[]@{ A={ - - H V295 -> V295 };  ..., } V295 -> V295 };
   //   };
   // }
-  dsp0 = dsp0;
+  dsp0 = dsp0; // Fresh Ident of dsp0
+  A  = { x -> (dsp0.A0 dsp0 x) }; // Bind variant
   // These dsp1 come from LAMBDA, not Fresh
-  D = { dsp1 -> (dsp1.dsp0.A dsp1.dsp0 1) };
+  D0 = { dsp1x -> (dsp1x.A 1) }; // 
 };
-@{ Aflt = (dsp1.dsp0.A dsp1.dsp0 3.1f); AD = (dsp1.D dsp1); }
+dsp2 = @{
+  dsp1 = dsp1;
+  D = { -> (dsp1.D0 dsp1) };
+};
+
+@{ Aflt = (dsp1.A 3.1f); AD = (dsp2.D); }

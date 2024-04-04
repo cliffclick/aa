@@ -24,6 +24,7 @@ public class Ident extends AST {
     return 0;
   }
   @Override public void nodes( Env e ) {
+
     // Load the ident from the correct scope, issuing a linked list of display
     // loads along the way.
     Env e2 = e;
@@ -39,15 +40,17 @@ public class Ident extends AST {
     Node x = Util.eq(_name,"$dyn") || Util.eq(_name,TypeFld.CLZ)
       ? ld
       : new BindFPNode(ld,ptr,0).peep();
-    }
 
-    // Find a defining LetRec, or null for lambdas and primitives.  This loop
-    // crawls all the way up to Root, including past the point of definition.
-    for( AST par = _par, old=null; par != null; old = par, par = par._par )
-      if( par instanceof LetRec let && let._vars.find(_name) != -1 &&
-          // If the ident comes from the body side, needs a Fresh
-          let.body() == old )
-        x = fresh(x,let);
+    // Under this closure-conversion model, all idents EXCEPT Envs/Displays/Scopes
+    // come from a field load - and never need a "fresh".
+
+    //// Find a defining LetRec, or null for lambdas and primitives.  This loop
+    //// crawls all the way up to Root, including past the point of definition.
+    //for( AST par = _par, old=null; par != null; old = par, par = par._par )
+    //  if( par instanceof LetRec let && let._vars.find(_name) != -1 &&
+    //      // If the ident comes from the body side, needs a Fresh
+    //      let.body() == old )
+    //    x = fresh(x,let);
 
     // No defining LetRec, must be a Lambda or primitive
     e._scope.rez(x);

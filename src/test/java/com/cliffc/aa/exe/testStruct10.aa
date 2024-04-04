@@ -1,0 +1,4 @@
+// Type: [Missing field 'x']
+// Eval: CRASH
+
+@{ y =3; }.x

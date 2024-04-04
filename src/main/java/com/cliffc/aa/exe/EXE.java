@@ -20,7 +20,7 @@ import java.util.function.IntSupplier;
 import static com.cliffc.aa.AA.*;
 
 public class EXE {
-  
+
   public static void main( String[] args ) throws IOException {
     for( String arg : args ) {
       if( arg.equals("-") ) repl();
@@ -32,7 +32,7 @@ public class EXE {
   }
 
   // Parse; Type; Run
-  private static final String ANSI_RESET = "\u001B[0m"; 
+  private static final String ANSI_RESET = "\u001B[0m";
   private static final String RED  = "\u001B[31m";
   private static final String GREEN= "\u001B[32m";
   private static final String BLUE = "\u001B[34m";
@@ -70,9 +70,9 @@ public class EXE {
       put("str",new Str ());
       put("pair",new Pair());
     }};
-  
 
-  
+
+
   // ----------------- PARSER ---------------------
   private static int X;
   private static byte[] BUF;
@@ -122,9 +122,9 @@ public class EXE {
     if( peek("@{") ) {
       Struct str = new Struct();
       while( !peek("}") ) str.add(require(id(),'='),require(fterm(),';'));
-      return str;      
+      return str;
     }
-    
+
     // Let or Id
     if( isAlpha0(BUF[X]) || isOp(BUF[X]) ) {
       String id = id(false);
@@ -138,7 +138,7 @@ public class EXE {
 
     throw TODO();
   }
-  
+
   // Parse a term with an optional following field.
   private static Syntax fterm() {
     Syntax term = term();
@@ -148,7 +148,7 @@ public class EXE {
       term = id.equals("_") ? new DynField(term,new Ident("$dyn")) : new Field(id,term);
     }
   }
-  
+
   private static final SB ID = new SB();
   private static String id() { return id( false); }
   private static String id( boolean num ) {
@@ -183,7 +183,7 @@ public class EXE {
     while( !peek('"') ) sb.p((char)BUF[X++]);
     return new Con(sb.toString());
   }
-  
+
   private static byte skipWS() {
     while(true) {
       if( X == BUF.length ) return -1;
@@ -195,7 +195,7 @@ public class EXE {
       X++;
     }
   }
-  
+
   private static boolean isWS    (byte c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
   private static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }
   private static boolean isOp    (byte c) { return "*?+-/>#=".indexOf(c)>=0; }
@@ -222,7 +222,7 @@ public class EXE {
     @Override public int getAsInt() { return _uid; }
     // Frame and Lambda counter
     static int FCNT=3;
-    
+
     Syntax _par;                // Parent in the AST
 
     TV3 _tvar;                  // Current HM type
@@ -235,7 +235,7 @@ public class EXE {
     // Visit whole tree recursively, applying 'map' to self, and reducing that
     // with the recursive value from all children.
     abstract <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce );
-    
+
     // Print for debugger
     @Override final public String toString() { return str(new SB()).toString(); }
     abstract SB str(SB sb);
@@ -261,7 +261,7 @@ public class EXE {
     public void add_work() { }
   }
 
-  
+
   // --- Constant ------------------------
   static class Con extends Syntax {
     final Val _con;
@@ -287,7 +287,7 @@ public class EXE {
   static class Ident extends Syntax {
     private final String _name; // The identifier name
     private int _dbx;           // Display index (deBrujin); count of frames up
-    
+
     Ident( String name ) { _name=name; }
     @Override SB str(SB sb) { return sb.p(_name); }
     @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
@@ -343,7 +343,7 @@ public class EXE {
     final Syntax _body;         // Function body
     final String[] _args;       // Argument names
     final int _fid;             // Unique ID for frame and lambda
-    
+
     Lambda(String[] args, Syntax body ) {
       _body = body;  if( body!=null ) body._par = this;
       _args = args;
@@ -359,7 +359,7 @@ public class EXE {
     void strShort( SB sb ) {sb.p( "LAM" ).p( _fid );}
     int nargs() { return _args.length; }
     TV3 arg(int i) { return tvar().arg(i); }
-    
+
     @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
       _tvar = new TVLambda(nargs(),penv,new TVLeaf());
       // Extend the environment with a new call-stack/nested env
@@ -378,7 +378,7 @@ public class EXE {
       // TVLambda ret is made early, unify with body now
       ((TVLambda)tvar()).ret().unify(_body.tvar(),false);
     }
-    
+
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       return reduce.apply(map.apply(this),_body.visit(map,reduce));
     }
@@ -417,7 +417,7 @@ public class EXE {
       return sb.unchar().p(')');
     }
     int nargs() { return _args.length; }
-    
+
     @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
       _tvar = new TVLeaf();
       _fun.prep_tree(nongen,penv);
@@ -427,7 +427,7 @@ public class EXE {
         : new TVLambda(nargs(),new TVLeaf(),tvar());
       if( !(tfun instanceof TVLambda) )
         tfun.unify(lam,false);
-      
+
       assert lam.nargs() == nargs();
       for( int i=ARG_IDX; i<nargs(); i++ ) {
         _args[i].prep_tree(nongen,penv);
@@ -435,7 +435,7 @@ public class EXE {
       }
       tvar().unify(lam.ret(),false);
     }
-    
+
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       T slf = map.apply(this);
       T rez = reduce.apply(slf,_fun.visit(map,reduce));
@@ -498,7 +498,7 @@ public class EXE {
       if( cmp >= 0 ) tvar().unify(_true.tvar(),false);
       if( cmp <= 0 ) tvar().unify(_fals.tvar(),false);
     }
-    
+
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       T slf = map.apply(this), rez;
       rez = reduce.apply(slf,_pred.visit(map,reduce));
@@ -521,14 +521,14 @@ public class EXE {
       return syn.eval(penv);
     }
   }
-  
+
   // --- Let ------------------------
   static class Let extends Syntax {
     final Syntax _def, _body;
     final String _arg;       // Argument name
     int _fid;                // Enclosing frame alias
     static final Ary<Let> LETS = new Ary<Let>(Let.class);
-    
+
     Let(String arg, Syntax def, Syntax body ) {
       _def  = def;  def ._par = this;
       _body = body; body._par = this;
@@ -556,7 +556,7 @@ public class EXE {
       _tvar = new TVLeaf();
       tvar().unify(_body.tvar(),false); // Unify 'Let._tvar' with the '_body._tvar'
     }
-    
+
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       T rez = map.apply(this);
       T def = reduce.apply(rez,_def .visit(map,reduce));
@@ -574,7 +574,7 @@ public class EXE {
   // --- Struct ------------------------
   /**
      GIANT TODO:
-     
+
      Observed that AA mixes Structs and Closures, on purpose.
      EXE does not.
 
@@ -621,7 +621,7 @@ public class EXE {
         str.arg(i).unify(fld(i).tvar(),false);
       }
     }
-    
+
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       T rez = map.apply(this);
       for( Syntax fld : _flds )
@@ -657,7 +657,7 @@ public class EXE {
       if( ptr.find().as_ptr().load().idx(_lab) == -1 )
         throw new IllegalArgumentException("Missing field '"+_lab+"'");
     }
-    
+
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) {
       return reduce.apply(map.apply(this),_ptr.visit(map,reduce));
     }
@@ -674,7 +674,7 @@ public class EXE {
     @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
       _tvar = new TVLeaf();
       _ptr.prep_tree(nongen,penv);
-      
+
       TV3 tv3 = tvar();
       TV3 ptr = _ptr.tvar();
       // Inflate ptr to a dyntable
@@ -683,7 +683,7 @@ public class EXE {
         ptrdyn = tdyn0;
       else
         ptr.unify(ptrdyn = new TVDynTable(),false);
-      
+
       TV3 self = ptrdyn.find_apy(_par);
       if( self==null )
         ptrdyn.add_apy(_par,tv3);
@@ -712,7 +712,7 @@ public class EXE {
       DynTable is required at Lambdas as an extra input, supplied by Apply (who
       gets it from their parent).  DynTables are tree-structured, matching the
       AST/lexical structure.
-      
+
       In the Value/concrete domain, the input DynTable maps either DynFields
       (e.g. this field itself) or Idents (Fresh in AA), and can be treated as a
       special kind of TVStruct - with AST elements as field labels.  A DynField
@@ -724,9 +724,9 @@ public class EXE {
       be resolved.  To allow for resolution, the DynTable field type is the
       DynField input TVStruct type, and has to resolve by unifying 1 of those
       choices (which then fixes the resolved label in the DynTable).
-      
+
    */
-  
+
   static class DynField extends Syntax {
     Syntax _ptr;                // The struct to select from; a list of labels
     Syntax _dyn;                // The DynTable, gives a self->label mapping
@@ -805,14 +805,16 @@ public class EXE {
       TVPtr penv = new TVPtr(BitsAlias.make0(_fid),env);
       env.add_fld("$dyn", _dyn);
       prep_tree(new Ary<>(TV3.class), penv);
-      
+
       boolean progress=true;
       while( progress ) {
         progress = visit( syn -> syn.hm(false), (a,b) -> a || b );
       }
       // Check for simple type errors
+      TV3.forestFindInit();
       visit( syn -> {
-          if( syn.tvar() instanceof TVErr terr )
+          TV3 terr = syn.tvar().treeFind( tv -> tv instanceof TVErr );
+          if( terr != null )
             throw new IllegalArgumentException(terr.toString());
           if( syn.tvar() instanceof TVBase base && base._t instanceof TypeNil tn && tn.getClass()==TypeNil.class )
             throw new IllegalArgumentException("Mixing basic types");
@@ -839,7 +841,7 @@ public class EXE {
     static TV3 INT64() { return new TVBase(TypeInt.INT64); }
     static TV3 FLT64() { return new TVBase(TypeFlt.FLT64); }
     static TV3 STR  () { return new TVBase(TypeMemPtr.STRPTR); }
-    
+
     final TV3[] _tvs;
     PrimSyn(TV3... tvs) {
       super(IDS[tvs.length],null);
@@ -848,7 +850,7 @@ public class EXE {
     abstract PrimSyn make();
     abstract String name();
     @Override final SB str(SB sb) { return sb.p(name()); }
-    
+
     @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
       TV3 tret = _tvs[_tvs.length-1];
       TVLambda lam = new TVLambda(nargs(),penv,tret);
@@ -856,7 +858,7 @@ public class EXE {
         lam.arg(ARG_IDX+1+i).unify(_tvs[i],false);
       _tvar = lam;
     }
-    
+
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this);  }
     @Override Val apply( Val... args ) {
       // See Apply.eval for field names
@@ -973,7 +975,7 @@ public class EXE {
     @Override String name() { return "f-"; }
     @Override double dop(double x, double y) { return x-y; }
   }
-  
+
   // greater doubles
   static class FGT extends PrimSyn {
     public FGT() { super(FLT64(), FLT64(), INT64()); }
@@ -1055,7 +1057,7 @@ public class EXE {
     FltVal    as_flt   () { return null; }
     StrVal    as_str   () { return null; }
     PtrVal    as_ptr   () { return null; }
-    KontVal   as_kont  () { return null; }    
+    KontVal   as_kont  () { return null; }
     StructVal as_struct() { return null; }
     TypeNil   as_flow  () { throw TODO(); }
     DynVal    as_dyn   () { return null; }
@@ -1089,7 +1091,7 @@ public class EXE {
     String gets() { throw TODO(); }
     public static void reset() { EVCNT=0; }
   }
-  
+
   private static class IntVal extends Val {
     final long _con;
     IntVal(long con) { _con=con; }
@@ -1099,7 +1101,7 @@ public class EXE {
     @Override long getl() { return _con; }
     TypeNil as_flow() { return TypeInt.con(_con); }
   }
-  
+
   private static class FltVal extends Val {
     final double _con;
     FltVal(double con) { _con=con; }
@@ -1109,7 +1111,7 @@ public class EXE {
     @Override double getd() { return _con; }
     TypeNil as_flow() { return TypeFlt.con(_con); }
   }
-  
+
   private static class StrVal extends Val {
     final String _con;
     StrVal(String con) { _con=con; }
@@ -1119,13 +1121,13 @@ public class EXE {
     @Override String gets() { return _con; }
     TypeNil as_flow() { return TypeMemPtr.STRPTR; }
   }
-  
+
   private static class NilVal extends Val {
     static final NilVal NIL = new NilVal();
     @Override SB _str (SB sb, VBitSet visit, NonBlockingHashMapLong<String> dups) { return sb.p("nil"); }
     @Override SB _str0(SB sb, VBitSet visit, NonBlockingHashMapLong<String> dups) { throw TODO(); }
   }
-  
+
   private static class KontVal extends Val {
     PtrVal _penv;
     final Lambda _lam;
@@ -1141,7 +1143,7 @@ public class EXE {
       return _penv==null ? null : _penv._get_dups(visit,dups);
     }
   }
-  
+
   private static class PtrVal extends Val {
     static final PtrVal PTRCLZ = new PtrVal(0,new StructVal());
     final StructVal _val;
@@ -1189,7 +1191,7 @@ public class EXE {
     PtrVal dsp() { return (PtrVal)at(TypeFld.CLZ); }
     SB _str0(SB sb, VBitSet visit, NonBlockingHashMapLong<String> dups) {
       if( _len==0 ) return sb.p("()");
-      
+
       if( Util.find(_labels,"0")!= -1 ) {
         sb.p("( ");
         for( int i=0; i<_len; i++ ) {
@@ -1214,7 +1216,7 @@ public class EXE {
       if( _len==0 ) return null; // Not a dup, just replicate
       if( visit.tset(_uid) ) return dup_name(dups);
       for( int i=0; i<_len; i++ )
-        if( _vals[i]!=null ) 
+        if( _vals[i]!=null )
           _vals[i]._get_dups(visit,dups);
       return null;
     }
@@ -1224,13 +1226,13 @@ public class EXE {
     final TVDynTable _dyn;
     DynVal(TVDynTable dyn) { _dyn = dyn; }
     @Override DynVal as_dyn() { return this; }
-    
+
     Val at(Apply a) {
       if( _dyn==null ) return this;
       TV3 dyn = _dyn.find_apy(a);
       return new DynVal(dyn instanceof TVDynTable tdyn ? tdyn : null);
     }
-    
+
     @Override SB _str0(SB sb, VBitSet visit, NonBlockingHashMapLong<String> dups) {
       return _dyn==null ? sb.p(0) : _dyn.str(sb,null,null,false,true);
     }

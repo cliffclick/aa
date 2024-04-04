@@ -1,0 +1,22 @@
+// Explicit closure style
+// Type: *[11]@{ AD=1; Aflt=0.5f; }
+// Eval: *[11]@{ Aflt=0.5f; AD=1; }
+
+// See https://www.epfl.ch/labs/lamp/wp-content/uploads/2019/01/acc16_05_closure-conversion.pdf
+
+
+call = { fptr arg -> (fptr.code fptr.env arg) };
+
+A = @{
+  // No free variables in "code"
+  code = { dsp0 x -> if (rnd) ? (call dsp0.A x) : x };
+  env  = @{ A = A; };
+};
+
+D = @{
+  // No free variables in "code"
+  code = { dsp1 -> (call dsp1.A 1) };
+  env  = @{ A = A; D = D; };
+};
+
+@{ Aflt = (call A 0.5f); AD = (D.code D.env); }

@@ -44,7 +44,7 @@ public class TestHM {
     if( rprog==null ) rprog=prog;
     assertEquals(stripIndent("("+rprog+")"),stripIndent(syn.toString()));
     Type gcp = Type.valueOf(frez_gcp);
-    
+
     // Check expected types for HMT and GCP
     Type rflow = null;
     if( gcp    !=null )  if( gcp != (rflow=syn.flow_type()) ) System.err.println(gcp + " =!= " + rflow);
@@ -124,7 +124,7 @@ public class TestHM {
           "[30]{any,3 ->*[17](_, %[2,17][2,30]?, %[2,17][2,30]?) }",
           "[17]", "[8,30]" );
   }
-  
+
   // Because {y->y} is passed in, all 'y' types must agree.
   // This unifies 3 and 5 which results in 'nint8'
   @Test public void a_basic_03() {
@@ -270,8 +270,8 @@ public class TestHM {
         "*[17](_, %[2,17][2,29,30,31]?, %[2,17][2,29,30,31]?)",
         "[17]","[]");
   }
-  
-  
+
+
   // Stacked if functions "carry through" precision.
   // Test was buggy, since 'rand' is a known non-zero function pointer constant,
   // GCP folds the 'if' to the true arm.  Instead, call: '(rand 2)'
@@ -284,7 +284,7 @@ public class TestHM {
         "(if (rand 2) (n 1) (n \"abc\"))",
         "[Cannot unify 1 and *str:(97)]", "%[4][]" );
   }
-  
+
   @Test public void c_composition_00() { run( "g = {f -> 5}; (g g)",  "5", "5"); }
 
   @Test public void c_composition_01() {
@@ -558,7 +558,7 @@ map ={fun parg -> (fun (cdr parg))};
   // Broken from Marco; function 'f' clearly uses 'p2.a' but example 'res1' does not
   // pass in a field 'a'... and still no error.  Fixed.
   @Test public void d_struct_err_06() {
-    run("f = { p1 -> p1.a };"+"(f @{b=2.3f})",
+    run("f = { p1 -> p1.a };"+"(f @{b=0.5f})",
         "Missing field a",
         "Scalar");
   }
@@ -1043,7 +1043,7 @@ loop = { name cnt ->
         null,null );
   }
 
-  // No overload 
+  // No overload
   @Test public void g_overload_07() {
     run("{ ptr -> (ptr.x ptr.x) }",
         "{ *@{x= A:{ A-> B}; ...} -> B }",
@@ -1127,7 +1127,7 @@ loop = { name cnt ->
 
   // Test polymorphic uses of overload; in both cases the correct overload is field 1
   @Test public void g_overload_12() {
-    run("f = { ptr -> ptr._.x };"+ 
+    run("f = { ptr -> ptr._.x };"+
         "(pair (f (pair 1 @{x=2})) (f (triple 3 @{x=4} \"abc\")))",
         "f = { ptr -> ptr.1.x };"+
         "(pair (f (pair 1 @{x=2})) (f (triple 3 @{x=4} \"abc\")))",
@@ -1153,7 +1153,7 @@ loop = { name cnt ->
         "blue = (color 456 \"blue\");"+
         "lite = { c -> (color (dec c._) (isempty c._))};"+ // Should be "(color (sub c 0x111) (cat "light" c))"
         "(pair (lite red) (lite blue))",
-        
+
         "color = { hex name -> (pair hex name )};"+
         "red  = (color 123 \"red\" );"+
         "blue = (color 456 \"blue\");"+
@@ -1524,7 +1524,7 @@ List = { generic ->
 ListInt = (List {value -> (dec     value)}); // Confirm elements are ints   ; same as "new List<int>()"
 ListStr = (List {value -> (isempty value)}); // Confirm elements are strings; same as "new List<String>()"
 """;
-    
+
   // A generic List, which is given a way to force the values to be a specific
   // type.
   @Test public void h_variance_02() {
@@ -1610,7 +1610,7 @@ list_str0 = ((ListStr) 17   );
         "*[28]@{_; a=%[2,17,18,19,20,21,27,28][2,29,30,31,32,33,34,38]?; b=%[2,17,18,19,20,21,27,28][2,29,30,31,32,33,34,38]?; bool=*[20]@{_; false=PA:*[18,19]@{_; and=[29,32]{any,3 -> %[2,17,18,19,20,21,27,28][2,29,30,31,32,33,34,38]? }; or=[30,33]{any,3 -> %[2,17,18,19,20,21,27,28][2,29,30,31,32,33,34,38]? }; then=[31,34]{any,4 -> %[2,17,18,19,20,21,27,28][2,29,30,31,32,33,34,38]? }}; force=[38]{any,3 -> PA }; true=PA}}",
 
         "[17,18,19,20,21,22,27,28]","[29,30,31,32,33,34,38]"
-        );    
+        );
   }
 
   // Regression test; was NPE.  Was testMyBoolsNullPException from marco.servetto@gmail.com.
@@ -1753,7 +1753,7 @@ all
   two=%[2,17,18,19,20,21,27,28,29][2,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43]?
 }
 """;
-    
+
    run("""
 void = @{};
 err  = {unused->(err unused)};
@@ -2106,7 +2106,7 @@ maybepet = petcage.get;
          "p2 = (triple p1 p1 p1);"+
          "p3 = (triple p2 p2 p2);"+
          "p3",
-        
+
         rez_hm,
         "*[20](_, 0=PB:*[19](_, 0=PA:*[18](_, 0=XA:[30]{any,5 -> *[17](_, %[2,17,18,19,20][2,30]?, %[2,17,18,19,20][2,30]?, %[2,17,18,19,20][2,30]?) }, 1=XA, 2=XA), 1=PA, 2=PA), 1=PB, 2=PB)",
         "[17,18,19,20]","[30]");
@@ -2121,7 +2121,7 @@ maybepet = petcage.get;
     String fog = "fog = { f g -> { x -> (f (g x)) } }; "; // Core AA does not have a composition operator
     String base = "(fog dup dup)";
     // Running time and the result program type are both linear in the program size.
-    // Be sure to turn off asserts when running, or the cubic asserts will blow out the runtime!    
+    // Be sure to turn off asserts when running, or the cubic asserts will blow out the runtime!
     for( int i=0; i<100; i++ ) {
       String core = "(fog dup "+base+" )";
       String prog = dup+fog+core;
@@ -2142,7 +2142,7 @@ maybepet = petcage.get;
     String xn = "x0";
     String base = "x0 = { z -> z}; ";
     // Running time and the result program type are both *exponential* in the program size.
-    // Be sure to turn off asserts when running, or the cubic asserts will blow out the runtime!    
+    // Be sure to turn off asserts when running, or the cubic asserts will blow out the runtime!
     for( int i=0; i<10; i++ ) {
       String xn1 = "x"+(i+1);
       base = base + xn1 + "= (pair "+xn+" "+xn+"); ";

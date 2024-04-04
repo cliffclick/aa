@@ -16,7 +16,7 @@ public class TestEXE {
     File folder = new File("src/test/java/com/cliffc/aa/exe");
     File[] tests = folder.listFiles(file -> file.getName().endsWith("aa") /*&& !file.getName().contains("Over")*/);
     Arrays.sort(tests, (s0,s1) -> Util.alphanumCompare(s0.toString(),s1.toString()));
-    tests = new File[]{new File("src/test/java/com/cliffc/aa/exe/testRecur12.aa")};
+    //tests = new File[]{new File("src/test/java/com/cliffc/aa/exe/testRecur13.aa")};
     for( File f : tests ) {
       String prog = Files.readString( f.toPath());
       String extype = get_expected(prog,"// Type: ");
@@ -26,18 +26,18 @@ public class TestEXE {
         EXE.Root root = EXE.compile(prog,0,true,true);
         TV3 tv = root.tvar();
         assertEquals(f.toString(),extype,tv.p());
-      
+
         try {
           EXE.Val rez = root.eval(null);
           assertEquals(f.toString(),exeval,rez.toString());
         } catch( NullPointerException npe ) {
           assertEquals(f.toString(),exeval,"CRASH"); // Some are expected
         }
-        
+
       } catch( IllegalArgumentException iae ) {
         // Compile fails as expected
         assertEquals(f.toString(),extype,iae.getMessage());
-      }      
+      }
     }
   }
 

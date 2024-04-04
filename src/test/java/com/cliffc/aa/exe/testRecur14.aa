@@ -1,0 +1,7 @@
+// Unreported missing-field errors
+// Type: [Missing field 'envA'*[]@{ foo={ - - A:1 -> A:1 };  ..., }]
+// Eval: CRASH
+
+Acode = { dsp0 x -> if (rnd) ? (dsp0.foo x) : x };
+Dcode = { AX -> (Acode AX.envA 1) };
+(Dcode @{})

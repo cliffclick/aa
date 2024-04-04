@@ -118,7 +118,8 @@ public class TestTVar {
       boolean rez = v0.unify( v1, false );
       assertTrue( rez );
       assertSame( fldb0.find(), fldb1.find() );
-      assertEquals(3,v0.find().as_struct().len() );
+      // Add "Missing field C" to result
+      assertEquals(4,v0.find().as_struct().len() );
     }
     // Normal, close on right
     { TV3[] tvs = _testUnifyMix();
@@ -129,7 +130,8 @@ public class TestTVar {
       boolean rez = v0.unify( v1, false );
       assertTrue( rez );
       assertSame( fldb0.find(), fldb1.find() );
-      assertEquals(3,v0.find().as_struct().len() );
+      // Add "Missing field C" to result
+      assertEquals(4,v0.find().as_struct().len() );
     }
     // Fresh, close on left (fresh)
     { TV3[] tvs = _testUnifyMix();

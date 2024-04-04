@@ -103,12 +103,6 @@ public class TVStruct extends TVExpanding {
     TVPtr clz = pclz();
     return clz==null ? null : clz.load().arg_clz(fld);
   }
-  // Return the first open struct on the super class chain, including self.
-  public TVStruct openClz() {
-    if( _open ) return this;
-    TVPtr pclz = pclz();
-    return pclz==null ? null : pclz.load().openClz();
-  }
 
 
   // Return the TV3 for field 'fld' or null if missing, with OUT rollups
@@ -169,33 +163,64 @@ public class TVStruct extends TVExpanding {
   }
 
   // Unify this into that.  Ultimately "this" will be U-F'd into "that" and so
-  // all structure changes go into "that".
+  // all structural changes go into "that".  Unify structurally, meaning that
+  // fields in both structures are unified.
+
+  // An open struct happens on a field use; it is a requirement for a field.
+  // When unifying two open structs, the requirements add/union: all fields are
+  // required.  (walk LHS, search CLZ and unify or add to RHS)
+
+  // A closed struct happens on a structure definition; it describes available
+  // fields.  When unifying two closed structures, only fields in both are
+  // available (field intersection).  (walk LHS & unify RHS; walk RHS & remove extras)
+
+  // When unifying an open struct with a closed struct, fields in the open must
+  // appear in the closed, or else its a missing field error.  Fields from the
+  // open struct can appear at any class level in the closed struct.
+  // (walk open, search CLZ, unify or add error to closed)
+
+  // Under all 3 scenarios, we start with: walk LHS and unify RHS.
+  // Open LHS searches RHS CLZ, closed searchs local RHS only.
+  // Then if missing:
+  //   Both open, add extra to RHS
+  //   LHS open, add as error to RHS
+  //   LHS closed, nothing.
+  // Then if LHS closed, walk RHS:
+  //   if RHS closed: If missing local LHS, del RHS
+  //   if RHS open: search LHS CLZ and unify.
+  //      Then if missing: add as error to RHS
+
+
   @Override boolean _unify_impl( TV3 tv3 ) {
     TVStruct lhs = this;
     TVStruct rhs = (TVStruct)tv3; // Invariant when called
     assert !lhs.unified() && !rhs.unified();
     // Either no CLZ or it is in slot 0
     assert lhs.idx(TypeFld.CLZ) <= 0 && rhs.idx(TypeFld.CLZ) <= 0;
-    // Open classes to add open fields as needed
-    TVStruct lhsOpenSelf = lhs.openClz();
-    TVStruct rhsOpenSelf = rhs.openClz();
-    TVStruct lhsOpenClz = lhs.pclz() == null ? null : lhs.pclz().load().openClz();
+    // Assert if closed, parent clazzes are closed:
+    TVPtr plhs = lhs.pclz(), prhs = rhs.pclz();
+    assert lhs._open || plhs==null || !plhs.load()._open;
+    assert rhs._open || prhs==null || !prhs.load()._open;
+
     // Record _open values, then close rhs if needed
     boolean lhsOpen = lhs._open;
     boolean rhsOpen = rhs._open;
     if( !lhsOpen && rhsOpen ) rhs.close();
 
-    // Walk left, search right including RHS CLZ
+    // Walk left, search right; if LHS open search clz else local.
     // If found, unify.
-    // Else if open in any CLZ, add
-    // Else ignore
+    // Else if LHS open Then
+    //   If RHS open, add extra to RHS
+    //   Else add error to RHS
+    // Else if RHS was open (& LHS closed & keeping closed)
     for( int i=0; i<lhs._max; i++ ) { // Walk left
       assert !lhs.unified() && !rhs.unified();
       String fld = lhs._flds[i];
-      TV3 frhs = lhsOpen ? rhs.arg_clz(lhs._flds[i]) : rhs.arg(fld); // Search right
-      if( frhs != null ) {               // Found RHS
+      TV3 flhs = lhs.arg(i);
+      TV3 frhs = lhsOpen ? rhs.arg_clz(fld) : rhs.arg(fld); // Search right
+      if( frhs != null ) { // Found RHS
         // Unify the two fields
-        lhs.arg(i)._unify(frhs,false);
+        flhs._unify(frhs,false);
         // It can be the case that recursive LHS unifies.  If it does, the
         // result might have a different field layout, in which case the
         // ordered visit might miss fields.  Restart unifying field by field.
@@ -203,33 +228,33 @@ public class TVStruct extends TVExpanding {
         if( lhs.unified() )  i = -1; // LHS changed?  Restart loop from scratch
         lhs = lhs.find();
         rhs = rhs.find();
-      } else if( rhsOpenSelf!=null ) {
-        rhs.add_fld(fld,lhs.arg(i));
-      } else {
-        // if we would delete because missing & closed on RHS and open on LHS,
-        // instead push LHS field "uphill" to next open class as a way to
-        // delete it here.
-        if( lhsOpenClz != null )
-          throw TODO();
-        /*ignore del field RHS, because already not there*/
+      } else if( lhsOpen || rhsOpen ) {  // Missing RHS
+        // Add extra or error to RHS
+        rhs.add_fld(fld,flhs);
+        if( lhsOpen && !rhsOpen ) flhs._unify_err("Missing field '"+fld+"'",null,null,false);
       }
     }
 
     // Walk RHS, search LHS.
-    for( int i=0; i<rhs._max; i++ ) { // Walk left
-      assert !lhs.unified() && !rhs.unified();
-      String fld = rhs._flds[i];
-      int idx = lhs.idx(fld);   // Field is in LHS directly
-      if( idx != -1 ) continue; // Already unified via prior loop
-      TV3 flhs = rhsOpen ? lhs.arg_clz(fld) : null; // Search LHS (always fails locally since already checked)
-      if( flhs != null ) {  // Found LHS
-        throw TODO();       // Must have found in some superclazz
-      } else if( lhsOpenSelf != null ) {
-        /*ignore add field LHS, because LHS will union away */
-      } else {
-        rhs.del_fld(i--);       // Remove extras right, shuffles trailing order
+    //   if RHS open: search LHS CLZ.
+    //      If found, unify.
+    //      Else add as error to RHS
+    //   if RHS closed: If missing local LHS, del RHS
+    if( !lhsOpen )
+      for( int i=0; i<rhs._max; i++ ) { // Walk left
+        assert !lhs.unified() && !rhs.unified();
+        String fld = rhs._flds[i];
+        if( rhsOpen ) {         // Closed LHS, open RHS
+          TV3 flhs = lhs.arg_clz(fld);
+          TV3 frhs = rhs.arg(i);
+          if( flhs==null ) frhs._unify_err("Missing field '"+fld+"'",null,null,false); // Missing LHS, open RHS becomes miss_fld error
+          else flhs._unify(frhs,false);
+        } else {                // Closed LHS, closed RHS
+          TV3 flhs = lhs.arg(fld);
+          if( flhs==null )
+            rhs.del_fld(i--);   // Remove extras right, shuffles trailing order
+        }
       }
-    }
 
     return true;
   }
@@ -295,13 +320,15 @@ public class TVStruct extends TVExpanding {
     assert pclz()==null && that.pclz()!=null; // Open on left, closed on right
     // Walk left, search right (with CLZ)
     // If found, unify
-    // else ignore (del right)
+    // else error: missing field
     boolean progress = false;
     for( int i=0; i<_max; i++ ) {         // Walk left
       TV3 fthat = that.arg_clz(_flds[i]); // Search right (with CLZ)
       if( fthat != null ) {
         progress |= fthat.vcrisscross(test);
         progress |= arg(i)._fresh_unify(fthat,test);
+      } else {
+        that.unify_err("Missing field '"+_flds[i]+"'",arg(i),null,test);
       }
     }
     return progress;

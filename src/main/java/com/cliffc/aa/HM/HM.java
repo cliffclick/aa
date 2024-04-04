@@ -2368,7 +2368,7 @@ public class HM {
     }
     static T2 make_str(TypeMemPtr flow) {
       assert flow.is_str();
-      T2 t2str = make_struct(new String[]{"str:","0"},new T2[]{make_leaf(),make_base(flow._obj.get("0")._t)});
+      T2 t2str = make_struct(new String[]{"str:","0"},new T2[]{make_leaf(),make_base(flow._obj.get("_")._t)});
       return make_ptr(t2str);
     }
 

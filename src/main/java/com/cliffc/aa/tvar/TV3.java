@@ -6,6 +6,7 @@ import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import java.util.IdentityHashMap;
+import java.util.function.Predicate;
 import static com.cliffc.aa.AA.TODO;
 
 /** Type variable base class
@@ -623,6 +624,21 @@ abstract public class TV3 implements Cloneable {
     }
     return true;
   }
+
+  // -------------------------------------------------------------
+  private static final VBitSet FVISIT  = new VBitSet();
+  public static void forestFindInit() { FVISIT.clear();  }
+  public TV3 treeFind( Predicate<TV3> p ) {
+    if( FVISIT.tset(_uid) ) return null;
+    if( p.test(this) ) return this;
+    TV3 hit;
+    if( _args != null )
+      for( int i=0; i<len(); i++ )
+        if( arg(i)!=null && (hit=arg(i).treeFind(p)) != null )
+          return hit;
+    return null;
+  }
+
 
   // -----------------
 
