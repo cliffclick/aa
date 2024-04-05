@@ -5,14 +5,19 @@ Adding more tests to the EXE version, since it executes.
 Did the AST version, flips to Nodes & does Combo typing.
 
 Sorting out self-recursive displays, maybe got it finally:
-See https://www.epfl.ch/labs/lamp/wp-content/uploads/2019/01/acc16_05_closure-conversion.pdf
 
+See https://www.epfl.ch/labs/lamp/wp-content/uploads/2019/01/acc16_05_closure-conversion.pdf
 See exe/testRecur[12,13,15,16].aa, as I work through the allowed shapes.
+
+
 Basic learnings:
 - Code has no free variables, only uses indirect env/display access.
+- - Since only field loads, no Fresh in a function.
 - Closure is Code + Env/Display.
 - Display is self-referential struct:  "env = @{ closure = @{ code = {...}; env = env }... other closures }"
 - - Shorter version: "env = @{ field = env }"
+- Getting a Env/Display to place into a later closure is an Ident, DOES do a Fresh
+
 
 See
 ast/testBasic9.aa - need a version
