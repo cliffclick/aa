@@ -1,4 +1,55 @@
 =======================================
+04/05/2024
+
+Adding more tests to the EXE version, since it executes.
+Did the AST version, flips to Nodes & does Combo typing.
+
+Sorting out self-recursive displays, maybe got it finally:
+See https://www.epfl.ch/labs/lamp/wp-content/uploads/2019/01/acc16_05_closure-conversion.pdf
+
+See exe/testRecur[12,13,15,16].aa, as I work through the allowed shapes.
+Basic learnings:
+- Code has no free variables, only uses indirect env/display access.
+- Closure is Code + Env/Display.
+- Display is self-referential struct:  "env = @{ closure = @{ code = {...}; env = env }... other closures }"
+- - Shorter version: "env = @{ field = env }"
+
+See
+ast/testBasic9.aa - need a version
+ast/testBasic10 that matches eg.
+exe/testBasic16
+
+Rewrite exe/testBasic15 in AA style as ast/testBasic10.
+
+// A is the self-recursive ID function.
+// This should make a closure (BindFP) between the code for A and the File-
+// Scope Env/Display.  This scope should now be closed, which allows it to be
+// typed with just A
+A = { x -> math.rand(2) ? /*expands to ^.A*/A(x) : x };
+
+// D calls A with an int.
+// New extension to File-Scope has a D field, plus a prior-env pointer back to
+// the A Env/Display.
+D = { -> A(1) }; 
+
+// Report back calling A with float and D (calling A with int)
+@{ Aflt = A(0.5); Dint = D() }
+
+BUG IS: Currently putting both D and A in the same File-Scope env,
+which breaks when they both use the same Env in their closures.
+
+MUST SPLIT THE DISPLAYS, AT LEAST FOR TYPING.
+Equivalent:
+
+  Each Closure can share the same Env/Display, but has a *prefix* of the
+  Display that is already defined, and self, and a post-fix not used.
+  Also, Display is cycle-sorted.
+
+  Possible that BindFP could know where to chop off the display and make a
+  corrected TypeFunPtr.
+
+
+=======================================
 03/17/2024
 
 Fought this for a long time.  Problem is that var uses can't tell if they're in

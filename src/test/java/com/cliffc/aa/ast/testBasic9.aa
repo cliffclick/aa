@@ -20,4 +20,4 @@
 
 A = { x -> math.rand(2) ? A(x) : x };
 D = {   -> A(1) };
-@{ Aflt = A(3.14); Dint = D(); }
+@{ Aflt = A(0.5); Dint = D(); }
