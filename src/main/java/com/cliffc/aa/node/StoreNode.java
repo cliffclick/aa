@@ -25,7 +25,7 @@ public class StoreNode extends StoreAbs {
   }
   @Override public String label() { return "."+_fld+"="; }   // Self short name
 
-  
+
   @Override Type _value( TypeMem tm, TypeMemPtr tmp ) {
     return tm.update(tmp,TypeFld.make(_fld,rez()._val,_fin));
   }
@@ -40,12 +40,12 @@ public class StoreNode extends StoreAbs {
       assert i==2 || i==3;        // Address & value live
       return luse.at_def(_fld);   // Address is ANY/ALL from field
     }
-    
+
     throw TODO();
   }
-  
-  @Override TypeMem _live_kill(TypeMemPtr tmp) {
-    return ((TypeMem)_live).kill(tmp._aliases,_fld);
+
+  @Override TypeMem _live_kill(TypeMem live0, TypeMemPtr tmp) {
+    return live0.kill(tmp._aliases,_fld);
   }
 
 
@@ -61,7 +61,7 @@ public class StoreNode extends StoreAbs {
   }
 
   @Override boolean ld_st_check(StoreAbs st) { throw AA.TODO(); }
-  
+
 //  @Override public Node ideal_reduce() {
 //    if( is_prim() ) return null;
 //    if( _live == Type.ANY ) return null; // Dead from below; nothing fancy just await removal

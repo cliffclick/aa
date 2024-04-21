@@ -3,6 +3,7 @@ package com.cliffc.aa;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.NonBlockingHashMapLong;
+import com.cliffc.aa.util.Ary;
 
 import java.util.HashSet;
 
@@ -138,8 +139,8 @@ public abstract class Combo {
   public static boolean during() { return !AA.LIFTING              ; }
   public static boolean post  () { return  AA.LIFTING &&  HM_FREEZE; }
 
-
   static final HashSet<DynLoadNode> DYNS = new HashSet<>();
+  public static final Ary<FreshNode> FRESH = new Ary<>(FreshNode.class);
 
   public static void opto() {
     assert Env.GVN.work_is_clear();
@@ -160,7 +161,8 @@ public abstract class Combo {
           DYNS.add(dyn);
       });
     Env.ROOT.walk( n -> {
-        if( n instanceof FreshNode frsh ) frsh.set_nongen();
+        if( n instanceof FreshNode frsh )
+          FRESH.push(frsh).set_nongen();
       });
     Env.ROOT.xval();
     Env.ROOT.xliv();
@@ -208,28 +210,34 @@ public abstract class Combo {
     // Analysis phase.
     // Work down list until all reachable nodes types quit falling
     Node n;
+    boolean progress = false;
     while( (n=Env.GVN.pop_flow()) != null ) {
       cnt++; assert cnt < 20000; // Infinite loop check
       Type told = n._val;
 
       // Forwards flow
-      n.combo_forwards();
+      progress |= n.combo_forwards();
 
       // Backwards flow
-      n.combo_backwards();
+      progress |= n.combo_backwards();
 
       // H-M unification
-      n.combo_unify();
+      progress |= n.combo_unify();
 
       // During Combo value flow, the exact fcn pointers appear,
       // and we require wiring to make these edges explicit.
       if( told != n._val ) {
-        if( n instanceof CallNode call ) call.cepi().CG_wire();
-        if( n instanceof RootNode root ) root.CG_wire();
+        if( n instanceof CallNode call ) progress |= call.cepi().CG_wire();
+        if( n instanceof RootNode root ) progress |= root.CG_wire();
       }
 
       // Very expensive assert: everything that can make progress is on worklist
-      assert NodeUtil.more_work(Env.ROOT)==0;
+      //assert NodeUtil.more_work(Env.ROOT)==0;
+
+      if( Env.GVN.flow_len()==0 && progress ) {
+        progress = false;
+        Env.GVN.add_flow(FRESH);
+      }
     }
     return cnt;
   }
@@ -251,5 +259,5 @@ public abstract class Combo {
     FREEZE_WORK.clear();
   }
 
-  static void reset() { HM_NEW_LEAF = HM_AMBI = HM_FREEZE=false; FREEZE_WORK.clear(); DYNS.clear(); }
+  static void reset() { HM_NEW_LEAF = HM_AMBI = HM_FREEZE=false; FREEZE_WORK.clear(); DYNS.clear(); FRESH.clear(); }
 }

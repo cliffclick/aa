@@ -206,7 +206,8 @@ public class LoadNode extends Node {
       //  lphi.addDef(ns[i]);
       //lphi._live = _live;
       //return lphi.peep();
-      throw TODO();
+      //throw TODO();
+      return null;
     }
 
     return null;

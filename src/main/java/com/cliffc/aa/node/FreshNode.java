@@ -55,20 +55,15 @@ public class FreshNode extends Node {
   public void set_nongen() {
     TV3 tv = tvar();
     tv.deps_add_deep(this);
-    if( len()>1 ) {
-      _nongen = new TV3[len()-1];
-      for( int i = 1; i < len(); i++ )
-        _nongen[i - 1] = in(i).tvar();
-      TV3 id = id().tvar();
-      if( id instanceof TVExpanding tex )
-        tex.make_nongen_delay(tv,_nongen,this);
-    }
+    _nongen = new TV3[len()-1];
+    for( int i = 1; i < len(); i++ )
+      _nongen[i-1] = in(i).tvar();
   }
 
   @Override public boolean unify( boolean test ) {
     TV3 fresh = id().tvar(), that = tvar();
     //return fresh.fresh(this,_nongen).unify(that,test);
-    return fresh.fresh_unify(this,_nongen,that,test);
+    return fresh.fresh_unify(_nongen,that,test);
   }
   // Two FreshNodes are only equal, if they have compatible TVars
   @Override public boolean equals(Object o) {

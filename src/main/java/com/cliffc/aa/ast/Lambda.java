@@ -1,11 +1,13 @@
 package com.cliffc.aa.ast;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.type.*;
-import com.cliffc.aa.type.TypeFld.Access;
 import com.cliffc.aa.node.*;
-import com.cliffc.aa.util.SB;
+import com.cliffc.aa.type.TypeFld.Access;
+import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.TypeNil;
+import com.cliffc.aa.type.TypeRPC;
 import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.SB;
 
 import static com.cliffc.aa.AA.*;
 
@@ -63,8 +65,22 @@ public class Lambda extends ASTVars {
       _fun.unkeep();
       RetNode ret = new RetNode(inScope.ctrl(),inScope.mem(),inScope.rez(),rpc,_fun).init();
 
-      Node fptr = new FunPtrNode(ret).peep();
-      // No early bind; callers do a lookup first - which binds AFTER the Fresh.
+      // Code pointer
+      Node code = new FunPtrNode(ret).peep();
+
+      // The outer scope is a shared closure.
+      // Take just the prefix of scope variables declared up through now (after
+      // sorting for mutual-let-rec); add the mut-let-rec set to the nongens.
+      Node frsh = new PartialScopeFreshNode(outScope).peep();
+      // TODO: expecting to have to repeat this up-scope
+      LetRec let = (LetRec)_par;
+      for( String mutletrec : let._vars )
+        // Add mut-let-rec set to the nongens
+        frsh.addDef(outScope.stk().in(mutletrec));
+
+      // Make a fat fcn pointer; the frsh is the closure pointer.
+      Node fptr = new BindFPNode(code,frsh).peep();
+      // Return fat fcn pointer
       outScope.rez(fptr);
     }
   }

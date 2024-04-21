@@ -139,8 +139,6 @@ public class TVStruct extends TVExpanding {
     _max++;
     // New field is just as wide
     tvf.widen(_widen,false);
-    // Changed struct shape, move delayed-fresh updates to now
-    move_delay();
     return true;
   }
 
@@ -175,12 +173,12 @@ public class TVStruct extends TVExpanding {
   // available (field intersection).  (walk LHS & unify RHS; walk RHS & remove extras)
 
   // When unifying an open struct with a closed struct, fields in the open must
-  // appear in the closed, or else its a missing field error.  Fields from the
+  // appear in the closed, or else it is a missing field error.  Fields from the
   // open struct can appear at any class level in the closed struct.
   // (walk open, search CLZ, unify or add error to closed)
 
   // Under all 3 scenarios, we start with: walk LHS and unify RHS.
-  // Open LHS searches RHS CLZ, closed searchs local RHS only.
+  // Open LHS searches RHS CLZ, closed searches local RHS only.
   // Then if missing:
   //   Both open, add extra to RHS
   //   LHS open, add as error to RHS
@@ -199,7 +197,7 @@ public class TVStruct extends TVExpanding {
     assert lhs.idx(TypeFld.CLZ) <= 0 && rhs.idx(TypeFld.CLZ) <= 0;
     // Assert if closed, parent clazzes are closed:
     TVPtr plhs = lhs.pclz(), prhs = rhs.pclz();
-    assert lhs._open || plhs==null || !plhs.load()._open;
+    //assert lhs._open || plhs==null || !plhs.load()._open;
     assert rhs._open || prhs==null || !prhs.load()._open;
 
     // Record _open values, then close rhs if needed
@@ -227,10 +225,12 @@ public class TVStruct extends TVExpanding {
         if( lhs.unified() )  i = -1; // LHS changed?  Restart loop from scratch
         lhs = lhs.find();
         rhs = rhs.find();
-      } else if( lhsOpen || rhsOpen ) {  // Missing RHS
-        // Add extra or error to RHS
+      } else if( lhsOpen ) {  // Missing RHS
+        // Add error to RHS
         rhs.add_fld(fld,flhs);
-        if( lhsOpen && !rhsOpen ) flhs._unify_err("Missing field '"+fld+"'",null,null,false);
+        if( !rhsOpen ) flhs._unify_err("Missing field '"+fld+"'",null,null,false);
+      } else if( rhsOpen ) {
+        rhs.add_fld(fld,flhs);
       }
     }
 
@@ -317,7 +317,7 @@ public class TVStruct extends TVExpanding {
   }
 
   private boolean _fresh_unify_impl_mix_open(TVStruct that, boolean test) {
-    assert pclz()==null && that.pclz()!=null; // Open on left, closed on right
+    //assert pclz()==null && that.pclz()!=null; // Open on left, closed on right
     // Walk left, search right (with CLZ)
     // If found, unify
     // else error: missing field
@@ -347,13 +347,13 @@ public class TVStruct extends TVExpanding {
         that.add_fld(_flds[i],arg(i)._fresh());
       }
     }
-    TVStruct rhsclz = that.pclz().load(); // Must exist
+    TVStruct rhsclz = that.pclz()==null ? null : that.pclz().load(); // Must exist
 
     for( int i=0; i<that._max; i++ ) { // Walk right
       TV3 tv3;
       if( arg(that._flds[i])!=null ) {
         // Already fresh_unified above, do nothing
-      } else if( (tv3=rhsclz.arg_clz(that._flds[i])) != null ) {
+      } else if( (tv3=(rhsclz==null ? null : rhsclz.arg_clz(that._flds[i]))) != null ) {
         that.arg(i).unify(tv3,false); // New CLZ has same field, unify (not fresh) in rhsclz
         that.del_fld(i--);            // Folded into CLZ
       } else {

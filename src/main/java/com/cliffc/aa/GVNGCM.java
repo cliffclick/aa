@@ -31,7 +31,7 @@ public class GVNGCM {
   public <N extends Node> N add_flow  ( N n ) { return add_work(_work_flow  ,n); }
   public <N extends Node> N add_mono  ( N n ) { return add_work(_work_mono  ,n); }
   public <N extends Node> N add_flow_reduce( N n ) { return add_flow(add_reduce(n)); }
-  
+
   public void add_grow  ( Node n ) { add_work(_work_grow  ,n); }
   public void add_inline( FunNode n ) { add_work(_work_inline, n); }
   public void add_flow_defs  ( Node n ) { add_work_defs(_work_flow,n); }
@@ -63,7 +63,7 @@ public class GVNGCM {
       _work_inline.add(n);
     return n;
   }
-  public void add_flow( Ary<Node> ary ) { for( Node n : ary ) add_flow(n); }
+  public <N extends Node> void add_flow( Ary<N> ary ) { for( Node n : ary ) add_flow(n); }
 
   public Node pop_flow() { return _work_flow.pop(); }
   public int flow_len() { return _work_flow.len(); }
@@ -159,62 +159,4 @@ public class GVNGCM {
       }
     }
   }
-
-  //// Walk all memory edges, and 'retype' them, probably DOWN (counter to
-  //// 'iter').  Used when inlining, and the inlined body needs to acknowledge
-  //// bypasses aliases.  Used during code-clone, to lift the split alias parent
-  //// up & out.
-  //private static final WorkNode WORK_RETYPE = new WorkNode("retype");
-  //public static void retype_mem( BitSet aliases, Node mem, Node exit, boolean skip_calls ) {
-  //  WORK_RETYPE.add(mem);
-  //  // Update all memory ops
-  //  while( !WORK_RETYPE.isEmpty() ) {
-  //    Node wrk = WORK_RETYPE.pop();
-  //    if( !(wrk instanceof CallNode) && !wrk.is_mem() && wrk!=mem ) continue; // Not a memory Node?
-  //    Type twrk = wrk._val;
-  //    Type tmem0 = twrk instanceof TypeTuple ? ((TypeTuple)twrk).at(1) : twrk;
-  //    if( !(tmem0 instanceof TypeMem tmem1) ) continue; // Node does have a memory type?
-  //    //if( aliases!=null && !tmem1.has_used(aliases) ) continue; // Does not use the listed memory?
-  //    if( wrk instanceof CallNode call) { // Do the CEPI for a Call, skipping in-between
-  //      CallEpiNode cepi = call.cepi();
-  //      if( cepi != null ) WORK_RETYPE.add(cepi);
-  //    }
-  //    Type tval = wrk.value();     // Recompute memory value
-  //    if( twrk == tval ) continue; // No change
-  //    wrk._val = tval;             // Progress!!!
-  //    Env.GVN.add_flow_uses(wrk);  // Forwards flow the update
-  //    if( wrk==exit ) continue;    // Stop at end
-  //    if( skip_calls && wrk instanceof MProjNode && wrk.in(0) instanceof CallNode )
-  //      continue;               // Skip the inside of calls
-  //
-  //    WORK_RETYPE.add(wrk._uses);
-  //  }
-  //  //assert Env.ROOT.more_work(true)==0;
-  //}
-
-  //// Limited optimizations on nodes built in this region, and all are forced
-  //// alive to avoid having to track individual liveness.
-  //public class Build<N extends Node> implements AutoCloseable {
-  //  Ary<Node> _tmps = new Ary<>(new Node[1],0);
-  //  public N _ret;
-  //  public Node xform( Node n ) {
-  //    n.xval(); // Set value before reduce
-  //    Node x = (n instanceof RegionNode || n instanceof PhiNode) ? null : n.do_reduce();   // Attempt to reduce
-  //    Node y = x==null ? n : x;
-  //    return add_work_new(y);
-  //  }
-  //  public Node init( Node n ) {
-  //    assert _tmps._len<16;             // Time for a BitSet
-  //    if( _tmps.find(n)!=-1 ) return n; // Already flowed & keeped
-  //    n.push();                         // Force alive for the duration
-  //    if( n.do_flow()!=null )           // Update types
-  //      n.deps_work_clear();            // Back on worklist for progress
-  //    return _tmps.push(n);             // Track, for untracking at close
-  //  }
-  //  @Override public void close() {
-  //    for( Node tmp : _tmps )   // Bulk unuse, and allow opts
-  //      add_unuse(tmp);
-  //    Node.pops(_tmps._len);
-  //  }
-  //}
 }

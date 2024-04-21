@@ -297,7 +297,7 @@ public class EXE {
         TVStruct env = penv.load();
         TV3 arg = env.arg(_name);
         if( arg != null ) {
-          _tvar = isFresh() ? arg.fresh(null,nongen.asAry()) : arg;
+          _tvar = isFresh() ? arg.fresh(nongen.asAry()) : arg;
           return;
         }
         // Search up a env layer

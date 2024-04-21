@@ -1,4 +1,10 @@
 =======================================
+04/17/2024
+
+Basic learnings:
+AA's operational semantics is basically: closure conversion with strong 1st-class typing
+
+=======================================
 04/05/2024
 
 Adding more tests to the EXE version, since it executes.

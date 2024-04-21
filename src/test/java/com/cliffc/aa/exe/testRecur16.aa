@@ -3,6 +3,7 @@
 // Eval: *[12]@{ Aflt=0.5f; AD=1; }
 
 // See https://www.epfl.ch/labs/lamp/wp-content/uploads/2019/01/acc16_05_closure-conversion.pdf
+// See https://www.cs.cmu.edu/~rwh/papers/closures/popl96.pdf
 
 // Inside each code ptr there are NO free variables, instead everything is
 // reached from the dsp/env ptr.

@@ -16,7 +16,7 @@ public abstract class StoreAbs extends Node {
     super(null,mem,adr,val);
     _bad = bad;
   }
-  
+
   @Override public boolean isMem() { return true; }
 
   public Node mem() { return in(1); }
@@ -34,7 +34,7 @@ public abstract class StoreAbs extends Node {
   }
   // Subclasses define behavior past just a mem & ptr
   abstract Type _value( TypeMem tm, TypeMemPtr tmp );
-  
+
   // Compute the liveness local contribution to def's liveness.  Turns around
   // value into live: if values are ANY then nothing is demand-able.
   @Override final public Type live_use( int i ) {
@@ -49,30 +49,31 @@ public abstract class StoreAbs extends Node {
 
     // Pointer, which memory we might kill
     TypeMemPtr tmp = adr()._val instanceof TypeMemPtr tmp0 ? tmp0 : adr()._val.oob(TypeMemPtr.ISUSED);
+    // Liveness as a TypeMem.  If current liveness is the default ALL, go ahead
+    // an upgrade to RootNodes global default - which globally excludes kills.
+    TypeMem live0 = RootNode.removeKills(in(i),_live);
+
     if( tmp.above_center() ) {
       if( i!=MEM_IDX ) return Type.ANY;
       if( tmp._aliases==BitsAlias.NANY ) return TypeMem.ANYMEM; // High, killing all
       // Kill specific structs or fields
-      return _live_kill(tmp);
+      return _live_kill(live0,tmp);
     }
     adr().deps_add_live(in(i));
-    
-    // Liveness as a TypeMem.  If current liveness is the default ALL, go ahead
-    // an upgrade to RootNodes global default - which globally excludes kills.
-    TypeMem live0 = RootNode.removeKills(in(i),_live);
+
     // Specific live-use varies from field-vs-struct
     return _live_use(live0,tmp,i);
   }
   abstract Type _live_use( TypeMem live0, TypeMemPtr tmp, int i );
-  abstract TypeMem _live_kill(TypeMemPtr tmp);
+  abstract TypeMem _live_kill(TypeMem live0, TypeMemPtr tmp);
 
   // Can 'this' Store wipe out or fold into a prior store
   abstract boolean st_st_check( StoreAbs st );
-  
+
   @Override public Node ideal_reduce() {
     if( isPrim() ) return null;
     if( _live == Type.ANY ) return null; // Dead from below; nothing fancy just await removal
-    
+
     Node mem = mem();
     Node adr = adr();
     if( mem==this ) return null; // Dead self-cycle
@@ -80,7 +81,7 @@ public abstract class StoreAbs extends Node {
     // Address is high, nothing is stored
     if( adr._val.above_center() )
       return kill_rez_stall_till_live();
-    
+
     // Is this Store dead from below?
     if( adr._val instanceof TypeMemPtr tmp && _live instanceof TypeMem lmem &&
         !_is_live(lmem.ld(tmp)) )
@@ -130,7 +131,7 @@ public abstract class StoreAbs extends Node {
   // Is this Store alive, based on given liveness?
   // StoreX checks the whole struct while Store only checks the field
   abstract boolean _is_live( TypeStruct live );
-  
+
   // Still until live-ness alives, then kill self
   private Node kill_rez_stall_till_live() {
     // No need for rez
@@ -140,11 +141,11 @@ public abstract class StoreAbs extends Node {
     return null;
   }
 
-  
+
   // Given a tptr, trez:
   //    ptr.load().unify(rez)
   @Override public boolean has_tvar() { return true; }
- 
+
   @Override public ErrMsg err( boolean fast ) {
     Type tadr = adr()._val;
     Type tmem = mem()._val;

@@ -211,16 +211,6 @@ abstract public class TV3 implements Cloneable {
     that._deps_work_clear();
   }
 
-  static final VBitSet MDVISIT = new VBitSet();
-  void merge_delay_fresh(Ary<TVExpanding.DelayFresh>dfs) {
-    if( dfs==null || dfs.len()==0 ) return;
-    if( _args==null ) return;
-    if( MDVISIT.tset(_uid) ) return;
-    for( int i=0; i<len(); i++ )
-      if( arg(i) != null )
-        arg(i).merge_delay_fresh(dfs);
-  }
-
   // -------------------------------------------------------------
   // Classic Hindley-Milner structural unification.
   // Returns false if no-change, true for change.
@@ -324,16 +314,17 @@ abstract public class TV3 implements Cloneable {
 
 
   static private final IdentityHashMap<TV3,TV3> VARS = new IdentityHashMap<>();
-  // A per-fresh-unify DelayFresh
-  static TVExpanding.DelayFresh FRESH_ROOT;
 
-  public boolean fresh_unify( FreshNode frsh, TV3[] nongen, TV3 that, boolean test ) {
+  // A per-fresh-unify NONGEN
+  static TV3[] NONGEN;
+
+  public boolean fresh_unify( TV3[] nongen, TV3 that, boolean test ) {
     if( this==that ) return false;
-    assert VARS.isEmpty() && DUPS.isEmpty() && FRESH_ROOT ==null;
-    FRESH_ROOT = new TVExpanding.DelayFresh(this,that,frsh,nongen);
+    assert VARS.isEmpty() && DUPS.isEmpty() && NONGEN ==null;
+    NONGEN = nongen;
     boolean progress = _fresh_unify(that,test);
     VARS.clear();  DUPS.clear();
-    FRESH_ROOT = null;
+    NONGEN = null;
     return progress;
   }
 
@@ -360,7 +351,7 @@ abstract public class TV3 implements Cloneable {
     if( that instanceof TVLeaf ) { // RHS is a tvar; union with a deep copy of LHS
       if( test ) return true;
       // Must call _fresh first to trigger vcrisscross.
-      // This handles the case where 'that' is a Leaf and appears inside of 'this'.
+      // This handles the case where 'that' is a Leaf and appears inside 'this'.
       TV3 frsh = _fresh();
       that.vcrisscross(test);
       return that.union(frsh);
@@ -464,19 +455,19 @@ abstract public class TV3 implements Cloneable {
   // Return a fresh copy of 'this'
   public TV3 fresh() {
     assert VARS.isEmpty();
-    assert FRESH_ROOT ==null;
+    assert NONGEN ==null;
     TV3 rez = _fresh();
     VARS.clear();
     return rez;
   }
 
-  public TV3 fresh(FreshNode ignore, TV3[] nongen) {
+  public TV3 fresh(TV3[] nongen) {
     assert VARS.isEmpty();
-    assert FRESH_ROOT ==null;
-    FRESH_ROOT = new TVExpanding.DelayFresh(this,null,null,nongen);
+    assert NONGEN ==null;
+    NONGEN = nongen;
     TV3 rez = _fresh();
     VARS.clear();
-    FRESH_ROOT = null;
+    NONGEN = null;
     return rez;
   }
 
@@ -514,12 +505,11 @@ abstract public class TV3 implements Cloneable {
   // -----------------
   static final VBitSet ODUPS = new VBitSet();
   boolean nongen_in() {
-    if( FRESH_ROOT ==null || FRESH_ROOT._nongen==null ) return false;
+    if( NONGEN ==null ) return false;
     ODUPS.clear();
-    TV3[] nongen = FRESH_ROOT._nongen;
-    for( int i=0; i<nongen.length; i++ ) {
-      TV3 tv3 = nongen[i];
-      if( tv3.unified() ) nongen[i] = tv3 = tv3.find();
+    for( int i=0; i<NONGEN.length; i++ ) {
+      TV3 tv3 = NONGEN[i];
+      if( tv3.unified() ) NONGEN[i] = tv3 = tv3.find();
       if( _occurs_in_type(tv3) )
         return true;
     }
@@ -678,9 +668,7 @@ abstract public class TV3 implements Cloneable {
   public void reset_deps() { DEPS_VISIT.clear(); _reset_deps(); }
   private void _reset_deps() {
     if( DEPS_VISIT.tset(_uid) ) return;
-    if( _deps!=null ) _deps = null;
-    if( this instanceof TVExpanding tex && tex._delay_fresh != null )
-      tex._delay_fresh.clear();
+    _deps = null;
     if( _args!=null )
       for( int i=0; i<len(); i++ )
         if( _args[i]!=null )

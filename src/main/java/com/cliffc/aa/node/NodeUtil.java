@@ -20,7 +20,7 @@ public abstract class NodeUtil {
   // telling when an iterator ends early, to avoid leaking.  This is not
   // exactly asserted for, so some leaks may happen.  The general rule is:
   // only use these iterators if they run to the end; early exits leak.
-  
+
   public static class Iter implements Iterator<Node>, Iterable<Node> {
     private static final Ary<Iter> POOL = new Ary<>(Iter.class);
     private static int CNT=0; // Number of Iters made, helps to track leaks
@@ -41,7 +41,7 @@ public abstract class NodeUtil {
   }
   public static boolean leak() { return Iter.POOL._len<Iter.CNT; }
 
-  
+
   // Fold control copies
   public static Node fold_ccopy(Node x) {
     Node cc = x.in(0).isCopy(0);
@@ -51,7 +51,7 @@ public abstract class NodeUtil {
     return GVN.add_reduce(x.setDef(0,cc));
   }
 
-  
+
   // --------------------------------------------------------------------------
   // Assert all value and liveness calls only go forwards, and if they can
   // progress they are on the worklist.
@@ -83,8 +83,8 @@ public abstract class NodeUtil {
     // Check for HMT progress
     if( !AA.LIFTING &&                      // Falling, in Combo, so HM is running
         oliv!=Type.ANY && oval!=Type.ANY && // Alive in any way
-        n.has_tvar() &&                       // Doing TVar things
-        (!GVN.on_flow(n) || Combo.HM_FREEZE) ) { // Not already on worklist, or past freezing
+        n.has_tvar() &&                     // Doing TVar things
+        ((!GVN.on_flow(n) && !(n instanceof FreshNode)) || Combo.HM_FREEZE) ) { // Not already on worklist, or past freezing
       if( n.unify(true) )
         errs += _report_bug(n,Combo.HM_FREEZE ? "Progress after freezing" : "Progress bug");
     }

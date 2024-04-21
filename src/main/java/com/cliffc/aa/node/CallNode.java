@@ -384,9 +384,9 @@ public class CallNode extends Node {
       // Find argument getting liveness computed
       ParmNode parm = fun.parm(i);
       if( parm!=null ) {    // Parm is in use?
+        parm.deps_add_live(def);
         t = t.meet(parm._live); // As alive as the using Parm
         if( t == Type.ALL ) return Type.ALL;
-        parm.deps_add(def);
       }
     }
     return t;

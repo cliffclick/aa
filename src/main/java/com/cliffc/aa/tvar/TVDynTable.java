@@ -27,7 +27,7 @@ public class TVDynTable extends TV3 {
   private IntSupplier[] _uids;  // Which Syntaxes/Nodes
 
   private long[] _cmps;         // Prior match results; 2 bits for (1,2,3) becomes (1,3,7 in trial_resolve)
-  
+
   private String[] _labels;     // Resolved DynField labels
 
   public TVDynTable() { }
@@ -114,7 +114,7 @@ public class TVDynTable extends TV3 {
     return labels;
   }
 
-  
+
   // -------------------------------------------------------------
 
   // Resolve all pairs of inputs as DynTables
@@ -139,7 +139,7 @@ public class TVDynTable extends TV3 {
     return _resolve(idx(uid),test);
   };
 
-  
+
   // Try to resolve the label; return true if progress
   private boolean _resolve(int idx, boolean test) {
     TV3 matches = first(idx);
@@ -167,7 +167,7 @@ public class TVDynTable extends TV3 {
       case 7:
         assert cmp != 1;
         break;
-        
+
       case 1:
         assert cmp != 7;
         yess++;
@@ -176,7 +176,7 @@ public class TVDynTable extends TV3 {
         progress = handle_match(idx,i,str,pattern);
         pattern = pattern.find();
         break;
-        
+
       default: throw TODO();
       }
     }
@@ -224,7 +224,7 @@ public class TVDynTable extends TV3 {
     assert get_cmp(idx,i)==cmp;
   }
 
-  
+
   // True if ALL resolved
   public boolean all_resolved() { VBS.clear(); return _all_resolved(); };
   private boolean _all_resolved() {
@@ -239,11 +239,11 @@ public class TVDynTable extends TV3 {
       }
     return resolved;
   }
-  
+
   // -------------------------------------------------------------
   @Override public void _union_impl( TV3 tv3 ) {
   }
-  
+
   // -------------------------------------------------------------
   @Override boolean _unify_impl( TV3 tv3 ) {
     return _unify_impl0((TVDynTable)tv3,0);
@@ -284,14 +284,14 @@ public class TVDynTable extends TV3 {
     // uids in that not this, no need to check
     return ptrue();
   }
-  
+
   private void _unify_half( int idx, TV3 lhs ) {
     if( lhs==null ) return;
     if( _args[idx]==null ) _args[idx] = lhs;
     else lhs._unify(arg(idx),false);
   }
 
-  
+
   // -------------------------------------------------------------
   @Override boolean _fresh_unify_impl(TV3 tv3, boolean test) {
     TVDynTable that = (TVDynTable)tv3; // Invariant when called
@@ -299,8 +299,10 @@ public class TVDynTable extends TV3 {
     for( int i=0; i<_max; i++ ) {
       IntSupplier node = _uids[i];
       int idx = that.idx(node);
-      if( idx == -1 ) throw TODO();
-      else {
+      if( idx == -1 ) {
+        that.add_dyn(node, first(i)._fresh(), secnd(i)==null ? null : secnd(i)._fresh());
+
+      } else {
         assert is_dyn(i) == that.is_dyn(idx);
         TV3 cyclic = that.first(idx).vget();
         if( cyclic !=null && that.first(idx) != cyclic)
@@ -309,7 +311,7 @@ public class TVDynTable extends TV3 {
           cyclic = that.secnd(idx).vget();
           if( cyclic !=null && that.secnd(idx) != cyclic)
             throw TODO();         // vcrisscross
-          
+
           // Unify match on match
           progress |= first(i)._fresh_unify(that.first(idx),test);
           that = that.find();
@@ -341,7 +343,7 @@ public class TVDynTable extends TV3 {
             assert that._labels[idx]==null;
             that._labels[idx] = _labels[i];
           }
-        
+
         } else {
           // Should be 2 Call/Apply table entries, recursively fresh first(i)/that.first(idx)
           progress |= first(i)._fresh_unify(that.first(idx),test);
@@ -350,8 +352,8 @@ public class TVDynTable extends TV3 {
     }
     return progress;
   }
-  
-  
+
+
   // -------------------------------------------------------------
   @Override int _trial_unify_ok_impl( TV3 pat ) {
     TVDynTable that = (TVDynTable) pat; // Invariant when called
@@ -375,14 +377,14 @@ public class TVDynTable extends TV3 {
     return lhs._trial_unify_ok(rhs);
   }
 
-  
+
   @Override boolean _exact_unify_impl(TV3 tv3) {
     throw TODO();
   }
   @Override void _widen( byte widen ) {
     throw TODO();
   }
-  
+
   // -------------------------------------------------------------
   @Override TypeMemPtr _as_flow( Node dep ) {
     Type t = ADUPS.get(_uid);
@@ -399,7 +401,7 @@ public class TVDynTable extends TV3 {
     // Recursively type fields
     for( int i=0; i<_max; i++ )
       flds[i]._t = first(i)._as_flow(dep);
-    
+
     return tmp;
   }
 
@@ -424,7 +426,7 @@ public class TVDynTable extends TV3 {
         return true;
     return false;
   }
-  
+
   @Override public VBitSet _get_dups_impl(VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     if( !debug && noDynLoad() ) return dups;
     for( int i=0; i<len(); i++ )

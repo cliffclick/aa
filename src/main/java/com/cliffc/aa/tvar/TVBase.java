@@ -20,7 +20,7 @@ public class TVBase extends TVExpanding {
     if( _t instanceof TypeFlt ) return _t!=TypeFlt.FLT64;
     throw TODO();
   }
-  
+
   @Override int eidx() {
     if( _t instanceof TypeInt ) return TVErr.XINT;
     if( _t instanceof TypeFlt ) return TVErr.XFLT;
@@ -32,7 +32,7 @@ public class TVBase extends TVExpanding {
     if( _t instanceof TypeFlt ) return (TVPtr)PrimNode.PFLT.tvar();
     throw TODO();
   }
-  
+
   // -------------------------------------------------------------
   @Override public void _union_impl(TV3 t) {
     TVBase that = (TVBase)t;    // Invariant when called
@@ -40,9 +40,9 @@ public class TVBase extends TVExpanding {
     if( mt==that._t ) return;
     that._t = mt;
   }
-  
+
   @Override boolean _unify_impl(TV3 t ) { return true; }
-  
+
   // -------------------------------------------------------------
   @Override boolean _fresh_unify_impl(TV3 that, boolean test) {
     TVBase base = (TVBase)that;
@@ -50,7 +50,6 @@ public class TVBase extends TVExpanding {
     Type t = _t.meet(base._t);
     if( t==base._t ) return false;
     if( test ) return true;
-    base.move_delay();          // Any Fresh base updates need to rerun
     base._t = t;
     return true;
   }
@@ -69,7 +68,7 @@ public class TVBase extends TVExpanding {
     return _t == base._t;
   }
 
-  
+
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) { return _t; }
   @Override void _widen( byte widen ) {
@@ -81,5 +80,5 @@ public class TVBase extends TVExpanding {
   }
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     return _t==TypeMemPtr.STRPTR ? sb.p("str") : sb.p(_t);
-  }  
+  }
 }

@@ -21,7 +21,7 @@ public class TVLeaf extends TVExpanding {
   private boolean _no_progress;
   @Override boolean can_progress() { return !_no_progress; }
   public void set_no_progress() { _no_progress=true; }
-  
+
   // Leafs never show up in errors
   @Override int eidx() { throw TODO(); }
 
@@ -32,7 +32,7 @@ public class TVLeaf extends TVExpanding {
     assert !(that instanceof TVLeaf) || _uid > that._uid;
     return this.union(that);
   }
-  
+
   // Leafs have no subclass specific parts to union.
   @Override public void _union_impl(TV3 that) { }
 
@@ -47,7 +47,7 @@ public class TVLeaf extends TVExpanding {
 
   // Never unifies
   @Override boolean _exact_unify_impl( TV3 tv3 ) { return false; }
-  
+
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) {
     if( Combo.HM_FREEZE ) return Env.ROOT.ext_scalar(dep);

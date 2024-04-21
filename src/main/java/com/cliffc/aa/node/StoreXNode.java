@@ -17,7 +17,7 @@ public class StoreXNode extends StoreAbs {
   }
 
   @Override public String label() { return "Store"; }
-  
+
   StructNode struct() { return (StructNode)in(3); }
 
   @Override Type _value( TypeMem tm, TypeMemPtr tmp ) {
@@ -44,8 +44,8 @@ public class StoreXNode extends StoreAbs {
     return luse==TypeStruct.UNUSED ? Type.ANY : Type.ALL; // Address is ANY/ALL if any field is live
   }
 
-  @Override TypeMem _live_kill(TypeMemPtr tmp) {
-    return ((TypeMem)_live).kill(tmp._aliases);
+  @Override TypeMem _live_kill(TypeMem live0, TypeMemPtr tmp) {
+    return live0.kill(tmp._aliases);
   }
 
   // Is this Store alive, based on given liveness?
@@ -54,9 +54,9 @@ public class StoreXNode extends StoreAbs {
   @Override boolean st_st_check( StoreAbs sta ) {
     return sta instanceof StoreXNode st;
   }
-  
+
   @Override boolean ld_st_check(StoreAbs st) { throw AA.TODO(); }
- 
+
   @Override public TV3 _set_tvar() {
     assert rez()!= Env.ANY; // Did not clear out during iter; return mem().tvar()
 
@@ -67,8 +67,8 @@ public class StoreXNode extends StoreAbs {
 
     // Result must be the struct
     TVStruct stz = ptr.load();
-    rez().set_tvar().unify(stz,false);    
-    
+    rez().set_tvar().unify(stz,false);
+
     return null;
   }
 
@@ -86,7 +86,7 @@ public class StoreXNode extends StoreAbs {
     for( int alias : aliases ) {
       // Each alias unifies into the global field state
       TVPtr nptr = (TVPtr)(NewNode.get(alias)).tvar();
-      progress |= nptr.load().fresh_unify(null,null,ts,test);
+      progress |= nptr.load().fresh_unify(null,ts,test);
       if( test && progress ) return true;
       ts = ts.find();
     }

@@ -504,7 +504,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // already.  However, value changes only add uses, not defs, and vice-versa.
   void deps_add_live( Node dep ) {
     if( _deps==null ) _deps = new Ary<>(new Node[1],0);
-    if( _deps.find(dep)==-1 && NodeUtil.mid_work_assert()) {
+    if( _deps.find(dep)==-1 && !NodeUtil.mid_work_assert()) {
       assert dep!=null;
       _deps.push(dep);
     }
@@ -720,48 +720,51 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Do One Step of forwards-dataflow analysis.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
-  public void combo_forwards() {
-    if( isPrim() ) return;
+  public boolean combo_forwards() {
+    if( isPrim() ) return false;
     Type oval = _val;           // Old local type
     Type nval = value();        // New type
-    if( oval == nval ) return;  // No progress
+    if( oval == nval ) return false;  // No progress
     assert oval.isa(nval);      // Monotonic
     _val = nval;                // Record progress
     add_flow_uses();            // Classic forwards flow on change.
     deps_work_clear();          // Any extra flow changes
+    return true;
   }
 
   // Do One Step of backwards-dataflow analysis.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
-  public void combo_backwards() {
-    if( isPrim() ) return;
+  public boolean combo_backwards() {
+    if( isPrim() ) return false;
     Type oliv = _live;
     Type nliv = live();
     // TODO: If use._value >= constant, force live-use to ANY.
     // Not done for ITER, because replace-with constant happens anyways.
-    if( oliv == nliv ) return;  // No progress
+    if( oliv == nliv ) return false;  // No progress
     assert oliv.isa(nliv);      // Monotonic
     _live = nliv;               // Record progress
     add_flow_defs();            // Classic reverse flow on change.
     deps_work_clear();          // Any extra flow changes
+    return true;
   }
 
   // Do One Step of Hindley-Milner unification.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
-  public void combo_unify() {
+  public boolean combo_unify() {
     TV3 old = _tvar;
-    if( old==null ) return;
+    if( old==null ) return false;
     //if( _val == Type.ANY ) { /*tvar().deps_add_deep(this); */ return; } // No HM progress on untyped code
     // No HM progress on dead code, except for Call uses; required to unify calls.
     if( _live== Type.ANY && !has_call_use() )
-      return;
+      return false;
     if( unify(false) ) {
       assert !_tvar.find().unify(old.find(),true);// monotonic: unifying with the result is no-progress
-      TVExpanding.do_delay_fresh();
       // HM changes; push related neighbors
       for( Node def : defs() ) if( def!=null && def.has_tvar() ) GVN.add_flow(def);
       for( Node use : uses() ) if(              use.has_tvar() ) GVN.add_flow(use);
+      return true;
     }
+    return false;
   }
 
   // TODO: rethink this, or make virtual

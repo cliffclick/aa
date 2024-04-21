@@ -30,14 +30,14 @@ public class TestTVar {
     // Fresh leaf to lambda, no progress
     { TV3[] tvs = _testUnify();
       TV3 v0 = tvs[0], v1 = tvs[1];
-      boolean rez = v0.fresh_unify( null, null, v1, false );
+      boolean rez = v0.fresh_unify( null, v1, false );
       assertFalse( rez );
       assertNotSame( v0.find(), v1.find() );
     }
     // Fresh lambda to leaf; fresh unchanged but leaf is unifiable with lambda
     { TV3[] tvs = _testUnify();
       TV3 v0 = tvs[0], v1 = tvs[1];
-      boolean rez = v1.fresh_unify( null, null, v0, false );
+      boolean rez = v1.fresh_unify( null, v0, false );
       assertTrue( rez );
       assertNotSame( v0.find(), v1.find() );
       assertEquals( 3, v0.find().trial_unify_ok( v1 ) ); // Always a hard yes in a trial
@@ -66,12 +66,12 @@ public class TestTVar {
     // Fresh
     { TV3[] tvs = _testUnifyOpen();
       TV3 v0 = tvs[0], v1 = tvs[1];
-      boolean rez = v0.fresh_unify( null, null, v1, false );
+      boolean rez = v0.fresh_unify( null, v1, false );
       assertTrue( rez );
       assertEquals(3,v1.as_struct().len() );
     }
   }
-  
+
   // Simply unify two closed structs
   private static TV3[] _testUnifyClose() {
     return new TV3[]{
@@ -95,7 +95,7 @@ public class TestTVar {
       TV3 v0 = tvs[0], v1 = tvs[1];
       TV3 fldb0 = v0.find().as_struct().arg("fldB");
       TV3 fldb1 = v1.find().as_struct().arg("fldB");
-      boolean rez = v0.fresh_unify( null, null, v1, false );
+      boolean rez = v0.fresh_unify( null, v1, false );
       assertTrue( rez );
       assertEquals(3,v0.as_struct().len() );
       assertEquals(2,v1.as_struct().len() );
@@ -136,7 +136,7 @@ public class TestTVar {
     // Fresh, close on left (fresh)
     { TV3[] tvs = _testUnifyMix();
       TV3 v0 = tvs[0], v1 = tvs[1];
-      boolean rez = v0.fresh_unify( null, null, v1, false );
+      boolean rez = v0.fresh_unify( null, v1, false );
       v1 = v1.find();
       assertTrue( rez );
       assertEquals(3,v0.as_struct().len() );
@@ -147,7 +147,7 @@ public class TestTVar {
     // Fresh, close on right (fresh)
     { TV3[] tvs = _testUnifyMix();
       TV3 v0 = tvs[0], v1 = tvs[1];
-      boolean rez = v1.fresh_unify( null, null, v0, false );
+      boolean rez = v1.fresh_unify( null, v0, false );
       assertFalse( rez );
       assertEquals(3,v0.as_struct().len() );
       assertEquals(2,v1.as_struct().len() );
@@ -156,8 +156,8 @@ public class TestTVar {
     }
   }
 
-  
-  
+
+
   // Make a TVStruct with no Clz, and 1 field which should be in the Clz.
   //   @{ fld=V1, ... }
   // Make a TVStruct with a CLz and the fld in the class.
@@ -169,39 +169,39 @@ public class TestTVar {
     int zalias = BitsAlias.new_alias();
     TVPtr vpclz = new TVPtr(BitsAlias.make0(zalias),vclz);
     TVStruct vs3  = new TVStruct(CLZ, new TV3[]{vpclz});
-      
+
     TVLeaf v0 = new TVLeaf();
     TVStruct vs1  = new TVStruct(true);
     vs1.add_fld(FLD[1],v0 ); // Unpinned field
-    
+
     return new TV3[]{ vs1,vs3,v0,vlam2 };
   }
   @Test public void testUnifyClz0() {
     // Normal unify, fld moves up to shared CLZ and unifies
     { TV3[] tvs = _testUnifyClz0();
-      TV3 vs1 = tvs[0], vs3 = tvs[1], v0 = tvs[2], vlam2 = tvs[3];      
+      TV3 vs1 = tvs[0], vs3 = tvs[1], v0 = tvs[2], vlam2 = tvs[3];
       boolean rez = vs3.unify(vs1,false);
       assertTrue(rez);
       assertSame(v0.find(),vlam2.find());
     }
     { TV3[] tvs = _testUnifyClz0();
-      TV3 vs1 = tvs[0], vs3 = tvs[1], v0 = tvs[2], vlam2 = tvs[3];      
-      boolean rez = vs3.fresh_unify(null,null,vs1,false);
+      TV3 vs1 = tvs[0], vs3 = tvs[1], v0 = tvs[2], vlam2 = tvs[3];
+      boolean rez = vs3.fresh_unify(null,vs1,false);
       assertTrue(rez);
       assertEquals( 3, v0.find().trial_unify_ok( vlam2 ) ); // Always a hard yes in a trial
     }
     { TV3[] tvs = _testUnifyClz0();
-      TV3 vs1 = tvs[0], vs3 = tvs[1], v0 = tvs[2], vlam2 = tvs[3];      
-      boolean rez = vs1.fresh_unify(null,null,vs3,false);
+      TV3 vs1 = tvs[0], vs3 = tvs[1], v0 = tvs[2], vlam2 = tvs[3];
+      boolean rez = vs1.fresh_unify(null,vs3,false);
       assertFalse(rez);
     }
   }
 
   // Testing criss-cross Fresh unify.  Getting this wrong gets me infinite
   // blow-up instead of a cycle.
-  // FRESH: { V4:@{a=V2} @{b=V4} -> ret }
+  // FRESH: { V3:@{a=V2} @{b=V3} -> ret }
   // THAT : { V1         V2      -> ret }
-  
+
   // Unification will unify V1 to a fresh of @{a=V2}, unify V2 to a fresh of
   // @{b=V3}, but then the fresh @{a=V2} gets unified with the V2-unify of
   // @{b=V3} and the cycle closes.
@@ -232,7 +232,7 @@ public class TestTVar {
     // Fresh unify, will cross-cross
     { TV3[] tvs = _testCrissCross();
       TV3 lam0 = tvs[0], lam1 = tvs[1], dsp0 = tvs[2], dsp1 = tvs[3], dyn0 = tvs[4], dyn1 = tvs[5];
-      boolean rez = lam0.fresh_unify(null,null,lam1,false);
+      boolean rez = lam0.fresh_unify(null,lam1,false);
       assertTrue(rez);
       TV3 B = dyn1.find();
       TV3 C = dsp1.find();
@@ -243,7 +243,7 @@ public class TestTVar {
     // Fresh unify other way
     { TV3[] tvs = _testCrissCross();
       TV3 lam0 = tvs[0], lam1 = tvs[1], dsp0 = tvs[2], dsp1 = tvs[3], dyn0 = tvs[4], dyn1 = tvs[5];
-      boolean rez = lam1.fresh_unify(null,null,lam0,false);
+      boolean rez = lam1.fresh_unify(null,lam0,false);
       assertFalse(rez);
       assertFalse(dsp0.unified());
       assertFalse(dsp1.unified());
@@ -251,7 +251,7 @@ public class TestTVar {
       assertFalse(dyn1.unified());
     }
   }
-  
+
   // Testing criss-cross Fresh unify.  Getting this wrong gets me infinite
   // blow-up instead of a cycle.
   // FRESH: V2:*[]@{fld=V1}
@@ -277,13 +277,13 @@ public class TestTVar {
     // Fresh unify
     { TV3[] tvs = _testCrissCross2();
       TV3 v1 = tvs[0], v2 = tvs[1];
-      boolean rez = v1.fresh_unify(null,null,v2,false);
+      boolean rez = v1.fresh_unify(null,v2,false);
       assertFalse(rez);
     }
     // Fresh unify other way.  This will trigger criss-cross
     { TV3[] tvs = _testCrissCross2();
       TV3 v1 = tvs[0], v2 = tvs[1];
-      boolean rez = v2.fresh_unify(null,null,v1,false);
+      boolean rez = v2.fresh_unify(null,v1,false);
       assertTrue(rez);
       assertSame(v1.find().as_struct().arg("fld"),v1.find());
       assertSame(v2.find().as_struct().arg("fld"),v1.find());
@@ -291,7 +291,74 @@ public class TestTVar {
     }
   }
 
-  
+  // Testing criss-cross Fresh unify.  Getting this wrong gets me infinite
+  // blow-up instead of a cycle.
+  // This is similar to CrissCross2, except that V1 is a compatible struct instead of leaf
+  // FRESH: V2:*[9]@{baz=3    ; foo=V1; }
+  // THAT : V1:*[9]@{baz=7    ;    ...; }
+  // Result:
+  // FRESH: V2:*[9]@{baz=3    ; foo=V1; }
+  // THAT : V1:*[9]@{baz=nint8; foo=V1; }
+  static final int zalias = BitsAlias.new_alias();
+  static final BitsAlias alias = BitsAlias.make0(zalias);
+
+  private static TV3[] _testCrissCross3() {
+    TV3 v1 = new TVPtr(alias,new TVStruct(new String[]{"baz"      }, new TV3[]{new TVBase(TypeInt.con(7))    },true ));
+    TV3 v2 = new TVPtr(alias,new TVStruct(new String[]{"baz","foo"}, new TV3[]{new TVBase(TypeInt.con(3)), v1},false));
+    return new TV3[]{ v1,v2 };
+  }
+  @Test public void testCrissCross3() {
+    // Normal unify.
+    // V12: *[9]@{baz=nint8; foo=V12; }
+    { TV3[] tvs = _testCrissCross3();
+      TV3 v1 = tvs[0], v2 = tvs[1];
+      boolean rez = v1.unify(v2,false);
+      assertTrue(rez);
+      v2 = v2.find();
+      assertSame(v1.find(),v2);
+      assertSame(v2.as_ptr().load().arg("foo"),v2);
+    }
+    // Fresh unify old school.  Notice it requires V1 in the non-gen set for Fresh.
+    // THAT:  V1: *[9]@{baz=nint8; foo=*[9]@{baz=7; ...}
+    // FRESH: V2: *[9]@{baz= 3   ; foo=V1; }
+    { TV3[] tvs = _testCrissCross3();
+      TV3 v1 = tvs[0], v2 = tvs[1];
+      boolean rez = v2.fresh(new TV3[]{v1}).unify(v1,false);
+      assertTrue(rez);
+      assertSame(TypeInt.con(3),((TVBase)(v2.as_ptr().load().arg("baz")))._t);
+      assertSame(v1,v2.as_ptr().load().arg("foo"));
+      assertSame(v1,v1.as_ptr().load().arg("foo"));
+    }
+    // Fresh unify.  Triggers criss-cross issues.
+    { TV3[] tvs = _testCrissCross3();
+      TV3 v1 = tvs[0], v2 = tvs[1];
+      boolean rez = v2.fresh_unify(null,v1,false);
+      assertTrue(rez);
+      assertSame(TypeInt.con(3),((TVBase)(v2.as_ptr().load().arg("baz")))._t);
+      assertSame(v1,v2.as_ptr().load().arg("foo"));
+      assertSame(v1,v1.as_ptr().load().arg("foo"));
+    }
+    // Fresh unify other way.
+    { TV3[] tvs = _testCrissCross3();
+      TV3 v1 = tvs[0], v2 = tvs[1];
+      boolean rez = v1.fresh(new TV3[]{v2}).unify(v2,false);
+      assertTrue(rez);
+      assertSame(TypeInt.NINT8,((TVBase)(v1.as_ptr().load().arg("baz")))._t);
+      assertSame(v1,v2.find());
+    }
+    // Fresh unify other way.
+    { TV3[] tvs = _testCrissCross3();
+      TV3 v1 = tvs[0], v2 = tvs[1];
+      boolean rez = v1.fresh_unify(null,v2,false);
+      assertTrue(rez);
+      assertSame(TypeInt.con(7),((TVBase)(v1.as_ptr().load().arg("baz")))._t);
+      assertSame(TypeInt.NINT8 ,((TVBase)(v2.as_ptr().load().arg("baz")))._t);
+      assertSame(v1,v2.as_ptr().load().arg("foo"));
+    }
+  }
+
+
+
   // Build a super-class chain list.
   // tvs[0] is an open TVStruct with no fields.
   // tvs[N] is an open TVStruct with exactly a CLZ TVPtr to tvs[N-1]
@@ -310,12 +377,12 @@ public class TestTVar {
   // This test is now no good, as new invariant is that CLZs are never open
   // and that open structs have no CLZ.
   private static TV3[] _testUnifyClz1() {
-    // Should get cross-fields from both and unify with the CLZ field in the other.    
+    // Should get cross-fields from both and unify with the CLZ field in the other.
     //   @{ ^=@{ fld0={ int -> V2 }, ...}, fld1= { int -> V4} }
     //   @{ ^=@{ fld1={ V3 -> flt }, ...}, fld0= { V5 -> flt} }
     TVStruct[] tvs0 = superchain(new TVStruct[2]);
     TVStruct[] tvs1 = superchain(new TVStruct[2]);
-    
+
     TV3 vint = new TVBase(TypeInt.INT64);
     TV3 vflt = new TVBase(TypeFlt.FLT64);
     TVLambda vlam0 = new TVLambda(AA.ARG_IDX, vint, new TVLeaf());
@@ -325,7 +392,7 @@ public class TestTVar {
 
     tvs0[0].add_fld("fld0",vlam0 );
     tvs1[0].add_fld("fld1",vlam3 );
-    
+
     TVStruct vs0 = tvs0[1];
     TVStruct vs1 = tvs1[1];
     vs0.add_fld("fld1",vlam1 );
@@ -346,7 +413,7 @@ public class TestTVar {
     }
     { TV3[] tvs = _testUnifyClz1();
       TV3 vs0 = tvs[0], vs1 = tvs[1], vlam0 = tvs[2], vlam1 = tvs[3], vlam3 = tvs[4], vlam4 = tvs[5];
-      boolean rez = vs0.fresh_unify(null,null,vs1,false);
+      boolean rez = vs0.fresh_unify(null,vs1,false);
       assertTrue(rez);
       // Both look alike
       assertEquals( 1, vs0.find().trial_unify_ok( vs1 ) ); // Always a hard yes in a trial
@@ -358,7 +425,7 @@ public class TestTVar {
     }
     { TV3[] tvs = _testUnifyClz1();
       TV3 vs0 = tvs[0], vs1 = tvs[1], vlam0 = tvs[2], vlam1 = tvs[3], vlam3 = tvs[4], vlam4 = tvs[5];
-      boolean rez = vs1.fresh_unify(null,null,vs0,false);
+      boolean rez = vs1.fresh_unify(null,vs0,false);
       assertTrue(rez);
       // Both look alike
       assertEquals( 1, vs1.find().trial_unify_ok( vs0 ) ); // Always a hard yes in a trial
@@ -406,10 +473,10 @@ public class TestTVar {
     vclzC0.add_fld("fld0",v2_0 );
     vclzC1.add_fld("fld2",v2_1 );
     vclzC1.close();
-    
+
     return new TV3[]{ vclzC0, vclzC1, v0, v2_0, v1_0, v1_1 };
   }
-  
+
   @Ignore @Test public void testUnifyClz2() {
     { TV3[] tvs = _testUnifyClz2();
       TVStruct vclzC0 = (TVStruct)tvs[0], vclzC1 = (TVStruct)tvs[1];
@@ -426,7 +493,7 @@ public class TestTVar {
     { TV3[] tvs = _testUnifyClz2();
       TVStruct vclzC0 = (TVStruct)tvs[0], vclzC1 = (TVStruct)tvs[1];
       TV3 v0 = tvs[2], v2_0 = tvs[3], v1_0 = tvs[4], v1_1 = tvs[5];
-      boolean rez = vclzC0.fresh_unify(null,null,vclzC1,false);
+      boolean rez = vclzC0.fresh_unify(null,vclzC1,false);
       assertTrue(rez);
       // Both look alike
       assertEquals( 1, vclzC0.find().trial_unify_ok( vclzC1 ) ); // Always a hard yes in a trial
@@ -436,7 +503,7 @@ public class TestTVar {
     { TV3[] tvs = _testUnifyClz2();
       TVStruct vclzC0 = (TVStruct)tvs[0], vclzC1 = (TVStruct)tvs[1];
       TV3 v0 = tvs[2], v2_0 = tvs[3], v1_0 = tvs[4], v1_1 = tvs[5];
-      boolean rez = vclzC1.fresh_unify(null,null,vclzC0,false);
+      boolean rez = vclzC1.fresh_unify(null,vclzC0,false);
       assertTrue(rez);
       // Both look alike
       assertEquals( 1, vclzC1.find().trial_unify_ok( vclzC0 ) ); // Always a hard yes in a trial
