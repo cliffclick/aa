@@ -259,7 +259,7 @@ public class StructNode extends Node {
     TVStruct ts = (TVStruct)_tvar;
     // Unify all fields
     for( int i=0; i<len(); i++ )
-      ts.arg(i).unify(in(i).set_tvar(),false); // Unify (possible cycle)
+      ts.arg(i).unify(in(i)==Env.ANY ? new TVLeaf() : in(i).set_tvar(),false); // Unify (possible cycle)
     // Force slot 0 to be a sensible CLZ for all but CLZCLZ
     if( this!=PrimNode.ZCLZ ) {
       assert Util.eq(ts.fld(0),TypeFld.CLZ);

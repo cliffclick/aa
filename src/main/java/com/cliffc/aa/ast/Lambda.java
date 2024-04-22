@@ -74,9 +74,11 @@ public class Lambda extends ASTVars {
       Node frsh = new PartialScopeFreshNode(outScope).peep();
       // TODO: expecting to have to repeat this up-scope
       LetRec let = (LetRec)_par;
-      for( String mutletrec : let._vars )
+      for( String mutletrec : let._vars ) {
         // Add mut-let-rec set to the nongens
-        frsh.addDef(outScope.stk().in(mutletrec));
+        int idx = outScope.stk().find(mutletrec);
+        if( idx != -1 ) frsh.addDef(outScope.stk().in(idx));
+      }
 
       // Make a fat fcn pointer; the frsh is the closure pointer.
       Node fptr = new BindFPNode(code,frsh).peep();

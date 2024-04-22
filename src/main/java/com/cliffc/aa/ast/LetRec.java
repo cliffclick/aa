@@ -12,16 +12,18 @@ import static com.cliffc.aa.AA.TODO;
 
 
 public class LetRec extends ASTVars {
-  private final Access _acc;
+  private final Ary<Access> _accs;
 
-  private LetRec(boolean rw) { super(new Ary<>(String.class)); _acc = rw ? Access.RW : Access.Final; }
+  private LetRec() { super(new Ary<>(String.class));  _accs = new Ary<>(Access.class); }
   public  LetRec(String var, boolean rw, AST def, AST body) {
-    this(rw);
+    this();
     _vars.push(var);
+    _accs.push(rw ? Access.RW : Access.Final);
     _kids.push(def);
     if( body instanceof LetRec let ) {
-      _vars.addAll(let._vars);
       _kids.addAll(let._kids);
+      _vars.addAll(let._vars);
+      _accs.addAll(let._accs);
       assert !(body() instanceof LetRec); // Only 1 round of rollups needed?
     } else
       _kids.push(body);
@@ -33,7 +35,8 @@ public class LetRec extends ASTVars {
   // name = name = def; ....
   @Override public SB str(SB sb) {
     for( int i=0; i<_vars._len; i++ ) {
-      sb.p(_vars.at(i)).p(" = ");
+      sb.p(_vars.at(i));
+      sb.p(_accs.at(i)==Access.RW ? " := " : " = ");
       _kids.at(i).str(sb).p(";").nl().i();
     }
     return body()==null ? sb : body().str(sb);
@@ -152,9 +155,10 @@ public class LetRec extends ASTVars {
     int old = leader;
     if( leader(idx) != leader ) {
       leader = leader(idx);
-      let = new LetRec(_acc==Access.RW);       // Changing leaders
+      let = new LetRec();       // Changing leaders
     }
     // Add vars to the LetRec
+    let._accs.push(_accs.at(idx));
     let._vars.push(_vars.at(idx));
     let._kids.push(_kids.at(idx));
     _kids.at(idx)._par = let;
@@ -174,32 +178,39 @@ public class LetRec extends ASTVars {
   StructNode _stk;
   int _oldx;
   @Override public void nodes( Env e ) {
+    ScopeNode scope = e._scope;
+    StructNode stk = _stk = scope.stk();
     // Single variables can be re-definitions or StoreNodes
-    if( _vars._len==1 && _par.redef(_vars.at(0))!=null ) {
-      _kids.at(0).nodes(e);
-      e._scope.mem(new StoreNode(e._scope.mem(), e._scope.ptr(), e._scope.rez(), _vars.at(0), _acc, null ).peep());
+    if( _accs.at(0) == Access.RW ) {
+      assert _vars._len==1 && _kids._len==2;
+      _kids.at(0).nodes(e);     // Go ahead and get the one kid def
+      Node rez = scope.rez();
+      String var = _vars.at(0);
+      // If assignment is new, add field
+      if( stk.find(var)== -1 )
+        stk.add_fld(var,Access.RW,Env.ANY,null);
+      scope.mem(new StoreNode(scope.mem(), scope.ptr(), rez, var, Access.RW, null ).peep());
       body().nodes(e);
       return;
     }
 
     // Mutual-Let-Recursive variables.
     // Start with forward-refs for all.
-    _stk = e._scope.stk();
-    _oldx = _stk.len();
+    _oldx = stk.len();
     for( String var : _vars ) {
       ForwardRefNode fref = new ForwardRefNode(var,null).init();
       fref.scope();
       // TODO: Preserve Access mode
-      _stk.add_fld(var,_acc,fref,null);
+      stk.add_fld(var,Access.Final,fref,null);
     }
 
     // Make nodes for all the defs; stitching them to the ForwardRefs
     for( int i=0; i<_vars._len; i++ ) {
       _kids.at(i).nodes(e);
-      Node def = e._scope.rez();
-      ForwardRefNode fref = (ForwardRefNode)_stk.in(_oldx+i);
+      Node def = scope.rez();
+      ForwardRefNode fref = (ForwardRefNode)stk.in(_oldx+i);
       // Assign def to name
-      _stk.set_fld(_vars.at(i), _acc,def,true);
+      stk.set_fld(_vars.at(i), Access.Final,def,true);
       // Close the fref cycle, and remove.
       if( !fref.isDead() ) {
         fref.self();
@@ -207,7 +218,7 @@ public class LetRec extends ASTVars {
         fref.subsume(def);
       }
     }
-    _oldx = _stk.len();
+    _oldx = stk.len();
     // Now the body
     body().nodes(e);
   }

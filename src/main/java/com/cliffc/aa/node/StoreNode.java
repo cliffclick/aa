@@ -163,22 +163,19 @@ public class StoreNode extends StoreAbs {
     TV3 adr = adr().set_tvar();
     TVPtr ptr = adr instanceof TVPtr ptr0 ? ptr0 : new TVPtr(BitsAlias.EMPTY, new TVStruct(true));
     adr.unify(ptr,false);
-    // The struct
-    TVStruct ts = ptr.load();
     // Add/unify field into struct
-    TV3 fld = rez().set_tvar();
-    TV3 xfld = ts.arg(_fld);
-    if( xfld==null ) ts.add_fld(_fld,fld );
-    else             fld.unify(xfld,false);
+    TV3 ptr_fld = ptr.load().arg(_fld);
+    TV3 self_fld = rez().set_tvar();
+    if( ptr_fld==null ) ptr.load().add_fld(_fld,self_fld );
+    else                self_fld.unify(ptr_fld,false);
     return null;
   }
 
   @Override public boolean unify( boolean test ) {
-    TVPtr ptr = (TVPtr)adr().tvar();
-    TV3 self_fld = rez().tvar();
     assert !isPrim();
-    TVStruct ts = ptr.load();
-    TV3 ptr_fld = ts.arg(_fld);
+    TVPtr ptr = (TVPtr)adr().tvar();
+    TV3 ptr_fld = ptr.load().arg(_fld);
+    TV3 self_fld = rez().tvar();
     return self_fld.unify(ptr_fld,test);
   }
 

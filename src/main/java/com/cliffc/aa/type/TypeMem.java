@@ -229,7 +229,7 @@ public class TypeMem extends Type<TypeMem> {
   public TypeMem make_from(int alias, TypeStruct oop) {
     TypeStruct[] as = Arrays.copyOf( _objs,Math.max( _objs.length,alias+1));
     as[alias] = oop;
-    return make0(as);    
+    return make0(as);
   }
 
   public static final TypeMem ANYMEM,ALLMEM,EXTMEM; // Every alias is unused (so above XOBJ or below OBJ)
@@ -313,7 +313,7 @@ public class TypeMem extends Type<TypeMem> {
       if( aliases==BitsAlias.NALL ) return aliases; // Already full
       TypeStruct ts = at(work.pop());
       if( ts==TypeStruct.ISUSED )
-        aliases = _add_one(BitsAlias.EXTX,visit,work,aliases);
+        return BitsAlias.NALL;
       for( TypeFld tfld : ts ) {
         Type fld = tfld._t;
         // Called function returns are also tracked
@@ -490,14 +490,14 @@ public class TypeMem extends Type<TypeMem> {
     return true;
   }
 
-  
+
   // Struct store into a conservative set of aliases.
   // 'precise' is replace, imprecise is MEET.
   public TypeMem update( TypeMemPtr tmp, TypeStruct tvs ) {
     // If precise, just replace whole struct
     if( tmp.is_con() )
       return set(tmp._aliases.getbit(),tvs);
-    
+
     // Must do struct-by-struct updates, doing inprecise meets
     Ary<TypeStruct> ss = new Ary<>( _objs.clone());
     for( int alias : tmp._aliases )
@@ -515,7 +515,7 @@ public class TypeMem extends Type<TypeMem> {
       //return set(alias,at(alias).update());
       throw TODO();
     }
-    
+
     // Must do struct-by-struct updates
     Ary<TypeStruct> ss = new Ary<>( _objs.clone());
     for( int alias : tmp._aliases )
@@ -525,7 +525,7 @@ public class TypeMem extends Type<TypeMem> {
     return make0(ss.asAry());
   }
 
-  
+
 
   // Everything in the 'escs' set is flattened to UNUSED.
   public TypeMem kill(BitsAlias escs) {
@@ -561,7 +561,7 @@ public class TypeMem extends Type<TypeMem> {
         { found=true; break; }
     }
     if( !found ) return this;
-    
+
     TypeStruct[] tos = _objs.clone();
     tos[0] = null;
     for( int alias : escs )
@@ -570,7 +570,7 @@ public class TypeMem extends Type<TypeMem> {
     return make0(tos);
   }
 
-  
+
   // False if field is modifiable across any alias
   public boolean fld_not_mod( BitsAlias aliases, String name) {
     for( int alias : aliases ) {

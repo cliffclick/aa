@@ -75,9 +75,9 @@ public class RootNode extends Node {
     if( in(ARG_IDX) == null ) return TypeTuple.ROOT;
 
     // Primitive memory
-    TypeMem tmem = (TypeMem)val(ARG_IDX);
-    if( val(MEM_IDX) instanceof TypeMem vmem )
-      tmem = (TypeMem)tmem.meet(vmem);
+    TypeMem primem = (TypeMem)val(ARG_IDX);
+    // Plus escaping memory
+    TypeMem tmem = val(MEM_IDX) instanceof TypeMem vmem ? (TypeMem)primem.meet(vmem) : primem;
 
     // Conservative final result.  Until Combo external calls can still wire, and escape arguments
     if( Combo.pre() )
@@ -144,7 +144,8 @@ public class RootNode extends Node {
     TypeStruct extstr2 = (TypeStruct)extstr.meet( TypeStruct.make(false,escs,TypeFlds.EMPTY) );
     tmem = tmem.set(BitsAlias.EXTX,extstr2);
 
-    // RootNode value is a 4-pack
+    // RootNode value is a 4-pack.  The *memory* is PRIM memory, as the starting
+    // point for what Root calls.  The *control* is also an input
     return TypeTuple.make(Type.CTRL, tmem, trez, escs);
   }
 

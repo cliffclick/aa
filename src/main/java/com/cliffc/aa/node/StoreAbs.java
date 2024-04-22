@@ -100,8 +100,7 @@ public abstract class StoreAbs extends Node {
           // Store field over struct
           if( this instanceof StoreNode sfld && st instanceof StoreXNode snew ) {
             StructNode str = snew.struct();
-            assert str.nUses()==1; // Need to either clone the struct or profit metric
-            if( str.set_fld(sfld._fld,sfld._fin,rez(),false) ) {
+            if( str.nUses()==1 && str.set_fld(sfld._fld,sfld._fin,rez(),false) ) {
               str.xval();
               // Delete self
               return snew;

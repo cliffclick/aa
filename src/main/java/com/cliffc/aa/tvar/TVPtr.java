@@ -28,13 +28,19 @@ public class TVPtr extends TV3 {
   @Override int eidx() { return TVErr.XPTR; }
 
   public BitsAlias aliases() { return _aliases; }
-  
+
   // -------------------------------------------------------------
   // Union aliases
   @Override public void _union_impl(TV3 that) {
     assert !unified();
     TVPtr ptr = (TVPtr)that;    // Invariant when called
     ptr._aliases = _aliases.meet(ptr._aliases);
+    // Special case for nil vs primitive
+    if( ptr._may_nil && ptr.load().is_prim() ) {
+      TVBase base = (TVBase)ptr.load().arg(1);
+      base._t = base._t.meet(TypeNil.NIL);
+    }
+
   }
 
   @Override boolean _unify_impl(TV3 that ) {
@@ -47,7 +53,7 @@ public class TVPtr extends TV3 {
     boolean progress = false;
     TVPtr ptr = that.find();    // Invariant when called
     BitsAlias aliases = _aliases.meet( ptr._aliases );
-    
+
     // Update aliases
     if( aliases != ptr._aliases ) {
       if( !test ) ptr._aliases = aliases;
@@ -78,11 +84,11 @@ public class TVPtr extends TV3 {
 
   @Override void _widen( byte widen ) { }
 
-  
+
   boolean is_nil (TVStruct str) { return str.len()==0 &&  _aliases.is_empty() && _may_nil; }
   boolean is_0clz(TVStruct str) { return str.len()==0 && (_aliases.is_empty() || _aliases==BitsAlias.CLZ); }
   boolean is_prim(TVStruct str) { return str.is_prim() && _aliases==BitsAlias.EMPTY; }
-  
+
   @Override public VBitSet _get_dups_impl(VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     if( _args.length == 0 || _args[0]==null ) return dups; // Broken ptr
     // Look for short-form prints
@@ -98,7 +104,7 @@ public class TVPtr extends TV3 {
     // Normally walk the pointed-at TVStruct
     return tv0._get_dups(visit,dups,debug,prims);
   }
-  
+
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     // Broken ptr
     if( _args.length == 0 || _args[0]==null )

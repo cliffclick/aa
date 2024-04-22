@@ -191,8 +191,6 @@ abstract public class TV3 implements Cloneable {
     _union_impl(that); // Merge subclass specific bits into that
     that.widen(_widen,false);
 
-    // Move delayed-fresh updates onto the not-delayed list
-    _union_delay(that);
     // Add Node updates to _work_flow list
     that._union_deps(this);
     // Actually make "this" into a "that"
@@ -202,8 +200,6 @@ abstract public class TV3 implements Cloneable {
 
   // Merge subclass specific bits
   abstract public void _union_impl(TV3 that);
-
-  public void _union_delay(TV3 that) { }
 
   // Push all dependent nodes onto the worklist
   public void _union_deps(TV3 that) {
