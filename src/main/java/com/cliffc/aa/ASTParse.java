@@ -41,7 +41,7 @@ public class ASTParse {
 
 
   public ErrMsg prog(Env e) {
-    AST rez = stmts();
+    AST rez = stmts(true);
     if( rez == null )
       return ErrMsg.syntax(null,"Not a program?");
     if( skipWS() != -1 ) return ErrMsg.trailingjunk(null);
@@ -58,8 +58,8 @@ public class ASTParse {
   /** Parse a list of statements; final semicolon is optional.
    *  stmts= [tstmt or stmt] [; stmts]*[;]?
    */
-  private AST stmts() {
-    return stmt();
+  private AST stmts(boolean lookup_current_scope_only) {
+    return stmt(lookup_current_scope_only);
   }
 
   /** A type-statement assigns a type to a type variable.  */
@@ -68,7 +68,7 @@ public class ASTParse {
   }
 
   /** A statement is a list of variables to final-assign or re-assign... */
-  private AST stmt() {
+  private AST stmt(boolean lookup_current_scope_only) {
     if( peek('^') ) {           // Early function exit
       throw TODO();
     }
@@ -105,10 +105,10 @@ public class ASTParse {
       if( peek(":=") ) rs.set(toks._len);              // Re-assignment parse
       else if( !peek_not('=','=') ) {                  // Not any assignment
         // For structs, allow a bare id as a default def of nil
-        if( false /*lookup_current_scope_only && ts.isEmpty() && (peek(';') || peek('}') ||
+        if( lookup_current_scope_only && ts.isEmpty() && (peek(';') || peek('}') ||
         // These next two tokens are syntactically invalid, but a semi-common error situation:
         //   @{ fld;fld;fld;...  fld );  // Incorrect closing paren.  Go ahead and allow a bare id.
-                                                                  peek(']') || peek(')' )) */) {
+                                                                  peek(']') || peek(')' )) ) {
           _x--;                 // Push back statement end
           default_nil=true;     // Shortcut def of nil
           rs.set(toks._len);    // Shortcut mutable
@@ -129,14 +129,15 @@ public class ASTParse {
     // Check for no-statement after start of assignment, e.g. "x = ;"
     if( ifex == null ) {        // No statement?
       if( toks._len == 0 ) return null;
-      ifex = err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
+      ifex = default_nil ? new Const(TypeNil.NIL)
+        : err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
     }
 
     if( toks._len==0 ) return ifex;
 
     // Assign
     require(';',0);
-    AST body = stmt();
+    AST body = stmt(lookup_current_scope_only);
     return new LetRec(toks.at(0),rs.get(0),ifex,body);
   }
 
@@ -157,8 +158,8 @@ public class ASTParse {
     AST expr = apply();
     if( expr == null ) return null; // Expr is required, so missing expr implies not any ifex
     if( !peek('?') ) return expr;   // No if-expression
-    AST t = stmt();
-    AST f = peek(':') ? stmt() : con(TypeNil.NIL);
+    AST t = stmt(false);
+    AST f = peek(':') ? stmt(false) : con(TypeNil.NIL);
     return new Iff(expr,t,f);
   }
 
@@ -262,7 +263,7 @@ public class ASTParse {
         // Store or load against memory
         if( peek(":=") || peek_not('=','=')) {
           Access fin = _buf[_x-2]==':' ? Access.RW : Access.Final;
-          AST val = stmt();
+          AST val = stmt(false);
           if( val == null )
             return err_ctrl2("Missing stmt after assigning field '."+tok+"'");
           throw TODO();         // Field store
@@ -275,11 +276,11 @@ public class ASTParse {
         oldx = _x-1;
         var args = new Ary<>(AST.class);
         args.add(null).add(null).add(null).add(dynCall());
-        AST arg1 = stmts();
+        AST arg1 = stmts(false);
         if( arg1 != null ) {
           args.add(arg1);
           while( peek(',') ) // Final comma is optional
-            args.add(stmts());
+            args.add(stmts(false));
         }
         require(')',oldx);
         n = new Call(args.add(n)); // Function last
@@ -329,7 +330,7 @@ public class ASTParse {
     int oldx = _x;
     if( peek1(c,'(') ) {        // a nested statement or a tuple
       int first_arg_start = _x;
-      AST s = stmts();
+      AST s = stmts(false);
       if( s==null ) { _x = oldx; return null; } // A bare "()" pair is not a statement
       if( peek(')') ) return s;                 // A (grouped) statement
       if( !peek(',') ) return s;                // Not a tuple, probably a syntax error
@@ -390,7 +391,7 @@ public class ASTParse {
    */
   private AST struct() {
     int oldx = _x-1;              // Opening @{
-    LetRec let = (LetRec)stmts(); // Create local vars-as-fields
+    LetRec let = (LetRec)stmts(true); // Create local vars-as-fields
     require('}',oldx);            // Matched closing }
     return new Struct(let);
   }
@@ -444,7 +445,7 @@ public class ASTParse {
     if( _x == oldx ) { formals.set_len(ARG_IDX+1);  ids.set_len(ARG_IDX+1); bads.set_len(ARG_IDX+1); }
 
     // Parse function body
-    AST rez = stmts();          // Parse function body
+    AST rez = stmts(true);      // Parse function body
     if( rez == null ) rez = err_ctrl2("Missing function body");
     require('}',oldx-1);      // Matched with opening {}
 
