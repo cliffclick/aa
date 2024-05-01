@@ -153,6 +153,6 @@ public class TypeInt extends TypeNil<TypeInt> {
   public TypeInt maxsize(TypeInt ti) { return (TypeInt)meet(ti);  }
   // Shallow wrap
   public TypeMemPtr wrap() {
-    return TypeMemPtr.make(false,false,false,false,BitsAlias.EMPTY,TypeStruct.make_prim(TypeFld.make_clz(TypeMemPtr.INTPTR),TypeFld.make_prim(this))); // Wrapped primitive
+    return TypeMemPtr.make(false,false,false,is_con(),BitsAlias.EMPTY,TypeStruct.make_prim(TypeFld.make_clz(TypeMemPtr.INTPTR),TypeFld.make_prim(this))); // Wrapped primitive
   }
 }

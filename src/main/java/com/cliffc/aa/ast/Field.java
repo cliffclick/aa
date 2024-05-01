@@ -1,10 +1,9 @@
 package com.cliffc.aa.ast;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.node.Node;
 import com.cliffc.aa.node.LoadNode;
+import com.cliffc.aa.node.Node;
 import com.cliffc.aa.util.SB;
-
 import static com.cliffc.aa.AA.TODO;
 
 public class Field extends AST {

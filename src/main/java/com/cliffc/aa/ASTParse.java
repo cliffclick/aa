@@ -209,12 +209,39 @@ public class ASTParse {
       String tok = token0();
       Oper binop = Oper.bin_op(tok,prec);
       if( binop==null ) { _x=opx; return lhs; }
-      throw TODO();
+      _x -= binop.adjustx(tok); // Chosen op can be shorter than tok
+      skipWS();
+      int rhsx = _x;            // Invariant: WS already skipped
+      // Load against LHS pointer.  If this is a primitive, the Load loads
+      // against the primitive clazz.
+      AST over= new Field(binop._name,lhs);
+      // DynTable to call
+      AField dyn = dynCall();
+      // Resolve the set of primitive choices
+      AST fun = new DynField(over,dyn._kids.at(0));
+      // Bind the LHS to the function
+      AST bind= new Bind(fun,lhs);
+      // Parse the RHS operand
+      AST rhs = binop._lazy
+        ? _lazy_expr(binop)
+        : _expr_higher_require(binop);
+      //
+      // Emit the call to both terms
+      lhs = new Call(null,null,null,dyn,rhs,bind);
     }
   }
   // Get an expr at the next higher precedence, or a term, or null
   private AST _expr_higher( int prec ) {
     return prec+1 == Oper.MAX_PREC ? term() : _expr(prec+1);
+  }
+  private AST _expr_higher_require( Oper op ) {
+    AST rhs = _expr_higher(op._prec);
+    return rhs==null ? err_ctrl2("Missing term after '"+op._name+"'") : rhs;
+  }
+  // Parse a RHS operand into a 'thunk', a zero-arg function.
+  // Function takes in memory, display
+  private AST _lazy_expr(Oper op) {
+    throw TODO();
   }
 
 
@@ -243,7 +270,22 @@ public class ASTParse {
     // balanced ops require a trailing balanced close.
     Oper op = Oper.pre_bal(tok,false);
     if( op != null ) {
-      throw TODO();
+      _x -= op.adjustx(tok); // Chosen op can be shorter than tok
+      AST e0 = term();
+      if( e0 == null ) { return err_ctrl2("Missing term after operator '"+op+"'"); } // Parsed a valid leading op but missing trailing expr
+      if( op.is_open() ) throw TODO(); // Parse the close
+      if( op._nargs!=1 ) throw TODO(); // No binary/trinary allowed here
+      // Dynamic field
+      AField dyn = dynCall();
+      // Load against e0 pointer.  If e0 is a primitive, the Load is a no-op;
+      // otherwise this converts a reference to a value.
+      AST over= new Field(op._name,e0);
+      // Resolve the correct function from the overload choices
+      AST fun = new DynField(over,dyn._kids.at(0));
+      // Need the TypeFunPtr to pick up the display type
+      AST bind = new Bind(fun,e0);
+      // Call the uniop:
+      n = new Call(null,null,null,dyn,/*no args*/bind/*function*/);
     } else {
       // Normal leading term
       _x = oldx;                // Roll back and try again
@@ -363,7 +405,7 @@ public class ASTParse {
   // A fact hardwired to "$dyn".
   private AST dynLoad() { return new Ident("$dyn");  }
   // Load a Call/Apply field out of a DynTable
-  private AST dynCall() { return new AField(dynLoad()); }
+  private AField dynCall() { return new AField(dynLoad()); }
 
   ///** Parse a tuple; first stmt but not the ',' parsed.
   // *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
