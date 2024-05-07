@@ -67,7 +67,7 @@ public class StoreXNode extends StoreAbs {
 
     // Result must be the struct
     TVStruct stz = ptr.load();
-    rez().set_tvar().unify(stz,false);
+    rez().set_tvar().unify(stz.find(),false);
 
     return null;
   }

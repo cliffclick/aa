@@ -29,10 +29,10 @@ public class Ident extends AST {
     Node ptr = e2._scope.ptr();
     while( e2._scope.stk().find(_name) == -1 ) {
       assert e2._scope.stk().is_closure(); // TODO: only skip up fcn closures
-      ptr = new LoadNode(e._scope.mem(),ptr,"^",false,true,null).peep();
+      ptr = new LoadNode(e._scope.mem(),ptr,"^",false,null).peep();
       e2 = e2._par;
     }
-    Node ld = new LoadNode(e._scope.mem(),ptr,_name,false,true,null).peep();
+    Node ld = new LoadNode(e._scope.mem(),ptr,_name,false,null).peep();
 
     // Bind unknown loads, in case an FP is involved
     //Node x = Util.eq(_name,"$dyn") || Util.eq(_name,TypeFld.CLZ)

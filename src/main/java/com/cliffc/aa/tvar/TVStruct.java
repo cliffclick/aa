@@ -198,7 +198,7 @@ public class TVStruct extends TVExpanding {
     // Assert if closed, parent clazzes are closed:
     TVPtr plhs = lhs.pclz(), prhs = rhs.pclz();
     //assert lhs._open || plhs==null || !plhs.load()._open;
-    assert rhs._open || prhs==null || !prhs.load()._open;
+    //assert rhs._open || prhs==null || !prhs.load()._open;
 
     // Record _open values, then close rhs if needed
     boolean lhsOpen = lhs._open;

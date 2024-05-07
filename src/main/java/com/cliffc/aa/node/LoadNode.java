@@ -7,6 +7,9 @@ import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
 
+// TODO: Fold in Bind, DynLoad
+
+
 // Load a struct from memory.  Does its own nil-check testing.  Display/Frames
 // are normal structs, so local vars are ALSO normal struct loads.
 
@@ -20,10 +23,6 @@ public class LoadNode extends Node {
   // LET-polymorphism.  When false, this Load could be a struct field load,
   // OR it could be self-recursive definition, OR it could be unknown.
   private boolean _fresh;
-  // When false, the _fresh field is unknown; the Load is known as a identifier
-  // (not a field load) but we do not (yet) know if it is part of a self-
-  // recursive definition or not.
-  private boolean _known;
 
   // Prevent recursive expansion during ideal_grow
   private boolean _mid_grow;
@@ -31,7 +30,7 @@ public class LoadNode extends Node {
   // A struct using just the field; just a cache for faster live-use
   private final TypeStruct _live_use;
 
-  public LoadNode( Node mem, Node adr, String fld, boolean fresh, boolean known, Parse bad ) {
+  public LoadNode( Node mem, Node adr, String fld, boolean fresh, Parse bad ) {
     super(null,mem,adr);
     _fld = fld;
     _bad = bad;
@@ -55,17 +54,26 @@ public class LoadNode extends Node {
     if( ta==TypeNil.NIL || ta==TypeNil.XNIL )
       ta = (TypeNil)ta.meet(PrimNode.PINT._val);
 
-    // Exactly only prior Operator Binds produce Deep Ptrs, and these do
-    // field-selects from the struct instead of loads.
+    // Load the matching struct from memory
     TypeStruct ts = ta instanceof TypeMemPtr tmp && !tmp.is_simple_ptr()
-      ? tmp._obj
+      ? tmp._obj                // Primitives are not-simple
       : tm.ld(ta);
-
+    // Field lookup, might check superclass
     Type t = lookup(ts,tm,_fld);
-    if( t!=null ) return t;
+    // Did not find field.  Generic escaped scalar
+    if( t==null )
+      return Env.ROOT.ext_scalar(this);
 
-    // Did not find field
-    return Env.ROOT.ext_scalar(this);
+    // Bind if loading a TFP or a TS with TFP and the DSP is live
+    boolean dsp_live = !_live.above_center() && (_live==Type.ALL || (_live instanceof TypeStruct ts2 && ts2.has("dsp")));
+    if( t instanceof TypeFunPtr tfp && !tfp.has_dsp() && dsp_live )
+      return tfp.make_from(ta);
+    // If loading a TypeStruct (and not a DynTable) must be an Overload; bind
+    // recursive 1-level deep.
+    if( t instanceof TypeStruct ts2 && !Util.eq("$dyn",_fld) ) {
+      throw TODO();
+    }
+    return t;
   }
 
 
@@ -278,7 +286,7 @@ public class LoadNode extends Node {
             BitsAlias esc_aliases = Env.ROOT.ralias();
             // Collides, might be use/def by call
             if( aliases.overlaps(esc_aliases) ) {
-              Env.ROOT.deps_add(ldst); // Revisit if fewer escapes
+              Env.ROOT.deps_add_live(ldst); // Revisit if fewer escapes
               return mem;
             }
             // Compute direct call argument set
@@ -323,7 +331,6 @@ public class LoadNode extends Node {
 
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
-    //if( !_known ) throw TODO();
     // Load takes a pointer
     TV3 ptr0 = adr().set_tvar();
     TVPtr ptr;
@@ -384,7 +391,6 @@ public class LoadNode extends Node {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
     if( !(o instanceof LoadNode ld) ) return false;
-    if( !_known || !ld._known ) return false; // Assume the fresh field will differ
     if( _fresh != ld._fresh ) return false;   // Fresh field does differ
     return Util.eq(_fld,ld._fld);
   }

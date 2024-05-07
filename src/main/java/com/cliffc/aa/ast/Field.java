@@ -4,7 +4,6 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.node.LoadNode;
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.util.SB;
-import static com.cliffc.aa.AA.TODO;
 
 public class Field extends AST {
   final String _name;
@@ -20,6 +19,6 @@ public class Field extends AST {
     _kids.at(0).nodes(e);
     Node ptr = e._scope.rez();
     Node mem = e._scope.mem();
-    e._scope.rez(new LoadNode(mem,ptr,_name,false,false,null).init());
+    e._scope.rez(new LoadNode(mem,ptr,_name,false,null).peep());
   }
 }

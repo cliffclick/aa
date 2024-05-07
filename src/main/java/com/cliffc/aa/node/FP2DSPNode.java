@@ -30,27 +30,18 @@ public class FP2DSPNode extends Node {
   private static final Type DSP_LIVE = TypeStruct.UNUSED.add_fldx(TypeFld.make("dsp",Type.ALL));
   @Override public Type live_use( int i ) { return DSP_LIVE; }
 
-  @Override public Node ideal_reduce() {
-    Node fp = fp();
-    // Note: cannot bypass Fresh nodes here; might need to Fresh a display.
-    if( fp instanceof BindFPNode bind )
-      return bind.dsp();
-    return null;
-  }
-
-  
   @Override public boolean has_tvar() { return true; }
 
   @Override public TV3 _set_tvar() {
     TV3 tv = fp().set_tvar();
     if( tv instanceof TVLambda fun )
       return fun.dsp();
-    
+
     _tvar=new TVLeaf();
     new TVLambda(TVLambda.UNKNOWN_NARGS,_tvar,new TVLeaf());
     return _tvar;
   }
-  
+
   //// Implements class HM.Lambda unification.
   //@Override public boolean unify( boolean test ) {
   //  TV3 tv = tvar(0);

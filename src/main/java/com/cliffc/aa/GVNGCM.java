@@ -22,7 +22,7 @@ public class GVNGCM {
   public boolean on_inline( Node n ) { return _work_inline.on(n); }
 
   static public <N extends Node> N add_work( WorkNode work, N n ) {
-    if( n==null || n.isDead() ) return n;
+    if( n==null || n.isDead() || n.isPrim() ) return n;
     work.add(n);
     return n;
   }

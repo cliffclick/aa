@@ -14,6 +14,6 @@ public class Const extends AST {
   }
 
   @Override public void nodes( Env e ) {
-    e._scope.rez( new ConNode(_t) );
+    e._scope.rez( new ConNode(_t).peep() );
   }
 }

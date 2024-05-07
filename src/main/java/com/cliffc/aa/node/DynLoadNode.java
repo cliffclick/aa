@@ -19,30 +19,25 @@ import static com.cliffc.aa.AA.*;
 // like a normal variable; they get an original definition next to Root.  Since
 // they get loaded Fresh, they can have different types, hence different fields
 // at every call site.
-// 
+//
 // Most of the exciting inference now is handed off to TVDynTable, and the
 // setup of passing "$dyn" arguments around.
 
-public class DynLoadNode extends Node {
-
-  // Where to report errors
-  private final Parse _bad;
+public class DynLoadNode extends LoadNode {
 
   // Set of resolved field names
   private final HashSet<String> _resolves;
-  
+
   public DynLoadNode( Node mem, Node adr, Node dyn, Parse bad ) {
-    super(null,mem,adr,dyn);
-    _bad = bad;
+    super(mem,adr,"_",true,bad);
+    addDef(dyn);
     _resolves = new HashSet<>();
   }
 
   @Override public String label() { return "._"; }   // Self short name
-  
-  public Node mem() { return in(MEM_IDX); }
-  public Node adr() { return in(DSP_IDX); }
+
   public Node dyn() { return in(ARG_IDX); }
-  
+
   @Override public Type value() {
     Type tadr = adr()._val;
     Type tmem = mem()._val;
@@ -82,7 +77,7 @@ public class DynLoadNode extends Node {
     return t;
   }
 
-  
+
   // The only memory required here is what is needed to support the Load.
   // If the Load is alive, so is the address.
   @Override public Type live_use( int i ) {
@@ -101,7 +96,7 @@ public class DynLoadNode extends Node {
     if( !(adr instanceof TypeNil ptr) || // Not a ptr, assume it becomes one
         ptr._aliases==BitsAlias.NALL )   // All aliases, then all mem needed
       return RootNode.removeKills(def);  // All mem minus KILLS
-  
+
     if( ptr._aliases.is_empty() )  return Type.ANY; // Nothing is demanded still
 
     // TODO: not quite monotonic, if def is high and falls to mem
@@ -126,7 +121,7 @@ public class DynLoadNode extends Node {
   public boolean resolve_failed_no_match( TV3 pattern, TVStruct rhs, boolean test ) {
     throw TODO();
   }
-  
+
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
     _tvar = new TVLeaf();
@@ -135,7 +130,7 @@ public class DynLoadNode extends Node {
     TVPtr ptr;
     if( ptr0 instanceof TVPtr ptr1 ) ptr = ptr1;
     else ptr0.unify(ptr = new TVPtr(BitsAlias.EMPTY, new TVStruct(true) ),false);
-    
+
     // Also prep the DynTable
     TV3 _dyn = dyn().set_tvar();
     TVDynTable dyn = new TVDynTable();
@@ -149,5 +144,5 @@ public class DynLoadNode extends Node {
 
   @Override public boolean unify( boolean test ) {
     return dyn().tvar() instanceof TVDynTable tab && tab.resolve(this,test);
-  }  
+  }
 }

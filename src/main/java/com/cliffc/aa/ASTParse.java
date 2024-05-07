@@ -219,15 +219,13 @@ public class ASTParse {
       AField dyn = dynCall();
       // Resolve the set of primitive choices
       AST fun = new DynField(over,dyn._kids.at(0));
-      // Bind the LHS to the function
-      AST bind= new Bind(fun,lhs);
       // Parse the RHS operand
       AST rhs = binop._lazy
         ? _lazy_expr(binop)
         : _expr_higher_require(binop);
       //
       // Emit the call to both terms
-      lhs = new Call(null,null,null,dyn,rhs,bind);
+      lhs = new Call(null,null,null,dyn,rhs,lhs);
     }
   }
   // Get an expr at the next higher precedence, or a term, or null
@@ -282,10 +280,8 @@ public class ASTParse {
       AST over= new Field(op._name,e0);
       // Resolve the correct function from the overload choices
       AST fun = new DynField(over,dyn._kids.at(0));
-      // Need the TypeFunPtr to pick up the display type
-      AST bind = new Bind(fun,e0);
       // Call the uniop:
-      n = new Call(null,null,null,dyn,/*no args*/bind/*function*/);
+      n = new Call(null,null,null,dyn/*no more args*/,fun);
     } else {
       // Normal leading term
       _x = oldx;                // Roll back and try again
@@ -311,18 +307,18 @@ public class ASTParse {
           throw TODO();         // Field store
         } else {
           // Field load
-          n = new Field(tok,n);
+          n = Util.eq(tok,"_")
+            ? new DynField(n,dynLoad())
+            : new Field(tok,n);
         }
 
       } else if( peek('(') ) {  // Attempt a function-call
         oldx = _x-1;
-        var args = new Ary<>(AST.class);
+        var args = new Ary<>(AST.class);    AST arg1;
         args.add(null).add(null).add(null).add(dynCall());
-        AST arg1 = stmts(false);
-        if( arg1 != null ) {
+        while( (arg1 = stmts(false)) != null ) {
           args.add(arg1);
-          while( peek(',') ) // Final comma is optional
-            args.add(stmts(false));
+          if( !peek(',') ) break; // Final comma is optional
         }
         require(')',oldx);
         n = new Call(args.add(n)); // Function last
@@ -403,7 +399,7 @@ public class ASTParse {
   }
 
   // A fact hardwired to "$dyn".
-  private AST dynLoad() { return new Ident("$dyn");  }
+  private Ident dynLoad() { return new Ident("$dyn");  }
   // Load a Call/Apply field out of a DynTable
   private AField dynCall() { return new AField(dynLoad()); }
 

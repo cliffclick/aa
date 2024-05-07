@@ -498,18 +498,17 @@ public class TestNodeSmall {
     ParmNode parm_dsp_ptr = new ParmNode(DSP_IDX,fun,null,dsp_file_ptr._val).addDef(dsp_file_ptr).init();
     // Close the function up
     RetNode ret = new RetNode(fun,parm_mem,parm_dsp_ptr,rpc,fun).init();
-    FunPtrNode fptr = new FunPtrNode(ret).init();
+    FunPtrNode fptr = new FunPtrNode(ret,dsp_file_ptr).init();
     fptr._name = "fact";
-    BindFPNode bind = new BindFPNode(fptr,dsp_file_ptr);
     // Close the cycle
-    dsp_file.add_fld("fact",Access.Final,bind,null);
+    dsp_file.add_fld("fact",Access.Final,fptr,null);
     dsp_file.close();
     // Return the fptr to keep all alive
-    ScopeNode env = new ScopeNode(null,ctl,mem,bind,dsp_file_ptr,dsp_file).init();
+    ScopeNode env = new ScopeNode(null,ctl,mem,fptr,dsp_file_ptr,dsp_file).init();
     Env.ROOT.setDef(AA.MEM_IDX,Env.MEM_0);
     Env.ROOT.setDef(AA.REZ_IDX,dsp_file);
 
-    Node[] nodes = new Node[]{ctl,mem,rpc,dsp_prims,dsp_file,dsp_file_ptr,dsp_file_mem,fun,parm_mem,parm_dsp_ptr,ret,fptr,bind,env};
+    Node[] nodes = new Node[]{ctl,mem,rpc,dsp_prims,dsp_file,dsp_file_ptr,dsp_file_mem,fun,parm_mem,parm_dsp_ptr,ret,fptr,env};
 
     // Validate graph initial conditions.  No optimizations, as this
     // pile-o-bits is all dead and will vaporize if the optimizer is turned
@@ -529,7 +528,7 @@ public class TestNodeSmall {
     AA.LIFTING = true;
 
     // Validate cyclic display/function type
-    TypeFunPtr tfptr0 = (TypeFunPtr) bind._val;
+    TypeFunPtr tfptr0 = (TypeFunPtr) fptr._val;
     Type tdptr0 = tfptr0.dsp();
     Type tret = ((TypeTuple) ret._val).at(REZ_IDX);
     assertEquals(tdptr0,tret); // Returning the display

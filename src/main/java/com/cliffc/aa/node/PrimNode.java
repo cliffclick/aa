@@ -177,14 +177,6 @@ public abstract class PrimNode extends Node {
     return PRIMS;
   }
 
-  // Make a fresh HMT wrapped int
-  private static final String[] ss  = new String[]{TypeFld.CLZ,TypeFld.PRIM};
-  final static TVPtr IINT () { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PINT.tvar(),new TVBase(TypeInt. INT64)},false)); }
-  final static TVPtr IBOOL() { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PINT.tvar(),new TVBase(TypeInt. BOOL )},false)); }
-  final static TVPtr  IFLT() { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.tvar(),new TVBase(TypeFlt. FLT64)},false)); }
-  final static TVPtr INFLT() { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.tvar(),new TVBase(TypeFlt.NFLT64)},false)); }
-
-
   static boolean chk(Node n) {
     boolean b0 = n.value()==n._val ;
     boolean b1 = n.live ()==n._live;
@@ -192,6 +184,14 @@ public abstract class PrimNode extends Node {
     boolean b = b0 && b1 && b2;
     return b;
   }
+
+
+  // Make a fresh HMT wrapped int
+  private static final String[] ss  = new String[]{TypeFld.CLZ,TypeFld.PRIM};
+  final static TVPtr IINT () { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PINT.tvar(),new TVBase(TypeInt. INT64)},false)); }
+  final static TVPtr IBOOL() { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PINT.tvar(),new TVBase(TypeInt. BOOL )},false)); }
+  final static TVPtr  IFLT() { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.tvar(),new TVBase(TypeFlt. FLT64)},false)); }
+  final static TVPtr INFLT() { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.tvar(),new TVBase(TypeFlt.NFLT64)},false)); }
 
 
   // Used for test cases; changes the golden-rule expected alias/fidx based on
@@ -215,9 +215,9 @@ public abstract class PrimNode extends Node {
     init();
     // Return the result
     RetNode ret = new RetNode(fun,null/*no mem*/,this,rpc,fun).init();
-    // FunPtr is UNBOUND here, will be bound when loaded thru a named struct to the Clazz.
-    // Primitives all late-bind by default, so no BindFP here.
-    return new FunPtrNode(_name,ret).init();
+    // FunPtr is UNBOUND here, will be bound when loaded through a named struct to the Clazz.
+    // Primitives all late-bind by default.
+    return new FunPtrNode(_name,ret,Env.ANY).init();
   }
 
   // Primitive wrapped as a simple function.
@@ -237,9 +237,8 @@ public abstract class PrimNode extends Node {
     init();
     // Return the result
     RetNode ret = new RetNode(fun,mem,this,rpc,fun).init();
-    // FunPtr is UNBOUND here, will be bound when loaded thru a named struct to the Clazz.
-    // Primitives all late-bind by default, so no BindFP here.
-    return new FunPtrNode(_name,ret).init();
+    // FunPtr is UNBOUND here, will be bound when loaded through a named struct to the Clazz.
+    return new FunPtrNode(_name,ret,Env.ANY).init();
   }
 
   // Make and install a primitive Clazz.
@@ -269,6 +268,8 @@ public abstract class PrimNode extends Node {
         char op = p.charAt(0)=='_' ? p.charAt(1) : p.charAt(0);
         ptr0 = new NewNode(""+clzname.charAt(0)+op+":",BitsAlias.new_alias(BitsAlias.LOCX),true).init();
         scp.mem(new StoreXNode(scp.mem(),ptr0,over,null));
+        // TODO: Overs are TypeStruct not TMP, no NewNode
+        throw TODO();
       }
       clz.add_fld(prims[0]._name,Access.Final,ptr0,null);
     }
@@ -710,8 +711,7 @@ public abstract class PrimNode extends Node {
       Node fal = new CProjNode(iff,0).init();
       Node tru = new CProjNode(iff,1).init();
       // Call on true branch; if false do not call.
-      Node dsp = new FP2DSPNode(rhs,null).init();
-      Node cal = new CallNode(true,_badargs,tru,mem,dsp,rhs).init();
+      Node cal = new CallNode(true,_badargs,tru,mem,rhs).init();
       Node cep = new CallEpiNode(cal).init();
       Node ccc = new CProjNode(cep).init();
       Node memc= new MProjNode(cep).init();
@@ -722,7 +722,7 @@ public abstract class PrimNode extends Node {
       Node phim= new PhiNode(TypeMem.ALLMEM,null,reg,mem,memc ).init();
       // Plug into return
       RetNode ret = new RetNode(reg,phim,phi,rpc,fun).init();
-      return new FunPtrNode(_name,ret).init();
+      return new FunPtrNode(_name,ret,Env.ANY).init();
     }
   }
 
@@ -749,8 +749,7 @@ public abstract class PrimNode extends Node {
       Node fal = new CProjNode(iff,0).init();
       Node tru = new CProjNode(iff,1).init();
       // Call on false branch; if true do not call.
-      Node dsp = new FP2DSPNode(rhs,null).init();
-      Node cal = new CallNode(true,_badargs,fal,mem,dsp,rhs).init();
+      Node cal = new CallNode(true,_badargs,fal,mem,rhs).init();
       Node cep = new CallEpiNode(cal).init();
       Node ccc = new CProjNode(cep).init();
       Node memc= new MProjNode(cep).init();
@@ -761,7 +760,7 @@ public abstract class PrimNode extends Node {
       Node phim= new PhiNode(TypeMem.ALLMEM,null,reg,mem,memc ).init();
       // Plug into return
       RetNode ret = new RetNode(reg,phim,phi,rpc,fun).init();
-      return new FunPtrNode(_name,ret).init();
+      return new FunPtrNode(_name,ret,Env.ANY).init();
     }
   }
 

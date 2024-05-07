@@ -45,7 +45,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   }
 
 
-  public static int _PRIM_CNT = 99999;
+  public static int _PRIM_CNT = 0;
   // Initial state after loading e.g. primitives.
   public static void initPrim() { _PRIM_CNT=CNT; }
   // Reset is called after a top-level exec exits (e.g. junits) with no parse

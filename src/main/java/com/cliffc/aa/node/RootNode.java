@@ -76,13 +76,14 @@ public class RootNode extends Node {
 
     // Primitive memory
     TypeMem primem = (TypeMem)val(ARG_IDX);
-    // Plus escaping memory
+    // Plus reaching memory - I search this for the closure of escapes
     TypeMem tmem = val(MEM_IDX) instanceof TypeMem vmem ? (TypeMem)primem.meet(vmem) : primem;
 
     // Conservative final result.  Until Combo external calls can still wire, and escape arguments
     if( Combo.pre() )
       return CACHE_DEF;
 
+    // Find all escaping aliases and functions -
     // Walk the 'rez', all Call args (since they call Root, their args escape)
     // and function rets (since called from Root, their return escapes).
     AryInt awork = new AryInt();
@@ -142,11 +143,16 @@ public class RootNode extends Node {
 
     TypeStruct extstr = tmem.at(BitsAlias.EXTX);
     TypeStruct extstr2 = (TypeStruct)extstr.meet( TypeStruct.make(false,escs,TypeFlds.EMPTY) );
-    tmem = tmem.set(BitsAlias.EXTX,extstr2);
+
+    // Now build the memory reachable from escapes
+    TypeMem xmem = primem.make_from(BitsAlias.EXTX,extstr2);
+    for( int alias : escs._aliases )
+      if( alias!=BitsAlias.EXTX )
+        xmem = xmem.make_from(alias,tmem.at(alias));
 
     // RootNode value is a 4-pack.  The *memory* is PRIM memory, as the starting
     // point for what Root calls.  The *control* is also an input
-    return TypeTuple.make(Type.CTRL, tmem, trez, escs);
+    return TypeTuple.make(Type.CTRL, xmem, trez, escs);
   }
 
   private TypeNil _add_all( TypeNil escs, AryInt awork, AryInt fwork, Type t ) {

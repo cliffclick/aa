@@ -5,7 +5,7 @@
 // HMT: *[19]@{ _; A1=   *[18]@{ _; fld=int:nint8; };    A7=*[18]@{ _; fld=int:nint8; }; }
 
 var := 1;
-A_noinline = { -> @{ fld = var; } };
-A1 = A_noinline();
+A_noinline := { -> @{ fld = var; } };
+A1 := A_noinline();
 var := 7;
 @{ A1 = A1; A7 = A_noinline(); }

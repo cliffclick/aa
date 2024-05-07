@@ -1,4 +1,66 @@
 =======================================
+05/03/2024
+
+Primitives need to updated to TS not TMP.
+
+OVERLOADs are a TypeStruct, and NOT a TypeMemPtr to a TypeStruct.  This avoids
+the issue of using shallow/deep pointers, and binding a TFP trying to update memory.
+
+Fold together Load+Bind.  Removes some graph confusion.
+Fold together DynLoad and Load+Bind.  Basically a DynLoad is a Load taking an offset edge (binds same way).
+
+Example
+color = @{ hex = 0x123; name = "red"; run={ x -> ... } };
+
+Pattern:
+x.toString() // Normal field load; binds x to loaded TFP
+x.age        // Normal field load; bind is skipped since loaded value is not a TFP
+1+2          // Parser expands as 1._+_._(2)
+1._+_        // Normal field load of a OVER/TS; and binds deep
+color._.eq("")  // DynLoad, no bind to TypeMemPtr of string
+color._ + 456   // DynLoad, no bind to TypeInt
+color.run    // Normal field load; binds color to TFP run
+color._(3)   // DynLoad; binds color to TFP run
+1._+_._      // DynLoad; since TS expects deep bound already; skips bind
+
+fun = { x -> x }; // Top level define; builds a TFP pre-bound to the local scope
+Person = :@{
+  fun = { x -> x }; // Field is defined as constant UNBOUND fcn, will bind on load
+}
+
+Rules:
+- FldLoad of TFP - assert input does NOT transit unbound->bound; if unbound, bind; else noop
+- FldLoad of TS  - repeat FldLoad on fields
+- FldLoad of hi  - might TFP/TS stays high
+- FldLoad of lo  - no-op
+- DynLoad - if fields mix bind, then stay high until resolved (all low)
+            - if all fields unbound, then can bind
+            - if any field    bound, then wait till all bound (then no-op)
+
+
+
+// Stretch goals: better syntax for overloaded instance methods:
+Person = : @{
+  _tax0 = { x -> compute_tax_x }
+  _tax1 = { x y -> compute_tax_x_and_y }
+  tax = (_tax0,_tax1);
+};
+// Normal tax load of a TS, binds deep.
+// Normal dynload selects which (pre-bound) tax function.
+.... person.tax._(x  );....
+.... person.tax._(x,y);....
+//  Better syntax
+Person = : @{
+  tax = { x -> compute_tax_x }
+  tax = { x y -> compute_tax_x_and_y }
+};
+// Parser can expand these
+.... person.tax(x  );....
+.... person.tax(x,y);....
+
+
+
+=======================================
 04/17/2024
 
 Basic learnings:

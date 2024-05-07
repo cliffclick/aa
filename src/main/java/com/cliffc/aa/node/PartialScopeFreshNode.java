@@ -1,10 +1,9 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
-import com.cliffc.aa.tvar.TV3;
-import com.cliffc.aa.tvar.TVStruct;
-import com.cliffc.aa.tvar.TVPtr;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Util;
 
 // "fresh" the incoming TVar: make a fresh instance before unifying
 public class PartialScopeFreshNode extends FreshNode {
@@ -12,7 +11,7 @@ public class PartialScopeFreshNode extends FreshNode {
   final String[] _flds;
 
   public PartialScopeFreshNode( ScopeNode scope ) {
-    super(scope.stk());
+    super(scope.ptr());
     _alias = scope.ptr()._alias;
     StructNode frame = scope.stk();
     // Copy partial list of field names
@@ -29,8 +28,8 @@ public class PartialScopeFreshNode extends FreshNode {
 
   @Override public Type live_use( int i ) {
     if( i != 0 ) return Type.ALL;
-    return val(0) instanceof TypeStruct ts
-      ? ts.flatten_live_fields()
+    return val(0) instanceof TypeMemPtr tmp
+      ? tmp._obj.flatten_live_fields()
       : val(0).oob();
   }
 
@@ -48,10 +47,16 @@ public class PartialScopeFreshNode extends FreshNode {
   }
 
   @Override public boolean unify( boolean test ) {
-    if( !(tvar(0) instanceof TVStruct fresh) ) throw AA.TODO();
+    if( !(tvar(0) instanceof TVPtr ptr) ) throw AA.TODO();
+    TVStruct fresh = ptr.load();
     TV3[] tvs = new TV3[_flds.length];
-    for( int i=0; i<_flds.length; i++ )
+    for( int i=0; i<_flds.length; i++ ) {
       tvs[i] = fresh.arg(_flds[i]);
+      if( tvs[i] == null )
+        tvs[i] = Util.eq(_flds[i],TypeFld.CLZ)
+          ? new TVPtr(BitsAlias.EMPTY, new TVStruct(true) )
+          : new TVLeaf();
+    }
     TVStruct partial = new TVStruct(_flds,tvs,true);
     TVStruct that = ((TVPtr)tvar()).load();
     return partial.fresh_unify(_nongen,that,test);

@@ -176,10 +176,10 @@ public class CallNode extends Node {
       // Find a tuple being passed in directly; unpack
       Node fun = popKeep(); // Pop off the function
       Node nnn = popKeep(); // Pop off the tuple
-      if( nnn instanceof StructNode )
+      if( nnn instanceof StructNode ) {
         for( Node n : nnn.defs() ) // Push the args; unpacks the tuple
           addDef(n);
-      else {
+      } else {
         assert nnn instanceof ConNode;
         for( TypeFld fld : ts )
           addDef(Node.con(fld._t));
@@ -198,26 +198,23 @@ public class CallNode extends Node {
 
     // Dead, do nothing
     if( tctl(tcall)!=Type.CTRL ) { // Dead control (NOT dead self-type, which happens if we do not resolve)
-      if( (ctl() instanceof ConNode) ) return null;
-      // Kill all inputs with type-safe dead constants
-      set_xmem();
-      for( int i=ARG_IDX; i<len(); i++ )
-        setDef(i,Env.ANY);
-      CallEpiNode cepi = cepi();
-      if( cepi==null ) {
-        //while( _uses._len>0 ) {
-        //  Node use = _uses.last();
-        //  assert use instanceof FunNode;
-        //  use.remove(use._defs.find(this));
-        //}
-        throw TODO();
-      }
-      return setDef(0,Env.XCTRL);
+    //  if( (ctl() instanceof ConNode) ) return null;
+    //  // Kill all inputs with type-safe dead constants
+    //  set_xmem();
+    //  for( int i=ARG_IDX; i<len(); i++ )
+    //    setDef(i,Env.ANY);
+    //  CallEpiNode cepi = cepi();
+    //  if( cepi==null ) {
+    //    //while( _uses._len>0 ) {
+    //    //  Node use = _uses.last();
+    //    //  assert use instanceof FunNode;
+    //    //  use.remove(use._defs.find(this));
+    //    //}
+    //    throw TODO();
+    //  }
+    //  return setDef(0,Env.XCTRL);
+      throw TODO();
     }
-
-    // Call can skip a direct BindFP to the source of the FP itself
-    if( fdx() instanceof BindFPNode bind && bind.fp()._val instanceof TypeFunPtr  )
-      return GVN.add_reduce(set_fdx(bind.fp()));
 
     // Have some sane function choices?
     TypeFunPtr tfp  = ttfp(tcall);
@@ -236,6 +233,7 @@ public class CallNode extends Node {
     // alive args still need to resolve.
     if( cepi!=null && ttfp(tcall)._fidxs != BitsFun.NALL && !isKeep() && err(true)==null && cepi.is_CG(true) ) {
       // 1 bit for each argument, used to track arg usage
+      if( nargs()>63 ) throw TODO();
       int abits = 0;
       for( int i=DSP_IDX; i<nargs(); i++ ) if( in(i)!=Env.ANY ) abits |= (1<<i);
       // Find arg uses
@@ -343,7 +341,7 @@ public class CallNode extends Node {
     boolean is_keep = isKeep();
     if( i==CTL_IDX ) return def.isMem() ? TypeMem.ALLMEM : Type.ALL;
     if( i==MEM_IDX ) return RootNode.removeKills(def,_live); // JOIN away kills
-    if( i==nargs() ) return _unpacked ? FP_LIVE : Type.ALL;
+    if( i==nargs() ) return FP_LIVE;
     if( !_unpacked ) return TypeStruct.ISUSED;
     if( is_keep  )   return Type.ALL; // Still under construction, all alive
 

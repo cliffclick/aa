@@ -226,13 +226,13 @@ public class TestNode {
     test1monotonic(new  CProjNode(_ins[0],0));
     test1monotonic(new    ErrNode(_ins[0],null,"\nerr\n"));
     test1monotonic(new    FunNode(TypeTuple.INT64.len()));
-    test1monotonic(new FunPtrNode("anon",ret));
+    test1monotonic(new FunPtrNode("anon",ret,Env.ANY));
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
     //test1monotonic_intrinsic(new NewAryNode.NewAry());
     //test1monotonic_intrinsic(new NewStrNode.ConvertI64Str());
     //test1monotonic_intrinsic(new NewStrNode.ConvertF64Str());
     //test1monotonic_intrinsic(new NewStrNode.AddStrStr());
-    test1monotonic(new   LoadNode(_ins[1],_ins[2],"_",false,true,null));
+    test1monotonic(new   LoadNode(_ins[1],_ins[2],"_",false,null));
     StructNode nnn1 = new StructNode(0,false,null );
     set_type(1,TypeNil.SCALAR);  nnn1.add_fld("x",Access.Final,_ins[1],null);
     set_type(2,TypeNil.SCALAR);  nnn1.add_fld("y",Access.Final,_ins[2],null);

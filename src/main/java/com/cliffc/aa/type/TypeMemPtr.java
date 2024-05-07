@@ -22,16 +22,13 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   // Pointers to singleton objects with no child aliases are constants.
   // This is generally true of Clazz objects and pointers.
   public boolean _is_con;
-  
+
   private TypeMemPtr init(boolean any, boolean nil, boolean sub, boolean is_con, BitsAlias aliases, TypeStruct obj ) {
     super.init(any, nil, sub, aliases, BitsFun.EMPTY);
     assert !aliases.test(0); // No nil in aliases, use nil/sub instead
     _obj=obj;
     _is_con = is_con;
     return this;
-  }
-  private TypeMemPtr init(boolean any, boolean nil, boolean sub, BitsAlias aliases, TypeStruct obj ) {
-    return init(any,nil,sub,false,aliases,obj);
   }
   @Override TypeMemPtr copy() {
     TypeMemPtr tmp = super.copy();
@@ -82,7 +79,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     // Shortcut for printing boxed primitives
     if( is_prim() && _aliases==BitsAlias.EMPTY ) {
       if( _obj.at(0)==INTPTR ) return _obj.at(1)._str(P.p("int:"));
-      if( _obj.at(0)==FLTPTR ) return _obj.at(1)._str(P.p("flt:"));      
+      if( _obj.at(0)==FLTPTR ) return _obj.at(1)._str(P.p("flt:"));
     }
     if( is_clz_ptr() ) return P.p("*CLZ");
     P.p(_is_con ? '$' : '*');
@@ -93,7 +90,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   @Override boolean _str_complex0(PENV P) { return _obj._str_complex(P); }
 
   boolean is_clz_ptr() { return this==Cons.CLZ_TMP; }
-  
+
   static TypeMemPtr valueOf(Parse P, String cid, boolean any, boolean is_con) {
     P.require(is_con ? '$' : '*');
     var aliases = P.bits(BitsAlias.EMPTY);
@@ -300,7 +297,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   @Override public Type sharptr2( TypeMem mem ) {
     if( is_prim() )
       return this;
-    
+
     return mem.sharpen(this);
   }
   public boolean is_prim() { return _obj.is_prim(); }

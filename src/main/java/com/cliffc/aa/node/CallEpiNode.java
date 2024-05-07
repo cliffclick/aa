@@ -504,12 +504,12 @@ public final class CallEpiNode extends Node {
     CallNode call = call();     // Call header for Apply
     Node fdx = call.fdx();      // node {dsp dyn args -> ret}
     TV3 tfun = fdx.set_tvar();  // type {dsp dyn args -> ret}
-    
+
     TVLambda lam = tfun instanceof TVLambda lam0 ? lam0
       : new TVLambda(call.nargs(),new TVLeaf(),tvar());
     if( !(tfun instanceof TVLambda) )
       tfun.unify(lam,false);
-      
+
     assert lam.nargs() == call.nargs();
     for( int i=DSP_IDX; i<call.nargs(); i++ ) {
       TV3 targ = call.in(i).set_tvar();

@@ -1,5 +1,5 @@
 // Mutually recursive
-// GCP: *[22]@{ _; someC=PA:*[]@{^=$[5,6](...); _=%[5,6][]; $nil}?; someD=PA; ...}
+// GCP: *[22]@{ _; someC=PA:*[]@{^=*[5,6](...); _=%[5,6][]; $nil}?; someD=PA; ...}
 // HMT: *[22]@{ _; someC=flt:3.14; someD=int:nint8; }
 A = { x -> E() ? B(x) : x };
 D = {   -> E() ? B(1) : C(2) };

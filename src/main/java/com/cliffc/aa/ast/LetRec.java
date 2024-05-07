@@ -177,6 +177,7 @@ public class LetRec extends ASTVars {
 
   StructNode _stk;
   int _oldx;
+  Node[] _frefs;
   @Override public void nodes( Env e ) {
     ScopeNode scope = e._scope;
     StructNode stk = _stk = scope.stk();
@@ -196,21 +197,27 @@ public class LetRec extends ASTVars {
 
     // Mutual-Let-Recursive variables.
     // Start with forward-refs for all.
+    _frefs = new Node[_vars._len];
     _oldx = stk.len();
-    for( String var : _vars ) {
-      ForwardRefNode fref = new ForwardRefNode(var,null).init();
+    for( int i=0; i<_vars._len; i++ ) {
+      String var = _vars.at(i);
+      // If assignment is new, add field
+      if( stk.find(var)== -1 )
+        stk.add_fld(var,Access.RW,Env.ANY,null);
+      ForwardRefNode fref = new ForwardRefNode(var,null).init().keep();
       fref.scope();
-      // TODO: Preserve Access mode
-      stk.add_fld(var,Access.Final,fref,null);
+      _frefs[i] = fref;
+      scope.mem(new StoreNode(scope.mem(), scope.ptr(), fref, var, Access.Final, null ).peep());
     }
 
     // Make nodes for all the defs; stitching them to the ForwardRefs
     for( int i=0; i<_vars._len; i++ ) {
       _kids.at(i).nodes(e);
       Node def = scope.rez();
-      ForwardRefNode fref = (ForwardRefNode)stk.in(_oldx+i);
+      ForwardRefNode fref = _frefs[i].unkeep();
+      _frefs[i] = def;
       // Assign def to name
-      stk.set_fld(_vars.at(i), Access.Final,def,true);
+      //stk.set_fld(_vars.at(i), Access.Final,def,true);
       // Close the fref cycle, and remove.
       if( !fref.isDead() ) {
         fref.self();

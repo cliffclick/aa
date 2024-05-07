@@ -184,7 +184,7 @@ public class StructNode extends Node {
           assert !parent.isPrim();
           parent.stk().add_fld(fref._name,TypeFld.Access.RW,fref,_fld_starts.at(i)).xval();
           // Stomp field locally to load from parent
-          LoadNode fld = new LoadNode(parent.mem(),parent.ptr(),fref._name,false,false,_fld_starts.at(i)).init();
+          LoadNode fld = new LoadNode(parent.mem(),parent.ptr(),fref._name,false,_fld_starts.at(i)).init();
           setDef(i,fld);
           parent.mem().xval();
           Env.GVN.add_work_new(fld);

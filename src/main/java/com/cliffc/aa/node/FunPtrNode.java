@@ -29,23 +29,24 @@ public final class FunPtrNode extends Node {
   // interesting thing is when an out-of-scope TVar uses the same TVar
   // internally in different parts - the copy replicates this structure.  When
   // unified, it forces equivalence in the same places.
-  public FunPtrNode( String name, RetNode ret ) {
-    super(ret);
+  public FunPtrNode( String name, RetNode ret, Node env ) {
+    super(ret,env);
     _name = name;
   }
 
   @Override String label() {
-    if( _name != null ) return "*Fun_"+_name;
+    if( _name != null ) return "*"+_name+"{}";
     FunNode fun = xfun();
-    if( fun==null ) return "*Fun";
-    return "*"+fun.label();
+    if( fun==null ) return "*{->}";
+    return "*"+fun.label()+"{}";
   }
   // Already a constant
   @Override public boolean shouldCon() { return false; }
-  
+
   // Display (already fresh-loaded) but no name.
-  public  FunPtrNode( RetNode ret ) { this(ret.fun()._name,ret); }
+  public FunPtrNode( RetNode ret, Node env ) { this(ret.fun()._name,ret,env); }
   public RetNode ret() { return in(0)==null ? null : (RetNode)in(0); }
+  public Node dsp() { return in(1); }
   public FunNode fun() { return ret().fun(); }
   public FunNode xfun() { RetNode ret = ret(); return ret !=null && ret.in(4) instanceof FunNode ? ret.fun() : null; }
   int nargs() { return ret()._nargs; }
@@ -64,39 +65,25 @@ public final class FunPtrNode extends Node {
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;
     RetNode ret = ret();
-    TypeTuple tret = (TypeTuple)(ret._val instanceof TypeTuple ? ret._val : ret._val.oob(TypeTuple.RET));
-    return TypeFunPtr.make_no_dsp(ret._fidx,nargs(),tret.at(REZ_IDX));
+    Type tret = ret._val instanceof TypeTuple tt ? tt.at(REZ_IDX) : TypeNil.SCALAR;
+    return TypeFunPtr.make(ret._fidx,nargs(),dsp()._val,tret);
   }
 
   // FunPtrs return RetNode liveness for memory
   @Override public Type live_use( int i ) {
-    Node ret = in(i);
-    assert ret instanceof RetNode;
-    // Pre-combo, Ret is alive because unwired caller may yet appear and demand
-    // all memory
-    FunNode fun = xfun();
-    if( fun==null ) return TypeMem.ANYMEM; // Dead, no memory demand
-    if( fun.unknown_callers() || fun.last() instanceof RootNode )
-      return RootNode.removeKills(ret); // All mem minus KILLS
-    // During/post-combo, Ret is alive only if called or escaped.
-    Env.ROOT.deps_add(ret);
-    if( Env.ROOT.rfidxs().test(fun._fidx) ) // Escaped
-      return Env.ROOT._live;    // Whatever Root requires, we do also
-    return TypeMem.ANYMEM;      // Dead, no memory demand
+    if( i==0 ) {
+      // The RET is alive, but the FunPtr does not itself demand any memory.
+      // Instead, either it escapes and Root demands memory, or it is called
+      // and the Call demands memory.
+      return _live==Type.ALL ? TypeMem.ANYMEM : Type.ANY;
+    } else {
+      // Display passes live along
+      return _live;
+    }
   }
 
   @Override public Node ideal_reduce() {
-    // Dead display post-Combo, we can wipe out the display type
-    if( _tvar!=null && tvar() instanceof TVLambda lam && !(lam.dsp() instanceof TVLeaf) &&
-        _val instanceof TypeFunPtr tfp && tfp.dsp()==Type.ANY && xfun()!=null ) {
-      Node dsp = xfun().parm(DSP_IDX);
-      if( dsp==null ) {
-        _tvar = ((TVLambda)lam.copy()).clr_dsp();
-        return this;
-      } else {
-        dsp.deps_add(this);     // If parm deletes
-      }
-    }
+    // Since 2 parts liveness, could check live being not-live and remove either part
     return null;
   }
 
@@ -114,7 +101,16 @@ public final class FunPtrNode extends Node {
     args[0] = rez.set_tvar();
     for( int i=DSP_IDX; i<nargs(); i++ )
       args[i] = parms[i]==null ? new TVLeaf() : parms[i].set_tvar();
-    return new TVLambda(args);
+    // Set early to stop cycles on self-recursive functions
+    _tvar = new TVLambda(args);
+    // Display is either "ANY" meaning: no display; binding happens on load.
+    // Or: bound to PartialScopeFreshNode - which is a Fresh.
+    // Or: bound to a Fresh type of some struct (instanceof call)
+    if( dsp()!=Env.ANY ) {
+      TV3 tvdsp = dsp().set_tvar();
+      args[DSP_IDX].find().unify(tvdsp,false);
+    }
+    return _tvar;
   }
-  
+
 }

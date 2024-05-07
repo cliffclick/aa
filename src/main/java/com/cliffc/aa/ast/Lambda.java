@@ -65,25 +65,21 @@ public class Lambda extends ASTVars {
       _fun.unkeep();
       RetNode ret = new RetNode(inScope.ctrl(),inScope.mem(),inScope.rez(),rpc,_fun).init();
 
-      // Code pointer
-      Node code = new FunPtrNode(ret).peep();
-
       // The outer scope is a shared closure.
       // Take just the prefix of scope variables declared up through now (after
       // sorting for mutual-let-rec); add the mut-let-rec set to the nongens.
       Node frsh = new PartialScopeFreshNode(outScope).peep();
       // TODO: expecting to have to repeat this up-scope
       LetRec let = (LetRec)_par;
-      for( String mutletrec : let._vars ) {
-        // Add mut-let-rec set to the nongens
-        int idx = outScope.stk().find(mutletrec);
-        if( idx != -1 ) frsh.addDef(outScope.stk().in(idx));
-      }
+      if( let._frefs != null )
+        for( Node fref : let._frefs )
+          frsh.addDef(fref);
 
       // Make a fat fcn pointer; the frsh is the closure pointer.
-      Node fptr = new BindFPNode(code,frsh).peep();
+      Node code = new FunPtrNode(ret,frsh).peep();
+
       // Return fat fcn pointer
-      outScope.rez(fptr);
+      outScope.rez(code);
     }
   }
 
