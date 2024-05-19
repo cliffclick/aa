@@ -27,13 +27,13 @@ public class StoreNode extends StoreAbs {
 
 
   @Override Type _value( TypeMem tm, TypeMemPtr tmp ) {
-    return tm.update(tmp,TypeFld.make(_fld,rez()._val,_fin));
+    return tm.update(tmp,TypeFld.make(_fld,rez()._val,_fin),NewNode.is_con(tmp._aliases));
   }
 
   @Override Type _live_use( TypeMem live0, TypeMemPtr tmp, int i ) {
     assert !tmp.above_center();
     // Not a precise store, so no kills
-    if( !tmp.is_con() ) {
+    if( !NewNode.is_con(tmp._aliases) ) {
       // Asking for live-in, give it
       if( i==1 ) return live0;
       TypeStruct luse = live0.ld(tmp);

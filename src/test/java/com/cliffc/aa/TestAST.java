@@ -5,6 +5,7 @@ import com.cliffc.aa.util.Util;
 import com.cliffc.aa.tvar.TV3;
 
 import org.junit.Test;
+import org.junit.Ignore;
 
 import java.io.File;
 import java.io.IOException;
@@ -14,8 +15,8 @@ import java.util.Arrays;
 import static org.junit.Assert.assertEquals;
 
 public class TestAST {
-  @Test public void testJig() throws IOException {
-    testOne(0,new File("src/test/java/com/cliffc/aa/ast/testBasic8.aa"));
+  @Ignore @Test public void testJig() throws IOException {
+    testOne(0,new File("src/test/java/com/cliffc/aa/ast/testBasic5.aa"));
   }
 
   @Test public void testAll() throws IOException {

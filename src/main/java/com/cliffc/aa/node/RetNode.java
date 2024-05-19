@@ -22,14 +22,14 @@ public final class RetNode extends Node {
     set_fidx(fun._fidx);
     _live = RootNode.removeKills(null);   // All mem minus KILLS
   }
-  
+
   // Short self name
   @Override public String label() {
     if( isDead() ) return "Ret!";
     FunNode fun = in(4) instanceof FunNode fun2 ? fun2 : null;
     return "Ret"+(isCopy() ? "!copy!" : (fun==null ? "["+_fidx+"]" : fun._name));
   }
-  
+
   @Override public boolean isCFG() { return true; }
   @Override public boolean isMem() { return true; }
   @Override public Node isCopy(int idx) { return isCopy() ? in(idx) : null; }
@@ -40,7 +40,7 @@ public final class RetNode extends Node {
   public Node rez() { return in(2); }
   public Node rpc() { return in(3); }
   public FunNode fun() { return (FunNode)in(4); }
-  
+
   public FunPtrNode funptr() {
     for( int i=0; i<nUses(); i++ )
       if( use(i) instanceof FunPtrNode fptr )
@@ -89,7 +89,7 @@ public final class RetNode extends Node {
     if( in(0)==null ) return null; // No users inlining; dead gensym
     Node cc = NodeUtil.fold_ccopy(this); // Fold control copies
     if( cc!=null ) return cc;
-    
+
     // If the fun is a copy, then we are collapsing
     if( in(4) instanceof FunNode fun ) {
       Node cp = fun.isCopy(0);
@@ -129,7 +129,7 @@ public final class RetNode extends Node {
 
     // Collapsed to a constant?  Remove any control interior.
     Node ctl = ctl();
-    if( rez()._val.is_con() && !rez()._val.above_center() && ctl!=fun() && // Profit: can change control and delete function interior
+    if( rez()._val.is_con(NewNode.CONS) && !rez()._val.above_center() && ctl!=fun() && // Profit: can change control and delete function interior
         (mem==null || mem._val ==TypeMem.ANYMEM) ) // Memory has to be trivial also
       return setDef(0,fun());  // Gut function body
 

@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
+import com.cliffc.aa.AA;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVPtr;
 import com.cliffc.aa.tvar.TVStruct;
@@ -27,14 +28,16 @@ public class NewNode extends Node {
   private boolean _killed;
 
   public final String _hint;
-  
+
   // Just TMP.make(_alias,ISUSED)
   public TypeMemPtr _tptr;
 
   public NewNode( String hint, int alias, boolean is_con ) {
     super();
     _reset0_alias = alias;       // Allow a reset, if this alias splits and then we want to run a new test
-    set_alias(alias,is_con);
+    if( is_con )
+      CONS = CONS.meet(BitsAlias.make0(alias));
+    set_alias(alias);
     NEWS.setX(alias,this);
     _hint = hint;
   }
@@ -42,17 +45,17 @@ public class NewNode extends Node {
 
   @Override public String label() {
     return  (_killed ? "X" : "")+_hint+"*"+_alias;
-  } 
+  }
 
-  private void set_alias(int alias, boolean is_con) {
+  private void set_alias(int alias) {
     unelock();                  // Unlock before changing hash
     _alias = alias;
-    _tptr = TypeMemPtr.make_con(BitsAlias.make0(alias),is_con,TypeStruct.ISUSED);
+    _tptr = TypeMemPtr.make(alias,TypeStruct.ISUSED);
   }
-  @Override void walk_reset0() { set_alias(_reset0_alias,_tptr._is_con); super.walk_reset0(); }
+  @Override void walk_reset0() { set_alias(_reset0_alias); super.walk_reset0(); }
 
   @Override public Type value() { return _killed ? _tptr.dual() : _tptr; }
-  
+
   @Override public Node ideal_reduce() {
     if( !_killed && !used() ) {
       _killed = true;
@@ -64,7 +67,7 @@ public class NewNode extends Node {
     }
     return null;
   }
-  
+
   // If all uses are store addresses only, then this is a write-only memory and
   // is not used.
   private boolean used() {
@@ -90,7 +93,7 @@ public class NewNode extends Node {
     }
     return false;
   }
-  
+
   @Override public boolean has_tvar() { /*assert used(); */ return true; }
 
   @Override public TV3 _set_tvar() {
@@ -100,11 +103,11 @@ public class NewNode extends Node {
   // clones during inlining all become unique new sites
   @Override public @NotNull NewNode copy(boolean copy_edges) {
     // Split the original '_alias' class into 2 sub-aliases
-    assert !_tptr.is_con();
+    assert !_tptr.is_con(CONS);
     NEWS.set(_alias,null);
     NewNode nnn = (NewNode)super.copy(copy_edges);
-    nnn .set_alias(BitsAlias.new_alias(_alias),false); // Children alias classes, split from parent
-    this.set_alias(BitsAlias.new_alias(_alias),false); // The original NewNode also splits from the parent alias
+    nnn .set_alias(BitsAlias.new_alias(_alias)); // Children alias classes, split from parent
+    this.set_alias(BitsAlias.new_alias(_alias)); // The original NewNode also splits from the parent alias
     NEWS.setX(nnn ._alias,nnn );
     NEWS.setX(this._alias,this);
     Env.GVN.add_flow(this);     // Alias changes flow
@@ -128,4 +131,14 @@ public class NewNode extends Node {
     // Split and renumbered in FunNode inline, fixup in NEWS
     throw TODO();
   }
+
+  public static BitsAlias CONS = BitsAlias.EMPTY; // Constant aliases
+  public static boolean is_con(BitsAlias bits) {
+    if( bits.above_center() ) return true; // Might be a constant
+    int alias = bits.abit();
+    if( alias == -1 ) return false; // Too many bits
+    return CONS.test(alias);
+  }
+
+
 }

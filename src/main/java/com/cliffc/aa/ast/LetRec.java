@@ -237,7 +237,8 @@ public class LetRec extends ASTVars {
   @Override void addNonGen(FreshNode frsh) {
     if( _stk != null )          // If null, nothing is mid-def, so its all fresh
       for( int i=_oldx; i<_stk.len(); i++ )
-        frsh.addDef(_stk.in(i));
+        if( !_stk.val(i).above_center() )
+          frsh.addDef(_stk.in(i));
   }
 
 }

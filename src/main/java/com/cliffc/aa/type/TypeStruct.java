@@ -765,12 +765,12 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     return make_from(flds);
   }
 
-  @Override public boolean is_con() {
-    if( !_def.is_con() ) return false;
+  @Override public boolean is_con(BitsAlias cons) {
+    if( !_def.is_con(cons) ) return false;
     if( is_prim() )
-      return _flds[1].is_con();
+      return _flds[1].is_con(cons);
     for( TypeFld fld : _flds )
-      if( !fld.is_con() )
+      if( !fld.is_con(cons) )
         return false;
     return true;
   }

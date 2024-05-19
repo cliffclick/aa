@@ -169,8 +169,8 @@ public class TypeTuple extends Type<TypeTuple> {
 
   @Override public boolean above_center() { return _any; }
   // True if all internals is_con
-  @Override public boolean is_con() {
-    for( Type _t : _ts ) if( !_t.is_con() ) return false;
+  @Override public boolean is_con(BitsAlias cons) {
+    for( Type _t : _ts ) if( !_t.is_con(cons) ) return false;
     return true;
   }
   @Override public TypeTuple sharptr2( TypeMem mem ) {
@@ -194,7 +194,7 @@ public class TypeTuple extends Type<TypeTuple> {
     System.arraycopy(ary._es,0,ts,3,ary._len);
     return make0(false,ts);
   }
-  // Treat this Tuple as a function signature; last type 
+  // Treat this Tuple as a function signature; last type
   public boolean is_fun_sig() {
     return _ts.length>3 && _ts[0]==Type.ALL && _ts[1]==Type.ALL;
   }

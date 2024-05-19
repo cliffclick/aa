@@ -209,7 +209,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // args stop cycles (VBitSet) or sharpen pointers (TypeMem), or optimize
   // printing strings (SB).
 
-    
+
   // "Print Environment" - bunch of flags to shorten all the print signatures
   public static class PENV {
     public final SB sb;
@@ -250,7 +250,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     //assert t==this;
     return rez;
   }
-  
+
   public final String toString(boolean debug, boolean indent, boolean mem) {
     PENV P = new PENV(debug,indent,mem);
     _str_dups(P);
@@ -747,7 +747,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     };
   }
   // True if a constant.  Same as centerline-or-above-center.
-  public boolean is_con() {
+  public boolean is_con(BitsAlias cons) {
     assert is_simple();
     return above_center();
   }
@@ -797,7 +797,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     int _x;
     final NonBlockingHashMap<String,Type> _dups = new NonBlockingHashMap<>();
     Parse(String str) {
-      _str = str; 
+      _str = str;
     }
     Type type() { return type(null,false,-2); }
 
@@ -848,8 +848,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       case ':' -> throw TODO();
       case '#' -> TypeRPC   .valueOf(this,dup,any) ;
       case '{' -> TypeTuple .valueOf(this,dup,any) ;
-      case '*' -> TypeMemPtr.valueOf(this,dup,any,false);
-      case '$' -> TypeMemPtr.valueOf(this,dup,any,true );
+      case '*' -> TypeMemPtr.valueOf(this,dup,any);
       case '(' -> TypeStruct.valueOf(this,dup,any,true );
       case '@' -> TypeStruct.valueOf(this,dup,any,false);
       case '%' -> TypeNil   .valueOf(this,dup,any);
@@ -896,7 +895,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       }
     };
     }
-    
+
     // Helper for int/flt parse
     private double back_num(int oldx2) { _x=oldx2; return _num(); }
     private Type maybe_int(String dup, int oldx2) {

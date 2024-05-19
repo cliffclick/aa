@@ -41,7 +41,7 @@ public class FreshNode extends Node {
 
   @Override public Node ideal_reduce() {
     // Not a TFP, so toss it
-    if( _val.is_con() && !(_val instanceof TypeFunPtr) )
+    if( _val.is_con(NewNode.CONS) && !(_val instanceof TypeFunPtr) )
       return _val==TypeNil.XNIL ? new ConNode(_val).init() : id();
 
     return null;

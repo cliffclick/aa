@@ -84,6 +84,8 @@ public final class FunPtrNode extends Node {
 
   @Override public Node ideal_reduce() {
     // Since 2 parts liveness, could check live being not-live and remove either part
+    if( dsp() != Env.XSCALAR && _live instanceof TypeStruct live && live.has("fp") && !live.has("dsp") )
+      return setDef(1,Env.XSCALAR);
     return null;
   }
 

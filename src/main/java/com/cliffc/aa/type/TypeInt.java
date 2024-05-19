@@ -100,8 +100,8 @@ public class TypeInt extends TypeNil<TypeInt> {
     types.put("int"  ,INT64);
   }
   // Return a long from a TypeInt constant; assert otherwise.
-  @Override public long   getl() { assert is_con(); return _con; }
-  @Override public double getd() { assert is_con() && (long)((double)_con)==_con; return _con; }
+  @Override public long   getl() { assert is_con(null); return _con; }
+  @Override public double getd() { assert is_con(null) && (long)((double)_con)==_con; return _con; }
 
   @Override protected TypeInt xdual() {
     if( _z==0 ) return this;
@@ -144,7 +144,7 @@ public class TypeInt extends TypeNil<TypeInt> {
     return make(false,_nil,_sub,aliases,_fidxs);
   }
 
-  @Override public boolean is_con()  { return _z==0; }
+  @Override public boolean is_con(BitsAlias ignore)  { return _z==0; }
   public TypeInt minsize(TypeInt ti) {
     int zs =    _z==0 ? log(   _con) :    _z;
     int zi = ti._z==0 ? log(ti._con) : ti._z;
@@ -153,6 +153,6 @@ public class TypeInt extends TypeNil<TypeInt> {
   public TypeInt maxsize(TypeInt ti) { return (TypeInt)meet(ti);  }
   // Shallow wrap
   public TypeMemPtr wrap() {
-    return TypeMemPtr.make(false,false,false,is_con(),BitsAlias.EMPTY,TypeStruct.make_prim(TypeFld.make_clz(TypeMemPtr.INTPTR),TypeFld.make_prim(this))); // Wrapped primitive
+    return TypeMemPtr.make(false,false,false,BitsAlias.EMPTY,TypeStruct.make_prim(TypeFld.make_clz(TypeMemPtr.INTPTR),TypeFld.make_prim(this))); // Wrapped primitive
   }
 }

@@ -228,12 +228,12 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
       TypeNil tn = tsub.widen_sub();
       return tn==this ? this : xmeet(tn);
     }
-    // Keep subclass structure.  
+    // Keep subclass structure.
     TypeNil rez = tsub.ymeet(this);
     rez._nil &= _sub & tsub._sub; // Disallow the xnil->nil edge
     return (TypeNil)rez.canonicalize().chk().hashcons_free();
   }
-  
+
   // is allowed to be int or flt
   boolean chk(BitsAlias aliases) { return true; }
 
@@ -247,7 +247,7 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
 
   @Override public boolean above_center() { return _any; }
 
-  @Override public boolean is_con() { return above_center(); }
+  @Override public boolean is_con(BitsAlias ignore) { return above_center(); }
 
   @Override public Type widen() { return this; }
 

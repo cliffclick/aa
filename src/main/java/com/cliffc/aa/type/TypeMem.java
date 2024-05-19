@@ -355,7 +355,7 @@ public class TypeMem extends Type<TypeMem> {
   // --------------------------------------------------------------------------
   // Sharpen a dull pointer against this memory.
   public TypeMemPtr sharpen( TypeMemPtr dull ) {
-    assert dull.is_simple_ptr();
+    assert !dull.is_prim();
     if( _sharp_cache != null ) { // Check the cache first
       TypeMemPtr sharp = _sharp_cache.get(dull._aliases);
       if( sharp != null ) return sharp;
@@ -407,7 +407,7 @@ public class TypeMem extends Type<TypeMem> {
   void _dull( Type dull, final HashMap<BitsAlias,TypeMemPtr> dull_cache ) {
     if( !(dull instanceof Cyclic) ) return; // Nothing to sharpen
     // Check caches and return
-    if( dull instanceof TypeMemPtr tmp && tmp.is_simple_ptr() ) {
+    if( dull instanceof TypeMemPtr tmp && !tmp.is_prim() ) {
       BitsAlias aliases = tmp._aliases;
       if( sharp_get(aliases) != null ) return;
       if( dull_cache.get(aliases) != null ) return;
@@ -434,7 +434,7 @@ public class TypeMem extends Type<TypeMem> {
   private static TypeMemPtr _is_sharp(Type t) {
     if( DULLV.tset(t._uid) ) return null;
     if( !(t instanceof Cyclic) ) return null;
-    if( t instanceof TypeMemPtr tmp && tmp.is_simple_ptr() ) return tmp;
+    if( t instanceof TypeMemPtr tmp && !tmp.is_prim() ) return tmp;
     return t.walk((fld,ignore) -> _is_sharp(fld), (x,y)-> x==null ? y : x);
   }
 
@@ -451,7 +451,7 @@ public class TypeMem extends Type<TypeMem> {
     if( !(dull instanceof Cyclic) ) return dull; // Nothing to sharpen
     Type t;
     if( dull instanceof TypeMemPtr tmp ) {
-      if( tmp.is_simple_ptr() ) {
+      if( !tmp.is_prim() ) {
         t = sharp_get(tmp._aliases);
         if( t !=null ) return t;
         t = dull_cache.get(tmp._aliases);
@@ -493,9 +493,9 @@ public class TypeMem extends Type<TypeMem> {
 
   // Struct store into a conservative set of aliases.
   // 'precise' is replace, imprecise is MEET.
-  public TypeMem update( TypeMemPtr tmp, TypeStruct tvs ) {
+  public TypeMem update( TypeMemPtr tmp, TypeStruct tvs, boolean is_con ) {
     // If precise, just replace whole struct
-    if( tmp.is_con() )
+    if( is_con )
       return set(tmp._aliases.getbit(),tvs);
 
     // Must do struct-by-struct updates, doing inprecise meets
@@ -509,8 +509,8 @@ public class TypeMem extends Type<TypeMem> {
 
   // Field store into a conservative set of aliases.
   // 'precise' is replace, imprecise is MEET.
-  public TypeMem update( TypeMemPtr tmp, TypeFld fld ) {
-    if( tmp.is_con() ) {
+  public TypeMem update( TypeMemPtr tmp, TypeFld fld, boolean is_con ) {
+    if( is_con ) {
       int alias = tmp._aliases.getbit();
       //return set(alias,at(alias).update());
       throw TODO();
@@ -521,7 +521,7 @@ public class TypeMem extends Type<TypeMem> {
     for( int alias : tmp._aliases )
       if( alias != 0 )
         for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
-          ss.setX(kid,at(kid).update(fld,tmp.is_con()));
+          ss.setX(kid,at(kid).update(fld,is_con));
     return make0(ss.asAry());
   }
 
@@ -613,5 +613,5 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   @Override public boolean above_center() { return _objs[1].above_center(); }
-  @Override public boolean is_con()       { return false;}
+  @Override public boolean is_con(BitsAlias ignore) { return false;}
 }

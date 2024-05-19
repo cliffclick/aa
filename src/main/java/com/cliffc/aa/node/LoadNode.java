@@ -102,8 +102,10 @@ public class LoadNode extends Node {
       return t;
 
     // t is TFP  - assert input does NOT transit unbound->bound.  If unbound bind, else no-op.
-    if( t instanceof TypeFunPtr tfp )
-      return dsp == null ? tfp : tfp.make_from(dsp);
+    if( t instanceof TypeFunPtr tfp ) {
+      if( dsp == null || tfp.has_dsp() ) return tfp;
+      return tfp.make_from(dsp);
+    }
 
     // t is TMP  - Bind recursively one-step, else treat as lo
     if( t instanceof TypeMemPtr tmp && !tmp.is_prim() && over ) {

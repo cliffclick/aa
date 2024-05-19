@@ -122,7 +122,7 @@ public final class CallEpiNode extends Node {
 
     // Check for constant body
     Type trez = rrez._val;
-    if( trez.is_con() && rctl==fun && cmem == rmem && inline ) {
+    if( trez.is_con(NewNode.CONS) && rctl==fun && cmem == rmem && inline ) {
       Node c = Node.con(trez);
       c._live = Type.ALL;
       return unwire(call,ret,fun).set_is_copy(cctl,cmem,c);

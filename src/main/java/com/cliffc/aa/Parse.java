@@ -1462,7 +1462,7 @@ public class Parse implements Comparable<Parse> {
   private Type tcon() {
     Node n = ifex();
     if( n==null ) throw TODO(); // Missing ifex expecting a const-expr
-    if( !n._val.is_con() ) throw TODO(); // Not a const expr
+    if( !n._val.is_con(NewNode.CONS) ) throw TODO(); // Not a const expr
     //return n._val;
     // TODO: function constants have to be 'hooked'
     throw TODO();

@@ -281,7 +281,9 @@ public abstract class PrimNode extends Node {
     ZMATH.add_fld(TypeFld.CLZ,Access.Final,PCLZ,null);
     Node pi = con(TypeFlt.PI.wrap());
     ZMATH.add_fld("pi",Access.Final,pi,null);
-    ZMATH.add_fld(rand._name,Access.Final,rand.as_fun(),null);
+    FunPtrNode rptr = rand.as_fun();
+    rptr.setDef(1,Env.XSCALAR); // Rand is bound XSCALAR for no-display
+    ZMATH.add_fld(rand._name,Access.Final,rptr,null);
     ZMATH.close().init();
     Env.SCP_0.mem(new StoreXNode(Env.SCP_0.mem(),PMATH,ZMATH,null));
     return PMATH;
@@ -314,7 +316,7 @@ public abstract class PrimNode extends Node {
       if( ptn==null )return actual.oob(); // Not a primitive
       // Cap it at the formal
       TypeNil t = TS[i-DSP_IDX] = ptn==TypeNil.NIL ? TypeNil.NIL : (TypeNil)tformal.dual().meet(ptn);
-      if( t != TypeNil.NIL && !t.is_con() ) {
+      if( t != TypeNil.NIL && !t.is_con(NewNode.CONS) ) {
         is_con = false;         // Some non-constant
         if( t.above_center() ) has_high=true;
       }
@@ -544,7 +546,7 @@ public abstract class PrimNode extends Node {
       if( !(t0 instanceof TypeInt t0i) || !(t1 instanceof TypeInt t1i) )
         return TypeInt.INT64;
       // If both are constant ints, return the constant math.
-      if( t0i.is_con() && t1i.is_con() ) {
+      if( t0i.is_con(null) && t1i.is_con(null) ) {
         long i2 = t0i.getl() & t1i.getl();
         return i2==0 ? TypeNil.NIL : TypeInt.con(i2);
       }
