@@ -12,10 +12,8 @@ public class Struct extends AST {
   final Ary<String> _vars;
 
   // Any LetRecs are folded up into a Struct
-  public Struct(LetRec let) {
-    super(let._kids);
-    _vars = let._vars;
-  }
+  public Struct(LetRec let) { this(let._kids,let._vars); }
+  public Struct(Ary<AST> kids, Ary<String> vars) { super(kids); _vars = vars; }
 
   // @{ fld0=expr0; ... }
   @Override public SB str(SB sb) {

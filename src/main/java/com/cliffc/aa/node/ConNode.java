@@ -26,7 +26,6 @@ public class ConNode<T extends Type> extends Node {
   @Override public Type value() { return _t; }
 
   @Override public boolean has_tvar() {
-    if( _t==Type.ALL || _t==Type.ANY ) return true;  // Specifically allowed for various unused-displays on primitives
     if( _t instanceof TypeNil ) return true; // Yes on NIL, INT, FLT, MEMPTR, FUNPTR, STRUCT
     // No for TFLD, RPC
     return false;
@@ -35,7 +34,7 @@ public class ConNode<T extends Type> extends Node {
   @Override public TV3 _set_tvar() {
     unelock();                  // Hash now depends on TVars
     TV3 tv = TV3.from_flow(_t);
-    tv.deps_add_deep(this);     // Constant hash depends on tvar      
+    tv.deps_add_deep(this);     // Constant hash depends on tvar
     return tv;
   }
 
@@ -44,12 +43,7 @@ public class ConNode<T extends Type> extends Node {
   }
   @Override int hash() {
     // In theory also slot 0, but slot 0 is always Root.
-    int hash = _t.hashCode();
-    // Two NILs are typically different because their TV3s are different.
-    // Also, vary two TMPs or TFPs might vary (but not e.g. Scalar)
-    if( _tvar!=null && has_tvar() )
-      hash ^= _tvar._uid;
-    return hash;
+    return _t.hashCode();
   }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
@@ -61,6 +55,6 @@ public class ConNode<T extends Type> extends Node {
     // if they have the same TVars.
     return !has_tvar();
   }
-  
+
   //@Override Node walk_dom_last( Predicate<Node> P) { return null; }
 }

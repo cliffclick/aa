@@ -28,26 +28,27 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
     DO_GCP=true;
-    DO_HMT=true;
-    RSEED=0;
+    DO_HMT=false;
+    RSEED=2;
 
 
     // A,B,C are mutually recursive identity functions
     // D calls B or C with ints.
     // final struct calls C with floats
-    test("""
-A = { x -> math.rand(2) ? B(x) : x };
-D = {   -> math.rand(2) ? B(1) : C(2) };
-C = { x -> A(x) };
-B = { x -> C(x) };
-( D(), C(3.14) )
+    test("fcn = {(@{a=1;},@{b=2;})._}; (fcn().a, fcn().b)", "*[21]( _, %[2,4,21][2]?, %[2,4,21][2]?, ...)", "*[21](_, int:1,int:2)", null, null, "[21]", null);
+//    test("""
+//A = { x -> math.rand(2) ? B(x) : x };
+//D = {   -> math.rand(2) ? B(1) : C(2) };
+//C = { x -> A(x) };
+//B = { x -> C(x) };
+//( D(), C(3.14) )
+//
+//""",
+//         "","",null,null,null,null);
 
-""",
-         "","",null,null,null,null);
 
 
 
-    
     // Bug here is reduced to: the uses of `fcn` appear in the top-level open
     // File scope which being open, means `fcn` is not completely defined, so
     // uses are NOT-FRESH, so bind `fcn` to returning both an A and a B struct.
@@ -55,14 +56,14 @@ B = { x -> C(x) };
     // Bug is broken tagging of FRESH/NOT-FRESH - the top-level open FIle scope
     // is indeed OPEN, partially defined - but the fields within it get
     // incrementally defined over time.
-    
+
 //    // This test endlessly expands in AA, short/quick in EXE
 //    test("""
 //fcn = { -> ( @{ a = 1}, @{ b = 2} )._ };
 //(fcn().a, fcn().b )
 //""",
 //         "*[21]( _, int:1, int:2)", "*[21](_,int:1,int:2)",null,null,"[21]",null);
-    
+
 //    test("""
 //fcn = { ->
 //  @{ qi = { x -> x.a };
@@ -328,7 +329,7 @@ bar()
   }
 
 
-  
+
   @Test public void testParse02() {
     // Anonymous function definition.  Note: { x -> x&1 }; 'x' can be any struct with an operator '_&_'.
     test("{x:int -> x&1}","[55]{any,4 -> int1 }","{A int64 -> int64}",null,null,null,"[55]");

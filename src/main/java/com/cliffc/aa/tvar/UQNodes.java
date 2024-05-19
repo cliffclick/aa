@@ -10,7 +10,6 @@ public class UQNodes extends NonBlockingHashMapLong<Node> {
   private static UQNodes KEY = new UQNodes();
   private int _hash;
 
-
   private static UQNodes intern() {
     KEY.setHash();
     UQNodes uqset = UQSETS.get(KEY);
@@ -99,5 +98,5 @@ public class UQNodes extends NonBlockingHashMapLong<Node> {
     return true;
   }
 
+  public static void reset() { UQSETS.clear(); }
 }
-

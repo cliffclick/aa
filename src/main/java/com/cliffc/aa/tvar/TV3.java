@@ -870,6 +870,6 @@ abstract public class TV3 implements Cloneable {
   public static void reset_to_init0() {
     CNT=_INIT0_CNT;
     TVStruct.reset_to_init0();
-    TVExpanding.reset_to_init0();
+    UQNodes.reset();
   }
 }

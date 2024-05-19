@@ -14,7 +14,7 @@ import java.util.function.IntSupplier;
 import static com.cliffc.aa.AA.TODO;
 
 /** A Type for offsets to a DynLoad.
- *
+ * <p>
  * Args are in pairs; for a unresolved DynField its (match,pattern).
  * For a resolved DynField its (null,pattern) or ((),pattern).
  * For an Apply, its (apply,null) and the apply is either a Leaf (empty) or
@@ -29,8 +29,6 @@ public class TVDynTable extends TV3 {
   private long[] _cmps;         // Prior match results; 2 bits for (1,2,3) becomes (1,3,7 in trial_resolve)
 
   private String[] _labels;     // Resolved DynField labels
-
-  public TVDynTable() { }
 
   // Keeping max as the number of conceptual entities, but DynFields need a
   // pair of TV3 edges.

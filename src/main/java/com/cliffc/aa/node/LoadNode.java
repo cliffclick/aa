@@ -7,22 +7,42 @@ import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
 
-// TODO: Fold in Bind, DynLoad
-
-
 // Load a struct from memory.  Does its own nil-check testing.  Display/Frames
 // are normal structs, so local vars are ALSO normal struct loads.
+
+// Loaded function pointers are *bound* - the base ptr is passed as the first
+// argument to the function pointer, and are the "display" in the TFP.
+// Currying by any other name!
+
+// DynLoads inherit from Load, and have basically the same behavior except
+// that the field is specified as an offset passed in an extra input.  The
+// field is selected based on overload resolution using the HM TVars.
+
+// Value matrix:
+// Address is not a TMP - return OOB(adr)
+// Memory  is not a MEM - return OOB(mem)
+// TMP is deep - use given TS; true for primitives and overloads
+// TMP is shallow - use MEM.ld(TMP)
+//
+// For DynLoads, meet all/resolved fields.
+// For    Loads, just the loaded field.
+//
+// If TMP is shallow, attempt a Bind:
+//   If DSP is alive use adr else use XSCALAR.
+//   If loading a single field and its a TFP, Bind it (even if already bound -error)
+//   If loading a TMP, load again to a TS and Bind deep, returning a deep TMP.
+
 
 public class LoadNode extends Node {
   // Field being loaded from a TypeStruct.  If "_", the field name is inferred
   // from amongst the field choices.  If not present, then error.
-  public       String _fld;
+  public String _fld;
   // Where to report errors
-  private final Parse _bad;
+  final Parse _bad;
   // When doing HM, treat this Load as a identifier load and allow the type
   // LET-polymorphism.  When false, this Load could be a struct field load,
   // OR it could be self-recursive definition, OR it could be unknown.
-  private boolean _fresh;
+  boolean _fresh;
 
   // Prevent recursive expansion during ideal_grow
   private boolean _mid_grow;
@@ -43,7 +63,7 @@ public class LoadNode extends Node {
   Node adr() { return in(DSP_IDX); }
   private Node set_mem(Node a) { return setDef(MEM_IDX,a); }
 
-  @Override public Type value() {
+  @Override public final Type value() {
     Type tadr = adr()._val;
     Type tmem = mem()._val;
 
@@ -54,31 +74,68 @@ public class LoadNode extends Node {
     if( ta==TypeNil.NIL || ta==TypeNil.XNIL )
       ta = (TypeNil)ta.meet(PrimNode.PINT._val);
 
-    // Load the matching struct from memory
+    // Load the matching struct from memory / deep ptr
     TypeStruct ts = ta instanceof TypeMemPtr tmp && !tmp.is_simple_ptr()
       ? tmp._obj                // Primitives are not-simple
       : tm.ld(ta);
-    // Field lookup, might check superclass
-    Type t = lookup(ts,tm,_fld);
-    // Did not find field.  Generic escaped scalar
-    if( t==null )
-      return Env.ROOT.ext_scalar(this);
 
-    // Bind if loading a TFP or a TS with TFP and the DSP is live
-    boolean dsp_live = !_live.above_center() && (_live==Type.ALL || (_live instanceof TypeStruct ts2 && ts2.has("dsp")));
-    if( t instanceof TypeFunPtr tfp && !tfp.has_dsp() && dsp_live )
-      return tfp.make_from(ta);
-    // If loading a TypeStruct (and not a DynTable) must be an Overload; bind
-    // recursive 1-level deep.
-    if( t instanceof TypeStruct ts2 && !Util.eq("$dyn",_fld) ) {
-      throw TODO();
+    // Field lookup, might check superclass.
+    // DynLoads check all fields.
+    Type t = lookup(ts,tm);
+
+    // See if binding to the display:
+    // If a deep (and not primitive) pointer, it has already been bound
+    TypeNil dsp = ta instanceof TypeMemPtr tmp && !tmp.is_simple_ptr() && !tmp.is_prim() ? null
+      // Display is live, bind to incoming ptr
+      //: !_live.above_center() && (_live==Type.ALL || (_live instanceof TypeStruct ts2 && ts2.has("dsp"))) ? ta
+      //// If display is dead, bind to XSCALAR.
+      //: TypeNil.XSCALAR;        // Display is dead, bind to XSCALAR;
+      : ta;
+
+    // Optionally bind Display
+    return value_bind(t, tm, dsp, true);
+  }
+
+  private Type value_bind( Type t, TypeMem tm, TypeNil dsp, boolean over ) {
+    // t is high - might fall to TFP or TMP or neither, no binding (yet)
+    if( t.above_center() )
+      return t;
+
+    // t is TFP  - assert input does NOT transit unbound->bound.  If unbound bind, else no-op.
+    if( t instanceof TypeFunPtr tfp )
+      return dsp == null ? tfp : tfp.make_from(dsp);
+
+    // t is TMP  - Bind recursively one-step, else treat as lo
+    if( t instanceof TypeMemPtr tmp && !tmp.is_prim() && over ) {
+      assert tmp.is_simple_ptr();
+      TypeStruct ts = tm.ld(tmp);
+      TypeFld[] flds = TypeFlds.get(ts.len());
+      for( int i=0; i<flds.length; i++ )
+        flds[i] = ts.fld(i).make_from(value_bind(ts.fld(i)._t,tm,dsp,false));
+      return tmp.make_from(ts.make_from(flds));
     }
+
+    // t is lo (or TMP 2steps deep) - no-op/pass-thru
     return t;
   }
 
+  // Lookup and return field type.
+  // If no field, be conservative.
+  Type lookup( TypeStruct ts, TypeMem mem ) {
+    return lookup(ts,mem,_fld);
+  }
 
-  // Field lookup, might check superclass
   static Type lookup( TypeStruct ts, TypeMem mem, String fld ) {
+    Type t = _lookup(ts,mem,fld);
+    if( t!=null ) return t;     // Got it
+    if( ts._def.above_center() ) return Type.ANY; // Might fall to having field
+    // Return worse possible escaped scalar
+    return Env.ROOT.ext_scalar(null);
+  }
+
+  // Field lookup, might recursively check superclass.
+  // Returns field type or null.
+  private static Type _lookup( TypeStruct ts, TypeMem mem, String fld ) {
 
     // Check for direct field
     int idx = ts.find(fld);
@@ -86,13 +143,13 @@ public class LoadNode extends Node {
 
     // Have a super class?
     if( ts.len()==0 || !Util.eq(ts.fld(0)._fld,TypeFld.CLZ) )
-      return ts._def.above_center() ? TypeNil.XSCALAR : null;
+      return null;
 
     // Miss on closed structs looks at superclass.
     TypeNil ptr = (TypeNil)ts.fld(0)._t; // Load clazz ptr
     // Load the clazz struct type from memory
     ts = mem.ld(ptr);
-    return lookup(ts,mem,fld);
+    return _lookup(ts,mem,fld);
   }
 
 

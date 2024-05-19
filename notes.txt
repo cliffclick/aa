@@ -1,3 +1,7 @@
+`x`=======================================
+05/17/2024
+
+
 =======================================
 05/03/2024
 
@@ -13,10 +17,10 @@ Example
 color = @{ hex = 0x123; name = "red"; run={ x -> ... } };
 
 Pattern:
-x.toString() // Normal field load; binds x to loaded TFP
+x.toString() // Normal field load; binds x to loaded toString TFP
 x.age        // Normal field load; bind is skipped since loaded value is not a TFP
 1+2          // Parser expands as 1._+_._(2)
-1._+_        // Normal field load of a OVER/TS; and binds deep
+1._+_        // Normal field load of a TMP; and binds deep
 color._.eq("")  // DynLoad, no bind to TypeMemPtr of string
 color._ + 456   // DynLoad, no bind to TypeInt
 color.run    // Normal field load; binds color to TFP run
@@ -25,17 +29,25 @@ color._(3)   // DynLoad; binds color to TFP run
 
 fun = { x -> x }; // Top level define; builds a TFP pre-bound to the local scope
 Person = :@{
-  fun = { x -> x }; // Field is defined as constant UNBOUND fcn, will bind on load
+  fun = { x -> x }; // Field is defined as constant UNBOUND fcn, will bind on load "per.fun"
 }
 
+Ambiguous example:
+Person = : @{ name="cliff"; age=62; run=({p:Person->},{p:Person arg ->}); ... };
+INTENT#1: Person p = Person(); something = p.run_; ... LATER: something.0(p); // Something typed as a struct, fields not bound, missing "this"
+INTENT#2: Person p = Person(); something = p.run_; ... LATER: something.0();  // Something typed as a struct, fields bound, "this" point already bound
+
+
+
 Rules:
+- FldLoad of TMP - repeat FldLoad on fields, but treat TMP as lo
 - FldLoad of TFP - assert input does NOT transit unbound->bound; if unbound, bind; else noop
-- FldLoad of TS  - repeat FldLoad on fields
-- FldLoad of hi  - might TFP/TS stays high
-- FldLoad of lo  - no-op
+- FldLoad of hi  - might either TFP/TMP so stays high
+- FldLoad of lo  - no-op/pass-thru
 - DynLoad - if fields mix bind, then stay high until resolved (all low)
-            - if all fields unbound, then can bind
-            - if any field    bound, then wait till all bound (then no-op)
+          - else
+            - if all fields unbound, then can bind all
+            - if any field    bound, then wait till all bound (field JOIN, then no-op)
 
 
 

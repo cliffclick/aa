@@ -233,9 +233,9 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Clear the lock and remove from VALS
   public void unelock() {
     if( _elock ) {              // Edge-locked
-      _elock=false;             // Unlock
       Node x = VALS.remove(this);
       assert x==this;           // Got the right node out
+      _elock=false;             // Unlock
       _hash=0;                  // Recompute hash going back
     }
   }
@@ -776,7 +776,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( !isResetKeep() ) return;   // Primitives
     _elock = false;             // Clear elock if reset_to_init0
     _deps = null;               // No deps
-    if( _tvar!=null ) _tvar.reset_deps();
+    if( _tvar!=null ) tvar().reset_deps();
     walk_reset0();              // Special reset
 
     // Remove non-prim inputs to a prim.  Skips all asserts and worklists.

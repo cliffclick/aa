@@ -212,11 +212,11 @@ public class ASTParse {
       _x -= binop.adjustx(tok); // Chosen op can be shorter than tok
       skipWS();
       int rhsx = _x;            // Invariant: WS already skipped
+      // DynTable to call
+      AField dyn = dynCall();
       // Load against LHS pointer.  If this is a primitive, the Load loads
       // against the primitive clazz.
       AST over= new Field(binop._name,lhs);
-      // DynTable to call
-      AField dyn = dynCall();
       // Resolve the set of primitive choices
       AST fun = new DynField(over,dyn._kids.at(0));
       // Parse the RHS operand
@@ -225,7 +225,7 @@ public class ASTParse {
         : _expr_higher_require(binop);
       //
       // Emit the call to both terms
-      lhs = new Call(null,null,null,dyn,rhs,lhs);
+      lhs = new Call(null,null,null,dyn,rhs,fun);
     }
   }
   // Get an expr at the next higher precedence, or a term, or null
@@ -373,8 +373,7 @@ public class ASTParse {
       if( peek(')') ) return s;                 // A (grouped) statement
       if( !peek(',') ) return s;                // Not a tuple, probably a syntax error
       _x--;                                     // Reparse the ',' in tuple
-      //return tuple(oldx,s,first_arg_start);     // Parse a tuple
-      throw TODO();
+      return tuple(oldx,s,first_arg_start);     // Parse a tuple
     }
     // Anonymous function
     if( peek1(c,'{') )
@@ -403,21 +402,20 @@ public class ASTParse {
   // Load a Call/Apply field out of a DynTable
   private AField dynCall() { return new AField(dynLoad()); }
 
-  ///** Parse a tuple; first stmt but not the ',' parsed.
-  // *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
-  // */
-  //private Node tuple(int oldx, Node s, int first_arg_start) {
-  //  // First stmt is parsed already
-  //  StructNode nn = new StructNode(0,false,errMsg(oldx) ).init();
-  //  Parse bad = errMsg(first_arg_start);
-  //  keep(nn);
-  //  nn.add_fld(TypeFld.CLZ,Access.Final, PrimNode.PCLZ, null);
-  //  _tuple(oldx,s,bad,nn,0);
-  //  Node ptr = new NewNode("NEW").init();
-  //  Node nn0 = unkeep(nn).peep(); assert nn0==nn;
-  //  mem(new StoreXNode(mem(),keep(ptr),nn0,bad).peep());
-  //  return unkeep(ptr);
-  //}
+  /** Parse a tuple; first stmt but not the ',' parsed.
+   *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
+   */
+  private AST tuple(int oldx, AST s, int first_arg_start) {
+    // First stmt is parsed already
+    Ary<AST   > kids = new Ary<>(new AST   []{ s });
+    Ary<String> vars = new Ary<>(new String[]{"0"});
+    while( peek(',') ) {
+      vars.push((kids._len+"").intern());
+      kids.push(stmt(true));
+    }
+    require(')',oldx);
+    return new Struct(kids,vars);
+  }
 
 
   /** Parse anonymous struct; the opening "@{" already parsed.  A lexical scope

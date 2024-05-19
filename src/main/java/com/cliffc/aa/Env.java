@@ -199,6 +199,7 @@ public class Env implements AutoCloseable {
     GVN.reset_to_init0();
     Env.ROOT.walk(Node::walk_reset); // Clean out any wired prim calls
     Combo.reset();
+    TV3.reset_to_init0();
     assert NodeUtil.more_work(Env.ROOT) == 0; // Initial conditions are correct
     AA.reset();
     Node      .reset_to_init0();

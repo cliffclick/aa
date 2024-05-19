@@ -512,10 +512,12 @@ public final class CallEpiNode extends Node {
 
     assert lam.nargs() == call.nargs();
     for( int i=DSP_IDX; i<call.nargs(); i++ ) {
-      TV3 targ = call.in(i).set_tvar();
-      lam = lam.find();
-      if( lam.arg(i) != null )
+      Node arg = call.in(i);
+      if( arg.has_tvar() && lam.arg(i)!=null ) {
+        TV3 targ = call.in(i).set_tvar();
+        lam = lam.find();
         lam.arg(i).unify( targ, false );
+      }
     }
     tvar().unify(lam.ret(),false);
     return tvar();

@@ -423,7 +423,8 @@ public class RootNode extends Node {
 
   @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
-    if( in(REZ_IDX)==null ) return new TVLeaf(); // Happens on primitives
+    if( in(REZ_IDX)==null || !in(REZ_IDX).has_tvar() )
+      return new TVLeaf(); // Happens on primitives
     TV3 tv3 = in(REZ_IDX).set_tvar().find();
     tv3.widen((byte)1,false);   // Widen result, since escaping
     return tv3;

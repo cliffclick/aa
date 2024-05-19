@@ -268,8 +268,6 @@ public abstract class PrimNode extends Node {
         char op = p.charAt(0)=='_' ? p.charAt(1) : p.charAt(0);
         ptr0 = new NewNode(""+clzname.charAt(0)+op+":",BitsAlias.new_alias(BitsAlias.LOCX),true).init();
         scp.mem(new StoreXNode(scp.mem(),ptr0,over,null));
-        // TODO: Overs are TypeStruct not TMP, no NewNode
-        throw TODO();
       }
       clz.add_fld(prims[0]._name,Access.Final,ptr0,null);
     }

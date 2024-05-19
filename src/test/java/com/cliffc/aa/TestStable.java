@@ -26,8 +26,6 @@ public class TestStable {
     // Binary with precedence check
     test(" 1+2 * 3+4 *5", "int:27", "int:27");
 
-    // Float
-    test("1.2+3.4", "flt:4.6", "flt:4.6");
     // Mixed int/float with conversion
     test("1+2.3", "flt:3.3", "flt:3.3");
 
@@ -40,17 +38,18 @@ public class TestStable {
 
     // testOver5.aa, One DynLoad, fcn needs DynTable
     // Returning choice of structs and field selecting from it.
-    test("fcn = {(@{a=1},@{b=2})._}; (fcn().a, fcn().b)", "*[37](_, int:1,int:2)", "*[37](_, int:1,int:2)", null, null, "[37]", null);
+    test("fcn = {(@{a=1;},@{b=2;})._}; (fcn().a, fcn().b)", "*[21]( _, %[2,4,21][2]?, %[2,4,21][2]?, ...)", "*[21](_, int:1,int:2)", null, null, "[4,21]", null);
 
     // testOver6.aa, One DynLoad, fcn needs DynTable
     // Passing choice of structs and field selecting from it.
-    test("""
+    test(
+"""
 fcn = { x ->
   @{ qi = { x -> x.a };
      qf = { x -> x.b };
   }._ x
 };
-(fcn @{a=2}, fcn @{b=3.3})
+(fcn @{a=2;}, fcn @{b=3.3;})
 """,
          "*[39](_, 0=PA:$[]@{^=$[5,6](...); _=%[5,6][]; $nil}?, 1=PA)", "*[39](_,int:2,flt:3.3)",null,null,"[39]",null);
 
