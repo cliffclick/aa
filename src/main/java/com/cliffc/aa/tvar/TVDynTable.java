@@ -362,7 +362,7 @@ public class TVDynTable extends TV3 {
       if( idx== -1 ) { cmp |= 3; continue; } // Missing is assumed maybe
       cmp |= _trial_unify_half(first(i),that.first(idx));
       cmp |= _trial_unify_half(secnd(i),that.secnd(idx));
-      if( _labels[i]!=null && that._labels[i]!=null )
+      if( _labels[i]!=null && that._labels[idx]!=null && !Util.eq(_labels[i],that._labels[idx]))
         throw TODO();           // just fail if both non-null and not-equal
       if( cmp == 7 ) return 7;    // Arg failed so trial fails
     }
