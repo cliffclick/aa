@@ -65,7 +65,7 @@ public final class FunPtrNode extends Node {
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;
     RetNode ret = ret();
-    Type tret = ret._val instanceof TypeTuple tt ? tt.at(REZ_IDX) : TypeNil.SCALAR;
+    Type tret = ret._val instanceof TypeTuple tt ? tt.at(REZ_IDX) : ret._val.oob();
     return TypeFunPtr.make(ret._fidx,nargs(),dsp()._val,tret);
   }
 
