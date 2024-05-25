@@ -93,8 +93,6 @@ public class TestTVar {
     // Fresh
     { TV3[] tvs = _testUnifyClose();
       TV3 v0 = tvs[0], v1 = tvs[1];
-      TV3 fldb0 = v0.find().as_struct().arg("fldB");
-      TV3 fldb1 = v1.find().as_struct().arg("fldB");
       boolean rez = v0.fresh_unify( null, v1, false );
       assertTrue( rez );
       assertEquals(3,v0.as_struct().len() );
@@ -191,11 +189,16 @@ public class TestTVar {
       assertEquals( 3, v0.find().trial_unify_ok( vlam2 ) ); // Always a hard yes in a trial
     }
     { TV3[] tvs = _testUnifyClz0();
-      TV3 vs1 = tvs[0], vs3 = tvs[1], v0 = tvs[2], vlam2 = tvs[3];
+      TV3 vs1 = tvs[0], vs3 = tvs[1];
       boolean rez = vs1.fresh_unify(null,vs3,false);
       assertFalse(rez);
     }
   }
+
+  static final int zalias0 = BitsAlias.new_alias();
+  static final int zalias1 = BitsAlias.new_alias();
+  static final BitsAlias alias0 = BitsAlias.make0(zalias0);
+  static final BitsAlias alias1 = BitsAlias.make0(zalias1);
 
   // Testing criss-cross Fresh unify.  Getting this wrong gets me infinite
   // blow-up instead of a cycle.
@@ -209,15 +212,17 @@ public class TestTVar {
 
   private static TV3[] _testCrissCross() {
     TV3 ret = new TVLeaf();
-    TVLeaf   dsp1 = new TVLeaf();
-    TVLeaf   dyn1 = new TVLeaf();
+    TVLeaf   pdsp1 = new TVLeaf();
+    TVLeaf   pdyn1 = new TVLeaf();
     // { dsp dyn -> ret }
-    TVStruct dsp0 = new TVStruct(new String[]{TypeFld.CLZ,"a"},new TV3[]{TVPtr.PTRCLZ,dyn1});
-    TVStruct dyn0 = new TVStruct(new String[]{TypeFld.CLZ,"b"},new TV3[]{TVPtr.PTRCLZ,dsp0});
-    TVLambda lam0 = new TVLambda(new TV3[]{ret,null,dsp0,dyn0});
+    TVStruct dsp0 = new TVStruct(new String[]{TypeFld.CLZ,"a"},new TV3[]{TVPtr.PTRCLZ,pdyn1});
+    TVPtr    pdsp0= new TVPtr(alias0,dsp0);
+    TVStruct dyn0 = new TVStruct(new String[]{TypeFld.CLZ,"b"},new TV3[]{TVPtr.PTRCLZ,pdsp0});
+    TVPtr    pdyn0= new TVPtr(alias1,dyn0);
+    TVLambda lam0 = new TVLambda(new TV3[]{ret,null,pdsp0,pdyn0});
     // { V1  V2 -> ret }
-    TVLambda lam1 = new TVLambda(new TV3[]{ret,null,dsp1,dyn1});
-    return new TV3[]{ lam0, lam1, dsp0, dsp1, dyn0, dyn1 };
+    TVLambda lam1 = new TVLambda(new TV3[]{ret,null,pdsp1,pdyn1});
+    return new TV3[]{ lam0, lam1, pdsp0, pdsp1, pdyn0, pdyn1 };
   }
   @Test public void testCrissCross() {
     // Normal unify, fields remain separate
@@ -232,13 +237,40 @@ public class TestTVar {
     // Fresh unify, will cross-cross
     { TV3[] tvs = _testCrissCross();
       TV3 lam0 = tvs[0], lam1 = tvs[1], dsp0 = tvs[2], dsp1 = tvs[3], dyn0 = tvs[4], dyn1 = tvs[5];
+      /*  Pictorial of original structure
+B:*[CLZ]( )
+lam0 = {
+  A:*[ 9]@{ B; a=V153; }
+   :*[10]@{ B; b=A; }
+  -> V151
+};
+lam1 = {
+  V152
+  V153
+  -> V151
+};
+       */
       boolean rez = lam0.fresh_unify(null,lam1,false);
       assertTrue(rez);
-      TV3 B = dyn1.find();
-      TV3 C = dsp1.find();
-      assertSame(dsp0.as_struct().arg("a"),B);
-      assertSame(dsp1.find().as_struct().arg("a"),B);
-      assertSame(B.as_struct().arg("b"),C);
+      TV3 dyn1f = dyn1.find();
+      TV3 dsp1f = dsp1.find();
+      TVStruct debug = new TVStruct(new String[]{"lam0","lam1"},new TV3[]{lam0.find(),lam1.find()});
+      /*
+        Pictorial of resulting structure
+lam0={
+  A:*[ 9]@{ B; a=C; }
+   :*[10]@{ B; b=A; }
+   -> V151
+};
+lam1={
+   D:*[ 9]@{ B; a=C; }
+   C:*[10]@{ B; b=D; }
+   -> V151
+};
+      */
+      assertSame(dsp0.       as_ptr().load().arg("a"),dyn1f);
+      assertSame(dsp1.find().as_ptr().load().arg("a"),dyn1f);
+      assertSame(dyn1f.as_ptr().load().arg("b"),dsp1f);
     }
     // Fresh unify other way
     { TV3[] tvs = _testCrissCross();
@@ -299,12 +331,9 @@ public class TestTVar {
   // Result:
   // FRESH: V2:*[9]@{baz=3    ; foo=V1; }
   // THAT : V1:*[9]@{baz=nint8; foo=V1; }
-  static final int zalias = BitsAlias.new_alias();
-  static final BitsAlias alias = BitsAlias.make0(zalias);
-
   private static TV3[] _testCrissCross3() {
-    TV3 v1 = new TVPtr(alias,new TVStruct(new String[]{"baz"      }, new TV3[]{new TVBase(TypeInt.con(7))    },true ));
-    TV3 v2 = new TVPtr(alias,new TVStruct(new String[]{"baz","foo"}, new TV3[]{new TVBase(TypeInt.con(3)), v1},false));
+    TV3 v1 = new TVPtr(alias0,new TVStruct(new String[]{"baz"      }, new TV3[]{new TVBase(TypeInt.con(7))    },true ));
+    TV3 v2 = new TVPtr(alias0,new TVStruct(new String[]{"baz","foo"}, new TV3[]{new TVBase(TypeInt.con(3)), v1},false));
     return new TV3[]{ v1,v2 };
   }
   @Test public void testCrissCross3() {
