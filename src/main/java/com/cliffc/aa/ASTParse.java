@@ -133,12 +133,15 @@ public class ASTParse {
         : err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
     }
 
-    if( toks._len==0 ) return ifex;
+    // No assign, just an expression
+    if( !peek(';') ) return ifex;
 
     // Assign
-    require(';',0);
     AST body = stmt(lookup_current_scope_only);
-    return new LetRec(toks.at(0),rs.get(0),ifex,body);
+    if( body == null && toks._len == 0 ) return ifex;
+    String  fld = toks._len==0 ? ("$ignore"+0).intern() : toks.at(0);
+    boolean mut = toks._len==0 ? false : rs.get(0);
+    return new LetRec(fld,mut,ifex,body);
   }
 
   // Ignore the half-scope inside trinarys

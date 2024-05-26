@@ -18,11 +18,11 @@ public class TestStable {
     test("math.rand(2)","int:int64","int:int64");
   }
 
-  /*@Test*/ public void testStatements() {
+  @Test public void testStatements() {
     // Statements
-    test("(1;2 )", "2", "2");
-    test("(1;2;)", "2", "2"); // final semicolon is optional
-    test("1._+_._(2;3)", "4", "4"); // statements in arguments
+    test("(1;2 )", "int:2", "int:2");
+    test("(1;2;)", "int:2", "int:2"); // final semicolon is optional
+    test("1._+_._(2;3)", "int:4", "int:4"); // statements in arguments
   }
 
   // Test primitive math, and loading overloads from primitives.
@@ -41,6 +41,12 @@ public class TestStable {
 
     // Parsed as +(1,(2*3))
     test("1._+_._(2 * 3) ", "int:7", "int:7");
+
+    // Simpler overload tests
+    test("!(2,3.14)._","nil","nil", null, null, null, null);
+    test("(2,3.14)._.sin()","flt:0.0015926529164868282","flt:0.0015926529164868282", null, null, null, null);
+    // Two DynLoads, no Fresh
+    test("q=(2,3.14); (!q._,q._.sin())","*[18](_, int:int1, flt:flt64, ...)","*[18](_,int:int1,flt:flt64)", null, null, "[4,18]", null);
   }
 
   // More complex overload tests
@@ -61,6 +67,19 @@ fcn = { x ->
 (fcn @{a=2;}, fcn @{b=3.3;})
 """,
          "*[23]( _, %[2,4,23][2]?, %[2,4,23][2]?, ...)", "*[23](_,int:2,flt:3.3)",null,null,"[4,23]",null);
+
+//    // Multi-arg function selection from a set
+//    test(
+//"""
+//noinline_foo = { x y ->
+//        ( { x y -> !x      * !y },
+//          { x y -> x.sin() * !y }
+//  )._(x,y)
+//};
+//math.rand(2) ? noinline_foo(3,5) : noinline_foo(3.3,5)
+//""",
+//         "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
   }
+
 
 }
