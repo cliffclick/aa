@@ -58,7 +58,8 @@ public class PartialScopeFreshNode extends FreshNode {
           : new TVLeaf();
     }
     TVStruct partial = new TVStruct(_flds,tvs,true);
-    TVStruct that = ((TVPtr)tvar()).load();
-    return partial.fresh_unify(_nongen,that,test);
+    TVPtr frsh = new TVPtr(ptr.aliases(),partial);
+    TVPtr that = tvar().as_ptr();
+    return frsh.fresh_unify(_nongen,that,test);
   }
 }

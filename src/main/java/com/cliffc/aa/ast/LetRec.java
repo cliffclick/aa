@@ -234,6 +234,9 @@ public class LetRec extends ASTVars {
     return find(var) != -1 ? this : super.redef(var);
   }
 
+  // Called during AST->node expansion, only mid-definition nodes are non-
+  // generative.  Post definition extra defs act like the body and are all
+  // let-polymorphic.
   @Override void addNonGen(FreshNode frsh) {
     if( _stk != null )          // If null, nothing is mid-def, so its all fresh
       for( int i=_oldx; i<_stk.len(); i++ )

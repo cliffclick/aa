@@ -40,24 +40,27 @@ public class Ident extends AST {
     //  : new BindFPNode(ld,ptr,0).peep();
     Node x = ld; // AST not inserting Binds right now
 
-    // Find a defining LetRec, or null for lambdas and primitives.  This loop
-    // crawls all the way up to Root, including past the point of definition.
-    for( AST par = _par, old=null; par != null; old = par, par = par._par )
-      if( par instanceof LetRec let && let._vars.find(_name) != -1 &&
-          // If the ident comes from the body side, needs a Fresh
-          let.body() == old )
-        x = fresh(x,let);
+    // Fresh check: if not needed, skip collecting the nongen and making a fresh
+    if( isLetPolymorphic() ) {
+      // Fresh: this variable is let-polymorphic, and needs a non-gen set.
+      FreshNode frsh = new FreshNode(x).init();
+      // Walk to the Root and collect the non-gen edges
+      for( AST par = _par; par != null; par = par._par )
+        if( par instanceof ASTVars vars )
+          vars.addNonGen(frsh);
+      x = frsh;
+    }
 
-    // No defining LetRec, must be a Lambda or primitive
     e._scope.rez(x);
   }
 
-  private Node fresh( Node x, LetRec def ) {
-    FreshNode frsh = new FreshNode(x).init();
-    for( AST par = _par; par != def; par = par._par )
-      if( par instanceof ASTVars vars )
-        vars.addNonGen(frsh);
-    return frsh;
+  private boolean isLetPolymorphic() {
+    for( AST par = _par, old=null; par != null; old = par, par = par._par )
+      if( par instanceof LetRec let && let._vars.find(_name)!= -1 &&
+          // If the ident comes from the body side, needs a Fresh
+          let.body() == old )
+        return true;
+    return false;
   }
 
 }

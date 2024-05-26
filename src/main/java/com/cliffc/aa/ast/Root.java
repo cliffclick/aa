@@ -2,20 +2,34 @@ package com.cliffc.aa.ast;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.node.DefDynTableNode;
+import com.cliffc.aa.node.FreshNode;
 import com.cliffc.aa.type.TypeFld.Access;
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 
 import static com.cliffc.aa.AA.TODO;
 
-public class Root extends AST {
+public class Root extends ASTVars {
 
-  public Root( AST prog ) { super(prog); }
+  public Root( AST prog ) {
+    super(new Ary<String>(new String[]{"$dyn"}));
+    _kids.push(prog);
+  }
 
   @Override public SB str(SB sb) { return _str(sb); }
 
+  public DefDynTableNode _dyn;
   @Override public void nodes( Env e ) {
-    // Print the program as Nodes
-    e._scope.stk().add_fld("$dyn",Access.Final,new DefDynTableNode().init(),null);
+    // Print the program as Nodes.
+    // Always an initial Dyn-Table
+    _dyn = new DefDynTableNode().init();
+    e._scope.stk().add_fld("$dyn",Access.Final,_dyn,null);
     _kids.at(0).nodes(e);
   }
+
+  // No-op for mutual-let-rec detection
+  @Override int addEdge(int to) { return 0; }
+
+  // Add non-generative $dyn edge to a Fresh
+  @Override void addNonGen(FreshNode frsh) { frsh.addDef(_dyn); }
 }

@@ -14,8 +14,10 @@ public abstract class ASTVars extends AST {
 
   public ASTVars( Ary<String> vars ) { super(); _vars = vars;}
 
+  // Used to find mutual let rec cycles
   abstract int addEdge(int to);
 
+  // Add non-generative edges to a Fresh
   abstract void addNonGen(FreshNode frsh);
 
   int find(String var) { return _vars.find(var); }

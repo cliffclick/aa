@@ -17,7 +17,7 @@ import static com.cliffc.aa.AA.TODO;
  * <p>
  * Args are in pairs; for a unresolved DynField its (match,pattern).
  * For a resolved DynField its (null,pattern) or ((),pattern).
- * For an Apply, its (apply,null) and the apply is either a Leaf (empty) or
+ * For an Apply, its (apply,null) and the Call/Apply is either a Leaf (empty) or
  * nested a TVDynField.
  */
 public class TVDynTable extends TV3 {
@@ -26,7 +26,7 @@ public class TVDynTable extends TV3 {
 
   private IntSupplier[] _uids;  // Which Syntaxes/Nodes
 
-  private long[] _cmps;         // Prior match results; 2 bits for (1,2,3) becomes (1,3,7 in trial_resolve)
+  private long[] _cmps;         // Previous match results; 2 bits for (1,2,3) becomes (1,3,7 in trial_resolve)
 
   private String[] _labels;     // Resolved DynField labels
 

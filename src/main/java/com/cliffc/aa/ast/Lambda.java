@@ -8,7 +8,6 @@ import com.cliffc.aa.type.TypeNil;
 import com.cliffc.aa.type.TypeRPC;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
-
 import static com.cliffc.aa.AA.*;
 
 public class Lambda extends ASTVars {
@@ -69,11 +68,12 @@ public class Lambda extends ASTVars {
       // Take just the prefix of scope variables declared up through now (after
       // sorting for mutual-let-rec); add the mut-let-rec set to the nongens.
       Node frsh = new PartialScopeFreshNode(outScope).peep();
+      frsh.addDef(outScope.ptr());
       // TODO: expecting to have to repeat this up-scope
-      LetRec let = (LetRec)_par;
-      if( let._frefs != null )
-        for( Node fref : let._frefs )
-          frsh.addDef(fref);
+      for( AST par = _par, old = this; par!=null; old = par, par = par._par )
+        if( par instanceof LetRec let && old==let.body() && let._frefs != null )
+          for( Node fref : let._frefs )
+            frsh.addDef(fref);
 
       // Make a fat fcn pointer; the frsh is the closure pointer.
       Node code = new FunPtrNode(ret,frsh).peep();
@@ -83,6 +83,7 @@ public class Lambda extends ASTVars {
     }
   }
 
+  // All Lambda args are non-generative
   @Override void addNonGen(FreshNode frsh) {
     for( int i=ARG_IDX; i<_vars._len; i++ )
       frsh.addDef(_fun.parm(i));

@@ -2,8 +2,8 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.TV3;
-import com.cliffc.aa.tvar.TVExpanding;
 import com.cliffc.aa.tvar.TVLeaf;
+import com.cliffc.aa.tvar.TVStruct;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFunPtr;
 import com.cliffc.aa.type.TypeNil;
@@ -62,7 +62,7 @@ public class FreshNode extends Node {
 
   @Override public boolean unify( boolean test ) {
     TV3 fresh = id().tvar(), that = tvar();
-    //return fresh.fresh(this,_nongen).unify(that,test);
+    //TVStruct debug = new TVStruct(new String[]{"fresh","that "},new TV3[]{fresh,that });
     return fresh.fresh_unify(_nongen,that,test);
   }
   // Two FreshNodes are only equal, if they have compatible TVars
