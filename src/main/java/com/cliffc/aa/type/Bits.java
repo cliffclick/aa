@@ -533,7 +533,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer>, Comp
     void reset_to_init0() {
       for( int i=0; i<_kids.length; i++ )
         if( _kids[i] != null )
-          _kids[i][0] = i<_init.length ? _init[i] : 1;
+          _kids[i][0] = i<(_init==null ? 0 : _init.length) ? _init[i] : 1;
     }
     void free(int b) {
       if( is_parent(b) ) return; // Too hard to compress

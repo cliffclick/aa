@@ -91,6 +91,9 @@ public class Env implements AutoCloseable {
     PROTOS = new NonBlockingHashMap<>();
 
     // The Top-Level environment; holds the primitives.
+    BitsAlias .reset_to_init0();
+    BitsFun   .reset_to_init0();
+    BitsRPC   .reset_to_init0();
     PRIM = new Env();
     SCP_0 = PRIM._scope;
     STK_0 = SCP_0.stk();

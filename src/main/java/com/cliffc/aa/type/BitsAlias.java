@@ -32,7 +32,7 @@ public class BitsAlias extends Bits<BitsAlias> {
   public static final int FLTX = new_alias(LOCX); // Float-clazz alias
   public static final int RPCX = new_alias(LOCX); // RPC-clazz alias
   public static final int STRX = new_alias(LOCX); // String alias
-  
+
   // The All-Memory alias class
   public  static final BitsAlias NALL = new BitsAlias().make_impl(ALLX,null); // All aliases, no nil
   public  static final BitsAlias NANY = NALL.dual();
@@ -48,7 +48,8 @@ public class BitsAlias extends Bits<BitsAlias> {
   public static final BitsAlias RPC = make0(RPCX);
   public static final BitsAlias STR = make0(STRX);
 
-  public static final BitsAlias EMPTY = new BitsAlias().make(); // No bits; its its own dual
+  public static final BitsAlias EMPTY = new BitsAlias().make(); // No bits; it is its own dual
+  static { TREE.init0(); }
 
   // Return parent alias from child alias.
   public static int parent( int kid ) { return TREE.parent(kid); }
@@ -86,5 +87,5 @@ public class BitsAlias extends Bits<BitsAlias> {
     if( this==FLT ) return sb.p("[FLT]");
     return super.str(sb);
   }
-  
+
 }

@@ -150,7 +150,7 @@ public class TestType {
     // t2 = *[2] -> ()
     // Since t0.isa(t1) then   t0.join(t2) .isa(   t1.join(t2) )
 
-    int alias0 = BitsAlias.ALLX;
+    int alias0 = BitsAlias.LOCX;
     int alias1 = BitsAlias.new_alias(alias0);
     int alias2 = BitsAlias.new_alias(alias1);
 
@@ -266,7 +266,7 @@ public class TestType {
     assertTrue( mem .isa(bot));
 
     // ---
-    int alias0 = BitsAlias.ALLX;
+    int alias0 = BitsAlias.LOCX;
     int alias1 = BitsAlias.new_alias(alias0); // For STR
     int alias2 = BitsAlias.new_alias(alias1); // For ABC
     Type pmem0= TypeMemPtr.ISUSED0;    // *[ALL]?
@@ -279,7 +279,7 @@ public class TestType {
 
     TypeMemPtr pabc0= TypeMemPtr.make_nil(alias2,TypeStruct.POINT3D); // *["abc"]?
     TypeMemPtr pabc = TypeMemPtr.make    (alias2,TypeStruct.POINT3D); // *["abc"]?
-    TypeMemPtr pzer = TypeMemPtr.make(BitsAlias.new_alias(BitsAlias.ALLX),TypeStruct.ISUSED);// *[(0)]
+    TypeMemPtr pzer = TypeMemPtr.make(BitsAlias.new_alias(BitsAlias.LOCX),TypeStruct.ISUSED);// *[(0)]
     TypeMemPtr pzer0= TypeMemPtr.make(true,pzer._aliases,TypeStruct.ISUSED);  // *[(0)]?
     Type nil = TypeNil.NIL, xnil = TypeNil.XNIL;
 
@@ -367,15 +367,15 @@ public class TestType {
   // names, and will commonly have no names in common.
   @Test public void testStructTuple() {
     // meet @{c:0}? and @{c:@{x:1}?,}
-    int alias0 = BitsAlias.new_alias(BitsAlias.ALLX);
+    int alias0 = BitsAlias.new_alias(BitsAlias.LOCX);
     int alias1 = BitsAlias.new_alias(alias0);
-    int alias2 = BitsAlias.new_alias(BitsAlias.ALLX);
+    int alias2 = BitsAlias.new_alias(BitsAlias.LOCX);
     int alias3 = BitsAlias.new_alias(alias0);
     TypeStruct a1 = TypeStruct.make_test("c",TypeNil.NIL, TypeFld.Access.Final); // @{c:nil}
     TypeStruct a3 = TypeStruct.make_test("x",TypeInt.TRUE, TypeFld.Access.Final); // @{x: 1 }
     TypeStruct a2 = TypeStruct.make_test("c",TypeMemPtr.make_nil(alias3,a3), TypeFld.Access.Final); // @{c:*{3#}?}
     Ary<TypeStruct> tos = new Ary<>(TypeStruct.class);
-    tos.setX(BitsAlias.ALLX,TypeStruct.ISUSED);
+    tos.setX(BitsAlias.LOCX,TypeStruct.ISUSED);
     tos.setX(alias1,a1);
     tos.setX(alias2,a2);
     tos.setX(alias3,a3);
@@ -427,7 +427,7 @@ public class TestType {
   // Test limits on recursive type structures; recursively building nested
   // structures caps out in the type system at some reasonable limit.
   @Test public void testRecursive() {
-    final int alias1 = BitsAlias.new_alias(BitsAlias.ALLX);
+    final int alias1 = BitsAlias.new_alias(BitsAlias.LOCX);
 
     // Anonymous recursive structs -
     // - struct with pointer to self
@@ -459,19 +459,19 @@ public class TestType {
     // Cyclic named struct: Memory#2 :A:@{n:*[0,2],v:int}
     // If we unrolled this (and used S for Struct and 0 for Nil) we'd get:
     // AS0AS0AS0AS0AS0AS0...
-    final int alias2 = BitsAlias.new_alias(BitsAlias.ALLX);
+    final int alias2 = BitsAlias.new_alias(BitsAlias.LOCX);
     TypeMemPtr tptr2= TypeMemPtr.make_nil(alias2,TypeStruct.ISUSED); // *[0,2]
     TypeStruct ta2 = TypeStruct.make_test(Type.ALL,TypeStruct.XINTZ(),TypeFld.make("n",tptr2),fldv); // @{n:*[0,2],v:int}
 
     // Peel A once without the nil: Memory#3: A:@{n:*[2],v:int}
     // ASAS0AS0AS0AS0AS0AS0...
-    final int alias3 = BitsAlias.new_alias(BitsAlias.ALLX);
+    final int alias3 = BitsAlias.new_alias(BitsAlias.LOCX);
     TypeMemPtr tptr3= TypeMemPtr.make(alias3,TypeStruct.ISUSED); // *[3]
     TypeStruct ta3 = TypeStruct.make_test(Type.ALL,TypeStruct.XINTZ(),TypeFld.make("n",tptr2),fldv); // @{n:*[0,2],v:int}
 
     // Peel A twice without the nil: Memory#4: A:@{n:*[3],v:int}
     // ASASAS0AS0AS0AS0AS0AS0...
-    final int alias4 = BitsAlias.new_alias(BitsAlias.ALLX);
+    final int alias4 = BitsAlias.new_alias(BitsAlias.LOCX);
     TypeStruct ta4 = TypeStruct.make_test(Type.ALL,TypeStruct.XINTZ(),TypeFld.make("n",tptr3),fldv); // @{n:*[3],v:int}
 
     // Then make a MemPtr{3,4}, and ld - should be a PeelOnce
@@ -496,7 +496,7 @@ public class TestType {
     assertEquals(xta,mta);
 
     // Mismatched Names in a cycle; force a new cyclic type to appear
-    final int alias5 = BitsAlias.new_alias(BitsAlias.ALLX);
+    final int alias5 = BitsAlias.new_alias(BitsAlias.LOCX);
     TypeStruct tfb = TypeStruct.make_test(Type.ALL,TypeStruct.XSTRZ(),TypeFld.make("n",TypeMemPtr.make_nil(alias5,TypeStruct.ISUSED)),TypeFld.make("v",TypeFlt.FLT64));
     Type mtab = ta2.meet(tfb);
 
@@ -517,7 +517,7 @@ public class TestType {
     // Nest a linked-list style tuple 10 deep; verify actual depth is capped at
     // less than 5.  Any data loop must contain a Phi; if structures are
     // nesting infinitely deep, then it must contain a NewNode also.
-    //int alias = BitsAlias.new_alias(BitsAlias.ALLX);
+    //int alias = BitsAlias.new_alias(BitsAlias.LOCX);
     //TypeStruct ts = PrimNode.make(TypeFld.make("ptr",TypeNil.NIL),TypeFld.make("cnt",TypeInt.con(0)));
     //TypeMemPtr phi = TypeMemPtr.make(alias,ts);
     //for( int i=1; i<20; i++ ) {
