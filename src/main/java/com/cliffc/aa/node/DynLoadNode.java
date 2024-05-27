@@ -25,7 +25,7 @@ import static com.cliffc.aa.AA.*;
 public class DynLoadNode extends LoadNode {
 
   // Set of resolved field names
-  private final HashSet<String> _resolves;
+  public final HashSet<String> _resolves;
 
   public DynLoadNode( Node mem, Node adr, Node dyn, Parse bad ) {
     super(mem,adr,"_",true,bad);
@@ -59,31 +59,12 @@ public class DynLoadNode extends LoadNode {
 
   // The only memory required here is what is needed to support the Load.
   // If the Load is alive, so is the address.
-  @Override public Type live_use( int i ) {
-    //assert _live==Type.ALL;
-    Type adr = adr()._val;
-    // Since the Load is alive, the address is alive
-    if( i!=MEM_IDX ) return Type.ALL;
-    // Memory demands
-    Node def = mem();
-    // If adr() value changes, the def liveness changes; this is true even if
-    // def is ALSO adr().def() which the normal deps_add asserts prevent.
-    adr().deps_add_live(def);
-    if( adr.above_center() ) return Type.ANY; // Nothing is demanded
-
-    // Demand everything not killed at this field.
-    if( !(adr instanceof TypeNil ptr) || // Not a ptr, assume it becomes one
-        ptr._aliases==BitsAlias.NALL )   // All aliases, then all mem needed
-      return RootNode.removeKills(def);  // All mem minus KILLS
-
-    if( ptr._aliases.is_empty() )  return Type.ANY; // Nothing is demanded still
+  @Override public Type _live_use( TypeNil ptr, TypeMem mem ) {
 
     // TODO: not quite monotonic, if def is high and falls to mem
-    TypeStruct obj = def._val instanceof TypeMem mem
+    TypeStruct obj =
       // Named fields are live
-      ? mem.ld(ptr).flatten_live_fields()
-      // All fields are live
-      : TypeStruct.ISUSED;
+      mem.ld(ptr).flatten_live_fields();
     return TypeMem.make(ptr._aliases,obj);
   }
 
@@ -95,12 +76,6 @@ public class DynLoadNode extends LoadNode {
     return null;
   }
 
-  // No matches to pattern (no YESes, no MAYBEs).  Empty patterns might have no NOs.
-  public boolean resolve_failed_no_match( TV3 pattern, TVStruct rhs, boolean test ) {
-    throw TODO();
-  }
-
-  @Override public boolean has_tvar() { return true; }
   @Override public TV3 _set_tvar() {
     _tvar = new TVLeaf();
     // Load takes a pointer
@@ -113,7 +88,7 @@ public class DynLoadNode extends LoadNode {
     TV3 _dyn = dyn().set_tvar();
     TVDynTable dyn = new TVDynTable();
     _dyn.unify(dyn,false);
-    dyn = (TVDynTable)dyn.find();
+    dyn = dyn.find();
 
     // Load self into the table
     dyn.add_dyn(this,ptr,_tvar);

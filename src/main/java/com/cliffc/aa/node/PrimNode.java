@@ -217,7 +217,7 @@ public abstract class PrimNode extends Node {
     RetNode ret = new RetNode(fun,null/*no mem*/,this,rpc,fun).init();
     // FunPtr is UNBOUND here, will be bound when loaded through a named struct to the Clazz.
     // Primitives all late-bind by default.
-    return new FunPtrNode(_name,ret,Env.ANY).init();
+    return new FunPtrNode(_name,ret,null).init();
   }
 
   // Primitive wrapped as a simple function.
@@ -238,7 +238,7 @@ public abstract class PrimNode extends Node {
     // Return the result
     RetNode ret = new RetNode(fun,mem,this,rpc,fun).init();
     // FunPtr is UNBOUND here, will be bound when loaded through a named struct to the Clazz.
-    return new FunPtrNode(_name,ret,Env.ANY).init();
+    return new FunPtrNode(_name,ret,null).init();
   }
 
   // Make and install a primitive Clazz.
@@ -305,21 +305,26 @@ public abstract class PrimNode extends Node {
     // return high otherwise we return low.
     boolean is_con = true, has_high = false;
     for( int i=DSP_IDX; i<_formals.len(); i++ ) {
-      if( _formals.at(i)==Type.ANY ) { // Formal is dead
-        // TODO: Remove, only here for math.rand(2) instead of 2.rand
-        TS[i-DSP_IDX] = null;
-        continue;
+      TypeNil t=null;
+      // TODO: Remove, only here for math.rand(2) instead of 2.rand
+      if( _formals.at(i)!=Type.ANY ) { // Formal is dead
+        Type actual = val(i-DSP_IDX);
+        if( actual == TypeNil.NIL ) {
+          t = TypeNil.NIL;
+        } else {
+          TypeNil bare = unwrap(actual);
+          if( bare==null ) return actual.oob(); // Not a primitive
+          // Cap it at the formal
+          TypeNil tformal = (TypeNil)_formals.at(i);
+          t = (TypeNil)tformal.dual().meet(bare);
+          assert !(t instanceof TypeMemPtr); // Missing NewNode.CONS
+          if( !t.is_con(null) ) {
+            is_con = false;         // Some non-constant
+            if( t.above_center() ) has_high=true;
+          }
+        }
       }
-      TypeNil tformal = (TypeNil)_formals.at(i);
-      Type actual = val(i-DSP_IDX);
-      TypeNil ptn = unwrap(actual);
-      if( ptn==null )return actual.oob(); // Not a primitive
-      // Cap it at the formal
-      TypeNil t = TS[i-DSP_IDX] = ptn==TypeNil.NIL ? TypeNil.NIL : (TypeNil)tformal.dual().meet(ptn);
-      if( t != TypeNil.NIL && !t.is_con(NewNode.CONS) ) {
-        is_con = false;         // Some non-constant
-        if( t.above_center() ) has_high=true;
-      }
+      TS[i-DSP_IDX] = t;
     }
     return wrap(is_con ? apply(TS) : (has_high ? _ret.dual() : _ret));
   }
@@ -524,7 +529,7 @@ public abstract class PrimNode extends Node {
 
   abstract static class Prim2OpFI64 extends PrimNode {
     Prim2OpFI64( String name ) { super(name,TypeTuple.FLT64_INT64,TypeFlt.FLT64); }
-    @Override public TypeFlt apply( TypeNil[] args ) { return TypeFlt.con(op(args[0].getd(),args[1].getl())); }
+    @Override public TypeFlt apply( TypeNil[] args ) { return TypeFlt.con(op(args[0].getd(),args[2].getl())); }
     abstract double op( double x, long y );
   }
   static class AddFI64 extends Prim2OpFI64 { AddFI64() { super("_+_"); } double op( double l, long r ) { return l+r; } }
@@ -722,7 +727,7 @@ public abstract class PrimNode extends Node {
       Node phim= new PhiNode(TypeMem.ALLMEM,null,reg,mem,memc ).init();
       // Plug into return
       RetNode ret = new RetNode(reg,phim,phi,rpc,fun).init();
-      return new FunPtrNode(_name,ret,Env.ANY).init();
+      return new FunPtrNode(_name,ret,null).init();
     }
   }
 
@@ -760,7 +765,7 @@ public abstract class PrimNode extends Node {
       Node phim= new PhiNode(TypeMem.ALLMEM,null,reg,mem,memc ).init();
       // Plug into return
       RetNode ret = new RetNode(reg,phim,phi,rpc,fun).init();
-      return new FunPtrNode(_name,ret,Env.ANY).init();
+      return new FunPtrNode(_name,ret,null).init();
     }
   }
 

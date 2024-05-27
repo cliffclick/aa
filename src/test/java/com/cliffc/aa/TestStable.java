@@ -16,6 +16,8 @@ public class TestStable {
     test("math.rand 2","int:int64","int:int64");
     // Function call with parens
     test("math.rand(2)","int:int64","int:int64");
+    // Mixing nil and float
+    test("{ x y -> x.sin() * !y }(3.3,5)","flt:0.0f","flt:0.0f");
   }
 
   @Test public void testStatements() {
@@ -67,6 +69,14 @@ fcn = { x ->
 (fcn @{a=2;}, fcn @{b=3.3;})
 """,
          "*[23]( _, %[2,4,23][2]?, %[2,4,23][2]?, ...)", "*[23](_,int:2,flt:3.3)",null,null,"[4,23]",null);
+
+    test(
+"""
+( { x y -> !x      * !y },
+  { x y -> x.sin() * !y }
+)._(3.3,5)
+""",
+         "flt:1.2","flt:1.2");
 
 //    // Multi-arg function selection from a set
 //    test(

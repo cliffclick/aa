@@ -747,7 +747,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     };
   }
   // True if a constant.  Same as centerline-or-above-center.
-  public boolean is_con(BitsAlias cons) {
+  public boolean is_con(BitsAlias ignore) {
     assert is_simple();
     return above_center();
   }

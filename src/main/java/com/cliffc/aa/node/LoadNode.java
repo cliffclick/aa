@@ -85,12 +85,7 @@ public class LoadNode extends Node {
 
     // See if binding to the display:
     // If a deep (and not primitive) pointer, it has already been bound
-    TypeNil dsp = ta instanceof TypeMemPtr tmp && !tmp.is_simple_ptr() && !tmp.is_prim() ? null
-      // Display is live, bind to incoming ptr
-      //: !_live.above_center() && (_live==Type.ALL || (_live instanceof TypeStruct ts2 && ts2.has("dsp"))) ? ta
-      //// If display is dead, bind to XSCALAR.
-      //: TypeNil.XSCALAR;        // Display is dead, bind to XSCALAR;
-      : ta;
+    TypeNil dsp = ta instanceof TypeMemPtr tmp && !tmp.is_simple_ptr() && !tmp.is_prim() ? null : ta;
 
     // Optionally bind Display
     return value_bind(t, tm, dsp, true);
@@ -103,7 +98,9 @@ public class LoadNode extends Node {
 
     // t is TFP  - assert input does NOT transit unbound->bound.  If unbound bind, else no-op.
     if( t instanceof TypeFunPtr tfp ) {
-      if( dsp == null || tfp.has_dsp() ) return tfp;
+      if( dsp == null ) return tfp; // No display to bind
+      if( tfp.has_dsp() ) return tfp; // Already bound, no double-binding
+      // Bind
       return tfp.make_from(dsp);
     }
 
@@ -154,34 +151,34 @@ public class LoadNode extends Node {
     return _lookup(ts,mem,fld);
   }
 
-
   // The only memory required here is what is needed to support the Load.
   // If the Load is alive, so is the address.
-  @Override public Type live_use( int i ) {
-    //assert _live==Type.ALL;
-    Type adr = adr()._val;
+  @Override public final Type live_use( int i ) {
     // Since the Load is alive, the address is alive
     if( i!=MEM_IDX ) return Type.ALL;
+    Type adr = adr()._val;
     // Memory demands
-    Node def=mem();
+    Node def = mem();
     // If adr() value changes, the def liveness changes; this is true even if
     // def is ALSO adr().def() which the normal deps_add asserts prevent.
     adr().deps_add_live(def);
-    if( adr.above_center() ) return Type.ANY; // Nothing is demanded
-
-    // Demand everything not killed at this field.
-    if( !(adr instanceof TypeNil ptr) || // Not a ptr, assume it becomes one
-        ptr._aliases==BitsAlias.NALL )   // All aliases, then all mem needed
-      return RootNode.removeKills(def);  // All mem minus KILLS
-
-    // TODO: Liveness for generic clazz fields
-    //if( ptr instanceof TypeMemPtr tmp && !tmp.is_simple_ptr() ) {
-    //  tmp._obj.get(TypeFld.CLZ);
-    //}
-
-    if( ptr._aliases.is_empty() ) return Type.ANY; // Nothing is demanded still
+    // Not a pointer yet
+    if( !(adr instanceof TypeNil ptr) )
+      return adr.oob();
+    // Not a memory yet
+    if( !(def._val instanceof TypeMem mem) )
+      return def._val.oob();
+    // Check for sane aliases
+    if( ptr._aliases.is_empty() || ptr.above_center() )
+      return Type.ANY;          // Nothing is demanded still
+    if( ptr._aliases==BitsAlias.NALL )  // All memory?
+      return RootNode.removeKills(def); // All mem minus KILLS
 
     // Demand field "_fld" be "ALL", which is the default
+    return _live_use(ptr,mem);
+  }
+
+  Type _live_use(TypeNil ptr, TypeMem mem) {
     return TypeMem.make(ptr._aliases,_live_use);
   }
 

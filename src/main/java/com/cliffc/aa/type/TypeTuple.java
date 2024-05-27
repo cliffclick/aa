@@ -169,8 +169,8 @@ public class TypeTuple extends Type<TypeTuple> {
 
   @Override public boolean above_center() { return _any; }
   // True if all internals is_con
-  @Override public boolean is_con(BitsAlias cons) {
-    for( Type _t : _ts ) if( !_t.is_con(cons) ) return false;
+  @Override public boolean is_con(BitsAlias pass) {
+    for( Type _t : _ts ) if( !_t.is_con(pass) ) return false;
     return true;
   }
   @Override public TypeTuple sharptr2( TypeMem mem ) {

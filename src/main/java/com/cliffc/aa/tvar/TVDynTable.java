@@ -1,7 +1,9 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.Env;
+import com.cliffc.aa.Combo;
 import com.cliffc.aa.node.Node;
+import com.cliffc.aa.node.DynLoadNode;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.Util;
@@ -198,8 +200,10 @@ public class TVDynTable extends TV3 {
     String label = _labels[idx];
     if( label != null && !label.equals(choice) ) throw TODO("Two valid choices: "+label+" and "+choice);
     _labels[idx] = choice;
-    if( _uids[idx] instanceof Node n )
-      Env.GVN.add_flow(n);
+    if( _uids[idx] instanceof DynLoadNode dyn ) {
+      Env.GVN.add_flow(dyn);
+      fields(dyn._resolves,dyn,Combo.HM_AMBI);
+    }
     // We got the One True Match, unify
     return matches.arg(i).unify(pattern,false);
   }

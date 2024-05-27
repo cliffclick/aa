@@ -40,8 +40,7 @@ public final class CallEpiNode extends Node {
   @Override public Node ideal_reduce() {
     if( _is_copy )
       return NodeUtil.fold_ccopy(this);
-    CallNode call = call();
-    Type tc = call._val;
+    Type tc = in(0)._val;
     if( !(tc instanceof TypeTuple tcall) ) return null;
 
     // Wait until broken things clear out before wiring or inlining
@@ -58,6 +57,7 @@ public final class CallEpiNode extends Node {
     }
 
     if( CallNode.tctl(tcall) != Type.CTRL ) return progress; // Call not executable
+    CallNode call = call();
 
     // The one allowed function is already wired?  Then directly inline.
     // Requires this calls 1 target, and the 1 target is only called by this.

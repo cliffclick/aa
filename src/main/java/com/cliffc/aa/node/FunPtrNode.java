@@ -66,7 +66,17 @@ public final class FunPtrNode extends Node {
       return TypeFunPtr.EMPTY;
     RetNode ret = ret();
     Type tret = ret._val instanceof TypeTuple tt ? tt.at(REZ_IDX) : ret._val.oob();
-    return TypeFunPtr.make(ret._fidx,nargs(),dsp()._val,tret);
+    // If dsp() is null, returning an UNBOUND function.
+    // Else returning a *bound* function ptr, even if the display is dead,
+    // and pinch to +/-SCALAR
+    Type dsp;
+    if( dsp() == null ) dsp = Type.ANY; // Unbound
+    else {
+      dsp = dsp()._val;
+      dsp = dsp==Type.ANY ? TypeNil.XSCALAR
+        :  (dsp==Type.ALL ? TypeNil.SCALAR : dsp);
+    }
+    return TypeFunPtr.make(ret._fidx,nargs(),dsp,tret);
   }
 
   // FunPtrs return RetNode liveness for memory
@@ -108,7 +118,7 @@ public final class FunPtrNode extends Node {
     // Display is either "ANY" meaning: no display; binding happens on load.
     // Or: bound to PartialScopeFreshNode - which is a Fresh.
     // Or: bound to a Fresh type of some struct (instanceof call)
-    if( dsp()!=Env.ANY ) {
+    if( dsp()!=null && dsp()!=Env.ANY ) {
       TV3 tvdsp = dsp().set_tvar();
       args[DSP_IDX].find().unify(tvdsp,false);
     }
