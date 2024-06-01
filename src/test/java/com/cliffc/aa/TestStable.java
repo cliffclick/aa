@@ -76,7 +76,7 @@ fcn = { x ->
   { x y -> x.sin() * !y }
 )._(3.3,5)
 """,
-         "flt:1.2","flt:1.2");
+         "flt:0.0f","flt:0.0f");
 
 //    // Multi-arg function selection from a set
 //    test(

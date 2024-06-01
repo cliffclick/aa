@@ -446,7 +446,6 @@ public abstract class Node implements Cloneable, IntSupplier {
       deps_work_clear();
     }
   }
-  Node setLive(Type live) { _live=live; return this; }
   // Compute local contribution of use liveness to this def.
   // Overridden in subclasses that do per-def liveness.
   Type live_use( int i ) { return _live; }
@@ -596,8 +595,11 @@ public abstract class Node implements Cloneable, IntSupplier {
   // uses a constant or an existing node or is somehow reduced.
   // Returns null if no-progress.
   private Node _do_reduce() {
-    if( shouldCon() )
-      return kill(new ConNode(_val).setLive(_live).peep());
+    if( shouldCon() ) {
+      ConNode con = new ConNode(_val);
+      con._live = _live;
+      return kill(con.peep());
+    }
 
     // Try CSE
     if( !_elock ) {             // Not in VALS and can still replace

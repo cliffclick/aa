@@ -71,7 +71,10 @@ public class DynLoadNode extends LoadNode {
   @Override public Node ideal_reduce() {
     if( _resolves.size()==1 ) {
       String label = _resolves.iterator().next();
-      return new LoadNode(mem(),adr(),label,_fresh,_bad).peep().setLive(_live);
+      LoadNode load = new LoadNode(mem(),adr(),label,_fresh,_bad);
+      load._live = _live;
+      load._val = _val;
+      return load;
     }
     return null;
   }
