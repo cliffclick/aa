@@ -29,13 +29,19 @@ public class TestParse {
     JIG=true;
     DO_GCP=true;
     DO_HMT=false;
-    RSEED=2;
+    RSEED=3;
 
+    test(
+            """
+            ( { x y -> !x      * !y },
+              { x y -> x.sin() * !y }
+            )._(3.3,5)
+            """,
+            "flt:0.0f","flt:0.0f");
 
     // A,B,C are mutually recursive identity functions
     // D calls B or C with ints.
     // final struct calls C with floats
-    test("fcn = {(@{a=1;},@{b=2;})._}; (fcn().a, fcn().b)", "*[21]( _, %[2,4,21][2]?, %[2,4,21][2]?, ...)", "*[21](_, int:1,int:2)", null, null, "[21]", null);
 //    test("""
 //A = { x -> math.rand(2) ? B(x) : x };
 //D = {   -> math.rand(2) ? B(1) : C(2) };

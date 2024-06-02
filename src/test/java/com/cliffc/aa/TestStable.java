@@ -17,7 +17,17 @@ public class TestStable {
     // Function call with parens
     test("math.rand(2)","int:int64","int:int64");
     // Mixing nil and float
-    test("{ x y -> x.sin() * !y }(3.3,5)","flt:0.0f","flt:0.0f");
+    test("{ x y -> x.sin() * !y }(3.3,5)","flt:-0.0f","flt:-0.0f");
+  }
+
+  @Test public void testNil() {
+
+    test("0", "nil", "nil:nil");
+
+    test("!0", "int:1", "int:1");
+
+    test("0+3.3","flt:3.3f","flt:3.3");
+
   }
 
   @Test public void testStatements() {
@@ -30,7 +40,7 @@ public class TestStable {
   // Test primitive math, and loading overloads from primitives.
   @Test public void testOverPrim() {
     // Unary operator
-    test("!1", "nil", "nil");
+    test("!1", "nil", "nil:nil");
 
     // Binary with precedence check
     test(" 1+2 * 3+4 *5", "int:27", "int:27");
@@ -45,17 +55,17 @@ public class TestStable {
     test("1._+_._(2 * 3) ", "int:7", "int:7");
 
     // Simpler overload tests
-    test("!(2,3.14)._","nil","nil", null, null, null, null);
+    test("!(2,3.14)._","nil","nil:nil", null, null, null, null);
     test("(2,3.14)._.sin()","flt:0.0015926529164868282","flt:0.0015926529164868282", null, null, null, null);
     // Two DynLoads, no Fresh
-    test("q=(2,3.14); (!q._,q._.sin())","*[18](_, int:int1, flt:flt64, ...)","*[18](_,int:int1,flt:flt64)", null, null, "[4,18]", null);
+    test("q=(2,3.14); (!q._,q._.sin())","*[21](_, int:int1, flt:flt64, ...)","*[21](_,int:int1,flt:flt64)", null, null, "[4,21]", null);
   }
 
   // More complex overload tests
   @Test public void testOver() {
     // testOver5.aa, One DynLoad, fcn needs DynTable
     // Returning choice of structs and field selecting from it.
-    test("fcn = {(@{a=1;},@{b=2;})._}; (fcn().a, fcn().b)", "*[21]( _, %[2,4,21][2]?, %[2,4,21][2]?, ...)", "*[21](_, int:1,int:2)", null, null, "[4,21]", null);
+    test("fcn = {(@{a=1;},@{b=2;})._}; (fcn().a, fcn().b)", "*[24]( _, %[2,4,24][2]?, %[2,4,24][2]?, ...)", "*[24](_, int:1,int:2)", null, null, "[4,24]", null);
 
     // testOver6.aa, One DynLoad, fcn needs DynTable
     // Passing choice of structs and field selecting from it.
@@ -68,28 +78,28 @@ fcn = { x ->
 };
 (fcn @{a=2;}, fcn @{b=3.3;})
 """,
-         "*[23]( _, %[2,4,23][2]?, %[2,4,23][2]?, ...)", "*[23](_,int:2,flt:3.3)",null,null,"[4,23]",null);
+         "*[26]( _, %[2,4,26][2]?, %[2,4,26][2]?, ...)", "*[26](_,int:2,flt:3.3)",null,null,"[4,26]",null);
 
+    // Same using primitive math
     test(
 """
 ( { x y -> !x      * !y },
   { x y -> x.sin() * !y }
 )._(3.3,5)
 """,
-         "flt:0.0f","flt:0.0f");
+         "flt:0.0f","flt:-0.0f");
 
 //    // Multi-arg function selection from a set
 //    test(
-//"""
+//
+//         """
 //noinline_foo = { x y ->
 //        ( { x y -> !x      * !y },
 //          { x y -> x.sin() * !y }
 //  )._(x,y)
 //};
-//math.rand(2) ? noinline_foo(3,5) : noinline_foo(3.3,5)
+//math.rand(2) ? noinline_foo(3,0) : noinline_foo(3.3,0)
 //""",
 //         "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
   }
-
-
 }

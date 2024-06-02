@@ -71,8 +71,9 @@ public class LoadNode extends Node {
       return tadr.oob(); // Not an address
     if( !(tmem instanceof TypeMem tm) )
       return tmem.oob(); // Not a memory
+    // Treat NIL like a wrapped nil clazz
     if( ta==TypeNil.NIL || ta==TypeNil.XNIL )
-      ta = (TypeNil)ta.meet(PrimNode.PINT._val);
+      ta = (TypeMemPtr)PrimNode.PNIL._val;
 
     // Load the matching struct from memory / deep ptr
     TypeStruct ts = ta instanceof TypeMemPtr tmp && !tmp.is_simple_ptr()

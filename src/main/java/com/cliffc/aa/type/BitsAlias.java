@@ -28,9 +28,9 @@ public class BitsAlias extends Bits<BitsAlias> {
   public static final int EXTX = new_alias(ALLX); // External aliases
   public static final int LOCX = new_alias(ALLX); // Internal aliases
   public static final int CLZX = new_alias(LOCX); // Clazz-clazz alias
+  public static final int NILX = new_alias(LOCX); // Nil-clazz alias
   public static final int INTX = new_alias(LOCX); // Integer-clazz alias
   public static final int FLTX = new_alias(LOCX); // Float-clazz alias
-  public static final int RPCX = new_alias(LOCX); // RPC-clazz alias
   public static final int STRX = new_alias(LOCX); // String alias
 
   // The All-Memory alias class
@@ -43,9 +43,9 @@ public class BitsAlias extends Bits<BitsAlias> {
   public static final BitsAlias EXT = make0(EXTX);
   public static final BitsAlias LOC = make0(LOCX);
   public static final BitsAlias CLZ = make0(CLZX);
+  public static final BitsAlias NIL = make0(NILX);
   public static final BitsAlias INT = make0(INTX);
   public static final BitsAlias FLT = make0(FLTX);
-  public static final BitsAlias RPC = make0(RPCX);
   public static final BitsAlias STR = make0(STRX);
 
   public static final BitsAlias EMPTY = new BitsAlias().make(); // No bits; it is its own dual
@@ -83,6 +83,7 @@ public class BitsAlias extends Bits<BitsAlias> {
 
   @Override public SB str( SB sb ) {
     if( this==CLZ ) return sb.p("[CLZ]");
+    if( this==NIL ) return sb.p("[NIL]");
     if( this==INT ) return sb.p("[INT]");
     if( this==FLT ) return sb.p("[FLT]");
     return super.str(sb);

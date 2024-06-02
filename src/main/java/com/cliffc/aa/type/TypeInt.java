@@ -85,7 +85,7 @@ public class TypeInt extends TypeNil<TypeInt> {
   public  static final TypeInt INT8  = make(false,false,false, 8,0);
   public  static final TypeInt NINT8 = make(false,false,true , 8,0);
   public  static final TypeInt BOOL  = make(false,false,false, 1,0);
-  public  static final TypeInt ZERO  = con(0);
+  public  static final TypeInt ZERO  = make(false, true,false, 0,0);
   public  static final TypeInt TRUE  = con(1);
   public  static final TypeInt C3    = con(3);
   public  static final TypeInt C123  = con(123456789L);

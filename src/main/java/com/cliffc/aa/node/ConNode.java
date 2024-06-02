@@ -31,6 +31,16 @@ public class ConNode<T extends Type> extends Node {
     return false;
   }
 
+
+  // Constants.  You'd think "ConNode" and constant Type and be done, but no....
+
+  // Each constant has a copy - a *FRESH* copy of the associated class baked
+  // into associated phat prim value.  Example for int:17:
+  //   *[INTX]{ ^ = @{INTCLZ}, _ = int:17 }
+  // This is a *fresh* copy of the integer clazz.  However the integer clazz
+  // has no type variables, so fresh-or-not makes no difference.
+  //
+  // However, the NIL clazz is full of type variables
   @Override public TV3 _set_tvar() {
     unelock();                  // Hash now depends on TVars
     TV3 tv = TV3.from_flow(_t);

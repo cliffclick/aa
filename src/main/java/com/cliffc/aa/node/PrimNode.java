@@ -49,11 +49,13 @@ public abstract class PrimNode extends Node {
 
   // Int/Float/String primitives.
   public static final StructNode ZCLZ = new StructNode(0,false,null );
+  public static final StructNode ZNIL = new StructNode(0,false,null );
   public static final StructNode ZINT = new StructNode(0,false,null );
   public static final StructNode ZFLT = new StructNode(0,false,null );
   public static final StructNode ZSTR = new StructNode(0,false,null );
   public static final StructNode ZMATH= new StructNode(0,false,null );
   public static final NewNode PCLZ = new NewNode("TOP",BitsAlias.CLZX,true);
+  public static final NewNode PNIL = new NewNode("NIL",BitsAlias.NILX,true);
   public static final NewNode PINT = new NewNode("INT",BitsAlias.INTX,true);
   public static final NewNode PFLT = new NewNode("FLT",BitsAlias.FLTX,true);
   public static final NewNode PSTR = new NewNode("STR",BitsAlias.STRX,true); // String clazz, not strings
@@ -63,6 +65,13 @@ public abstract class PrimNode extends Node {
 
   public static PrimNode[] PRIMS() {
     if( PRIMS!=null ) return PRIMS;
+
+    // nil opers
+    PrimNode[][] NILS = new PrimNode[][]{
+      { new AddNil() },
+      { new NotNil() },
+      { new NilPrint() }
+    };
 
     // int opers
     PrimNode[][] INTS = new PrimNode[][]{
@@ -132,9 +141,12 @@ public abstract class PrimNode extends Node {
     // Gather
     Ary<PrimNode> allprims = new Ary<>(others);
     for( PrimNode prim : others ) allprims.push(prim);
-    for( PrimNode[] prims : FLTS   ) for( PrimNode prim : prims ) allprims.push(prim);
+    for( PrimNode[] prims : NILS   ) for( PrimNode prim : prims ) allprims.push(prim);
     for( PrimNode[] prims : INTS   ) for( PrimNode prim : prims ) allprims.push(prim);
+    for( PrimNode[] prims : FLTS   ) for( PrimNode prim : prims ) allprims.push(prim);
 
+    // Build the nil prototypes
+    make_prim(ZNIL,"nil:",PNIL,NILS);
     // Build the int and float prototypes
     make_prim(ZFLT,"flt:",PFLT,FLTS);
     make_prim(ZINT,"int:",PINT,INTS);
@@ -150,6 +162,7 @@ public abstract class PrimNode extends Node {
 
 
     // Set all TVars
+    PNIL.set_tvar();
     PINT.set_tvar();
     PFLT.set_tvar();
     Env.ROOT.walk( n -> {
@@ -188,10 +201,11 @@ public abstract class PrimNode extends Node {
 
   // Make a fresh HMT wrapped int
   private static final String[] ss  = new String[]{TypeFld.CLZ,TypeFld.PRIM};
-  final static TVPtr IINT () { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PINT.tvar(),new TVBase(TypeInt. INT64)},false)); }
-  final static TVPtr IBOOL() { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PINT.tvar(),new TVBase(TypeInt. BOOL )},false)); }
-  final static TVPtr  IFLT() { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.tvar(),new TVBase(TypeFlt. FLT64)},false)); }
-  final static TVPtr INFLT() { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.tvar(),new TVBase(TypeFlt.NFLT64)},false)); }
+  static TVPtr IINT (TypeInt ti) { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PINT.tvar(),new TVBase(ti)},false)); }
+  static TVPtr IBOOL() { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PINT.tvar(),new TVBase(TypeInt. BOOL )},false)); }
+  static TVPtr  IFLT() { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.tvar(),new TVBase(TypeFlt. FLT64)},false)); }
+  static TVPtr INFLT() { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.tvar(),new TVBase(TypeFlt.NFLT64)},false)); }
+  static TVPtr INIL() { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PNIL.tvar().fresh(),new TVBase(TypeNil. NIL  )},false)); }
 
 
   // Used for test cases; changes the golden-rule expected alias/fidx based on
@@ -371,10 +385,14 @@ public abstract class PrimNode extends Node {
 
   // Make a TV3
   public static TV3 wrap_base(Type rez) {
-    if( rez == TypeInt. INT64 )  return  IINT();
+    if( rez == TypeInt. INT64 )  return  IINT(TypeInt.INT64);
+    if( rez == TypeInt. TRUE  )  return  IINT(TypeInt.TRUE );
     if( rez == TypeInt. BOOL  )  return IBOOL();
     if( rez == TypeFlt. FLT64 )  return  IFLT();
     if( rez == TypeFlt.NFLT64 )  return INFLT();
+    if( rez == TypeNil.NIL    )  return  INIL();
+    if( rez == TypeNil.SCALAR )  return  new TVLeaf();
+    if( rez == TypeNil.XSCALAR || rez == TypeNil.XNIL )  return new TVPtr( BitsAlias.make0(0), new TVStruct(true) );
     throw TODO();
   }
 
@@ -424,6 +442,25 @@ public abstract class PrimNode extends Node {
   //    return make_flt((double)unwrap_ii(args[0]));
   //  }
   //}
+
+
+  static class AddNil extends PrimNode {
+    AddNil() { super("_+_", TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, TypeNil.NIL, Type.ANY,TypeNil.SCALAR),TypeNil.SCALAR); }
+    @Override public Type value() { return val(2); } // dsp is nil, skip dyn, return other arg
+    @Override public TypeNil apply(TypeNil[] ignore) { throw AA.TODO(); }
+    @Override TV3 _set_tvar() { return in(2).set_tvar();  } // ID function on RHS argument
+  }
+  static class NotNil extends PrimNode {
+    NotNil() { super("!_", TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, TypeNil.NIL, Type.ANY),TypeInt.TRUE); }
+    @Override public Type value() { return wrap(TypeInt.TRUE); }
+    @Override public TypeNil apply(TypeNil[] ignore) { throw AA.TODO(); }
+  }
+  static class NilPrint extends PrimNode {
+    NilPrint() { super(" nilclz", TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, TypeNil.NIL, Type.ANY),TypeNil.SCALAR); }
+    @Override public Type value() { return Type.ANY; }
+    @Override public TypeNil apply(TypeNil[] ignore) { throw AA.TODO(); }
+  }
+
 
   // 1Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim1OpF64 extends PrimNode {

@@ -1,5 +1,5 @@
 
-// Type: *[7]( _, 1, 2)
+// Type: *[FLT]( _, 1, 2)
 // Eval: *[7]( _, 1, 2)
 
 // Displays are closed & defined def-by-def.  So prior partial displays in the gen set.

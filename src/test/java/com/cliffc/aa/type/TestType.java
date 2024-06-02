@@ -54,9 +54,9 @@ public class TestType {
       "%[CLZ][]",               // BitsAlias.CLZ no nil
       "%[CLZ][]?",              // BitsAlias.CLZ yes nil
       "*[17]( _, 1, ~Scalar)",  // Bare ~type as a field
-      "[23]{any,3 -> *[7](3, Scalar) }", // Function returning a struct
+      "[23]{any,3 -> *[FLT](3, Scalar) }", // Function returning a struct
       "*[3]( _, 0=PA:*[3]@{ _; _*_=*[nALL]CLZ; f=flt64}, *[]CLZ, 2=PA)", // Struct with self-references
-      "PA:*[7]@{ _; add=[23]{any,4 -> PA }; i=int64}", // Struct with function return self-reference
+      "PA:*[FLT]@{ _; add=[23]{any,4 -> PA }; i=int64}", // Struct with function return self-reference
       "PA:*[18]@{ _; n1=*[17]@{ _; n1=PA; FB:v1=7}; FB}", // DUP Field
       "*[18]( _, 0=PA:*[17]( _, *[4,5]@{ _; x=nScalar}, nScalar), 1=PA)",
       "@{FA:head=*[17]@{ _; FA}?}", // Shared field in unrelated structs

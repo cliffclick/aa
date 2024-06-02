@@ -85,7 +85,7 @@ public class TypeFlt extends TypeNil<TypeFlt> {
   public static final TypeFlt NFLT32= make(false,false,true ,32,0);
   public static final TypeFlt PI    = con(Math.PI);
   public static final TypeFlt HALF  = con(0.5);
-  public static final TypeFlt ZERO  = con(0.0);
+  public static final TypeFlt ZERO  = make(false, true,false, 0,0);
   public static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,PI,FLT32,NFLT32,HALF};
   static void init1( HashMap<String,TypeNil> types ) {
     types.put("flt32",FLT32);

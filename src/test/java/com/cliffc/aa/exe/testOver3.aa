@@ -1,5 +1,5 @@
 // One DynLoad, fcn needs DynTable
-// Type: *[INT]( _, int64, flt64)
+// Type: *[NIL]( _, int64, flt64)
 // Eval: *[5]( _, 3, 3.400000013411045f)
 
 // fcn returns the Right Thing in each context

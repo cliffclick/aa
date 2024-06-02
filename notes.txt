@@ -1,5 +1,18 @@
 =======================================
-05/17/2024
+06/01/2024
+
+The Big Nil Question.
+"!0" ==>> "0.!_._()"
+  Con 0  <<=== WHAT IS THE TVAR HERE?
+  Load !_
+  DynLoad
+  Call
+
+Con 0 needs to have all sensible int/flt functions on it?
+So I can Load "!_".
+Means e.g. it has a NIL class ???
+  *[0]{ ^=*[]{NILCLZ}, _=TypeNil.NIL }
+
 
 
 =======================================

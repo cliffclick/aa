@@ -1,6 +1,6 @@
 // Gen counters
 // Simple test of captured environment
-// Type: A:*[3]( _, int64, { *[FLT]@{ B:*[7]@{ *[2]@{ $dyn=-; gen=C:{ *[2]@{ $dyn=-; gen=C;  ..., } D:- -> A };  ..., }; $dyn=D; inc={ B E:- int64 -> A };  ..., }; $dyn=E; cnt=int64;  ..., } - -> A })
+// Type: A:*[3]( _, int64, { *[INT]@{ B:*[FLT]@{ *[2]@{ $dyn=-; gen=C:{ *[2]@{ $dyn=-; gen=C;  ..., } D:- -> A };  ..., }; $dyn=D; inc={ B E:- int64 -> A };  ..., }; $dyn=E; cnt=int64;  ..., } - -> A })
 // Eval: *[3]( _, 1, <*[6]@{ _ $dyn=-; cnt=1; },LAM5>)
 gen = { ->
   inc = { cnt ->

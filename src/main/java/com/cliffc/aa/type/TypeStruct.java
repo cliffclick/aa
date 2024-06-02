@@ -630,6 +630,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     if( !P.indent ) {
       if( this==Cons.CLZ_CLZ ) return P.p("CLZ");
       if( is_top_clz() ) return P.p("@{TOPCLZ}");
+      if( is_nil_clz() ) return P.p("@{NILCLZ}");
       if( is_int_clz() ) return P.p("@{INTCLZ}");
       if( is_flt_clz() ) return P.p("@{FLTCLZ}");
       if( is_str_clz() ) return P.p("@{STRCLZ}");
@@ -668,6 +669,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   @Override boolean _str_complex0(PENV P) { return true; }
 
   boolean is_top_clz () { return _flds.length>1 && Util.eq("math",_flds[1]._fld); }
+  boolean is_nil_clz () { return find(" nilclz" ) != -1; }
   boolean is_int_clz () { return find("!_" ) != -1; }
   boolean is_flt_clz () { return find("sin") != -1; }
   boolean is_str_clz () { return _flds.length>1 && Util.eq("#_"  ,_flds[1]._fld); }
