@@ -5,7 +5,6 @@ import com.cliffc.aa.util.SB;
 import com.cliffc.aa.node.ConNode;
 import com.cliffc.aa.Env;
 
-
 public class Const extends AST {
   public final Type _t;
   public Const( Type t ) { _t = t; }

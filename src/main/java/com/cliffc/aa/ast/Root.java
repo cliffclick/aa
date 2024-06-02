@@ -7,12 +7,10 @@ import com.cliffc.aa.type.TypeFld.Access;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 
-import static com.cliffc.aa.AA.TODO;
-
 public class Root extends ASTVars {
 
   public Root( AST prog ) {
-    super(new Ary<String>(new String[]{"$dyn"}));
+    super(new Ary<>(new String[]{"$dyn"}));
     _kids.push(prog);
   }
 
