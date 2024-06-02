@@ -30,8 +30,7 @@ public class MProjNode extends ProjNode {
       return mem==this ? Env.ANY : mem;
 
     // Fold across pure calls (most primitives)
-    if( in(0) instanceof CallEpiNode cepi && !cepi._is_copy ) {
-      CallNode call = cepi.call();
+    if( in(0) instanceof CallEpiNode cepi && !cepi._is_copy && cepi.in(0) instanceof CallNode call ) {
       if( call.tfp()._fidxs!=BitsFun.NALL && cepi.nwired()>0 ) {
         boolean pure=true;
         for( int i=0; i<cepi.nwired(); i++ ) {
