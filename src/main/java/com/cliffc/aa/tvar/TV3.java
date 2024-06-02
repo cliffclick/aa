@@ -154,19 +154,18 @@ abstract public class TV3 implements Cloneable {
 
   // Set may_nil flag.  Return progress flag.
   // Set an error if both may_nil and use-nil.
-  public void add_may_nil( boolean test) {
-    if( _may_nil ) return;   // No change
-    if( test ) return;       // Will be progress
+  public boolean add_may_nil( boolean test) {
+    if( _may_nil ) return false;   // No change
+    if( test ) return ptrue();     // Will be progress
     if( _use_nil )
       _unify_err("May be nil",null,null,false);
-    _may_nil = ptrue();
+    return (_may_nil = ptrue());
   }
   // Set use_nil flag. Set an error if both may_nil and use-nil.
-  public void add_use_nil() {
-    if( !_use_nil ) {
-      _use_nil=true;                 // Progress
-      if( _may_nil ) throw TODO(); // unify_errs("May be nil",work);
-    }
+  public boolean add_use_nil() {
+    if( _use_nil ) return false;
+    if( _may_nil ) throw TODO(); // unify_errs("May be nil",work);
+    return (_use_nil=ptrue());   // Progress
   }
 
   public static boolean HALT_IF_PROGRESS = false;
@@ -184,12 +183,15 @@ abstract public class TV3 implements Cloneable {
     if( this==that ) return false;
     ptrue();
     assert !unified() && !that.unified(); // Cannot union twice
-    if( _may_nil ) that.add_may_nil(false);
-    if( _use_nil ) that.add_use_nil();
+    boolean progress=false;
+    if( _may_nil ) progress |= that.add_may_nil(false);
+    if( _use_nil ) progress |= that.add_use_nil();
     if( that._may_nil && that._use_nil )
       { that=that.find(); }
     _union_impl(that); // Merge subclass specific bits into that
-    that.widen(_widen,false);
+    progress |= that.widen(_widen,false);
+    assert _INIT0_CNT==99999 || that._uid >= _INIT0_CNT || !progress; // no updates to primitives
+    assert _INIT0_CNT==99999 ||      _uid >= _INIT0_CNT; // no unify primitive away
 
     // Add Node updates to _work_flow list
     that._union_deps(this);
@@ -697,7 +699,8 @@ abstract public class TV3 implements Cloneable {
     case TypeInt ti -> new TVBase(ti);
     case TypeFlt tf -> new TVBase(tf);
 
-    case TypeNil tn -> new TVPtr( BitsAlias.make0(0), new TVStruct(true) );
+    case TypeNil tn -> PrimNode.wrap_base(tn);
+
     case Type tt -> {
       if( tt == Type.ANY || tt == Type.ALL ) yield new TVLeaf();
       throw TODO();
@@ -839,7 +842,7 @@ abstract public class TV3 implements Cloneable {
   }
 
   // Debugging tool
-  TV3 f(int uid) { return _find(uid,new VBitSet()); }
+  public TV3 f(int uid) { return _find(uid,new VBitSet()); }
   private TV3 _find(int uid, VBitSet visit) {
     if( visit.tset(_uid) ) return null;
     if( _uid==uid ) return this;
@@ -850,6 +853,20 @@ abstract public class TV3 implements Cloneable {
         return arg;
     return null;
   }
+
+  // Check that all TV3s are early/primitive after reset.
+  public TV3 check_reset() { return _check(new VBitSet()); }
+  private TV3 _check(VBitSet visit ) {
+    if( visit.tset(_uid) ) return null;
+    if( _uid>=CNT ) return this;
+    if( _uf!=null ) return _uf._check(visit);
+    if( _args==null ) return null;
+    for( TV3 arg : _args )
+      if( arg!=null && (arg=arg._check(visit)) != null )
+        return arg;
+    return null;
+  }
+
 
   // Shallow clone of fields & args.
   public TV3 copy() {

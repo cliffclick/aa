@@ -212,7 +212,11 @@ public class Env implements AutoCloseable {
     BitsAlias .reset_to_init0();
     BitsFun   .reset_to_init0();
     BitsRPC   .reset_to_init0();
-    Env.ROOT.walk( n -> { assert n.isResetKeep(); } );
+    Env.ROOT.walk( n -> {
+        assert n.isResetKeep();
+        assert n.check_reset()==null;
+      } );
+    ANY._elock();
   }
 
   // Return Scope for a name, so can be used to determine e.g. mutability

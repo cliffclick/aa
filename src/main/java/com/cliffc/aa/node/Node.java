@@ -456,7 +456,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // typing.  This is a Type Variable which can unify with other TV3s forcing
   // Type-equivalence (JOIN of unified Types), and includes gross structure
   // (functions, structs, pointers, or simple Types).
-  TV3 _tvar;
+  public TV3 _tvar;
 
   // H-M Type-Variables
   public TV3 tvar() {
@@ -478,6 +478,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Initial default compute of type variables.  No set, no smarts.  Overridden.
   TV3 _set_tvar() { return new TVLeaf(); }
 
+  public TV3 check_reset() { return _tvar==null ? null : _tvar.check_reset(); }
 
   // Unifies this Node with others; Call/CallEpi with Fun/Parm/Ret.  NewNodes &
   // Load/Stores, etc.  Returns true if progressed, and puts neighbors back on
