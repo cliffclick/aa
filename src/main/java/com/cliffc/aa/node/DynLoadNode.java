@@ -51,7 +51,7 @@ public class DynLoadNode extends LoadNode {
     // possible choices.
     Type t = TypeNil.XSCALAR;
     if( dyn().tvar() instanceof TVDynTable dyn )
-      for( String label : dyn.fields(_resolves,this,Combo.HM_AMBI) )
+      for( String label : _resolves )
         t = t.meet(lookup(ts,mem,label));
     return t;
   }
