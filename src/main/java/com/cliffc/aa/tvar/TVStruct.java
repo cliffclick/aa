@@ -105,7 +105,7 @@ public class TVStruct extends TVExpanding {
   }
 
 
-  // Return the TV3 for field 'fld' or null if missing, with OUT rollups
+  // Return the TV3 for field 'fld' or null if missing, withOUT rollups
   public TV3 debug_arg(String fld) {
     int i = idx(fld);
     return i>=0 ? debug_arg(i) : null;
@@ -328,7 +328,7 @@ public class TVStruct extends TVExpanding {
         progress |= fthat.vcrisscross(test);
         progress |= arg(i)._fresh_unify(fthat,test);
       } else {
-        that.unify_err("Missing field '"+_flds[i]+"'",arg(i),null,test);
+        that._unify_err("Missing field '"+_flds[i]+"'",arg(i),null,test);
       }
     }
     return progress;
@@ -426,6 +426,7 @@ public class TVStruct extends TVExpanding {
     return st;
   }
 
+  boolean is_nil_clz() { return idx(" nilclz"  ) >= 0; }
   boolean is_int_clz() { return idx("!_"  ) >= 0; }
   boolean is_flt_clz() { return idx("sin" ) >= 0; }
   boolean is_str_clz() { return idx("#_"  ) >= 0; }
@@ -459,6 +460,7 @@ public class TVStruct extends TVExpanding {
 
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     if( _args==null  ) return sb.p(_open ? "(...)" : "()");
+    if( !prims && is_nil_clz() ) return sb.p("nil");
     if( !prims && is_int_clz() ) return sb.p("int");
     if( !prims && is_flt_clz() ) return sb.p("flt");
     if( !prims && is_str_clz() ) return sb.p("str");
