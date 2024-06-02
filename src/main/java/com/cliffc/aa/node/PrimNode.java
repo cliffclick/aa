@@ -399,14 +399,17 @@ public abstract class PrimNode extends Node {
   // All work done in set_tvar, no need to unify
   @Override public boolean unify( boolean test ) { return false; }
 
+  // Theory: GCP never reports errors, since it "doesn't know".
+  // HMT can confirm correct args where GCP might.
+  // See TestStable.testOver.
   @Override public ErrMsg err( boolean fast ) {
-    for( int i=DSP_IDX; i<_formals.len(); i++ ) {
-      if( _formals.at(i) == Type.ANY ) continue;
-      Type tactual = val(i-DSP_IDX);
-      TypeNil tformal = wrap(_formals.at(i));
-      if( !tactual.isa(tformal) )
-        return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[i-DSP_IDX],tactual, tformal);
-    }
+    //for( int i=DSP_IDX; i<_formals.len(); i++ ) {
+    //  if( _formals.at(i) == Type.ANY ) continue;
+    //  Type tactual = val(i-DSP_IDX);
+    //  TypeNil tformal = wrap(_formals.at(i));
+    //  if( !tactual.isa(tformal) )
+    //    return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[i-DSP_IDX],tactual, tformal);
+    //}
     return null;
   }
 

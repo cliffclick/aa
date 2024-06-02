@@ -89,17 +89,18 @@ fcn = { x ->
 """,
          "flt:0.0f","flt:-0.0f");
 
-//    // Multi-arg function selection from a set
-//    test(
-//
-//         """
-//noinline_foo = { x y ->
-//        ( { x y -> !x      * !y },
-//          { x y -> x.sin() * !y }
-//  )._(x,y)
-//};
-//math.rand(2) ? noinline_foo(3,0) : noinline_foo(3.3,0)
-//""",
-//         "*[13](_,int:4,flt:4.840000000000001)","*[15](int64,flt64)", null, null, "[14]", null);
+    // Multi-arg function selection from a set.  Note the really weak GCP
+    // result: argument "x" is passed as both an int and a flt, and HMT makes
+    // sure the correct arg is passed to the correct function.
+    test(
+"""
+noinline_foo = { x y ->
+        ( { x y -> !x      * !y },
+          { x y -> x.sin() * !y }
+          )._(x,y)  // The single call site; "x" is either int or flt
+};
+(noinline_foo(3,5), noinline_foo(3.3,5))
+""",
+         "*[24]( _, 0=PA:*[]@{^=*[6,7](...); _=%[6,7][]?; $nil}?, 1=PA, ...)","*[24]( _, int:int64, flt:flt64)", null, null, "[4,24]", null);
   }
 }
