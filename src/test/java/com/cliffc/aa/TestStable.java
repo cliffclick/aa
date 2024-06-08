@@ -10,6 +10,9 @@ public class TestStable {
   @Test public void testBasic() {
     // Simple number parsing
     test("1", "int:1", "int:1");
+    // Simple field create
+    test("x=1;x","int:1","int:1");
+    test("x=1;y=2; x","int:1","int:1");
     // Struct define and field lookup
     test("a=@{x=1.2;y;}; a.x", "flt:1.2", "flt:1.2"); // standard "." field naming; trailing semicolon optional
     // Function call without parens
@@ -21,13 +24,9 @@ public class TestStable {
   }
 
   @Test public void testNil() {
-
     test("0", "nil", "nil:nil");
-
     test("!0", "int:1", "int:1");
-
     test("0+3.3","flt:3.3f","flt:3.3");
-
   }
 
   @Test public void testStatements() {
@@ -58,7 +57,7 @@ public class TestStable {
     test("!(2,3.14)._","nil","nil:nil", null, null, null, null);
     test("(2,3.14)._.sin()","flt:0.0015926529164868282","flt:0.0015926529164868282", null, null, null, null);
     // Two DynLoads, no Fresh
-    test("q=(2,3.14); (!q._,q._.sin())","*[21](_, int:int1, flt:flt64, ...)","*[21](_,int:int1,flt:flt64)", null, null, "[4,21]", null);
+    test("q=(2,3.14); (!q._,q._.sin())","*[21](_, int:int1, flt:flt64)","*[21](_,int:int1,flt:flt64)", null, null, "[4,21]", null);
   }
 
   // More complex overload tests
@@ -102,5 +101,22 @@ noinline_foo = { x y ->
 (noinline_foo(3,5), noinline_foo(3.3,5))
 """,
          "*[24]( _, 0=PA:*[]@{^=*[6,7](...); _=%[6,7][]?; $nil}?, 1=PA, ...)","*[24]( _, int:int64, flt:flt64)", null, null, "[4,24]", null);
+  }
+
+
+  @Test public void testMutLetRec() {
+    // A,B,C are mutually recursive identity functions.
+    // D calls B or C with ints.
+    // final struct calls C with floats.
+    test(
+"""
+A = { x -> math.rand(2) ? B(x) : x };
+D = {   -> math.rand(2) ? B(1) : C(2) };
+C = { x -> A(x) };
+B = { x -> C(x) };
+( D(), C(3.14) )
+
+""",
+         "*[24]( _, 0=PA:*[]@{^=*[6,7](...); _=%[6,7][]; $nil}?, 1=PA, ...)","*[24]( _, int:nint8, flt:3.14)",null,null,"[4,24]",null);
   }
 }

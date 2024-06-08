@@ -12,7 +12,7 @@ import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
 
 /*** an implementation of language AA
- *
+ * <p>
  *  GRAMMAR:
  *  prog = stmts END
  *  stmts= [tstmt|stmt][; stmts]*[;]? // multiple statements; final ';' is optional
@@ -59,7 +59,7 @@ import static com.cliffc.aa.type.TypeFld.Access;
  *                                 // Pattern matching: 1 arg is the arg; 2+ args break down a (required) tuple
  *  str  = [.\%]*                  // String contents; \t\n\r\% standard escapes
  *  str  = %[num]?[.num]?fact      // Percent escape embeds a 'fact' in a string; "name=%name\n"
- *
+ * <p>
  *  type = tcon | tid | tvar | [?!]tptr | [?]tfun // "?" is nilable-ref, "!" is not-nil ref, missing is value-type
  *  tptr = tary | tstruct | ttuple
  *  tid  = type identifier         // NOT all-upper-case; LHS of type assignment
@@ -72,61 +72,60 @@ import static com.cliffc.aa.type.TypeFld.Access;
  *                                 // Tuple fields are always final.
  *  tstruct= [tid:]@{ [tfld;]* };  // Optional named type to extend, list of fields
  *  tfld = id [:type | tcon]       // Field name, option type or const-expr
- *
-
+ * <p>
  *
  * Structs and Types:
- *
+ * <p>
  * Structs are a collection of fields; fields name other values.  All fields
  * can be optionally typed; the types can be forward references.  Missing types
  * are inferred.
- *
+ * <p>
  * The same struct syntax is used in 4 cases: A normal object allocation, an
  * anonymous type struct, a named value-type, and a named reference type.
- *
+ * <p>
  * Normal values (e.g. primitives) have no memory identity, are not allocated
  * and the "==" test is deep: each field is tested via "==" and this is a
  * bitwise test.  Hence simple primitive ints and flts are just tested via a
  * simple bit test.
- *
+ * <p>
  * Value types (Vals) are a collection of normal values; the aggregate is
  * itself a value; it has no memory identity (pointer), is not allocated, is
  * not freed, is pass-by-value and does not allow side-effects on members.
  * Under the hood optimizations may do, e.g. COW optimizations.
- *
+ * <p>
  * Anonymous struct declarations have fields and field modifiers, but do not
  * allow any exprs.  They are a type, not a value.
- *
+ * <p>
  * Normal objects have a memory identity (pointer), require allocation and
  * lifetime management.  The "==" test is via ref/pointer only.  They have
  * mutable fields and allow side-effects.  The construction allows expressions
  * which are executed as the struct is built.
- *
+ * <p>
  * Vals and Refs (reference) types are top-level named type assignments.  They
  * make a constructor; a Val constructor makes values and a Ref constructor
  * makes normal objects.  Constructors are always automatically defined; if you
  * want a classic C++ or Java constructor, make a factory function instead.
- *
+ * <p>
  * All fields can be marked mutable or not; the default varies.
- *
+ * <p>
  * All fields require initialization; if an expr is not provided either a 0 or
  * an argument will be used in the constructor.  This varies from Vals vs Refs.
- *
+ * <p>
  * If an expression is a constant, it is precomputed and moved into a prototype
  * object (i.e. a C++ or Java "class" object), will be fetched on demand and
  * takes no space in object instances.  This is the common case for instance
  * functions and global constants.
- *
+ * <p>
  *      Syntax             Obj         Val           Ref       Anon
  *  fld [:type]     ;   r/w  ,  0   final, arg    r/w,    0    r/w     // arg in ValType, 0   elsewhere
  *  fld [:type]  =  ;   final,  0   final, arg    final, arg   final   //  0  in ObjType, arg elsewhere
  *  fld [:type] :=  ;   r/w  ,  0   error         r/w,    0    r/w     // err in ValType; no mutable fields
  *  fld [:type]  =e0;   final, e0   final, e0     final, e0    error   //                                    error in Anon, no value
  *  fld [:type] :=e0;   r/w  , e0   error         r/w,   e0    error   // err in ValType; no mutable fields; error in Anon, no value
- *
+ * <p>
  *
  * The Display
- *
+ * <p>
  * The Parser builds an IR presentation of the program semantics, which has
  * some subtleties.  See FunNode and CallNode for how function headers adnd
  * call sites are represented.  See FunPtrNode for a discussion on the "fat"
@@ -144,10 +143,10 @@ import static com.cliffc.aa.type.TypeFld.Access;
  *    (cntB,incB) = gen();  // Generate B counter, with a getter and incrementer
  *    incA(); incA(); incB();       // Now counter A=2 and B=1
  *    assert cntA()==2 && cntB==1;  // Assert counters are independent
- *
+ * <p>
  * Here the variable 'cnt' escapes the lifetime of 'gen' and gen's display must
  * be stack allocated.
- *
+ * <p>
  * Example: Same, except the inner functions are brought out at the top-level:
  *    _cnt = { cnt  } // Direct access to 'gen.cnt'
  *    _inc = { cnt++} // Direct access to 'gen.cnt'
@@ -155,7 +154,7 @@ import static com.cliffc.aa.type.TypeFld.Access;
  * And then we clone 'gen':
  *    gen2 = { cnt; ( _cnt, _inc ) }
  * But _cnt and _inc refer to the original 'gen' counter and not the new one.
- *
+ * <p>
  * Example: Same, except the display is explicit:
  *    _cnt = { dsp -> dsp.cnt  } // Code, not fptr, needs display
  *    _inc = { dsp -> dsp.cnt++} // Code, not fptr, needs display
@@ -163,19 +162,19 @@ import static com.cliffc.aa.type.TypeFld.Access;
  * And cloning gen:
  *    gen2 = { dsp2 = @{cnt}; ( (_cnt,dsp2), (_inc,dsp2) ) }
  * Here the two 'gen's can share their inner functions but use different displays.
- *
+ * <p>
  *
  * The Display is also available during @{} structure initialization, as a
  * default argument to nested functions.
- *
+ * <p>
  * Example:
  *   circle = @{ r=1.0; area = { -> 2*math.pi*r } }  // Uses 'r'
  *   square = @{ x=1.2; area = { -> x*x } }          // Uses 'x'
- *
+ * <p>
  * Each following init code is allowed to use all the fields that came before
  * it (plus itself for recursive functions), and is treated like a function
  * taking a hidden display argument of the structure itself.
- *
+ * <p>
  * Example: x = @{ fld1=init1; fld2=init2; ... }
  * Becomes: x = @{ fld1=0; fld2=0; ... }; x.fld1=init1(x); x.fld2=init2(x);...
  * Except the init1 does not get to use any x fields, the init2 call can only
@@ -247,9 +246,8 @@ public class Parse implements Comparable<Parse> {
       last = keep(stmt);
       stmt = tstmt();
       if( stmt == null ) stmt = stmt(lookup_current_scope_only);
-      if( stmt == null ) {
-        if( peek(';') ) { _x--; stmt=last; }   // Ignore empty statement
-      }
+      if( stmt == null )
+        stmt = last;            // Ignore empty statement
       if( unkeep(last) != stmt && last.nUses()==0 )
         last.kill(); // prior expression result no longer alive in parser
       assert bal == _keeps._len; // Balanced keep-alives
@@ -261,9 +259,9 @@ public class Parse implements Comparable<Parse> {
    *  assignments are always final, and can not exist before assignment (hence
    *  a variable cannot have a normal value and be re-assigned as a type
    *  variable).
-   *
+   * <p>
    *  tstmt = tvar = : type  // Value type
-   *
+   * <p>
    *  Value types are final-assigned; all fields are final and immutable.
    *  Fields not otherwise assigned are required by the constructor.  The
    *  constructor wraps the fields with a simple name; the result is not
@@ -271,10 +269,10 @@ public class Parse implements Comparable<Parse> {
    *  comparisons.  Value types support field lookups on structs, with fields
    *  set with constant expressions being moved to the prototype object (i.e.
    *  "class" object).
-   *
+   * <p>
    *
    *  tstmt = tvar = : [?!]type // Reference type
-   *
+   * <p>
    *  Reference types are mutable-assigned; fields are mutable by default and
    *  mutable fields are not filled in by the constructor.  The constructors do
    *  allocation; the result has an identity, an explicit lifetime needing
@@ -352,44 +350,44 @@ public class Parse implements Comparable<Parse> {
    *  Final-assigned variables can never be assigned again.  Forward references
    *  must be defined in the same scope (or higher) as the outermost pending def.
    *  This is the same as a lambda calc LetRec expression: "let id = def in ..."
-   *
+   * <p>
    *  stmt = [id[:type] [:]=]* ifex
    *  stmt = id     // Implicit variable creation with nil
    *  stmt = ^ifex  // Early function exit
-   *
+   * <p>
    *  Note the syntax difference between:
    *    stmt = id := val  //    re-assignment
    *    stmt = id  = val  // final assignment
    *   tstmt = id =:type  // type variable decl, type assignment
-   *
+   * <p>
    *  The ':=' is the re-assignment token, no spaces allowed.
-   *
+   * <p>
    * To handle "mutual let rec" we record enough information to detect
    * definition cycles as we go.  When we first start parsing an assignment
    * for A, we set A as a "scoped" forward ref:
    *    A = scoped_fref...
    * then we parse A's definition.  At the end of parsing, we change A's
    * forward ref to "defined" and replace it in-place in the struct.
-   *
+   * <p>
    * If, during the parsing of A's definition, we discover an unknown variable
    * B, we add that as an UNscoped forward ref in the scope.  We also record
    * that A's def depends on B - a possible mut let rec.  We might also
    * discover prior unscoped defs or previous cyclic defs; in any case we
    * record on A all those (possibly cyclic) defs.
-   *
+   * <p>
    * If we start a def for a prior-unscoped def, we go ahead and move it to
    * "scoped", and then parse as normal.
-   *
+   * <p>
    * Example:
    * A = { x -> rand ? B(x) : x };
    * D = {   -> rand ? B(1) : C(2) };
    * C = { x -> A(x) };
    * B = { x -> C(x) };
-   *
+   * <p>
    * Here {A,B,C} make a mutual let rec, and the cycle is all an big identity
    * function: any type can be passed into any of {A,B,C}.  Whereas D is NOT
    * part of this cycle and always returns an int.
-   *
+   * <p>
    * The representation of a *scoped forward-ref* is either the `null` or an
    * actual scoped ForwardRefNode.  We can use `null` normally if there's no
    * cyclic defs.
@@ -454,23 +452,23 @@ public class Parse implements Comparable<Parse> {
       badts.add(badt);
     }
 
-    // * Create new local fields for new tokens, in case of mut-let-rec
-    // * Parse the `ifex`, uses of the new or unknown fields may add to mut-let-rec sets.
-    // * Assign to previous defs with stores
-    // * Assign to new local fields, changing unscope-to-scoped, and scoped-to-defined
-    ScopeNode escope = scope();
-
-    // Create new local fields for new tokens, in case of mut-let-rec
-    for( int i=0; i<toks._len; i++ ) {
-      String tok = toks.at(i);               // Token being assigned
-      Access mutable = rs.get(i) ? Access.RW : Access.Final;  // Assignment is mutable or final
-      ScopeNode scope = lookup_scope(tok,lookup_current_scope_only);
-      if( scope==null ) {        // Create new tokens with null fields - shortcut for scoped frefs
-        ForwardRefNode fref = new ForwardRefNode(tok,badfs.at(i)).init();
-        fref.scope();
-        escope.stk().add_fld(tok,mutable,fref,badts.at(i));
-      }
-    }
+    //// * Create new local fields for new tokens, in case of mut-let-rec
+    //// * Parse the `ifex`, uses of the new or unknown fields may add to mut-let-rec sets.
+    //// * Assign to previous defs with stores
+    //// * Assign to new local fields, changing unscope-to-scoped, and scoped-to-defined
+    //ScopeNode escope = scope();
+    //
+    //// Create new local fields for new tokens, in case of mut-let-rec
+    //for( int i=0; i<toks._len; i++ ) {
+    //  String tok = toks.at(i);               // Token being assigned
+    //  Access mutable = rs.get(i) ? Access.RW : Access.Final;  // Assignment is mutable or final
+    //  ScopeNode scope = lookup_scope(tok,lookup_current_scope_only);
+    //  if( scope==null ) {        // Create new tokens with null fields - shortcut for scoped frefs
+    //    ForwardRefNode fref = new ForwardRefNode(tok,badfs.at(i)).init();
+    //    fref.scope();
+    //    escope.stk().add_fld(tok,mutable,fref,badts.at(i));
+    //  }
+    //}
 
 
     // Normal statement value parse
@@ -503,15 +501,21 @@ public class Parse implements Comparable<Parse> {
       ifex = new AssertNode(mem(), ifex, t, badf).peep();
 
     // Find initial set
-    StructNode stk = scope.stk();
-    int idx = stk.find(tok);
+    if( scope != null ) {
+      StructNode stk = scope.stk();
+      int idx = stk.find(tok);
 
-    // See if assigning over a forward-ref.
-    if( stk.in(idx) instanceof ForwardRefNode fref ) {
-      assert Util.eq(tok,fref._name);
-      // Now set in this scope
-      if( fref.isNotScoped() ) fref.scope();
-      return fref.assign( ifex, _e ); // Define & assign the forward-ref
+      // See if assigning over a forward-ref.
+      if( stk.in(idx) instanceof ForwardRefNode fref ) {
+        assert Util.eq(tok,fref._name);
+        //// Now set in this scope
+        //if( fref.isNotScoped() ) fref.scope();
+        //return fref.assign( ifex, _e ); // Define & assign the forward-ref
+        throw AA.TODO();
+      }
+    } else {
+      scope = scope();          // Create in current scope
+      scope.stk().add_fld(tok,mutable,Env.ANY,badt);
     }
 
     // Save across display load
@@ -635,28 +639,32 @@ public class Parse implements Comparable<Parse> {
 
   /** Parse a lisp-like function application.  To avoid the common bug of
    *  forgetting a ';', these must be on the same line.
-      apply = expr
-      apply = expr expr*
+      apply = fun
+      apply = fun expr*
    */
   private Node apply() {
-    Node expr = expr();
-    if( expr == null ) return null;
+    Node fun = expr();
+    if( fun == null ) return null;
     while( true ) {
       int bal = _keeps._len;    // Balanced keep-alives
       skipWS();
       int oldx = _x;
       int old_last = _lastNWS;
-      keep(expr);               // Keep alive across argument parse
+      keep(fun);               // Keep alive across argument parse
       Node arg = expr();
-      if( arg==null ) return unkeep(expr);
+      if( arg==null ) return unkeep(fun);
       // To avoid the common bug of forgetting a ';', these must be on the same line.
       int line_last = _lines.binary_search(old_last);
       int line_now  = _lines.binary_search(_x);
       if( line_last != line_now ) {
+        unkeep(fun);
         _x = oldx;  _lastNWS = old_last;
         return err_ctrl2("Lisp-like function application split between lines "+line_last+" and "+line_now+", but must be on the same line; possible missing semicolon?");
       }
-      expr = doCall(errMsgs(oldx,oldx),args(expr,dynCall(),arg)); // Pass the dyn and 1 arg
+      keep(arg);
+      Node dyn = keep(dynCall());
+      Node dsp = new FP2DSPNode(fun,null).peep();
+      fun = doCall(errMsgs(oldx,oldx),args(dsp,unkeep(dyn),unkeep(arg),unkeep(fun))); // Pass the dyn and 1 arg
       assert bal == _keeps._len; // Balanced keep-alives
     }
   }
@@ -694,24 +702,26 @@ public class Parse implements Comparable<Parse> {
       int rhsx = _x;            // Invariant: WS already skipped
       keep(lhs);
       Parse err = errMsg(opx);
+      // DynTable to call
+      AFieldNode dyn = keep(dynCall());
       // Load against LHS pointer.  If this is a primitive, the Load loads
       // against the primitive clazz.
       Node over= new LoadNode(mem(),lhs,binop._name,false,err).peep();
-      // DynTable to call
-      Node dyn = keep(dynCall());
       // Resolve the set of primitive choices
-      Node fun = keep(new DynLoadNode(mem(),over,(AFieldNode)dyn.in(0),err).peep());
-      // Parse the RHS operand
+      Node fun = keep(new DynLoadNode(mem(),over,dyn.in(0),err).peep());
+      Node dsp = keep(new FP2DSPNode(fun,err).peep());
+      // Parse the RHS operand.  May do anything, update memory, etc.
       Node rhs = binop._lazy
         ? _lazy_expr(binop)
         : _expr_higher_require(binop);
       //
       // Emit the call to both terms
+      dsp = unkeep(dsp);
       fun = unkeep(fun);
       dyn = unkeep(dyn);
       lhs = unkeep(lhs);
       // LHS in unhooked prior to optimizing/replacing.
-      lhs = doCall(errMsgs(opx,lhsx,rhsx), args(lhs,dyn,rhs));
+      lhs = doCall(errMsgs(opx,lhsx,rhsx), args(dsp,dyn,rhs,fun));
       // Invariant: LHS is unhooked
       assert bal == _keeps._len; // Balanced keep-alives
     }
@@ -869,23 +879,22 @@ public class Parse implements Comparable<Parse> {
         }
 
       } else if( peek('(') ) {  // Attempt a function-call
+        int bal = _keeps._len;  // Balanced keep-alives
         oldx = _x;              // Just past paren
-        Parse err = errMsg(_x-1);// Error at the openning paren
+        Parse err = errMsg(_x-1); // Error at the opening paren
         skipWS();               // Skip to start of 1st arg past "this"
         int first_arg_start = _x;
         keep(n);                // Keep alive across arg parse
-        // Argument tuple, with "this" or display first arg
-        StructNode args = new StructNode(0,false,err );
-        args.add_fld("0",Access.Final,n,err); // TODO: get the display start for errors
-        args.add_fld("1",Access.Final,dynCall(),err);
-        keep(args);
-        Node arg1 = stmts();
-        // Parse rest of arguments
-        _tuple(oldx-1,arg1,errMsg(first_arg_start),args,2); // Parse argument list
-        Node x = unkeep(args).peep(); assert x==args;
-        unkeep(n);                                // Function
+        Node dyn = keep(dynCall());
+        Node dsp = keep(new FP2DSPNode(n,null).peep());
+        Node arg0 = stmts();
+        // Argument tuple, for rest of arguments
+        StructNode args = keep(new StructNode(0,false,err ));
+        _tuple(oldx-1,arg0,errMsg(first_arg_start),args,0); // Parse argument list
+        Node args2 = unkeep(args).peep();
         Parse[] badargs = args.fld_starts();      // Args from tuple
-        n = doCall0(false,badargs,args(args));    // Pass the tuple
+        n = doCall0(false,badargs,args(unkeep(dsp),unkeep(dyn),args2,unkeep(n))); // Pass the tuple
+        assert bal == _keeps._len; // Balanced keep-alives
 
       } else {
         // Check for balanced op with a leading term, e.g. "ary [ idx ]" or
@@ -1111,10 +1120,10 @@ public class Parse implements Comparable<Parse> {
     // Load the resolve field from the display/scope structure
     return new LoadNode(mem(),dsp,"$dyn",true,null).peep();
   }
-  private Node dynCall() {
+  private AFieldNode dynCall() {
     Node ld = dynLoad();
     // Load a Call/Apply field out of a DynTable
-    return new AFieldNode(ld).peep();
+    return (AFieldNode)new AFieldNode(ld).peep();
   }
 
 

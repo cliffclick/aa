@@ -107,7 +107,8 @@ public class CallNode extends Node {
   // 0 - Control.  If XCTRL, call is not reached.
   // 1 - Memory.  This is memory into the call and also arg#0
   // 2 - Display; the first argument.
-  // 3+  Other "normal" arguments, numbered#ARG_IDX and up.
+  // 3 - Dyn table; 2nd argument
+  // 4+  Other "normal" arguments, numbered#ARG_IDX and up.
   // N - Last input is the function.
   public Node ctl() { return in(CTL_IDX); }
   public Node mem() { return in(MEM_IDX); }
@@ -171,7 +172,7 @@ public class CallNode extends Node {
     // When do I do 'pattern matching'?  For the moment, right here: if not
     // already unpacked a tuple, and can see the NewNode, unpack it right now.
     if( !_unpacked &&           // Not yet unpacked a tuple
-        val(DSP_IDX) instanceof TypeStruct ts && // An arg collection
+        val(ARG_IDX+1) instanceof TypeStruct ts && // An arg collection
         ts.is_tup() ) {                          // A tuple
       // Find a tuple being passed in directly; unpack
       Node fun = popKeep(); // Pop off the function
