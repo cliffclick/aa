@@ -515,7 +515,7 @@ public class Parse implements Comparable<Parse> {
       }
     } else {
       scope = scope();          // Create in current scope
-      scope.stk().add_fld(tok,mutable,Env.ANY,badt);
+      scope.stk().add_fld(tok,Access.RW,Env.ANY,badt);
     }
 
     // Save across display load
@@ -874,7 +874,7 @@ public class Parse implements Comparable<Parse> {
           n = Util.eq(tok,"_")
             // Using a plain underscore for the field name
             ? new DynLoadNode(mem(),n,dynLoad(),bad).peep()
-            // Normal non-oper load
+            // Normal non-oper field load
             : new    LoadNode(mem(),n,tok,false,bad).peep();
         }
 
@@ -1108,7 +1108,12 @@ public class Parse implements Comparable<Parse> {
 
       // Load the resolve field from the display/scope structure.
       // Known normal identifier load, so always a "fresh" tvar.
-      return new LoadNode(mem(),dsp,tok,true,bad).peep();
+      Node ld = new LoadNode(mem(),dsp,tok,true,bad).peep();
+      // Assume always Fresh for now, even for recursive defs.
+      // The extra Fresh can be removed after the scope closes
+      // and gets the mutual-let-rec fields sorted out.
+      Node frsh = new FreshNode(ld,_e).peep();
+      return frsh;
     }
   }
 
@@ -1137,7 +1142,7 @@ public class Parse implements Comparable<Parse> {
     keep(nn);
     nn.add_fld(TypeFld.CLZ,Access.Final, PrimNode.PCLZ, null);
     _tuple(oldx,s,bad,nn,0);
-    Node ptr = new NewNode("NEW").init();
+    Node ptr = new NewNode("TUPLE").init();
     Node nn0 = unkeep(nn).peep(); assert nn0==nn;
     mem(new StoreXNode(mem(),keep(ptr),nn0,bad).peep());
     return unkeep(ptr);
@@ -1164,7 +1169,7 @@ public class Parse implements Comparable<Parse> {
    *    id [:type] [amod [expr]]  // missing amod defaults to "id := 0"; missing expr defaults to "0"
    */
   private Node struct() {
-    int oldx = _x-1, pidx;      // Opening @{
+    int oldx = _x-1;            // Opening @{
     try( Env e = new Env(_e, null, 0, ctrl(), mem(), _e._scope.ptr(), null) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
       stmts(true);              // Create local vars-as-fields

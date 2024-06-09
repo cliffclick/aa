@@ -13,7 +13,7 @@ import com.cliffc.aa.util.Util;
 import static com.cliffc.aa.AA.TODO;
 import static com.cliffc.aa.type.TypeFld.Access;
 
-// Store a value into a named struct field.  Does it's own nil-check and value
+// Store a value into a named struct field.  Does its own nil-check and value
 // testing; also checks final field updates.
 public class StoreNode extends StoreAbs {
   final String _fld;

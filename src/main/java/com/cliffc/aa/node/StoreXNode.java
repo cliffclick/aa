@@ -52,7 +52,7 @@ public class StoreXNode extends StoreAbs {
   @Override boolean _is_live( TypeStruct live ) {  return live!=TypeStruct.UNUSED; }
 
   @Override boolean st_st_check( StoreAbs sta ) {
-    return sta instanceof StoreXNode st;
+    return sta instanceof StoreXNode;
   }
 
   @Override boolean ld_st_check(StoreAbs st) { throw AA.TODO(); }
