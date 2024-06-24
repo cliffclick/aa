@@ -1,10 +1,8 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
-import com.cliffc.aa.Combo;
-import com.cliffc.aa.Env;
-import com.cliffc.aa.ErrMsg;
-import com.cliffc.aa.tvar.*;
+import com.cliffc.aa.*;
+import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.TVLeaf;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.util.*;

@@ -173,9 +173,10 @@ public abstract class PrimNode extends Node {
     // Loop, setting initial types for all primitives
     Node n0;
     while( (n0=Env.GVN.pop_flow())!= null ) {
+      Type old = n0._val;
       n0.xval();
       n0.xliv();
-      if( n0.has_tvar() && n0.unify(false) ) {
+      if( old!=n0._val || (n0.has_tvar() && n0.unify(false)) ) {
         n0.add_flow_defs();
         n0.add_flow_uses();
       }
@@ -201,11 +202,10 @@ public abstract class PrimNode extends Node {
 
   // Make a fresh HMT wrapped int
   private static final String[] ss  = new String[]{TypeFld.CLZ,TypeFld.PRIM};
-  static TVPtr IINT (TypeInt ti) { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PINT.tvar(),new TVBase(ti)},false)); }
-  static TVPtr IBOOL() { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PINT.tvar(),new TVBase(TypeInt. BOOL )},false)); }
-  static TVPtr  IFLT() { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.tvar(),new TVBase(TypeFlt. FLT64)},false)); }
-  static TVPtr INFLT() { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.tvar(),new TVBase(TypeFlt.NFLT64)},false)); }
-  static TVPtr INIL() { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PNIL.tvar().fresh(),new TVBase(TypeNil. NIL  )},false)); }
+  static TVPtr IINT(TypeInt ti) { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PINT.tvar(),new TVBase(ti)},false)); }
+  static TVPtr IFLT(TypeFlt tf) { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.tvar(),new TVBase(tf)},false)); }
+  //static TVPtr INFLT() { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.tvar(),new TVBase(TypeFlt.NFLT64)},false)); }
+  static TVPtr INIL(          ) { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PNIL.tvar().fresh(),new TVBase(TypeNil.NIL)},false)); }
 
 
   // Used for test cases; changes the golden-rule expected alias/fidx based on
@@ -347,16 +347,18 @@ public abstract class PrimNode extends Node {
   // Wrap the PrimNode basic Type in a TMP->TS(.=ZINT, _=t).
   // Basically convert a `int` to a `Integer`
   public static TypeNil wrap( Type t ) {
-    return switch( t ) {
-      case TypeInt ti -> ti.wrap();
-      case TypeFlt tf -> tf.wrap();
-      case TypeNil tn -> tn;
-      default -> throw TODO();
-    };
+    //return switch( t ) {
+    //  case TypeInt ti -> ti.wrap();
+    //  case TypeFlt tf -> tf.wrap();
+    //  case TypeNil tn -> tn;
+    //  default -> throw TODO();
+    //};
+    return (TypeNil)t;
   }
   public static TypeNil unwrap( Type t ) {
-    if( !(t instanceof TypeMemPtr tmp) ) return null;
-    return (TypeNil)tmp._obj.at(TypeFld.PRIM);
+    //if( !(t instanceof TypeMemPtr tmp) ) return null;
+    //return (TypeNil)tmp._obj.at(TypeFld.PRIM);
+    return t instanceof TypeNil ta ? ta : null;
   }
 
 
@@ -385,14 +387,14 @@ public abstract class PrimNode extends Node {
 
   // Make a TV3
   public static TV3 wrap_base(Type rez) {
-    if( rez == TypeInt. INT64 )  return  IINT(TypeInt.INT64);
-    if( rez == TypeInt. TRUE  )  return  IINT(TypeInt.TRUE );
-    if( rez == TypeInt. BOOL  )  return IBOOL();
-    if( rez == TypeFlt. FLT64 )  return  IFLT();
-    if( rez == TypeFlt.NFLT64 )  return INFLT();
-    if( rez == TypeNil.NIL    )  return  INIL();
-    if( rez == TypeNil.SCALAR )  return  new TVLeaf();
+    if( rez == TypeNil.SCALAR )  return new TVLeaf();
     if( rez == TypeNil.XSCALAR || rez == TypeNil.XNIL )  return new TVPtr( BitsAlias.make0(0), new TVStruct(true) );
+    if( rez instanceof TypeInt ti ) return IINT(ti);
+    if( rez instanceof TypeFlt tf ) return IFLT(tf);
+    if( rez == TypeNil.NIL        ) return INIL();
+    //if( rez == TypeInt. TRUE  )  return  IINT(TypeInt.TRUE );
+    //if( rez == TypeInt. BOOL  )  return IBOOL();
+    //if( rez == TypeFlt.NFLT64 )  return INFLT();
     throw TODO();
   }
 

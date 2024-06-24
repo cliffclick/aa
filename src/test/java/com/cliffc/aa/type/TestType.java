@@ -45,7 +45,7 @@ public class TestType {
       "3",                      // Simple primitive int
       "int64",                  // Simple primitive range
       "123",                    // Class integer
-      "int:123",                // Wrapped integer
+      //"int:123",                // Wrapped integer
       "nint8",                  // Class integer range
       "3.14",                   // Simple primitive flt
       "flt32",                  // Simple primitive range

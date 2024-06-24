@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.Combo;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.*;
@@ -7,7 +8,6 @@ import com.cliffc.aa.type.*;
 
 import java.util.HashSet;
 
-import static com.cliffc.aa.AA.*;
 
 // Does a normal load, except the field label is inferred.
 //
@@ -35,14 +35,36 @@ public class DynLoadNode extends LoadNode {
 
   @Override public String label() { return "._"; }   // Self short name
 
-  public Node dyn() { return in(ARG_IDX); }
+  public Node dyn() { return in(AA.ARG_IDX); }
 
-  @Override Type lookup( TypeStruct ts, TypeMem mem ) {
+  @Override public final Type value() {
+    // (2) Good memory or exit
+    Type tmem = mem()._val;
+    if( !(tmem instanceof TypeMem mem) )
+      return tmem.oob(); // Not a memory
+
+    Type tadr = adr()._val;
+    switch( tadr ) {
+    case TypeMemPtr ptr :  return lookup(mem.ld(ptr));
+    case TypeStruct over:  return lookup(over);
+    case TypeFunPtr tfp: throw AA.TODO(); // Always an error
+    case TypeInt ti: throw AA.TODO(); // Surely an error
+    case TypeFlt tf: throw AA.TODO(); // Surely an error
+    case TypeNil tn:
+      if( tn==TypeNil.NIL || tn==TypeNil.XNIL ) throw AA.TODO(); // Surely an error
+      return tn;
+    case Type simple:
+      assert simple.getClass()==Type.class;
+      return simple;
+    }
+  }
+
+  Type lookup( TypeStruct ts ) {
     // Still resolving, dunno which field yet
     if( Combo.pre() ) {
       Type t = ts._def;
       for( TypeFld tf : ts )
-        t = t.meet( lookup(ts,mem,tf._fld) );
+        t = t.meet( tf._t );
       return t;
     }
 
@@ -52,7 +74,7 @@ public class DynLoadNode extends LoadNode {
     Type t = TypeNil.XSCALAR;
     if( dyn().tvar() instanceof TVDynTable dyn )
       for( String label : _resolves )
-        t = t.meet(lookup(ts,mem,label));
+        t = t.meet(ts.at_def(label));
     return t;
   }
 

@@ -355,7 +355,6 @@ public class TypeMem extends Type<TypeMem> {
   // --------------------------------------------------------------------------
   // Sharpen a dull pointer against this memory.
   public TypeMemPtr sharpen( TypeMemPtr dull ) {
-    assert !dull.is_prim();
     if( _sharp_cache != null ) { // Check the cache first
       TypeMemPtr sharp = _sharp_cache.get(dull._aliases);
       if( sharp != null ) return sharp;
@@ -407,7 +406,7 @@ public class TypeMem extends Type<TypeMem> {
   void _dull( Type dull, final HashMap<BitsAlias,TypeMemPtr> dull_cache ) {
     if( !(dull instanceof Cyclic) ) return; // Nothing to sharpen
     // Check caches and return
-    if( dull instanceof TypeMemPtr tmp && !tmp.is_prim() ) {
+    if( dull instanceof TypeMemPtr tmp ) {
       BitsAlias aliases = tmp._aliases;
       if( sharp_get(aliases) != null ) return;
       if( dull_cache.get(aliases) != null ) return;
@@ -434,7 +433,7 @@ public class TypeMem extends Type<TypeMem> {
   private static TypeMemPtr _is_sharp(Type t) {
     if( DULLV.tset(t._uid) ) return null;
     if( !(t instanceof Cyclic) ) return null;
-    if( t instanceof TypeMemPtr tmp && !tmp.is_prim() ) return tmp;
+    if( t instanceof TypeMemPtr tmp ) return tmp;
     return t.walk((fld,ignore) -> _is_sharp(fld), (x,y)-> x==null ? y : x);
   }
 
@@ -451,15 +450,10 @@ public class TypeMem extends Type<TypeMem> {
     if( !(dull instanceof Cyclic) ) return dull; // Nothing to sharpen
     Type t;
     if( dull instanceof TypeMemPtr tmp ) {
-      if( !tmp.is_prim() ) {
-        t = sharp_get(tmp._aliases);
-        if( t !=null ) return t;
-        t = dull_cache.get(tmp._aliases);
-        if( visit.tset(t._uid) ) return t;
-      } else {
-        assert tmp.is_prim();
-        return dull;
-      }
+      t = sharp_get(tmp._aliases);
+      if( t !=null ) return t;
+      t = dull_cache.get(tmp._aliases);
+      if( visit.tset(t._uid) ) return t;
     } else if( dull instanceof TypeStruct dullts ) {
       t = dullts.copy2();
     } else {

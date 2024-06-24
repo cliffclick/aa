@@ -71,10 +71,6 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   @Override PENV _str0( PENV P ) {
     if( _any ) P.p('~');
     // Shortcut for printing boxed primitives
-    if( is_prim() && _aliases==BitsAlias.EMPTY ) {
-      if( _obj.at(0)==INTPTR ) return _obj.at(1)._str(P.p("int:"));
-      if( _obj.at(0)==FLTPTR ) return _obj.at(1)._str(P.p("flt:"));
-    }
     if( is_clz_ptr() ) return P.p("*CLZ");
     P.p('*');
     if( P.debug ) _aliases.str(P.sb);
@@ -172,7 +168,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
 
   @Override protected TypeMemPtr xdual() {
     BitsAlias ad = _aliases.dual();
-    TypeStruct od = _obj.dual();
+    TypeStruct od = _obj._dual;
     boolean xor = _nil == _sub;
     return malloc(!_any,_nil^xor,_sub^xor,ad,od);
   }
@@ -281,12 +277,8 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   }
 
   @Override public Type sharptr2( TypeMem mem ) {
-    if( is_prim() )
-      return this;
-
     return mem.sharpen(this);
   }
-  public boolean is_prim() { return _obj.is_prim(); }
 
   @Override BitsFun _all_reaching_fidxs( TypeMem tmem) {
     BitsFun fidxs = BitsFun.EMPTY;

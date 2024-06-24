@@ -33,6 +33,24 @@ import static com.cliffc.aa.AA.*;
 //   If loading a TMP, load again to a TS and Bind deep, returning a deep TMP.
 
 
+/*
+----------------------------------
+Again?
+
+Load Address is:
+INT/FLT/NIL - flip to appropriate clazz
+TMP - assert shallow
+ - Lookup in Memory.
+ - - Hit in Struct, return loaded value.
+ - - Hit in Struct Clazz
+ - - - If fcn, assert unbound and bind
+ - - - If TMP, assert all unbound fcns, and bind, and return Struct
+ Struct
+ - Just a field select, return selected field.
+ - Can assert fcns are pre-bound
+ */
+
+
 public class LoadNode extends Node {
   // Field being loaded from a TypeStruct.  If "_", the field name is inferred
   // from amongst the field choices.  If not present, then error.
@@ -63,93 +81,107 @@ public class LoadNode extends Node {
   Node adr() { return in(DSP_IDX); }
   private Node set_mem(Node a) { return setDef(MEM_IDX,a); }
 
-  @Override public final Type value() {
-    Type tadr = adr()._val;
+  @Override public Type value() {
+    // (1) ADR is a TT, just a pre-bound overload, just field select
+    // and return; can assert fcns pre-bound
+    // (2) Good memory or exit
+    // (3) Good ADR (not a type-nil or fcn) or exit
+    // (4) If ADR is TMP
+    //     - Assert simple
+    //     - Lookup memory, get a TS
+    //     - If lookup field in TS, return loaded value
+    //     - Else switch to TS CLAZZ
+    // (5) If ADR is INT,FLT,NIL, switch to CLAZZ
+    // (6) Lookup in CLAZZ; if miss then miss
+    // (7) - If function, bind (assert unbound)
+    // (8) - If struct, return TT(ADR,struct)
+
+    // (2) Good memory or exit
     Type tmem = mem()._val;
-
-    if( !(tadr instanceof TypeNil ta) || (tadr instanceof TypeFunPtr) )
-      return tadr.oob(); // Not an address
-    if( !(tmem instanceof TypeMem tm) )
+    if( !(tmem instanceof TypeMem mem) )
       return tmem.oob(); // Not a memory
-    // Treat NIL like a wrapped nil clazz
-    if( ta==TypeNil.NIL || ta==TypeNil.XNIL )
-      ta = (TypeMemPtr)PrimNode.PNIL._val;
 
-    // Load the matching struct from memory / deep ptr
-    TypeStruct ts = ta instanceof TypeMemPtr tmp && !tmp.is_simple_ptr()
-      ? tmp._obj                // Primitives are not-simple
-      : tm.ld(ta);
+    Type tadr = adr()._val;
+    Type miss = null;
+    TypeMemPtr pclz = null;
+    switch( tadr ) {
+    case TypeMemPtr ptr: {
+      // (4) If ADR is TMP
+      //     - Assert simple
+      //     - Lookup memory, get a TS
+      //     - If lookup field in TS, return loaded value
+      //     - Else switch to TS CLAZZ
+      assert ptr.is_simple_ptr();
+      TypeStruct ts = mem.ld(ptr);
+      // Load here looks once here at _fld, then again in clazz
+      // DynLoad looks across all _flds and all clazz fields and can not "miss".
+      int idx = ts.find(_fld);
+      if( idx != -1 ) return ts.at(idx); // Hit, return
 
-    // Field lookup, might check superclass.
-    // DynLoads check all fields.
-    Type t = lookup(ts,tm);
+      if( ts.len()==0 || !Util.eq(ts.fld(0)._fld,TypeFld.CLZ) )
+        return missField(ts._def);
+      pclz = (TypeMemPtr)ts.fld(0)._t;
+      miss = ts._def;           // Fail type
+      break;
+    }
+    case TypeStruct over: {
+      // (1) ADR is a TS, just a pre-bound overload, just field select
+      // and return; can assert fcns pre-bound
+      int idx = over.find(_fld);
+      return idx != -1 ? over.at(idx) : missField(over._def);
+    }
+    case TypeFunPtr tfp: throw AA.TODO(); // Always an error
+    case TypeInt ti: pclz = (TypeMemPtr)PrimNode.PINT._val; break;
+    case TypeFlt tf: pclz = (TypeMemPtr)PrimNode.PFLT._val; break;
+    case TypeNil tn:
+      if( tn==TypeNil.SCALAR || tn==TypeNil.XSCALAR ) return tn;
+      pclz = (TypeMemPtr)PrimNode.PNIL._val;
+      break;
 
-    // See if binding to the display:
-    // If a deep (and not primitive) pointer, it has already been bound
-    TypeNil dsp = ta instanceof TypeMemPtr tmp && !tmp.is_simple_ptr() && !tmp.is_prim() ? null : ta;
+    case Type simple:
+      assert simple.getClass()==Type.class;
+      return simple;
+    }
 
-    // Optionally bind Display
-    return value_bind(t, tm, dsp, true);
+    TypeStruct clz = mem.ld(pclz);
+    int idx = clz.find(_fld);
+    if( idx== -1 ) return missField(miss==null ? clz._def : miss);
+    // Class loaded constant field
+    Type x = clz.at(idx);
+    // (7) - If function, bind (assert unbound)
+    // (8) - If struct, return TT(ADR,struct)
+    return value_bind(x,mem,(TypeNil)tadr,true);
   }
 
-  private Type value_bind( Type t, TypeMem tm, TypeNil dsp, boolean over ) {
+  private static Type missField(Type defalt) {
+    return defalt.above_center()  ? TypeNil.XSCALAR // Might fall to having field
+      // Return worse possible escaped scalar
+      : Env.ROOT.ext_scalar(null);
+  }
+
+  private Type value_bind( Type t, TypeMem mem, TypeNil dsp, boolean over ) {
     // t is high - might fall to TFP or TMP or neither, no binding (yet)
     if( t.above_center() )
       return t;
 
     // t is TFP  - assert input does NOT transit unbound->bound.  If unbound bind, else no-op.
     if( t instanceof TypeFunPtr tfp ) {
-      if( dsp == null ) return tfp; // No display to bind
-      if( tfp.has_dsp() ) return tfp; // Already bound, no double-binding
+      assert dsp!=null;
+      assert !tfp.has_dsp();
       // Bind
       return tfp.make_from(dsp);
     }
 
     // t is TMP  - Bind recursively one-step, else treat as lo
-    if( t instanceof TypeMemPtr tmp && !tmp.is_prim() && over ) {
+    if( t instanceof TypeMemPtr tmp && over ) {
       assert tmp.is_simple_ptr();
-      TypeStruct ts = tm.ld(tmp);
+      TypeStruct ts = mem.ld(tmp);
       TypeFld[] flds = TypeFlds.get(ts.len());
       for( int i=0; i<flds.length; i++ )
-        flds[i] = ts.fld(i).make_from(value_bind(ts.fld(i)._t,tm,dsp,false));
-      return tmp.make_from(ts.make_from(flds));
+        flds[i] = ts.fld(i).make_from(value_bind(ts.fld(i)._t,null,dsp,false));
+      return ts.make_from(flds);
     }
-
-    // t is lo (or TMP 2steps deep) - no-op/pass-thru
     return t;
-  }
-
-  // Lookup and return field type.
-  // If no field, be conservative.
-  Type lookup( TypeStruct ts, TypeMem mem ) {
-    return lookup(ts,mem,_fld);
-  }
-
-  static Type lookup( TypeStruct ts, TypeMem mem, String fld ) {
-    Type t = _lookup(ts,mem,fld);
-    if( t!=null ) return t;     // Got it
-    if( ts._def.above_center() ) return Type.ANY; // Might fall to having field
-    // Return worse possible escaped scalar
-    return Env.ROOT.ext_scalar(null);
-  }
-
-  // Field lookup, might recursively check superclass.
-  // Returns field type or null.
-  private static Type _lookup( TypeStruct ts, TypeMem mem, String fld ) {
-
-    // Check for direct field
-    int idx = ts.find(fld);
-    if( idx != -1 ) return ts.at(idx);
-
-    // Have a super class?
-    if( ts.len()==0 || !Util.eq(ts.fld(0)._fld,TypeFld.CLZ) )
-      return null;
-
-    // Miss on closed structs looks at superclass.
-    TypeNil ptr = (TypeNil)ts.fld(0)._t; // Load clazz ptr
-    // Load the clazz struct type from memory
-    ts = mem.ld(ptr);
-    return _lookup(ts,mem,fld);
   }
 
   // The only memory required here is what is needed to support the Load.

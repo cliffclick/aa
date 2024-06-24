@@ -1,4 +1,55 @@
 =======================================
+06/23/2024
+
+No AA last 2 weeks.  :-P
+
+Tried going deep on final fields; hit issues that NewNode needed to be deep,
+but can't see all fields at construction
+
+New Plan-
+Load Address is:
+INT/FLT/NIL - flip to appropriate clazz
+TMP - assert shallow
+ - Lookup in Memory.
+ - - Hit in Struct, return loaded value.
+ - - Hit in Struct Clazz
+ - - - If fcn, assert unbound and bind
+ - - - If TMP, assert all unbound fcns, and bind, and return Struct
+ Struct
+ - Just a field select from overload, return selected field.
+ - Can assert fcns are pre-bound
+
+
+
+=======================================
+06/10/2024
+
+Worked like 1 day last week.  :-P
+Back to Parse (still).
+Running TestStable up until a serious function call... now need Fresh and PartialScope.
+
+Can run AST/Parse side-by-side and see the missing Nodes.
+Need to insert some placeholder (Fresh, All Scope?)
+in all places, so don't lose any Ident users (LoadNode def) -
+and THEN the Real Work begins:
+- Walk the Scope, look for FRefs in cycles.
+- Topo sort, merging cycles into a single "LetRec"
+- Swap out existing Fresh for corrected Fresh/PartialScope
+
+
+=======================================
+06/02/2024
+
+Unwind AST-Parse.
+
+Back to Parse.  Insert too many Fresh.
+At close of scope, check for frefs.
+If frefs, topo-sort, cycle search.
+Reorder scope vars.
+Insert PartialScopeFresh over Fresh for things used after def.
+
+
+=======================================
 06/01/2024
 
 The Big Nil Question.
@@ -13,7 +64,7 @@ So I can Load "!_".
 Means e.g. it has a NIL class ???
   *[0]{ ^=*[]{NILCLZ}, _=TypeNil.NIL }
 
-
+Heh, appears to be working, crazy eh?
 
 =======================================
 05/03/2024

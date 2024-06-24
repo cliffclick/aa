@@ -1,7 +1,6 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.AA;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVPtr;
 import com.cliffc.aa.tvar.TVStruct;

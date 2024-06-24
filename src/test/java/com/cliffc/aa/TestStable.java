@@ -9,55 +9,56 @@ public class TestStable {
   // Basic tests not requiring overloads - which avoids all operators.
   @Test public void testBasic() {
     // Simple number parsing
-    test("1", "int:1", "int:1");
+    test("1", "1", "int:1");
     // Simple field create
-    test("x=1;x","int:1","int:1");
-    test("x=1;y=2; x","int:1","int:1");
+    test("x=1;x","1","int:1");
+    test("x=1;y=2; x","1","int:1");
     // Struct define and field lookup
-    test("a=@{x=1.2;y;}; a.x", "flt:1.2", "flt:1.2"); // standard "." field naming; trailing semicolon optional
+    test("a=@{x=1.2;y;}; a.x", "1.2", "flt:1.2"); // standard "." field naming; trailing semicolon optional
     // Function call without parens
-    test("math.rand 2","int:int64","int:int64");
+    test("math.rand 2","int64","int:int64");
     // Function call with parens
-    test("math.rand(2)","int:int64","int:int64");
+    test("math.rand(2)","int64","int:int64");
     // Mixing nil and float
-    test("{ x y -> x.sin() * !y }(3.3,5)","flt:-0.0f","flt:-0.0f");
+    test("{ x y -> x.sin() * !y }(3.3,0)","-0.1577456941432482","flt:-0.1577456941432482");
   }
 
   @Test public void testNil() {
     test("0", "nil", "nil:nil");
-    test("!0", "int:1", "int:1");
-    test("0+3.3","flt:3.3f","flt:3.3");
+    test("!0", "1", "int:1");
+    test("0+3.3","3.3f","flt:3.3");
   }
 
   @Test public void testStatements() {
     // Statements
-    test("(1;2 )", "int:2", "int:2");
-    test("(1;2;)", "int:2", "int:2"); // final semicolon is optional
-    test("1._+_._(2;3)", "int:4", "int:4"); // statements in arguments
+    test("(1;2 )", "2", "int:2");
+    test("(1;2;)", "2", "int:2"); // final semicolon is optional
+    test("1._+_._(2;3)", "4", "int:4"); // statements in arguments
   }
 
   // Test primitive math, and loading overloads from primitives.
   @Test public void testOverPrim() {
+    //test("q=(2,3.14); (!q._,q._.sin())","*[21](_, int:int1, flt:flt64)","*[21](_,int:int1,flt:flt64)", null, null, "[4,21]", null);
     // Unary operator
     test("!1", "nil", "nil:nil");
 
     // Binary with precedence check
-    test(" 1+2 * 3+4 *5", "int:27", "int:27");
+    test(" 1+2 * 3+4 *5", "27", "int:27");
 
     // Mixed int/float with conversion
-    test("1+2.3", "flt:3.3", "flt:3.3");
+    test("1+2.3", "3.3", "flt:3.3");
 
     // Function application, traditional paren/comma args
-    test("1._+_._(2)", "int:3", "int:3" );
+    test("1._+_._(2)", "3", "int:3" );
 
     // Parsed as +(1,(2*3))
-    test("1._+_._(2 * 3) ", "int:7", "int:7");
+    test("1._+_._(2 * 3) ", "7", "int:7");
 
     // Simpler overload tests
     test("!(2,3.14)._","nil","nil:nil", null, null, null, null);
-    test("(2,3.14)._.sin()","flt:0.0015926529164868282","flt:0.0015926529164868282", null, null, null, null);
+    test("(2,3.14)._.sin()","0.0015926529164868282","flt:0.0015926529164868282", null, null, null, null);
     // Two DynLoads, no Fresh
-    test("q=(2,3.14); (!q._,q._.sin())","*[21](_, int:int1, flt:flt64)","*[21](_,int:int1,flt:flt64)", null, null, "[4,21]", null);
+    test("q=(2,3.14); (!q._,q._.sin())","*[21](_, int1, flt64)","*[21](_,int:int1,flt:flt64)", null, null, "[4,21]", null);
   }
 
   // More complex overload tests

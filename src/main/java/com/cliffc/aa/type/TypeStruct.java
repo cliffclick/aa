@@ -267,7 +267,6 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   public static TypeStruct make_test( Type def, Type clz, TypeFld fld0, TypeFld fld1 ) {
     return make(false,def,TypeFlds.make(TypeFld.make_clz(clz),fld0,fld1));
   }
-  public boolean is_prim() { return _flds.length==2 && _flds[0].is_clz() && _flds[1].is_prim(); }
 
   // Add a field to an under construction TypeStruct; _flds is not interned.
   public TypeStruct add_fld( TypeFld fld ) {
@@ -769,8 +768,6 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
 
   @Override public boolean is_con(BitsAlias pass) {
     if( !_def.is_con(pass) ) return false;
-    if( is_prim() )
-      return _flds[1].is_con(pass);
     for( TypeFld fld : _flds )
       if( !fld.is_con(pass) )
         return false;

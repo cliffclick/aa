@@ -37,7 +37,7 @@ public class RootNode extends Node {
   public TypeMem primMem() { return (TypeMem)val(ARG_IDX); }
 
   TypeMem rmem(Node dep) {
-    deps_add(dep);
+    deps_add_live(dep);
     return _val instanceof TypeTuple tt ? (TypeMem)tt.at(MEM_IDX) : TypeMem.ALLMEM.oob(_val.above_center());
   }
   Type rrez() {
@@ -97,7 +97,7 @@ public class RootNode extends Node {
         // If Call is calling an externally defined function then all args escape
         if( call.tfp()._fidxs.overlaps(BitsFun.EXT) ) {
           for( int j=DSP_IDX; j<call.nargs(); j++ ) {
-            call.arg(j).deps_add(this);
+            call.arg(j).deps_add_live(this);
             escs = _add_all(escs,awork,fwork,call.arg(j)._val);
           }
         }

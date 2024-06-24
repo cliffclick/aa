@@ -191,7 +191,7 @@ abstract public class TV3 implements Cloneable {
     _union_impl(that); // Merge subclass specific bits into that
     progress |= that.widen(_widen,false);
     assert _INIT0_CNT==99999 || that._uid >= _INIT0_CNT || !progress; // no updates to primitives
-    assert _INIT0_CNT==99999 ||      _uid >= _INIT0_CNT; // no unify primitive away
+    assert _INIT0_CNT==99999 ||      _uid >= _INIT0_CNT || that._uid < _INIT0_CNT; // no unify primitive away
 
     // Add Node updates to _work_flow list
     that._union_deps(this);
@@ -696,9 +696,6 @@ abstract public class TV3 implements Cloneable {
       }
       yield new TVStruct(ss,tvs,ts._def==Type.ALL);
     }
-    case TypeInt ti -> new TVBase(ti);
-    case TypeFlt tf -> new TVBase(tf);
-
     case TypeNil tn -> PrimNode.wrap_base(tn);
 
     case Type tt -> {

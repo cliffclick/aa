@@ -28,23 +28,23 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
     DO_GCP=true;
-    DO_HMT=true;
+    DO_HMT=false;
     RSEED=0;
 
-
-    // A,B,C are mutually recursive identity functions
-    // D calls B or C with ints.
-    // final struct calls C with floats
-    test(
-"""
-A = { x -> math.rand(2) ? B(x) : x };
-D = {   -> math.rand(2) ? B(1) : C(2) };
-C = { x -> A(x) };
-B = { x -> C(x) };
-( D(), C(3.14) )
-
-""",
-         "*[24]( _, 0=PA:*[]@{^=*[6,7](...); _=%[6,7][]; $nil}?, 1=PA, ...)","*[24]( _, int:nint8, flt:3.14)",null,null,"[4,24]",null);
+    test("fcn = {(@{a=1;},@{b=2;})._}; (fcn().a, fcn().b)", "*[24]( _, %[2,4,24][2]?, %[2,4,24][2]?, ...)", "*[24](_, int:1,int:2)", null, null, "[4,24]", null);
+//    // A,B,C are mutually recursive identity functions
+//    // D calls B or C with ints.
+//    // final struct calls C with floats
+//    test(
+//"""
+//A = { x -> math.rand(2) ? B(x) : x };
+//D = {   -> math.rand(2) ? B(1) : C(2) };
+//C = { x -> A(x) };
+//B = { x -> C(x) };
+//( D(), C(3.14) )
+//
+//""",
+//         "*[24]( _, 0=PA:*[]@{^=*[6,7](...); _=%[6,7][]; $nil}?, 1=PA, ...)","*[24]( _, int:nint8, flt:3.14)",null,null,"[4,24]",null);
   }
 
   static private void assertTrue(boolean t) {
