@@ -65,7 +65,7 @@ public class TestStable {
   @Test public void testOver() {
     // testOver5.aa, One DynLoad, fcn needs DynTable
     // Returning choice of structs and field selecting from it.
-    test("fcn = {(@{a=1;},@{b=2;})._}; (fcn().a, fcn().b)", "*[24]( _, %[2,4,24][2]?, %[2,4,24][2]?, ...)", "*[24](_, int:1,int:2)", null, null, "[4,24]", null);
+    test("fcn = {(@{a=1;},@{b=2;})._}; (fcn().a, fcn().b)", "*[24]( _, 1, 2)", "*[24](_, int:1,int:2)", null, null, "[4,24]", null);
 
     // testOver6.aa, One DynLoad, fcn needs DynTable
     // Passing choice of structs and field selecting from it.

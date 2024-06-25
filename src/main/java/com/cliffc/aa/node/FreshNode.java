@@ -3,7 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVLeaf;
-import com.cliffc.aa.tvar.TVStruct;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFunPtr;
 import com.cliffc.aa.type.TypeNil;
@@ -16,16 +15,27 @@ public class FreshNode extends Node {
   // forward-refs.
   public TV3[] _nongen;   // Set of visible non-generative type vars
 
+  // Asking for a non-gen of self; never makes a fresh
+  private final boolean _copy;
+
   public FreshNode( Node id, Env e ) {
     super(id);
     // Copy the set of NONGEN variables in the current lexical tree
+    boolean copy = false;
     for( ; e!=null; e=e._par ) {
       StructNode stk = e._scope.stk();
-      for( int i=0; i<stk._nargs; i++ )
+      for( int i=0; i<stk._nargs; i++ ) {
+        if( stk.in(i)==id )
+          copy=true;
         addDef(stk.in(i));
+      }
     }
+    _copy = copy;
   }
-  public FreshNode( Node id ) { super(id); }
+  public FreshNode( Node id ) {
+    super(id);
+    _copy=false;
+  }
 
   @Override public String label() { return "Fresh"; }
   public Node id() { return in(0); } // The HM identifier
@@ -44,6 +54,8 @@ public class FreshNode extends Node {
     if( _val.is_con(NewNode.CONS) && !(_val instanceof TypeFunPtr) )
       return _val==TypeNil.XNIL ? new ConNode(_val).init() : id();
 
+    if( _copy )
+      return id();
     return null;
   }
 

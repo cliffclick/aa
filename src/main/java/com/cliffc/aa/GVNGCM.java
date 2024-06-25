@@ -128,7 +128,7 @@ public class GVNGCM {
       else break;
       if( m == null ) ITER_CNT_NOOP++;     // No progress profiling
       else n.deps_work_clear();            // Progress; deps on worklist
-      //assert NodeUtil.more_work(Env.ROOT) == 0;
+      assert NodeUtil.more_work(Env.ROOT) == 0;
       //assert NodeUtil.no_more_ideal(Env.ROOT);
       assert !NodeUtil.leak();
     }

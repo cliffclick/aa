@@ -115,6 +115,9 @@ public class Env implements AutoCloseable {
     _fun = fun;
     StructNode dsp = fref==null ? new StructNode(nargs,false,null) : fref;
     dsp.add_fld("^",TypeFld.Access.Final,dsp_ptr,null).init();
+    // Root defines $dyn
+    if( par!=null && par._par==null )
+      dsp.add_fld("$dyn", TypeFld.Access.Final,new DefDynTableNode().init(),null);
     NewNode ptr = new NewNode(fun==null ? "STRUCT" : "FRAME",BitsAlias.new_alias(),par==null).init();
     mem = new StoreXNode(mem,ptr,dsp,null).init();
     // Install a top-level prototype mapping

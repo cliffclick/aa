@@ -213,8 +213,6 @@ public class Parse implements Comparable<Parse> {
     _lines = new AryInt();//
     _lines.push(0);       // Line 0 at offset 0
     _keeps = new Ary<>(Node.class);
-    StructNode stk = scope().stk();
-    stk.add_fld("$dyn",Access.Final,new DefDynTableNode().init(),null);
   }
 
   // Debugging hook
@@ -1123,7 +1121,9 @@ public class Parse implements Comparable<Parse> {
     // Display/struct/scope containing the field
     Node dsp = get_display_ptr(scope);
     // Load the resolve field from the display/scope structure
-    return new LoadNode(mem(),dsp,"$dyn",true,null).peep();
+    Node ld = new LoadNode(mem(),dsp,"$dyn",true,null).peep();
+    Node frsh = new FreshNode(ld,_e).peep();
+    return frsh;
   }
   private AFieldNode dynCall() {
     Node ld = dynLoad();
