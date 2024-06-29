@@ -19,14 +19,14 @@ public class TestStable {
     test("math.rand 2","int64","int:int64");
     // Function call with parens
     test("math.rand(2)","int64","int:int64");
-    // Mixing nil and float
-    test("{ x y -> x.sin() * !y }(3.3,0)","-0.1577456941432482","flt:-0.1577456941432482");
   }
 
   @Test public void testNil() {
     test("0", "nil", "nil:nil");
     test("!0", "1", "int:1");
     test("0+3.3","3.3f","flt:3.3");
+    // Mixing nil and float
+    test("{ x y -> x.sin() * !y }(3.3,0)","-0.1577456941432482","flt:-0.1577456941432482");
   }
 
   @Test public void testStatements() {
@@ -38,7 +38,6 @@ public class TestStable {
 
   // Test primitive math, and loading overloads from primitives.
   @Test public void testOverPrim() {
-    //test("q=(2,3.14); (!q._,q._.sin())","*[21](_, int:int1, flt:flt64)","*[21](_,int:int1,flt:flt64)", null, null, "[4,21]", null);
     // Unary operator
     test("!1", "nil", "nil:nil");
 

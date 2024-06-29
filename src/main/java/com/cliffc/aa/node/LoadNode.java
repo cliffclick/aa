@@ -118,9 +118,9 @@ public class LoadNode extends Node {
       int idx = ts.find(_fld);
       if( idx != -1 ) return ts.at(idx); // Hit, return
 
-      if( ts.len()==0 || !Util.eq(ts.fld(0)._fld,TypeFld.CLZ) )
+      if( ts.len()==0 || !Util.eq(ts.fld(0)._fld,TypeFld.CLZ) || !(ts.fld(0)._t instanceof TypeMemPtr tsclz) )
         return missField(ts._def);
-      pclz = (TypeMemPtr)ts.fld(0)._t;
+      pclz = tsclz;
       miss = ts._def;           // Fail type
       break;
     }
@@ -467,6 +467,7 @@ public class LoadNode extends Node {
 
     // struct is end-of-super-chain, miss_field
     //return tvar().unify_err(resolve_failed_msg(),tvar(0),null,test);
+    System.out.println(ptr);
     throw TODO();
   }
 

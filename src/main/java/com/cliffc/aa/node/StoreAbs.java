@@ -134,7 +134,7 @@ public abstract class StoreAbs extends Node {
   // Still until live-ness alives, then kill self
   private Node kill_rez_stall_till_live() {
     // No need for rez
-    if( rez()!=Env.ANY ) Env.GVN.add_reduce(setDef(3,Env.ANY));
+    if( rez()!=Env.ANY ) Env.GVN.add_reduce(setDef(3,Env.ANY)).add_work();
     // Remove when liveness aligns
     if( _live.isa(mem()._live) ) return mem();
     return null;
