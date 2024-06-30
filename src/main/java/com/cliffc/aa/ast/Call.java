@@ -32,7 +32,11 @@ public class Call extends AST {
     ScopeNode scope = e._scope;
     // Collect all arguments; must keep them alive
     Node[] args = new Node[_kids._len];
-    for( int i=ARG_IDX; i<_kids._len; i++ ) {
+    // Eval the function *first*, same as the main AA parser
+    _kids.last().nodes(e);
+    args[_kids._len-1] = scope.rez().keep();
+    // Args evaluated in order
+    for( int i=ARG_IDX; i<_kids._len-1; i++ ) {
       _kids.at(i).nodes(e);
       args[i] = scope.rez().keep();
     }
