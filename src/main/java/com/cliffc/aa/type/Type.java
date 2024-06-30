@@ -245,7 +245,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     _str_dups(P);
     P.visit.clr();
     String rez = _str(P).sb.toString();
-    // Uncomment to test bi-jections
+    // Uncomment to test bijections
     //Type t = _valueOf(rez);
     //assert t==this;
     return rez;
@@ -256,7 +256,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     _str_dups(P);
     P.visit.clr();
     String rez = _str(P).sb.toString();
-    // Uncomment to test bi-jections
+    // Uncomment to test bijections
     //Type t = _valueOf(rez);
     //assert t==this;
     return rez;
@@ -274,7 +274,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     if( _hash==0 ) P.p("!!!");
 
     // Some early cutouts for common bulky cases
-    if( this instanceof TypeStruct && this==TypeStruct.ISUSED ) return P.p("(...)"); // Shortcut for common case
+    if( this instanceof TypeStruct && this==TypeStruct.ISUSED ) return P.p("()"); // Shortcut for common case
 
     // Print a dups label, and optionally the type
     String s = P.dups.get(_uid);
@@ -780,6 +780,9 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
 
   // Make from existing type, replacing TMPs with alias from the map
   public Type make_from(Type head, TypeMem map, VBitSet visit) { return this; }
+
+  // Clamp ANY/ALL to SCALAR
+  public TypeNil clamp() { return oob(TypeNil.SCALAR); }
 
   static final VBitSet ARF = new VBitSet();
   public final BitsFun all_reaching_fidxs( TypeMem tmem) {

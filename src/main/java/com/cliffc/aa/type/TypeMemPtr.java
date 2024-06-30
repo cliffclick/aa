@@ -41,6 +41,11 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   }
 
   @Override long static_hash() { return Util.mix_hash(super.static_hash(),_aliases._hash); }
+  @Override long compute_hash() {
+    long hash = lwalk( (fld,str) -> (fld==null ? 0 : fld._cyc_hash) ^ str.hashCode(),
+                       (hash0,hash1) -> hash0 ^ hash1 );
+    return Util.mix_hash(hash,static_hash());
+  }
 
   // Static properties equals.  Already known to be the same class and
   // not-equals.  Ignore edges.
@@ -56,7 +61,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     if( !(o instanceof TypeMemPtr t2) ) return false;
     if( !super.equals(t2) ) return false;
     if( _aliases != t2._aliases ) return false;
-    return _obj == t2._obj || _obj.cycle_equals(t2._obj);
+    return _obj == t2._obj || (_obj!=null && t2._obj!=null && _obj.cycle_equals(t2._obj));
   }
 
   @Override public void _str_dups( PENV P ) {
@@ -65,7 +70,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
         P.dups.put(_uid,"P"+(char)('A'+P._tmp++));
       return;
     }
-    _obj._str_dups(P);
+    if( _obj!=null ) _obj._str_dups(P);
   }
 
   @Override PENV _str0( PENV P ) {
@@ -74,10 +79,10 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     if( is_clz_ptr() ) return P.p("*CLZ");
     P.p('*');
     if( P.debug ) _aliases.str(P.sb);
-    return _obj._str(P).p(_str_nil());
+    return _obj==null ? P.p("()") : _obj._str(P).p(_str_nil());
   }
 
-  @Override boolean _str_complex0(PENV P) { return _obj._str_complex(P); }
+  @Override boolean _str_complex0(PENV P) { return _obj!=null && _obj._str_complex(P); }
 
   boolean is_clz_ptr() { return this==Cons.CLZ_TMP; }
 
@@ -120,6 +125,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   }
 
   public static TypeMemPtr make( int alias, TypeStruct obj ) { return make(false,BitsAlias.make0(alias),obj); }
+  public static TypeMemPtr make_simple( int alias ) { return make(alias,null); }
   public static TypeMemPtr make_nil( int alias, TypeStruct obj ) { return make(true,BitsAlias.make0(alias),obj); }
   public TypeMemPtr make_from( TypeStruct obj ) { return _obj==obj ? this : malloc_from(obj).hashcons_free(); }
   public TypeMemPtr make_from( BitsAlias aliases ) { return _aliases==aliases ? this : make(aliases.test(0),aliases.clear(0),_obj); }
@@ -168,7 +174,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
 
   @Override protected TypeMemPtr xdual() {
     BitsAlias ad = _aliases.dual();
-    TypeStruct od = _obj._dual;
+    TypeStruct od = _obj==null ? null : _obj._dual;
     boolean xor = _nil == _sub;
     return malloc(!_any,_nil^xor,_sub^xor,ad,od);
   }
@@ -177,7 +183,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     // Meet of aliases
     TypeMemPtr ptr = (TypeMemPtr)t;
     BitsAlias aliases = _aliases.meet(ptr._aliases);
-    TypeStruct to = (TypeStruct)_obj.meet(ptr._obj);
+    TypeStruct to = _obj==null || ptr._obj==null ? null : (TypeStruct)_obj.meet(ptr._obj);
     boolean any = _any & ptr._any;
     boolean nil = _nil & ptr._nil;
     boolean sub = _sub & ptr._sub;
@@ -186,10 +192,9 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
 
   // Widens, not lowers.
   @Override public TypeMemPtr simple_ptr() {
-    if( _obj.len()==0 ) return this;
-    return make_from(_obj.oob(TypeStruct.ISUSED));
+    return _obj==null ? this : make_from((TypeStruct)null);
   }
-  public final boolean is_simple_ptr() { return _obj==TypeStruct.ISUSED; }
+  public final boolean is_simple_ptr() { return _obj==null; }
 
   public BitsAlias aliases() { return _aliases; }
 
@@ -297,9 +302,9 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
       if( alias== -1 ) return false;
       if( !cons.test(alias) ) return false;
     }
-    return _obj.is_con(cons);
+    return _obj!=null && _obj.is_con(cons);
   }
 
   // Used for assertions
-  @Override boolean intern_check1() { return _obj.intern_get()!=null; }
+  @Override boolean intern_check1() { return _obj==null || _obj.intern_get()!=null; }
 }

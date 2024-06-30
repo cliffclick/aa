@@ -433,7 +433,8 @@ public class TypeMem extends Type<TypeMem> {
   private static TypeMemPtr _is_sharp(Type t) {
     if( DULLV.tset(t._uid) ) return null;
     if( !(t instanceof Cyclic) ) return null;
-    if( t instanceof TypeMemPtr tmp ) return tmp;
+    if( t instanceof TypeMemPtr tmp && tmp.is_simple_ptr() )
+      return tmp;
     return t.walk((fld,ignore) -> _is_sharp(fld), (x,y)-> x==null ? y : x);
   }
 

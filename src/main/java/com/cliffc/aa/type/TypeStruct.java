@@ -627,7 +627,6 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
 
     // Shortcuts for the large primitive clazz structures
     if( !P.indent ) {
-      if( this==Cons.CLZ_CLZ ) return P.p("CLZ");
       if( is_top_clz() ) return P.p("@{TOPCLZ}");
       if( is_nil_clz() ) return P.p("@{NILCLZ}");
       if( is_int_clz() ) return P.p("@{INTCLZ}");
@@ -655,8 +654,8 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
       P.p(is_tup ? ", " : "; "); // Between fields
       sep=true;
     }
-    if( _def==ALL ) P.p("..."); // Any extra fields are allowed
-    else if( _def==ANY ) {      // No extra fields
+    if( _def==ANY ) P.p("..."); // Any extra fields are allowed
+    else if( _def==ALL ) {      // No extra fields
       if( sep ) P.sb.unchar(2);
     } else {
       _def._str(P.p('$'));      // Unusual extra fields
@@ -689,7 +688,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   // e.g. (), (^=any), (^=any,"abc"), (3.14), (3.14,"abc",:=123)
   // @{}, @{x=3.14; y="abc"; z:=123}
   static TypeStruct valueOf(Parse P, String dup, boolean any, boolean is_tup ) {
-    TypeStruct ts = malloc(any,ANY,TypeFlds.get(0));
+    TypeStruct ts = malloc(any,ALL,TypeFlds.get(0));
     if( dup!=null ) P._dups.put(dup,ts);
     if( !is_tup ) { P.require('@');  P.require('{'); } else P.require('(');
     char close = is_tup ? ')' : '}';
@@ -697,7 +696,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
 
     int fld_num = 0;
     while(true) {
-      if( P.peek("...") ) { ts._def=ALL; break; }
+      if( P.peek("...") ) { ts._def=ANY; break; }
       if( P.peek('$') )
         { ts._def = P.type(null,false,-2); break; }
       TypeFld fld = ts.len()==0 && P.peek('_')

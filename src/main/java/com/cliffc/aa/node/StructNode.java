@@ -213,7 +213,8 @@ public class StructNode extends Node {
       flds[i] = TypeFld.make(_flds.at(i),val(i),_accesses.at(i));
     // Fields are sorted in TypeStruct so I can merge-sort
     Arrays.sort(flds,( tf0, tf1) -> TypeFld.scmp(tf0._fld,tf1._fld));
-    return TypeStruct.make_flds(Type.ALL.oob(_closed),flds);
+    //return TypeStruct.make_flds(Type.ANY.oob(_closed),flds);
+    return TypeStruct.make_flds(Type.ALL,flds);
   }
 
   // Return liveness for a field

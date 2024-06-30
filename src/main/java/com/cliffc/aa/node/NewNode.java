@@ -49,7 +49,7 @@ public class NewNode extends Node {
   private void set_alias(int alias) {
     unelock();                  // Unlock before changing hash
     _alias = alias;
-    _tptr = TypeMemPtr.make(alias,TypeStruct.ISUSED);
+    _tptr = TypeMemPtr.make_simple(alias);
   }
   @Override void walk_reset0() { set_alias(_reset0_alias); super.walk_reset0(); }
 
