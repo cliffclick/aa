@@ -52,7 +52,7 @@ public class DynLoadNode extends LoadNode {
     case TypeFlt tf: throw AA.TODO(); // Surely an error
     case TypeNil tn:
       if( tn==TypeNil.NIL || tn==TypeNil.XNIL ) throw AA.TODO(); // Surely an error
-      return tn;
+      return lookup(mem.ld(tn));
     case Type simple:
       assert simple.getClass()==Type.class;
       return simple;
@@ -75,7 +75,7 @@ public class DynLoadNode extends LoadNode {
     if( dyn().tvar() instanceof TVDynTable dyn )
       for( String label : _resolves )
         t = t.meet(ts.at_def(label));
-    return t;
+    return t.clamp();
   }
 
 

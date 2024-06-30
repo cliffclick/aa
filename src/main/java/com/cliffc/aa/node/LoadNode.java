@@ -103,7 +103,7 @@ public class LoadNode extends Node {
 
     Type tadr = adr()._val;
     Type miss = null;
-    TypeMemPtr pclz = null;
+    TypeNil pclz = null;
     switch( tadr ) {
     case TypeMemPtr ptr: {
       // (4) If ADR is TMP
@@ -116,7 +116,8 @@ public class LoadNode extends Node {
       // Load here looks once here at _fld, then again in clazz
       // DynLoad looks across all _flds and all clazz fields and can not "miss".
       int idx = ts.find(_fld);
-      if( idx != -1 ) return ts.at(idx); // Hit, return
+      if( idx != -1 )
+        return ts.at(idx).clamp(); // Hit, return, but ANY/ALL clamped to SCALAR
 
       if( ts.len()==0 || !Util.eq(ts.fld(0)._fld,TypeFld.CLZ) || !(ts.fld(0)._t instanceof TypeMemPtr tsclz) )
         return missField(ts._def);
@@ -134,8 +135,9 @@ public class LoadNode extends Node {
     case TypeInt ti: pclz = (TypeMemPtr)PrimNode.PINT._val; break;
     case TypeFlt tf: pclz = (TypeMemPtr)PrimNode.PFLT._val; break;
     case TypeNil tn:
-      if( tn==TypeNil.SCALAR || tn==TypeNil.XSCALAR ) return tn;
-      pclz = (TypeMemPtr)PrimNode.PNIL._val;
+      if( tn==TypeNil.SCALAR || tn==TypeNil.XSCALAR ) return tn.oob();
+      if( tn== TypeNil.NIL || tn==TypeNil.XNIL )  pclz = (TypeMemPtr)PrimNode.PNIL._val;
+      else pclz = tn;
       break;
 
     case Type simple:
@@ -154,9 +156,10 @@ public class LoadNode extends Node {
   }
 
   private static Type missField(Type defalt) {
-    return defalt.above_center()  ? TypeNil.XSCALAR // Might fall to having field
+    return defalt.above_center() ? Type.ANY // Might fall to having field
       // Return worse possible escaped scalar
       : Env.ROOT.ext_scalar(null);
+    //return defalt.oob(TypeNil.SCALAR);
   }
 
   private Type value_bind( Type t, TypeMem mem, TypeNil dsp, boolean over ) {
@@ -467,7 +470,6 @@ public class LoadNode extends Node {
 
     // struct is end-of-super-chain, miss_field
     //return tvar().unify_err(resolve_failed_msg(),tvar(0),null,test);
-    System.out.println(ptr);
     throw TODO();
   }
 

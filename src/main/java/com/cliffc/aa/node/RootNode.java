@@ -286,7 +286,8 @@ public class RootNode extends Node {
       case DefDynTableNode use -> live; // No implied live memory
       case MProjNode use -> (TypeMem)live.meet(use._live);
       case FunNode fun -> live; // Direct function escape, no implied memory
-      default -> throw TODO();  // Handle escaping calls, rturns.  Also null not expected
+      case CallEpiNode cepi -> (TypeMem)live.meet(cepi._live);
+      default -> throw TODO();  // Handle escaping calls, returns.  Also, null not expected
       };
     }
 

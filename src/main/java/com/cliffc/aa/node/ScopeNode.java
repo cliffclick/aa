@@ -21,7 +21,8 @@ public class ScopeNode extends Node {
   public ScopeNode( HashMap<String,TypeNil> types,  Node ctl, Node mem, Node rez, Node ptr, StructNode dsp) {
     super(ctl,mem,rez,ptr,dsp);
     _types = types;
-    _live = RootNode.defMem(this);
+    //_live = RootNode.defMem(this);
+    _live = live();
   }
   @Override public String label() {
     if( Parse.PARSE != null && Parse.PARSE.scope()==this )
@@ -79,7 +80,8 @@ public class ScopeNode extends Node {
 
   @Override public TypeMem live() {
     //assert is_keep() || Combo.pre() || is_prim();
-    return RootNode.removeKills(this);
+    return RootNode.defMem(this).flatten_live_fields();
+    //return RootNode.removeKills(this);
   }
 
   @Override public Type live_use( int i ) {

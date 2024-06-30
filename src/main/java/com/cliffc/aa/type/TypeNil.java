@@ -251,6 +251,8 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
 
   @Override public Type widen() { return this; }
 
+  @Override public TypeNil clamp() { return this; }
+
   // Return a double from a TypeFlt constant; assert otherwise.
   @Override public double getd() { return this==NIL ? 0 : super.getd(); }
   @Override public long   getl() { return this==NIL ? 0 : super.getl(); }

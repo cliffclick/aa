@@ -5,7 +5,10 @@ import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 
-// "fresh" the incoming TVar: make a fresh instance before unifying
+// Make a fresh instance of a prefix of incoming scope/display.  Only those
+// fields defined "so far" are available, and they are all fresh.  "So far" is
+// defined by the parser's scope logic, and modified by reordering for mutual
+// let rec.
 public class PartialScopeFreshNode extends FreshNode {
   final int _alias;
   final String[] _flds;
@@ -28,7 +31,7 @@ public class PartialScopeFreshNode extends FreshNode {
 
   @Override public Type live_use( int i ) {
     if( i != 0 ) return Type.ALL;
-    return val(0) instanceof TypeMemPtr tmp
+    return val(0) instanceof TypeMemPtr tmp && !tmp.is_simple_ptr()
       ? tmp._obj.flatten_live_fields()
       : val(0).oob();
   }
@@ -46,8 +49,10 @@ public class PartialScopeFreshNode extends FreshNode {
     return ptr;
   }
 
+  // Only fresh against the listed scope prefix.
   @Override public boolean unify( boolean test ) {
     if( !(tvar(0) instanceof TVPtr ptr) ) throw AA.TODO();
+    // Copy a prefix of the incoming scope
     TVStruct fresh = ptr.load();
     TV3[] tvs = new TV3[_flds.length];
     for( int i=0; i<_flds.length; i++ ) {
@@ -59,6 +64,7 @@ public class PartialScopeFreshNode extends FreshNode {
     }
     TVStruct partial = new TVStruct(_flds,tvs,true);
     TVPtr frsh = new TVPtr(ptr.aliases(),partial);
+    // Fresh-unify self/that
     TVPtr that = tvar().as_ptr();
     return frsh.fresh_unify(_nongen,that,test);
   }
