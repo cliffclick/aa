@@ -329,7 +329,10 @@ public final class CallEpiNode extends Node {
 
   // True if this CallEpi has virtual CG edges to other unknown callees.
   // If any function is wired, all are.
-  boolean unknown_callers() { return len()==1 || isPrim(); }
+  boolean unknown_callers() {
+    if( !Combo.pre() ) return false;
+    return len()==1 || isPrim();
+  }
 
   // Checks for sane Call Graph, similar to RetNode.is_CG
   public boolean is_CG(boolean precise) {
