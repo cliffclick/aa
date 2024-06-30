@@ -1,5 +1,5 @@
 // Ignore f and make a 5
-// GCP: int:5
+// GCP: 5
 // HMT: int:5
 // Eval: int:5
 g = {f -> 5};

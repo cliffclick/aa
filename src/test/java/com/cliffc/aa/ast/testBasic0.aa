@@ -1,5 +1,5 @@
 // Parse a comment and a number
-// GCP: int:3
+// GCP: 3
 // HMT: int:3
 // Eval: 3
 3
