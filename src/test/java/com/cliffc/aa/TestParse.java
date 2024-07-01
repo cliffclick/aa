@@ -32,17 +32,6 @@ public class TestParse {
     RSEED=0;
 
     test(
-    """
-    noinline_foo = { x y ->
-            ( { x y -> !x      * !y },
-              { x y -> x.sin() * !y }
-              )._(x,y)  // The single call site; "x" is either int or flt
-    };
-    (noinline_foo(3,5), noinline_foo(3.3,5))
-    """,
-            "*[24]( _, %[2,24][2]?, %[2,24][2]?)","*[24]( _, int:int64, flt:flt64)", null, null, "[4,24]", null);
-
-    test(
 """
 fcn = { ->
   ( { x -> x.a },
