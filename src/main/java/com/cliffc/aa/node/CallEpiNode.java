@@ -350,7 +350,7 @@ public final class CallEpiNode extends Node {
         fidx = BitsFun.EXTX;
       }
       if( (!LIFTING || precise) && // During Combo or after correcting during Iter,
-          !fidxs.test(fidx) ) return false; // wired without matching fidx is an error
+          !fidxs.test_recur(fidx) ) return false; // wired without matching fidx is an error
       if( n.findDef(call) == -1 ) return false; // Wired below but not above
     }
     // Check forward edges from CALL to CEPI

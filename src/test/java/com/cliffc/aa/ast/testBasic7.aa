@@ -1,7 +1,7 @@
 // Should be ast/testBasic7.aa
 // See       exe/testRecur12.aa
-// GCP: *[19]@{ _; Aflt=PA:*[]@{^=*[5,6](...); _=%[5,6][]; $nil}?; Dint=PA; ...}
-// HMT: *[19]@{ _; Aflt=flt:0.5f; Dint=int:1; }
+// GCP: *[22]@{ _; Aflt=%[6,7][]; Dint=%[6,7][]}
+// HMT: *[22]@{ _; Aflt=flt:0.5f; Dint=int:1;  }
 
 // Learnings from exe/testRecur12.aa
 // Always loading from a display struct - which means no-Fresh on load.

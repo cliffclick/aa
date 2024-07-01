@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV3;
@@ -22,9 +23,7 @@ public class FP2DSPNode extends Node {
     if( fpt instanceof TypeFunPtr tfp )
       return tfp.has_dsp() ? tfp.dsp() : Type.ANY;
     // Very weak, since input is not a function ptr.
-    if( fpt instanceof TypeNil tn )
-      return TypeMemPtr.make(false,tn._aliases,null);
-    return TypeMemPtr.ISUSED0;
+    return Env.ROOT.ext_scalar(this);
   }
 
   private static final Type DSP_LIVE = TypeStruct.UNUSED.add_fldx(TypeFld.make("dsp",Type.ALL));

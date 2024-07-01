@@ -1,4 +1,4 @@
 // Simple random
-// GCP: [14]{~Scalar,5 -> int:int64 }
+// GCP: [17]{~Scalar,5 -> int64 }
 // HMT: { nil - A -> int:int64 }
 math.rand

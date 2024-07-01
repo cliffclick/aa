@@ -1,8 +1,6 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
-import com.cliffc.aa.Combo;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 
@@ -72,10 +70,12 @@ public class DynLoadNode extends LoadNode {
     // differently with different TV3s from different paths, so meet over all
     // possible choices.
     Type t = TypeNil.XSCALAR;
-    if( dyn().tvar() instanceof TVDynTable dyn )
+    if( dyn().tvar() instanceof TVDynTable )
       for( String label : _resolves )
         t = t.meet(ts.at_def(label));
-    return t.clamp();
+    if( t==TypeNil.SCALAR || t==Type.ALL )
+      return Env.ROOT.ext_scalar(null);
+    return t;
   }
 
 
@@ -96,6 +96,7 @@ public class DynLoadNode extends LoadNode {
       LoadNode load = new LoadNode(mem(),adr(),label,_fresh,_bad);
       load._live = _live;
       load._val = _val;
+      load._tvar = _tvar;
       return load;
     }
     return null;

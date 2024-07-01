@@ -57,14 +57,14 @@ public class TestStable {
     test("!(2,3.14)._","nil","nil:nil", null, null, null, null);
     test("(2,3.14)._.sin()","0.0015926529164868282","flt:0.0015926529164868282", null, null, null, null);
     // Two DynLoads, no Fresh
-    test("q=(2,3.14); (!q._,q._.sin())","*[21](_, int1, flt64)","*[21](_,int:int1,flt:flt64)", null, null, "[4,21]", null);
+    test("q=(2,3.14); (!q._,q._.sin())","*[21](_, int1, flt64)","*[21](_,int:int64,flt:flt64)", null, null, "[4,21]", null);
   }
 
   // More complex overload tests
   @Test public void testOver() {
     // testOver5.aa, One DynLoad, fcn needs DynTable
     // Returning choice of structs and field selecting from it.
-    test("fcn = {(@{a=1;},@{b=2;})._}; (fcn().a, fcn().b)", "*[24]( _, 1, 2)", "*[24](_, int:1,int:2)", null, null, "[4,24]", null);
+    test("fcn = {(@{a=1;},@{b=2;})._}; (fcn().a, fcn().b)", "*[24]( _, %[2,24][2]?, %[2,24][2]?)", "*[24](_, int:1,int:2)", null, null, "[2,24]", null);
 
     // testOver6.aa, One DynLoad, fcn needs DynTable
     // Passing choice of structs and field selecting from it.
@@ -77,16 +77,16 @@ fcn = { x ->
 };
 (fcn @{a=2;}, fcn @{b=3.3;})
 """,
-         "*[26]( _, %[2,4,26][2]?, %[2,4,26][2]?, ...)", "*[26](_,int:2,flt:3.3)",null,null,"[4,26]",null);
+         "*[26]( _, %[2,26][2]?, %[2,26][2]?)", "*[26](_,int:2,flt:3.3)",null,null,"[4,26]",null);
 
     // Same using primitive math
     test(
 """
 ( { x y -> !x      * !y },
   { x y -> x.sin() * !y }
-)._(3.3,5)
+)._(3.3,0)
 """,
-         "flt:0.0f","flt:-0.0f");
+         "-0.1577456941432482","flt:-0.1577456941432482");
 
     // Multi-arg function selection from a set.  Note the really weak GCP
     // result: argument "x" is passed as both an int and a flt, and HMT makes
@@ -100,7 +100,7 @@ noinline_foo = { x y ->
 };
 (noinline_foo(3,5), noinline_foo(3.3,5))
 """,
-         "*[24]( _, 0=PA:*[]@{^=*[6,7](...); _=%[6,7][]?; $nil}?, 1=PA, ...)","*[24]( _, int:int64, flt:flt64)", null, null, "[4,24]", null);
+         "*[24]( _, %[2,24][2]?, %[2,24][2]?)","*[24]( _, int:int64, flt:flt64)", null, null, "[4,24]", null);
   }
 
 
@@ -117,6 +117,6 @@ B = { x -> C(x) };
 ( D(), C(3.14) )
 
 """,
-         "*[24]( _, 0=PA:*[]@{^=*[6,7](...); _=%[6,7][]; $nil}?, 1=PA, ...)","*[24]( _, int:nint8, flt:3.14)",null,null,"[4,24]",null);
+         "*[24]( _, %[6,7][], %[6,7][])","*[24]( _, int:nint8, flt:3.14)",null,null,"[4,24]",null);
   }
 }

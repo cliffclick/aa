@@ -1,4 +1,4 @@
 // Simple if/else
-// GCP: int:nint8
+// GCP: nint8
 // HMT: int:nint8
 math.rand(2) ? 3 : 4

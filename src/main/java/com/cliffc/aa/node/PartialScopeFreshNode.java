@@ -26,7 +26,7 @@ public class PartialScopeFreshNode extends FreshNode {
   @Override public String label() { return "PartialScopeFresh"; }
   @Override public Type value() {
     // ptr-to-partial struct
-    return TypeMemPtr.make(_alias,TypeStruct.ISUSED);
+    return TypeMemPtr.make_simple(_alias);
   }
 
   @Override public Type live_use( int i ) {

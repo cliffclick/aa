@@ -37,7 +37,7 @@ public abstract class PrimNode extends Node {
   public PrimNode( String name, boolean is_lazy, TypeTuple formals, TypeNil ret ) {
     _name = name;
     _is_lazy = is_lazy;
-    int fidx = BitsFun.new_fidx(BitsFun.INTX);
+    int fidx = BitsFun.new_fidx(BitsFun.EXTX);
     for( int i=DSP_IDX; i<formals._ts.length; i++ ) assert formals._ts[i] instanceof TypeNil || formals._ts[i]==Type.ANY;
     _formals = formals;
     _ret = ret;

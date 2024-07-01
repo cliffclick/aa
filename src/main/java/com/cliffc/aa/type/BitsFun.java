@@ -24,6 +24,7 @@ public class BitsFun extends Bits<BitsFun> {
   public static final int ALLX = new_fidx(0);
   public static final int EXTX = new_fidx(ALLX); // External callers
   public static final int INTX = new_fidx(ALLX); // Internal callers
+  static { TREE.init0(); }
   public static int new_fidx( int par ) { return TREE.split(par); }
   public static int new_fidx( ) { return TREE.split(INTX); } // Makes an INTERNAL fidx
   // Fast reset of parser state between calls0 to Exec
@@ -48,7 +49,6 @@ public class BitsFun extends Bits<BitsFun> {
   @Override public BitsFun EMPTY() { return EMPTY; }
 
   // Make a NEW fidx, with the given parent, and return the Bits with just it
-  public static BitsFun make_new_fidx( int parent_fidx ) { return make0(new_fidx(parent_fidx)); }
   public static void free(int fidx) { TREE.free(fidx); }
   public static BitsFun make0( int bit ) { return NALL.make(bit); }
   public static BitsFun make0( int... bits ) { return NALL.make(bits); }

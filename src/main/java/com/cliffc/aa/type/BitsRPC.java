@@ -21,13 +21,14 @@ public class BitsRPC extends Bits<BitsRPC> {
   }
 
   private static final Bits.Tree<BitsRPC> TREE = new Bits.Tree<>();
-  @Override Tree<BitsRPC> tree() { return TREE; } 
+  @Override Tree<BitsRPC> tree() { return TREE; }
   public static final int ALLX = new_rpc(0);
+  static { TREE.init0(); }
   public static int new_rpc( int par ) { return TREE.split(par); }
   // Fast reset of parser state between calls to Exec
   public static void init0() { TREE.init0(); }
   public static void reset_to_init0() { TREE.reset_to_init0(); }
-  
+
   // Have to make a first BitsRPC here; thereafter the v-call to make_impl
   // will make more on demand.  But need the first one to make a v-call.
   public  static final BitsRPC NALL  = new BitsRPC().make_impl(ALLX,null);

@@ -1122,8 +1122,8 @@ public class Parse implements Comparable<Parse> {
     Node dsp = get_display_ptr(scope);
     // Load the resolve field from the display/scope structure
     Node ld = new LoadNode(mem(),dsp,"$dyn",true,null).peep();
-    Node frsh = new FreshNode(ld,_e).peep();
-    return frsh;
+    //Node frsh = new FreshNode(ld,_e).peep();
+    return ld;
   }
   private AFieldNode dynCall() {
     Node ld = dynLoad();
@@ -1275,7 +1275,20 @@ public class Parse implements Comparable<Parse> {
 
       _e = e._par;            // Pop nested environment; pops nongen also
       // Anonymous functions early-bind.  Functions in structs become "methods" and late-bind.
-      Node cloj = scope().stk().is_closure() ? scope().ptr() : null;
+      Node cloj = null;
+      if( scope().stk().is_closure() ) {
+        // TODO: NEEDS "fcn" in the current frame, even as mid-def
+        // THEORY: INSTALL PARTIAL LATER, SAME AS AST.
+        // FLAG FUNPTRNODE SOMEHOW - ASSIGN IN SCOPE AS SOME LEVEL?
+        // FLAG PARTIAL OFF SCOPE (ALREADY), THEN VISIT ONCE WE CLOSE-OFF SCOPE AND SET MUT-LET-REC
+
+        cloj = new PartialScopeFreshNode(scope()).peep();
+        cloj.addDef(scope().ptr());
+        // TODO: Handle mid-progress defs
+        //for( Env e0 = e; e!=null; e = e._par ) {
+        //  // handle forward refs that are mid-progress
+        //}
+      }
       return new FunPtrNode(ret,cloj).peep();
     }
   }

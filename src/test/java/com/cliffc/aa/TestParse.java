@@ -14,7 +14,7 @@ import java.util.function.Supplier;
 import static com.cliffc.aa.AA.TODO;
 
 public class TestParse {
-  private static final BitsFun TEST_FUNBITS = BitsFun.make0(43);
+  private static final BitsFun TEST_FUNBITS = null;//BitsFun.make0(43);
 
   // Set to TRUE to run one test once, with fixed arguments.
   // Set to FALSE for each test to all combinations of HMT and GCP, with a bunch of random seeds.
@@ -31,7 +31,40 @@ public class TestParse {
     DO_HMT=false;
     RSEED=0;
 
-    test("fcn = {(@{a=1;},@{b=2;})._}; (fcn().a, fcn().b)", "*[24]( _, %[2,4,24][2]?, %[2,4,24][2]?, ...)", "*[24](_, int:1,int:2)", null, null, "[4,24]", null);
+    test(
+    """
+    noinline_foo = { x y ->
+            ( { x y -> !x      * !y },
+              { x y -> x.sin() * !y }
+              )._(x,y)  // The single call site; "x" is either int or flt
+    };
+    (noinline_foo(3,5), noinline_foo(3.3,5))
+    """,
+            "*[24]( _, %[2,24][2]?, %[2,24][2]?)","*[24]( _, int:int64, flt:flt64)", null, null, "[4,24]", null);
+
+    test(
+"""
+fcn = { ->
+  ( { x -> x.a },
+    { x -> x.b }
+)._
+};
+( fcn() @{a=2  ;},
+  fcn() @{b=3.3;} )
+""",
+         "*[26]( _, %[2,4,26][2]?, %[2,4,26][2]?, ...)", "*[26](_,int:2,flt:3.3)",null,null,"[4,26]",null);
+
+//    test(
+//            """
+//            fcn = { x ->
+//              @{ qi = { x -> x.a };
+//                 qf = { x -> x.b };
+//              }._ x
+//            };
+//            (fcn @{a=2;}, fcn @{b=3.3;})
+//            """,
+//            "*[26]( _, %[2,4,26][2]?, %[2,4,26][2]?, ...)", "*[26](_,int:2,flt:3.3)",null,null,"[4,26]",null);
+
 //    // A,B,C are mutually recursive identity functions
 //    // D calls B or C with ints.
 //    // final struct calls C with floats
