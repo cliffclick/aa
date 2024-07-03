@@ -168,8 +168,7 @@ public class AryInt {
   // HashMap) and the then the array changes, the hashCode() will change also.
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
-    if( !(o instanceof AryInt) ) return false;
-    AryInt ary = (AryInt)o;
+    if( !(o instanceof AryInt ary) ) return false;
     if( _len != ary._len ) return false;
     if( _es == ary._es ) return true;
     for( int i=0; i<_len; i++ )

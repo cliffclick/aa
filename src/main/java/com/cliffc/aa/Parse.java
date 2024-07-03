@@ -653,7 +653,9 @@ public class Parse implements Comparable<Parse> {
       if( arg==null ) return unkeep(fun);
       // To avoid the common bug of forgetting a ';', these must be on the same line.
       int line_last = _lines.binary_search(old_last);
-      int line_now  = _lines.binary_search(_x);
+      int line_now  = _lines.binary_search(oldx); // Returns insertion point
+      if( line_last==_lines._len || _lines.at(line_last) > old_last ) line_last--;
+      if( line_now ==_lines._len || _lines.at(line_now ) > oldx ) line_now--;
       if( line_last != line_now ) {
         unkeep(fun);
         _x = oldx;  _lastNWS = old_last;
@@ -1571,7 +1573,7 @@ public class Parse implements Comparable<Parse> {
     err_ctrl3("Expected closing '"+c+"' but "+(_x>=_buf.length?"ran out of text":"found '"+(char)(_buf[_x])+"' instead"),bad);
   }
 
-  // Skip WS, return true&skip if match, false & do not skip if miss.
+  // Skip WS, return true&skip if a match, false & do not skip if a miss.
   private boolean peek( char c ) { return peek1(skipWS(),c); }
   private boolean peek_noWS( char c ) { return peek1(_x >= _buf.length ? -1 : _buf[_x],c); }
   // Already skipped WS & have character;

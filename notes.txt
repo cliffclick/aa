@@ -1,4 +1,20 @@
 =======================================
+07/01/2024
+
+All stable tests pass on ASTParse!!!!  "make test".
+Normal Parse fails on setup in TestParse.JIG.
+
+The PartialScopeNode is missing "fcn", which the ASTParse has right.
+
+This gets me into the Heart of the Matter:
+
+  I cannot determine proper "Fresh" bits until a Scope closes; then I need to
+  walk the Scope looking for mut-let-rec sets, reorganize as needed, THEN
+  walk all PartialScopeFresh users and update their "partial" sets.
+
+
+
+=======================================
 06/23/2024
 
 No AA last 2 weeks.  :-P
