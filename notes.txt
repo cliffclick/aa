@@ -12,6 +12,12 @@ This gets me into the Heart of the Matter:
   walk the Scope looking for mut-let-rec sets, reorganize as needed, THEN
   walk all PartialScopeFresh users and update their "partial" sets.
 
+During ID lookup, walk up an internal AST looking for a Let (Scope/Frame) or a
+Lambda (which has embedded Scope/Frame) to decide to add a Fresh or not.
+Structure is (Lambda/Closure/body/Ident) then no Fresh.
+Structure is (Frame then the Frame is a Mut/Let/Ret, and can't tell until I sort out)
+
+
 
 
 =======================================

@@ -59,6 +59,7 @@ public class Env implements AutoCloseable {
   public static final StructNode STK_0; // Program start stack frame (has primitives)
   public static final  ScopeNode SCP_0; // Program start scope
 
+  public static final DefDynTableNode DYN;
   // Global named types.  Type names are ALSO lexically scoped during parsing
   // (dictates visibility of a name).  During semantic analysis a named type
   // can be Loaded from as a class obj, requiring Loads reverse the type name
@@ -73,7 +74,8 @@ public class Env implements AutoCloseable {
     // Initial control & memory
     CTL_0 = new CProjNode(ROOT,CTL_IDX).init();
     MEM_0 = new MProjNode(ROOT,MEM_IDX).init();
-    NODE_LO = MEM_0._uid+1;
+    DYN   = new DefDynTableNode().init().keep();
+    NODE_LO = DYN._uid+1;
 
     // Top-level or common default values
     ANY   = new ConNode<>(Type.ANY         ).keep();
@@ -110,15 +112,12 @@ public class Env implements AutoCloseable {
   public final FunNode _fun;     // Matching FunNode for this lexical environment
 
   // Shared Env constructor.
-  public Env( Env par, FunNode fun, int nargs, Node ctrl, Node mem, Node dsp_ptr, StructNode fref ) {
+  public Env( Env par, FunNode fun, int nargs, Node ctrl, Node mem, Node dsp_ptr, String hint, StructNode fref ) {
     _par = par;
     _fun = fun;
-    StructNode dsp = fref==null ? new StructNode(nargs,false,null) : fref;
+    StructNode dsp = fref==null ? new StructNode(nargs,false,null,hint) : fref;
     dsp.add_fld("^",TypeFld.Access.Final,dsp_ptr,null).init();
-    // Root defines $dyn
-    if( par!=null && par._par==null )
-      dsp.add_fld("$dyn", TypeFld.Access.Final,new DefDynTableNode().init(),null);
-    NewNode ptr = new NewNode(fun==null ? "STRUCT" : "FRAME",BitsAlias.new_alias(),par==null).init();
+    NewNode ptr = new NewNode(hint,BitsAlias.new_alias(),par==null).init();
     mem = new StoreXNode(mem,ptr,dsp,null).init();
     // Install a top-level prototype mapping
     if( fref!=null ) {          // Forward ref?
@@ -127,12 +126,12 @@ public class Env implements AutoCloseable {
       //PROTOS.put(fname,dsp);
       throw TODO();
     }
-    _scope = new ScopeNode(new HashMap<>(),ctrl,mem,XNIL,ptr,dsp).init();
+    _scope = new ScopeNode(new HashMap<>(),ctrl,mem,XNIL,ptr,dsp,hint).init();
   }
 
   // Top-level Env.  Contains, e.g. the primitives.
   // Above any file-scope level Env.
-  private Env( ) { this(null,null,0,ALL,ANYMEM,PrimNode.PCLZ,null); }
+  private Env( ) { this(null,null,3,ALL,ANYMEM,PrimNode.PCLZ,"TOP",null); }
 
   // Gather and report errors and typing
   TypeEnv gather_errors(ErrMsg err) {
@@ -195,6 +194,7 @@ public class Env implements AutoCloseable {
     BitsAlias.init0();
     BitsFun  .init0();
     BitsRPC  .init0();
+    DYN.init0();
   }
 
   // Reset all global statics for the next parse.  Useful during testing when

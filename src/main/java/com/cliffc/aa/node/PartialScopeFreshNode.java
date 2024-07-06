@@ -1,9 +1,11 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
-import com.cliffc.aa.tvar.*;
-import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
+import com.cliffc.aa.tvar.TV3;
+import com.cliffc.aa.tvar.TVPtr;
+import com.cliffc.aa.tvar.TVStruct;
+import com.cliffc.aa.type.*;
 
 // Make a fresh instance of a prefix of incoming scope/display.  Only those
 // fields defined "so far" are available, and they are all fresh.  "So far" is
@@ -36,36 +38,48 @@ public class PartialScopeFreshNode extends FreshNode {
       : val(0).oob();
   }
 
+  private TVPtr _partial;
   @Override public TV3 _set_tvar() {
-    // Close any cycles with an early set
-    TVStruct partial = new TVStruct(_flds,TVStruct.leafs(_flds.length),true);
-    TVPtr ptr = new TVPtr(BitsAlias.make0(_alias),partial);
-    _tvar = ptr;
+    // Close any cycles with an early set of self:
+    super._set_tvar();
 
-    // Make sure the shared closure is set_tvar
-    in(0).set_tvar();
-    // Do a first unify
-    unify(false);
-    return ptr;
+    // Maintain an internal prefix copy of in(0), limited to named fields.
+    // This is the "Fresh" template.  I'd like to just Fresh each input field
+    // to my output, but because of mut-let-rec cycles I need to grab all the
+    // _flds at once.  Maintaining an internal copy to avoid creating a new one
+    // each iteration (and thus declaring progress if unifying).
+    assert Util.eq(_flds[0],TypeFld.CLZ);
+    for( int i=1; i<_flds.length; i++ )
+      assert !_flds[i].equals(TypeFld.CLZ);
+    TVStruct partial = new TVStruct(_flds,TVStruct.leafs(_flds.length),true);
+    partial.arg(0,new TVPtr(BitsAlias.EMPTY, new TVStruct(true) ) );
+    _partial = new TVPtr(BitsAlias.make0(_alias),partial);
+
+    // Get the shared closure
+    TV3 share = in(0).set_tvar();
+    if( !(share instanceof TVPtr sptr) )
+      throw AA.TODO();
+    TVStruct sclo = sptr.load(); // Shared closure
+    // Unify to prefix of the incoming scope
+    for( String fld : _flds ) {
+      TV3 sarg = sclo   .arg( fld );
+      TV3 parg = partial.arg( fld );
+      if( sarg == null )
+        sclo.add_fld( fld, parg );
+      else parg.unify( sarg, false );
+    }
+    // Fresh-unify self/that
+    _partial.fresh_unify(_nongen,tvar(),false);
+    return tvar();
   }
 
   // Only fresh against the listed scope prefix.
   @Override public boolean unify( boolean test ) {
-    if( !(tvar(0) instanceof TVPtr ptr) ) throw AA.TODO();
-    // Copy a prefix of the incoming scope
-    TVStruct fresh = ptr.load();
-    TV3[] tvs = new TV3[_flds.length];
-    for( int i=0; i<_flds.length; i++ ) {
-      tvs[i] = fresh.arg(_flds[i]);
-      if( tvs[i] == null )
-        tvs[i] = Util.eq(_flds[i],TypeFld.CLZ)
-          ? new TVPtr(BitsAlias.EMPTY, new TVStruct(true) )
-          : new TVLeaf();
-    }
-    TVStruct partial = new TVStruct(_flds,tvs,true);
-    TVPtr frsh = new TVPtr(ptr.aliases(),partial);
-    // Fresh-unify self/that
-    TVPtr that = tvar().as_ptr();
-    return frsh.fresh_unify(_nongen,that,test);
+    //return frsh.fresh_unify(_nongen,that,test);
+    TV3 that = tvar();
+    TV3 fresh = _partial;
+    return fresh.fresh_unify(_nongen,that,test);
   }
+
+  @Override void walk_reset0() { _partial=null; super.walk_reset0(); }
 }

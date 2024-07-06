@@ -487,7 +487,7 @@ public class TestNodeSmall {
     // The file-scope display closing the graph-cycle.  Needs the FunPtr, not
     // yet built.
     ConNode dsp_prims = new ConNode<>(TypeMemPtr.DISP_SIMPLE).init();
-    StructNode dsp_file = new StructNode(1,false,null ).add_fld("^",Access.Final,dsp_prims,null).init();
+    StructNode dsp_file = new StructNode(1,false,null,"FILE" ).add_fld("^",Access.Final,dsp_prims,null).init();
     NewNode dsp_file_ptr = new NewNode("DSP").init();
     Node dsp_file_mem = new StoreXNode(mem,dsp_file_ptr,dsp_file,null).init();
     // Function header with nargs
@@ -504,7 +504,7 @@ public class TestNodeSmall {
     dsp_file.add_fld("fact",Access.Final,fptr,null);
     dsp_file.close();
     // Return the fptr to keep all alive
-    ScopeNode env = new ScopeNode(null,ctl,mem,fptr,dsp_file_ptr,dsp_file).init();
+    ScopeNode env = new ScopeNode(null,ctl,mem,fptr,dsp_file_ptr,dsp_file,"FILE").init();
     Env.ROOT.setDef(AA.MEM_IDX,Env.MEM_0);
     Env.ROOT.setDef(AA.REZ_IDX,dsp_file);
 

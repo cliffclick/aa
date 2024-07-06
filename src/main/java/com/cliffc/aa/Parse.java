@@ -550,7 +550,7 @@ public class Parse implements Comparable<Parse> {
 
     // True side
     ScopeNode t_scope, f_scope;
-    try( Env e = _e = new Env(_e, null, -1, ctrl(), mem(), scope().ptr(), null) ) { // Nest an environment for the local vars
+    try( Env e = _e = new Env(_e, null, -1, ctrl(), mem(), scope().ptr(),"IFX", null) ) { // Nest an environment for the local vars
       // TODO: Insert cast
       Node t_exp = stmt(false); // Parse true expression
       if( t_exp == null ) t_exp = err_ctrl2("missing expr after '?'");
@@ -572,7 +572,7 @@ public class Parse implements Comparable<Parse> {
     ctrl(new CProjNode(ifex,0).peep()); // Control for false branch
 
     // False side
-    try( Env e = _e = new Env(_e, null, -1, ctrl(), mem(), scope().ptr(), null) ) { // Nest an environment for the local vars
+    try( Env e = _e = new Env(_e, null, -1, ctrl(), mem(), scope().ptr(), "IFX", null) ) { // Nest an environment for the local vars
       // TODO: Insert cast
       Node f_exp = peek(':') ? stmt(false) : con(TypeNil.NIL);
       if( f_exp == null ) f_exp = err_ctrl2("missing expr after ':'");
@@ -706,7 +706,7 @@ public class Parse implements Comparable<Parse> {
       AFieldNode dyn = keep(dynCall());
       // Load against LHS pointer.  If this is a primitive, the Load loads
       // against the primitive clazz.
-      Node over= new LoadNode(mem(),lhs,binop._name,false,err).peep();
+      Node over= new LoadNode(mem(),lhs,binop._name,err).peep();
       // Resolve the set of primitive choices
       Node fun = keep(new DynLoadNode(mem(),over,dyn.in(0),err).peep());
       Node dsp = keep(new FP2DSPNode(fun,err).peep());
@@ -751,7 +751,7 @@ public class Parse implements Comparable<Parse> {
     Node dsp = new ParmNode(DSP_IDX,fun,null,outer_dsp._tptr ).init();
     Node mem = new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM  ).init();
     Node fptr;
-    try( Env e = new Env(_e, fun, 1, fun, mem, dsp, null) ) { // Nest an environment for the local vars
+    try( Env e = new Env(_e, fun, 1, fun, mem, dsp, "LAZY", null) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
       // Display is special: the default is simply the outer lexical scope.
       // But here, in a function, the display is actually passed in as a hidden
@@ -829,7 +829,7 @@ public class Parse implements Comparable<Parse> {
       Node dyn = keep(dynCall());
       // Load against e0 pointer.  If e0 is a primitive, the Load is a no-op;
       // otherwise this converts a reference to a value.
-      Node over= new LoadNode(mem(),e0,op._name,false,err).peep();
+      Node over= new LoadNode(mem(),e0,op._name,err).peep();
       // Resolve the correct function from the overload choices
       Node fun = new DynLoadNode(mem(),over,((AFieldNode)dyn).in(0),err).peep();
       // Call the operator
@@ -875,7 +875,7 @@ public class Parse implements Comparable<Parse> {
             // Using a plain underscore for the field name
             ? new DynLoadNode(mem(),n,dynLoad(),bad).peep()
             // Normal non-oper field load
-            : new    LoadNode(mem(),n,tok,false,bad).peep();
+            : new    LoadNode(mem(),n,tok,bad).peep();
         }
 
       } else if( peek('(') ) {  // Attempt a function-call
@@ -889,7 +889,7 @@ public class Parse implements Comparable<Parse> {
         Node dsp = keep(new FP2DSPNode(n,null).peep());
         Node arg0 = stmts();
         // Argument tuple, for rest of arguments
-        StructNode args = keep(new StructNode(0,false,err ));
+        StructNode args = keep(new StructNode(0,false,err,"ARGS" ));
         _tuple(oldx-1,arg0,errMsg(first_arg_start),args,0); // Parse argument list
         Node args2 = unkeep(args).peep();
         Parse[] badargs = args.fld_starts();      // Args from tuple
@@ -958,15 +958,14 @@ public class Parse implements Comparable<Parse> {
     // Now properly load from the display.
     Parse bad = errMsg();
     Node ptr = get_display_ptr(scope);
-    Node fd = new LoadNode(mem(),ptr,tok,false,bad).peep();
+    Node fd = new LoadNode(mem(),ptr,tok,bad).peep();
     if( fd instanceof ForwardRefNode )    // Prior is actually a forward-ref
       return err_ctrl1(ErrMsg.forward_ref(this,(FunPtrNode)fd));
-    //Node n = new FreshNode(fd,_e).peep();
     Node n = fd;
     keep(n);
     // Do a full lookup on "+", and execute the function
     // Get the overloaded operator field, always late binding
-    Node overplus = new LoadNode(mem(),n,"_+_",false,bad).peep();
+    Node overplus = new LoadNode(mem(),n,"_+_",bad).peep();
 
     Node dyn = keep(dynCall());
     // Resolve primitive choices
@@ -1108,11 +1107,12 @@ public class Parse implements Comparable<Parse> {
 
       // Load the resolve field from the display/scope structure.
       // Known normal identifier load, so always a "fresh" tvar.
-      Node ld = new LoadNode(mem(),dsp,tok,true,bad).peep();
-      // Assume always Fresh for now, even for recursive defs.
-      // The extra Fresh can be removed after the scope closes
-      // and gets the mutual-let-rec fields sorted out.
-      Node frsh = new FreshNode(ld,_e).peep();
+      Node ld = new LoadNode(mem(),dsp,tok,bad).peep();
+      // If from a closure, then never a Fresh.
+      // If from a Frame/Scope/MutLetRec then "It Depends" and
+      // gets decided later.
+      Node frsh = scope.stk().is_closure() ? ld : new FreshNode(ld,_e).peep();
+      //Node frsh = new FreshNode(ld,_e).peep();
       return frsh;
     }
   }
@@ -1122,10 +1122,9 @@ public class Parse implements Comparable<Parse> {
     ScopeNode scope = lookup_scope("$dyn",false);
     // Display/struct/scope containing the field
     Node dsp = get_display_ptr(scope);
-    // Load the resolve field from the display/scope structure
-    Node ld = new LoadNode(mem(),dsp,"$dyn",true,null).peep();
-    //Node frsh = new FreshNode(ld,_e).peep();
-    return ld;
+    // Load the resolve field from the display/closure structure.
+    // Since it's always a Lambda argument, never a Fresh
+    return new LoadNode(mem(),dsp,"$dyn",null).peep();
   }
   private AFieldNode dynCall() {
     Node ld = dynLoad();
@@ -1139,7 +1138,7 @@ public class Parse implements Comparable<Parse> {
    */
   private Node tuple(int oldx, Node s, int first_arg_start) {
     // First stmt is parsed already
-    StructNode nn = new StructNode(0,false,errMsg(oldx) ).init();
+    StructNode nn = new StructNode(0,false,errMsg(oldx),"TUP" ).init();
     Parse bad = errMsg(first_arg_start);
     keep(nn);
     nn.add_fld(TypeFld.CLZ,Access.Final, PrimNode.PCLZ, null);
@@ -1172,7 +1171,7 @@ public class Parse implements Comparable<Parse> {
    */
   private Node struct() {
     int oldx = _x-1;            // Opening @{
-    try( Env e = new Env(_e, null, 0, ctrl(), mem(), _e._scope.ptr(), null) ) { // Nest an environment for the local vars
+    try( Env e = new Env(_e, null, 0, ctrl(), mem(), _e._scope.ptr(), "", null) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
       stmts(true);              // Create local vars-as-fields
       require('}',oldx);        // Matched closing }
@@ -1244,7 +1243,7 @@ public class Parse implements Comparable<Parse> {
     Node dsp = new ParmNode(DSP_IDX,fun,null,formals.at(DSP_IDX)).init();
 
     // Increase scope depth for function body.
-    try( Env e = new Env(_e, fun, formals._len-DSP_IDX, fun, mem, dsp, null) ) { // Nest an environment for the local vars
+    try( Env e = new Env(_e, fun, formals._len-DSP_IDX, fun, mem, dsp, "FRM", null) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
       // Display is special: the default is simply the outer lexical scope.
       // But here, in a function, the display is actually passed in as a hidden
@@ -1278,7 +1277,7 @@ public class Parse implements Comparable<Parse> {
       _e = e._par;            // Pop nested environment; pops nongen also
       // Anonymous functions early-bind.  Functions in structs become "methods" and late-bind.
       Node cloj = null;
-      if( scope().stk().is_closure() ) {
+      if( !scope().stk().is_closure() ) {
         // TODO: NEEDS "fcn" in the current frame, even as mid-def
         // THEORY: INSTALL PARTIAL LATER, SAME AS AST.
         // FLAG FUNPTRNODE SOMEHOW - ASSIGN IN SCOPE AS SOME LEVEL?
@@ -1416,7 +1415,7 @@ public class Parse implements Comparable<Parse> {
     String str = new String(_buf,oldx,_x-oldx-1).intern();
     // Convert to ptr-to-constant-memory-string
     Parse bad = errMsg(oldx);
-    StructNode scon = new StructNode(0,false,bad );
+    StructNode scon = new StructNode(0,false,bad,"STR" );
     scon.add_fld(".",Access.Final,PrimNode.ZSTR,bad);
     scon.add_fld("0",Access.Final,con(TypeInt.con(str.charAt(0))),bad);
     StructNode scon1 = (StructNode)scon.close().peep();
@@ -1674,7 +1673,7 @@ public class Parse implements Comparable<Parse> {
     Node mmem = mem();
     while( true ) {
       if( scope == e._scope ) return ptr;
-      ptr = new LoadNode(mmem,ptr,"^",false,null).peep(); // Gen linked-list walk code, walking display slot
+      ptr = new LoadNode(mmem,ptr,"^",null).peep(); // Gen linked-list walk code, walking display slot
       e = e._par;               // Walk linked-list in parser also
     }
   }

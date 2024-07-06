@@ -632,7 +632,8 @@ public abstract class Node implements Cloneable, IntSupplier {
         //GVN.add_reduce_defs(this); // Unused NewNode kills
         subsume(nnn);           // Replace
       }
-      return nnn._elock();      // Put progress in VALs and return change
+      if( !nnn._elock ) GVN.add_reduce(nnn); // Revisit for GVN
+      return nnn;
     }
     // No progress; put in VALS and return no-change
     _elock();
@@ -763,7 +764,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       assert !_tvar.find().unify(old.find(),true);// monotonic: unifying with the result is no-progress
       // HM changes; push related neighbors
       for( Node def : defs() ) if( def!=null && def.has_tvar() ) GVN.add_flow(def);
-      for( Node use : uses() ) if(              use.has_tvar() ) GVN.add_flow(use);
+      for( Node use : uses() ) if( use!=null && use.has_tvar() ) GVN.add_flow(use);
       return true;
     }
     return false;
@@ -798,7 +799,6 @@ public abstract class Node implements Cloneable, IntSupplier {
       }
     if( isPrim() )
       _live = isMem() ? TypeMem.ALLMEM : Type.ALL;
-    return;
   }
   // Non-recursive specialized version
   void walk_reset0( ) {}

@@ -1,10 +1,11 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
+import com.cliffc.aa.tvar.TVLeaf;
+import com.cliffc.aa.tvar.TVStruct;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.util.Ary;
-
+import com.cliffc.aa.util.NonBlockingHashMapLong;
 import java.util.HashSet;
 
 /** Combined Global Constant Propagation and Hindly-Milner with extensions.
@@ -150,6 +151,13 @@ public abstract class Combo {
     // Set all values to ANY and lives to DEAD, their most optimistic types.
     // Set all type-vars to Leafs.
     RootNode.resetDefMemHigh();
+    // To avoid triggering the "never modify a primitive TV3", reset the $dyn
+    // TV3 to a non-primitive.  The DefDynTable starts at the TOP/PRIM level
+    // but is unified to its final form during analysis.
+    TVStruct tvTOP = Env.STK_0._tvar.as_struct();
+    int idx = tvTOP.idx("$dyn");
+    tvTOP.arg(idx,Env.DYN._tvar=new TVLeaf());
+
     Env.ROOT.walk( n -> {
         if( n.isPrim() ) return;
         n._val = n._live = Type.ANY;  // Highest value
@@ -157,12 +165,8 @@ public abstract class Combo {
         Env.GVN.add_flow(n);
         if( n instanceof FunNode fun )
           fun.set_unknown_callers();
-        if( n instanceof DynLoadNode dyn )
-          DYNS.add(dyn);
-      });
-    Env.ROOT.walk( n -> {
-        if( n instanceof FreshNode frsh )
-          FRESH.push(frsh).set_nongen();
+        if( n instanceof DynLoadNode dyn )  DYNS .add(dyn );
+        if( n instanceof FreshNode  frsh )  FRESH.add(frsh);
       });
     Env.ROOT.xval();
     Env.ROOT.xliv();
@@ -259,5 +263,13 @@ public abstract class Combo {
     FREEZE_WORK.clear();
   }
 
-  static void reset() { HM_NEW_LEAF = HM_AMBI = HM_FREEZE=false; FREEZE_WORK.clear(); DYNS.clear(); FRESH.clear(); }
+  static void reset() {
+    HM_NEW_LEAF = HM_AMBI = HM_FREEZE=false;
+    FREEZE_WORK.clear();
+    DYNS.clear();
+    FRESH.clear();
+    TVStruct tvTOP = Env.STK_0._tvar.as_struct();
+    int idx = tvTOP.idx("$dyn");
+    tvTOP.arg(idx,Env.DYN._tvar=Env.DYN._tv0);
+  }
 }

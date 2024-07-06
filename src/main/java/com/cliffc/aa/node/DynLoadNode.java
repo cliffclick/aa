@@ -26,7 +26,7 @@ public class DynLoadNode extends LoadNode {
   public final HashSet<String> _resolves;
 
   public DynLoadNode( Node mem, Node adr, Node dyn, Parse bad ) {
-    super(mem,adr,"_",true,bad);
+    super(mem,adr,"_",bad);
     addDef(dyn);
     _resolves = new HashSet<>();
   }
@@ -93,7 +93,7 @@ public class DynLoadNode extends LoadNode {
   @Override public Node ideal_reduce() {
     if( _resolves.size()==1 ) {
       String label = _resolves.iterator().next();
-      LoadNode load = new LoadNode(mem(),adr(),label,_fresh,_bad);
+      LoadNode load = new LoadNode(mem(),adr(),label,_bad);
       load._live = _live;
       load._val = _val;
       load._tvar = _tvar;

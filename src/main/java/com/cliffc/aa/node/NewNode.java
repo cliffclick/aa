@@ -43,7 +43,7 @@ public class NewNode extends Node {
   public NewNode( String hint ) { this(hint,BitsAlias.new_alias(),false); }
 
   @Override public String label() {
-    return  (_killed ? "X" : "")+_hint+"*"+_alias;
+    return  (_killed ? "X" : "*")+_alias+_hint;
   }
 
   private void set_alias(int alias) {

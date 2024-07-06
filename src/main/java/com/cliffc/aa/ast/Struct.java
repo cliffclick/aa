@@ -25,7 +25,7 @@ public class Struct extends AST {
 
   @Override public void nodes( Env e ) {
     ScopeNode scope = e._scope;
-    StructNode s = new StructNode(0,false,null);
+    StructNode s = new StructNode(0,false,null,"");
     s.add_fld(TypeFld.CLZ,Access.Final,PrimNode.PCLZ,null);
     for( int i=0; i<_vars._len; i++ ) {
       _kids.at(i).nodes(e);

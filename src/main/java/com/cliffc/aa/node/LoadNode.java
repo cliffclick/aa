@@ -57,10 +57,6 @@ public class LoadNode extends Node {
   public String _fld;
   // Where to report errors
   final Parse _bad;
-  // When doing HM, treat this Load as a identifier load and allow the type
-  // LET-polymorphism.  When false, this Load could be a struct field load,
-  // OR it could be self-recursive definition, OR it could be unknown.
-  boolean _fresh;
 
   // Prevent recursive expansion during ideal_grow
   private boolean _mid_grow;
@@ -68,7 +64,7 @@ public class LoadNode extends Node {
   // A struct using just the field; just a cache for faster live-use
   private final TypeStruct _live_use;
 
-  public LoadNode( Node mem, Node adr, String fld, boolean fresh, Parse bad ) {
+  public LoadNode( Node mem, Node adr, String fld, Parse bad ) {
     super(null,mem,adr);
     _fld = fld;
     _bad = bad;
@@ -483,7 +479,6 @@ public class LoadNode extends Node {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
     if( !(o instanceof LoadNode ld) ) return false;
-    if( _fresh != ld._fresh ) return false;   // Fresh field does differ
     return Util.eq(_fld,ld._fld);
   }
 

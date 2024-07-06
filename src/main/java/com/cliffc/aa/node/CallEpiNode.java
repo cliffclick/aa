@@ -441,8 +441,12 @@ public final class CallEpiNode extends Node {
         addDef(ret);
         fun.addDef(call);
         Env.GVN.add_flow(fun);
-        Env.GVN.add_flow_uses(fun);    // Parms have new inputs
-        Env.GVN.add_reduce(fun); // Last caller wired
+        Env.GVN.add_flow_uses(fun); // Parms have new inputs
+        Env.GVN.add_reduce(fun);    // Last caller wired
+        // Call args depend on parms being alive
+        for( Node use : fun.uses() )
+          if( use instanceof ParmNode parm )
+            parm.deps_add_live(call.in(parm._idx));
         // Swap so ROOT remains last
         if(     in(    len()-2)==Env.ROOT )     swap_last();
         if( fun.in(fun.len()-2)==Env.ROOT ) fun.swap_last();
@@ -474,7 +478,7 @@ public final class CallEpiNode extends Node {
       return p._live;
     }
     // Not a copy
-    if( i==CTL_IDX ) return _live;
+    if( i==CTL_IDX ) return RootNode.removeKills(def,_live);
     if( def instanceof RetNode ret && ret.mem()==null ) return Type.ANY; // No memory input
     // Wired return.
     // The given function is alive, only if the Call will Call it.
@@ -486,7 +490,7 @@ public final class CallEpiNode extends Node {
     if( fidxs.above_center() ) return Type.ANY; // Not called, so not alive
     // Call does not call this, so not alive.
     if( def instanceof RetNode ret )
-      return fidxs.test_recur(ret.fidx()) ? _live : Type.ANY;
+      return fidxs.test_recur(ret.fidx()) ? RootNode.removeKills(def,_live) : Type.ANY;
     // Must be Root
     if( ((RootNode)def).rfidxs().overlaps(fidxs) )
       return _live;

@@ -6,7 +6,6 @@ import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.Util;
 
 import java.util.Arrays;
@@ -68,7 +67,9 @@ public class StructNode extends Node {
   private final Parse _paren_start;
   private final Ary<Parse> _fld_starts;
 
-  public StructNode(int nargs, boolean forward_ref, Parse paren_start ) {
+  public final String _hint;
+
+  public StructNode(int nargs, boolean forward_ref, Parse paren_start, String hint ) {
     super();
     _nargs = nargs;
     _forward_ref = forward_ref;
@@ -77,18 +78,11 @@ public class StructNode extends Node {
     _paren_start = paren_start;
     _fld_starts = new Ary<>(new Parse[1],0);
     _live = TypeStruct.ISUSED;
+    _hint = hint;
   }
 
   @Override String label() {
-    if( is_closure() )
-      return _closed ? "FRAME" : "FRAME?";
-    SB sb = new SB().p("@{");
-    for( int i=0; i<_flds._len; i++ ) {
-      if( i==_nargs ) sb.p("| ");
-      sb.p(_flds.at(i)).p("; ");
-    }
-    if( _flds._len>0 ) sb.unchar(2);
-    return sb.p("}").toString().intern();
+    return "@"+_hint+(_closed ? "" : "?");
   }
 
   // Only if closed
@@ -184,7 +178,7 @@ public class StructNode extends Node {
           assert !parent.isPrim();
           parent.stk().add_fld(fref._name,TypeFld.Access.RW,fref,_fld_starts.at(i)).xval();
           // Stomp field locally to load from parent
-          LoadNode fld = new LoadNode(parent.mem(),parent.ptr(),fref._name,false,_fld_starts.at(i)).init();
+          LoadNode fld = new LoadNode(parent.mem(),parent.ptr(),fref._name,_fld_starts.at(i)).init();
           setDef(i,fld);
           parent.mem().xval();
           Env.GVN.add_work_new(fld);
@@ -197,7 +191,7 @@ public class StructNode extends Node {
   // multi-testing
   @Override void walk_reset0( ) {
     if( len()>0 )
-      while( !last().isPrim() ) {
+      while( !last().isResetKeep() ) {
         _flds.pop();
         _accesses.pop();
         _fld_starts.pop();

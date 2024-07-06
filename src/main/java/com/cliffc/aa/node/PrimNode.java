@@ -48,13 +48,13 @@ public abstract class PrimNode extends Node {
   @Override public String label() { return _name; }
 
   // Int/Float/String primitives.
-  public static final StructNode ZCLZ = new StructNode(0,false,null );
-  public static final StructNode ZNIL = new StructNode(0,false,null );
-  public static final StructNode ZINT = new StructNode(0,false,null );
-  public static final StructNode ZFLT = new StructNode(0,false,null );
-  public static final StructNode ZSTR = new StructNode(0,false,null );
-  public static final StructNode ZMATH= new StructNode(0,false,null );
-  public static final NewNode PCLZ = new NewNode("TOP",BitsAlias.CLZX,true);
+  public static final StructNode ZCLZ = new StructNode(0,false,null,"CLZ" );
+  public static final StructNode ZNIL = new StructNode(0,false,null,"NIL" );
+  public static final StructNode ZINT = new StructNode(0,false,null,"INT" );
+  public static final StructNode ZFLT = new StructNode(0,false,null,"FLT" );
+  public static final StructNode ZSTR = new StructNode(0,false,null,"STR" );
+  public static final StructNode ZMATH= new StructNode(0,false,null,"MATH");
+  public static final NewNode PCLZ = new NewNode("CLZ",BitsAlias.CLZX,true);
   public static final NewNode PNIL = new NewNode("NIL",BitsAlias.NILX,true);
   public static final NewNode PINT = new NewNode("INT",BitsAlias.INTX,true);
   public static final NewNode PFLT = new NewNode("FLT",BitsAlias.FLTX,true);
@@ -156,10 +156,12 @@ public abstract class PrimNode extends Node {
     // Math package
     Env.STK_0.add_fld("math",Access.Final,make_math(rand),null).xval();
 
+    // DefDynTable
+    Env.STK_0.add_fld("$dyn", TypeFld.Access.Final,Env.DYN,null);
+
     Env.ROOT.setDef(CTL_IDX,Env.CTL_0);
     Env.ROOT.setDef(MEM_IDX,Env.MEM_0);
     Env.ROOT.setDef(REZ_IDX,Env.ALL);
-
 
     // Set all TVars
     PNIL.set_tvar();
@@ -268,7 +270,7 @@ public abstract class PrimNode extends Node {
         // display argument is always of the primitive type, and the other
         // arguments may vary, and the correct primitive is picked using
         // overload resolution.
-        StructNode over = new StructNode(0,false,null );
+        StructNode over = new StructNode(0,false,null,"OVER" );
         over.add_fld(TypeFld.CLZ,Access.Final,PCLZ,null);
         int cnt=0;
         for( PrimNode prim : prims ) {

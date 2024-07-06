@@ -31,14 +31,14 @@ public class MProjNode extends ProjNode {
 
     // Fold across pure calls (most primitives)
     if( in(0) instanceof CallEpiNode cepi && !cepi._is_copy && cepi.in(0) instanceof CallNode call ) {
-      if( call.tfp()._fidxs!=BitsFun.NALL && cepi.nwired()>0 ) {
+      if( call.tfp()._fidxs!=BitsFun.NALL && cepi.nwired()>0 && _live.isa(call.mem()._live) ) {
         boolean pure=true;
         for( int i=0; i<cepi.nwired(); i++ ) {
           Node w = cepi.wired(i);
           if( w instanceof RetNode ret ) {
             if( ret.mem()!=null ) { pure=false;  break; }
           } else { pure=false;  break; }
-        }      
+        }
         if( pure )
           return call.mem();
       } else {

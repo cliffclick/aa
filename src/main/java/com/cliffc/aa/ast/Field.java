@@ -19,6 +19,6 @@ public class Field extends AST {
     _kids.at(0).nodes(e);
     Node ptr = e._scope.rez();
     Node mem = e._scope.mem();
-    e._scope.rez(new LoadNode(mem,ptr,_name,false,null).peep());
+    e._scope.rez(new LoadNode(mem,ptr,_name,null).peep());
   }
 }

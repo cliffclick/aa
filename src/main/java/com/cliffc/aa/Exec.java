@@ -31,11 +31,11 @@ public abstract class Exec {
   // Parse and type a string.  Can be nested.  In theory, will be eval() someday.
   // In theory, can keep the result node and promote them for the REPL.
   public static TypeEnv go( Env top, Node ctrl, Node mem, String src, String str ) { // Execute string
-    Env e = Env.FILE = new Env(top,null,1+1,ctrl,mem,top._scope.ptr(), null);
+    Env e = Env.FILE = new Env(top,null,0,ctrl,mem,top._scope.ptr(),"FILE", null);
 
     // Parse a program
-    ErrMsg err = new Parse(src,e,str).prog();
-    //ErrMsg err = new ASTParse(src,str).prog(e);
+    //ErrMsg err = new Parse(src,e,str).prog();
+    ErrMsg err = new ASTParse(src,str).prog(e);
 
     // Move final results into Root; close out the top scope
     Env.ROOT.setDef(CTL_IDX,e._scope.ctrl());

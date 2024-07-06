@@ -38,7 +38,7 @@ public class Lambda extends ASTVars {
     Node mem = new ParmNode(MEM_IDX,_fun,null,TypeMem.ALLMEM   ).init();
     Node dsp = new ParmNode(DSP_IDX,_fun,null,outScope.ptr()._tptr).init();
     // Increase scope depth for function body.
-    try( Env e = new Env(outer, _fun, _vars._len-DSP_IDX, _fun, mem, dsp, null) ) { // Nest an environment for the local vars
+    try( Env e = new Env(outer, _fun, _vars._len-DSP_IDX, _fun, mem, dsp,"LAMBDA", null) ) { // Nest an environment for the local vars
       ScopeNode inScope = e._scope;
       // Display is special: the default is simply the outer lexical scope.
       // But here, in a function, the display is actually passed in as a hidden

@@ -18,17 +18,16 @@ public class ScopeNode extends Node {
   // Mapping from type-variables to Types.  Types have a scope lifetime like values.
   public final HashMap<String,TypeNil> _types; // user-typing type names
 
-  public ScopeNode( HashMap<String,TypeNil> types,  Node ctl, Node mem, Node rez, Node ptr, StructNode dsp) {
+  public final String _hint;
+
+  public ScopeNode( HashMap<String,TypeNil> types,  Node ctl, Node mem, Node rez, Node ptr, StructNode dsp, String hint ) {
     super(ctl,mem,rez,ptr,dsp);
     _types = types;
     //_live = RootNode.defMem(this);
     _live = live();
+    _hint = hint;
   }
-  @Override public String label() {
-    if( Parse.PARSE != null && Parse.PARSE.scope()==this )
-      return "CURSCOP";
-    return "Scope";
-  }
+  @Override public String label() { return "$"+_hint; }
   @Override public boolean isCFG() { return true; }
   @Override public boolean isMem() { return true; }
 

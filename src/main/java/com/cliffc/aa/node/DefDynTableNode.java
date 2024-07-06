@@ -46,4 +46,6 @@ public class DefDynTableNode extends Node {
       throw AA.TODO("UNTESTED FOLDING 2 EQUAL DYNTABLES");  //return true;
     return false;
   }
+  public TV3 _tv0;
+  public void init0() { assert _tvar!=null; _tv0=_tvar; }
 }

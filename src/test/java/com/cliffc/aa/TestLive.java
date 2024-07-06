@@ -47,7 +47,7 @@ public class TestLive {
     ConNode fdy = new ConNode(TypeInt.con(9)).init();
 
     // New object, fields x,y holding ints
-    StructNode obj = new StructNode(0,false,null );
+    StructNode obj = new StructNode(0,false,null,"TEST" );
     obj.add_fld("x",TypeFld.Access.Final,fdx,null);
     obj.add_fld("y",TypeFld.Access.Final,fdy,null);
     obj.close().init();

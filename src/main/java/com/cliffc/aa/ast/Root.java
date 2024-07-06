@@ -1,7 +1,6 @@
 package com.cliffc.aa.ast;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.type.TypeFld.Access;
 import com.cliffc.aa.node.DefDynTableNode;
 import com.cliffc.aa.node.FreshNode;
 import com.cliffc.aa.util.Ary;
@@ -22,7 +21,7 @@ public class Root extends ASTVars {
     // Always an initial Dyn-Table
     //_dyn = new DefDynTableNode().init();
     //e._scope.stk().add_fld("$dyn",Access.Final,_dyn,null);
-    _dyn = (DefDynTableNode)e._scope.stk().in("$dyn");
+    _dyn = (DefDynTableNode)e._par._scope.stk().in("$dyn");
     _kids.at(0).nodes(e);
   }
 

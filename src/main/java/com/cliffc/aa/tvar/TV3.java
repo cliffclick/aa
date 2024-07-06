@@ -855,7 +855,7 @@ abstract public class TV3 implements Cloneable {
   public TV3 check_reset() { return _check(new VBitSet()); }
   private TV3 _check(VBitSet visit ) {
     if( visit.tset(_uid) ) return null;
-    if( _uid>=CNT ) return this;
+    if( _uid>=CNT ) return this; // Fails here
     if( _uf!=null ) return _uf._check(visit);
     if( _args==null ) return null;
     for( TV3 arg : _args )
