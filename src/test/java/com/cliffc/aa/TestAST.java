@@ -29,9 +29,9 @@ public class TestAST {
     File folder = new File("src/test/java/com/cliffc/aa/ast");
     File[] tests = folder.listFiles(file -> file.getName().endsWith("aa") && file.getName().contains(filter));
     Arrays.sort(tests, (s0,s1) -> Util.alphanumCompare(s0.toString(),s1.toString()));
-    for( File f : tests ) {
-      testOne(0,f);
-    }
+    for( File f : tests )
+      for( int i=0; i<4; i++ )
+        testOne(0,f);
   }
 
   public void testOne( int rseed, File f ) throws IOException {
@@ -44,7 +44,6 @@ public class TestAST {
       Type   expectGCPType = Type.valueOf(expectGCPStr);
       Type   actualGCPType = te._t;
       assertEquals(expectGCPType,actualGCPType);
-
 
       // Check the HM type
       String expectHMTStr  = get_expected(prog,"// HMT: ",false);

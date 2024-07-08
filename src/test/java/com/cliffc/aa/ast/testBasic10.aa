@@ -1,0 +1,9 @@
+// Function in a struct needs proper display/self/this
+// GCP: 3
+// HMT: int:3
+init=3;
+@{
+  fld := init;
+  get = { -> fld };
+}
+.get()

@@ -29,30 +29,21 @@ public class TestParse {
     JIG=true;
     DO_GCP=true;
     DO_HMT=false;
-    RSEED=1;
+    RSEED=0;
 
     test(
 """
-A = { x -> math.rand(2) ? B(x) : x };
-D = {   -> math.rand(2) ? B(1) : C(2) };
-C = { x -> A(x) };
-B = { x -> C(x) };
-( D(), C(3.14) )
-
+fcn = { ->
+  @{
+     q  = math.rand(2);
+     AA = { x -> x.a._+_.0(q) };
+     BB = { x -> x.b._+_.1(q) };
+  }._
+};
+( fcn() @{a=2  ;},
+  fcn() @{b=3.3;} )
 """,
-         "*[24]( _, %[6,7][], %[6,7][])","*[24]( _, int:nint8, flt:3.14)",null,null,"[4,24]",null);
-
-//    test(
-//"""
-//fcn = { ->
-//  ( { x -> x.a },
-//    { x -> x.b }
-//)._
-//};
-//( fcn() @{a=2  ;},
-//  fcn() @{b=3.3;} )
-//""",
-//         "*[26]( _, %[2,4,26][2]?, %[2,4,26][2]?)", "*[26](_,int:2,flt:3.3)",null,null,"[4,26]",null);
+         "*[26]( _, %[2,4,26][2]?, %[2,4,26][2]?)", "*[26](_,int:2,flt:3.3)",null,null,"[4,26]",null);
 
 //    test(
 //            """

@@ -876,6 +876,15 @@ abstract public class TV3 implements Cloneable {
     } catch(CloneNotSupportedException cnse) {throw TODO();}
   }
 
+  public TV3 hack_dsp() {
+    if( _args!=null )
+      for( int i=0; i<len(); i++ )
+        if( _args[i] != null )
+          _args[i] = arg(i).hack_dsp();
+    return this;
+  }
+
+
   // Initial state after loading e.g. primitives.
   public static int _INIT0_CNT = 99999;
   public static void init0() {

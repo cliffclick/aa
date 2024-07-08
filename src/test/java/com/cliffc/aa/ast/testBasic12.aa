@@ -1,0 +1,13 @@
+// Mutually recursive
+// GCP: *[25]@{ _; someC=%[6,7][]; someD=%[6,7][]   }
+// HMT: *[25]@{ _; someC=flt:3.14; someD=int:nint8; }
+gen = { init ->
+  @{
+    fld := init;
+    get = { -> fld };
+    inc = { -> fld := fld+1 };
+  }
+};
+A = gen(3);
+B = gen(7);
+(A.get(),B.inc(),B.get())

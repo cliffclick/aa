@@ -13,6 +13,8 @@ import static com.cliffc.aa.AA.TODO;
 
 public class LetRec extends ASTVars {
   private final Ary<Access> _accs;
+  // Cyclic ref; needs the full ForwardRef treatment during expansion
+  private boolean _cyclic;
 
   private LetRec() { super(new Ary<>(String.class));  _accs = new Ary<>(Access.class); }
   public  LetRec(String var, boolean rw, AST def, AST body) {
@@ -63,6 +65,7 @@ public class LetRec extends ASTVars {
   private int _idx;
   private long _stack;          // A stack of max 8
   private byte[] _leaders;
+  private boolean[] _cyclics; // Is leader cyclic?
 
   int addEdge(int to) {
     // Found a Let reference in the body; the def has already been walked
@@ -80,6 +83,7 @@ public class LetRec extends ASTVars {
     Arrays.fill(_edges,-1);
     _leaders = new byte[_vars._len];
     Arrays.fill(_leaders,(byte)-1);
+    _cyclics = new boolean[_vars._len];
     _stack = -1;
     // Set parent field.  Walk the children, building def/use edges
     for( _idx=0; _idx<_vars._len; _idx++ ) {
@@ -121,12 +125,13 @@ public class LetRec extends ASTVars {
       walk(idx);                // Walk it, checking for cycles
       return;
     }
-    // Found a cycle
+    // Found an edge to a prior leader
     long stk = _stack, i=0;
     while( stk != -1 && ((byte)(stk&0xFF)) != idx && leader((byte)(stk&0xFF)) != leader )
       { stk >>= 8; i++; }
     if( stk== -1 ) // Due to multi-edges, we might not find if dupped, so just ignore
-      return;
+      return;      // No cycle
+    _cyclics[leader]=true;
     // Set the cycle leader to all members
     stk = _stack;
     while( i>0 ) {
@@ -156,6 +161,7 @@ public class LetRec extends ASTVars {
     if( leader(idx) != leader ) {
       leader = leader(idx);
       let = new LetRec();       // Changing leaders
+      let._cyclic = _cyclics[leader];
     }
     // Add vars to the LetRec
     let._accs.push(_accs.at(idx));
@@ -182,7 +188,7 @@ public class LetRec extends ASTVars {
     ScopeNode scope = e._scope;
     StructNode stk = _stk = scope.stk();
     // Single variables can be re-definitions or StoreNodes
-    if( _accs.at(0) == Access.RW ) {
+    if( !_cyclic ) {
       assert _vars._len==1 && _kids._len==2;
       _kids.at(0).nodes(e);     // Go ahead and get the one kid def
       Node rez = scope.rez();

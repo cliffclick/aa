@@ -517,6 +517,13 @@ public class TVStruct extends TVExpanding {
     return is;
   }
 
+  @Override public TV3 hack_dsp() {
+    if( is_prim() ) return this;
+    for( int i=0; i<len(); i++ )
+      _args[i] = Util.eq(_flds[i],TypeFld.CLZ) ? TVPtr.PTRCLZ : arg(i).hack_dsp();
+    return this;
+  }
+
   public static void reset_to_init0() {
     //EMPTY._deps = null;
   }

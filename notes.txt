@@ -1,4 +1,36 @@
 =======================================
+07/08/2024
+
+So mid-upgrade to ASTParse to allow interleaving of Structs and Functions.
+Was flipping back-n-forth between Struct.java making the Struct Early or Late.
+Settled on making it Early, and now basically dealing with the fallout:
+
+escaping a struct makes it available on the Root input, which then confuses the
+final store tracking.
+
+So I hate veering off from getting ASTParse settled again but....
+back to wanting a private/public ptr type.
+Thinking about:
+- PHi has a widen operator for TMP
+- TMP can be constant, named so in the Prims, true exact Store updates
+- TMP can be private , made by all NewNode `@{}` to start with.  Phi.widen converts private -> shared
+- TMP can be shared  , the default.  Store does inexact updates.
+Goal here is AST/testBasic5.aa:
+  Root MProj reports *[22]@{ A1=final, A7=final }
+  rez = fcn call
+  A1 = rez;
+  tmp = *[22]@{ A1:=ANY, A7:=ANY };
+  tmp.A1 = A1; // Final Store
+  rez = fcn call
+  tmp.A7 = rez  // Final Store
+  return to Root: *[22];
+
+Since *[22] escapes to Root, its memory is available on input to test with the
+A7 final store imprecisely updating the `tmp`, so reporting a final store on an
+already-final field
+
+
+=======================================
 07/01/2024
 
 All stable tests pass on ASTParse!!!!  "make test".

@@ -305,6 +305,8 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     return _obj!=null && _obj.is_con(cons);
   }
 
+  @Override public Type hack_dsp() { return make_from(_obj.hack_dsp()); }
+
   // Used for assertions
   @Override boolean intern_check1() { return _obj==null || _obj.intern_get()!=null; }
 }

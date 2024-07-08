@@ -204,6 +204,14 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     return make_from(_t.make_from(head,mem,visit));
   }
 
+  // Field is public: can be seen if escaped via Root.  This is all fields
+  // withOUT a leading underscore or the CLZ field.  TODO: Operator names?
+  public boolean isPublic() {
+    return !Util.eq(_fld,CLZ) && _fld.charAt(0)!='_';
+  }
+
+  @Override public Type hack_dsp() { return make_from(_t.hack_dsp()); }
+
   // Used for assertions
   @Override boolean intern_check1() { return _t.intern_get()!=null; }
 }

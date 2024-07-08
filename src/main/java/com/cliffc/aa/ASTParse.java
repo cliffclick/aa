@@ -23,6 +23,15 @@ public class ASTParse {
   private final byte[] _buf;    // Bytes being parsed
   private int _x;               // Parser index
 
+  // Stack of names/idents/fields, so the parser can disambiguate "x" as either
+  // a Lambda arg "{ x -> ...}" or a LetRec body use "x = ...;...x..." or a
+  // LetRec recursive "fact = { n -> fact... }" or an internal Struct field "@{
+  // fld=init; ...fld... }"
+  enum Kind { Arg, Body, Def, Field };
+  private final Ary<String> _vars = new Ary<>(String.class);
+  private final Ary<Kind > _kinds = new Ary<>(Kind  .class);
+
+
   // Fields strictly for Java number parsing
   private static final NumberFormat _nf = NumberFormat.getInstance();
   private static final ParsePosition _pp = new ParsePosition(0);
@@ -34,6 +43,8 @@ public class ASTParse {
     _prog = prog;
     _buf = prog.getBytes();
     _x   = 0;
+    _vars .push("math");
+    _kinds.push(Kind.Arg);
   }
 
   // Handy for the debugger to print
@@ -41,7 +52,7 @@ public class ASTParse {
 
 
   public ErrMsg prog(Env e) {
-    AST rez = stmts(true);
+    AST rez = stmts(false);
     if( rez == null )
       return ErrMsg.syntax(null,"Not a program?");
     if( skipWS() != -1 ) return ErrMsg.trailingjunk(null);
@@ -125,7 +136,10 @@ public class ASTParse {
     }
 
     // Normal statement value parse
-    AST ifex = ifex();         // Parse an expression for the statement value
+    if( !lookup_current_scope_only ) push(toks,0,Kind.Def); // Push toks into scope
+    AST ifex = ifex();    // Parse an expression for the statement value
+    if( !lookup_current_scope_only ) pop(toks._len); // Pull from scope; if we exit should not be in scope
+
     // Check for no-statement after start of assignment, e.g. "x = ;"
     if( ifex == null ) {        // No statement?
       if( toks._len == 0 ) return null;
@@ -137,18 +151,30 @@ public class ASTParse {
     if( !peek(';') ) return ifex;
 
     // Assign
+    push(toks,0,lookup_current_scope_only ? Kind.Field : Kind.Body); // Push toks into scope
     AST body = stmt(lookup_current_scope_only);
+    pop(toks._len);       // Pull from scope; if we exit should not be in scope
+
     if( body == null && toks._len == 0 ) return ifex;
     String  fld = toks._len==0 ? ("$ignore"+0).intern() : toks.at(0);
     boolean mut = toks._len==0 ? false : rs.get(0);
     return new LetRec(fld,mut,ifex,body);
   }
 
-  // Ignore the half-scope inside trinarys
-  private boolean testIf() {
-    return false;
+  void push(Ary<String> toks, int i, Kind kind) {
+    for( ; i<toks._len; i++ ) {
+      _vars .push(toks.at(i));
+      _kinds.push(kind);
+    }
+  }
+  void pop(int len) {
+    _vars .pop(len);
+    _kinds.pop(len);
   }
 
+
+  // Ignore the half-scope inside trinarys
+  private boolean testIf() { return false; }
 
 
 
@@ -397,6 +423,15 @@ public class ASTParse {
   }
 
   private AST do_ident( String tok, int oldx ) {
+    for( int idx = _vars._len-1; idx >=0; idx-- )
+      if( Util.eq(_vars.at(idx),tok) )
+        return switch( _kinds.at(idx) ) {
+        case Arg  -> new Ident(tok);
+        case Def  -> new Ident(tok);
+        case Body -> new Ident(tok);
+        case Field-> new Field(tok,null); // Get enclosing struct as an unname ref
+        };
+    // Forward reference
     return new Ident(tok);
   }
 
@@ -484,7 +519,9 @@ public class ASTParse {
     if( _x == oldx ) { formals.set_len(ARG_IDX+1);  ids.set_len(ARG_IDX+1); bads.set_len(ARG_IDX+1); }
 
     // Parse function body
-    AST rez = stmts(true);      // Parse function body
+    push(ids,AA.ARG_IDX,Kind.Arg);
+    AST rez = stmts(false);      // Parse function body
+    pop(ids._len-AA.ARG_IDX);
     if( rez == null ) rez = err_ctrl2("Missing function body");
     require('}',oldx-1);      // Matched with opening {}
 

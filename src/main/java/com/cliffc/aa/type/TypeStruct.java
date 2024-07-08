@@ -794,6 +794,13 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     return t instanceof TypeStruct ts ? ts : t.oob(ISUSED);
   }
 
+  @Override public TypeStruct hack_dsp() {
+    TypeFld[] flds = TypeFlds.clone(_flds);
+    for( int i=0; i<flds.length; i++ )
+      flds[i] = Util.eq(flds[i]._fld,TypeFld.CLZ) ? Cons.CLZ_FLD : (TypeFld)flds[i].hack_dsp();
+    return make_from(flds);
+  }
+
   // Used for assertions
   @Override boolean intern_check1() {
     for( TypeFld fld : this )

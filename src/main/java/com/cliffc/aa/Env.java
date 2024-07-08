@@ -129,6 +129,23 @@ public class Env implements AutoCloseable {
     _scope = new ScopeNode(new HashMap<>(),ctrl,mem,XNIL,ptr,dsp,hint).init();
   }
 
+  // Struct Env
+  public Env( Env par, String hint ) {
+    ScopeNode scope = par._scope;
+    _par = par;
+    _fun = null;
+    StructNode dsp = new StructNode(0,false,null,hint) ;
+    dsp.add_fld("^",TypeFld.Access.Final,scope.ptr(),null).init();
+    NewNode ptr = new NewNode(hint,BitsAlias.new_alias(),false).init();
+    // See matching comment hack in Struct.java.
+    // Struct is made before running the init code.
+    Node mem = new StoreXNode(scope.mem(),ptr,dsp,null).init();
+    _scope = new ScopeNode(new HashMap<>(),scope.ctrl(),mem,ptr,ptr,dsp,hint).init();
+    // Struct is made after all field inits are generated, then struct is
+    // initialized all at once.
+    //_scope = new ScopeNode(new HashMap<>(),scope.ctrl(),scope.mem(),ptr,ptr,dsp,hint).init();
+  }
+
   // Top-level Env.  Contains, e.g. the primitives.
   // Above any file-scope level Env.
   private Env( ) { this(null,null,3,ALL,ANYMEM,PrimNode.PCLZ,"TOP",null); }
@@ -147,12 +164,18 @@ public class Env implements AutoCloseable {
     Type mem = Env.ROOT.in(MEM_IDX)._val;
     Type val = mem.sharptr(rez._val);
     TV3 tval = rez.tvar();
+    // TODO: EVIL BAD HACK: KILL ALL EMBEDDED DISPLAY PTRS
+    // BAD BECAUSE THEY SHOULD BE LIVE AND PART OF THE REPORTED TYPE... BUT
+    // BAD2 BECAUSE THEY ARE NEARLY ALL DEAD AND LIVENESS SHOULD KILL... BUT
+    // BAD3 NEED COMPLEX "NO PRIVATE FIELDS ARE LIVE" LIVENESS
+    Type val2 =  val.hack_dsp();
+    TV3 tval2 = tval.hack_dsp();
     BitsAlias aliases = Env.ROOT.ralias();
     BitsFun   fidxs   = Env.ROOT.rfidxs();
-    return new TypeEnv(val,     // GCP result
+    return new TypeEnv(val ,    // GCP result
                        fidxs,   // Escaping FIDXS
                        aliases, // Escaping ALIASES
-                       tval,
+                       tval ,
                        errs0.isEmpty() ? null : errs0);
   }
 

@@ -1,0 +1,12 @@
+// Function in a struct needs proper display/self/this
+// GCP: *[25]( _, 3, 7 )
+// HMT: *[25]( _, int:3, int:7 )
+gen = { init ->
+  @{
+    fld := init;
+    get = { -> init };
+  }
+};
+A = gen(3);
+B = gen(7);
+(A.get(),B.get())

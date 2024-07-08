@@ -15,6 +15,7 @@ public abstract class StoreAbs extends Node {
   public StoreAbs( Node mem, Node adr, Node val, Parse bad ) {
     super(null,mem,adr,val);
     _bad = bad;
+    _val = RootNode.defMem(null);
   }
 
   @Override public boolean isMem() { return true; }

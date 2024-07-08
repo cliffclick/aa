@@ -31,7 +31,7 @@ public abstract class Exec {
   // Parse and type a string.  Can be nested.  In theory, will be eval() someday.
   // In theory, can keep the result node and promote them for the REPL.
   public static TypeEnv go( Env top, Node ctrl, Node mem, String src, String str ) { // Execute string
-    Env e = Env.FILE = new Env(top,null,0,ctrl,mem,top._scope.ptr(),"FILE", null);
+    Env e = Env.FILE = new Env(top,null,1,ctrl,mem,top._scope.ptr(),"FILE", null);
 
     // Parse a program
     //ErrMsg err = new Parse(src,e,str).prog();

@@ -205,4 +205,12 @@ public class TypeTuple extends Type<TypeTuple> {
     // DSP_IDX
     return TypeFunPtr.make(_any,BitsFun.NALL,nargs(),_ts[2],ret());
   }
+
+  @Override public Type hack_dsp() {
+    Type[] ts = Types.clone(_ts);
+    for( int i=0; i<ts.length; i++ )
+      ts[i] = ts[i].hack_dsp();
+    return make0(_any,ts);
+  }
+
 }

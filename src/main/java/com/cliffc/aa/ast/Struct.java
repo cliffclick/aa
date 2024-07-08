@@ -2,8 +2,6 @@ package com.cliffc.aa.ast;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.node.*;
-import com.cliffc.aa.type.BitsAlias;
-import com.cliffc.aa.type.TypeFld;
 import com.cliffc.aa.type.TypeFld.Access;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
@@ -24,15 +22,31 @@ public class Struct extends AST {
   }
 
   @Override public void nodes( Env e ) {
-    ScopeNode scope = e._scope;
-    StructNode s = new StructNode(0,false,null,"");
-    s.add_fld(TypeFld.CLZ,Access.Final,PrimNode.PCLZ,null);
-    for( int i=0; i<_vars._len; i++ ) {
-      _kids.at(i).nodes(e);
-      s.add_fld(_vars.at(i),Access.Final,scope.rez(),null);
+    ScopeNode outScope = e._scope;
+    try( Env eStruct = new Env(e,"STRUCT") ) {
+      ScopeNode inScope = eStruct._scope;
+      StructNode s = inScope.stk();
+      // Struct is pre-allocated, fields filled with ANY, then the init code runs
+      for( int i=0; i<_vars._len; i++ )
+        s.add_fld(_vars.at(i),Access.RW,Env.ANY,null);
+      s.close();
+      for( int i=0; i<_vars._len; i++ ) {
+        _kids.at(i).nodes(eStruct);
+        inScope.mem( new StoreNode( inScope.mem(),inScope.ptr(),inScope.rez(),_vars.at(i),Access.Final,null));
+      }
+
+      //// See matching comment hack in Env.java
+      // The init code runs, then all fields are filled in at once.
+      //for( int i=0; i<_vars._len; i++ ) {
+      //  _kids.at(i).nodes(eStruct);
+      //  s.add_fld(_vars.at(i),Access.Final,inScope.rez(),null);
+      //}
+      //s.close();
+      //inScope.mem( new StoreXNode(inScope.mem(),inScope.ptr(),s,null).init());
+
+      outScope.ctrl(inScope.ctrl());
+      outScope.mem (inScope.mem ());
+      outScope.rez (inScope.ptr ());
     }
-    NewNode ptr = new NewNode("STRUCT",BitsAlias.new_alias(),false).init();
-    scope.rez(ptr);
-    scope.mem(new StoreXNode(scope.mem(),ptr,s,null).init());
   }
 }

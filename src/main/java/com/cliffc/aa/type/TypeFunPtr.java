@@ -436,6 +436,10 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
 
   @Override public TypeFunPtr sharptr2( TypeMem mem ) { return make_from(_dsp.sharptr2(mem),_ret.sharptr2(mem)); }
 
+  @Override public TypeFunPtr hack_dsp() {
+    return make_from(_dsp.hack_dsp(),_ret.hack_dsp());
+  }
+
   // All reaching fidxs, including any function returns
   @Override BitsFun _all_reaching_fidxs( TypeMem tmem) {
     //if( Type.ARF.tset(_uid) ) return _fidxs;

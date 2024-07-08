@@ -27,11 +27,11 @@ public class Ident extends AST {
     // loads along the way.
     Env e2 = e;
     Node ptr = e2._scope.ptr();
-    while( e2._scope.stk().find(_name) == -1 ) {
-      assert e2._scope.stk().is_closure() || e2==Env.FILE; // TODO: only skip up fcn closures
+    while( e2._scope.stk().find(_name) == -1 || !e2._scope.stk().is_closure() ) {
       ptr = new LoadNode(e._scope.mem(),ptr,"^",null).peep();
       e2 = e2._par;
     }
+    assert e2._scope.stk().is_closure();
     Node ld = new LoadNode(e._scope.mem(),ptr,_name,null).peep();
 
     // Bind unknown loads, in case an FP is involved
@@ -55,7 +55,7 @@ public class Ident extends AST {
   }
 
   private boolean isLetPolymorphic() {
-    for( AST par = _par, old=null; par != null; old = par, par = par._par )
+    for( AST par = _par, old=this; par != null; old = par, par = par._par )
       if( par instanceof LetRec let && let._vars.find(_name)!= -1 &&
           // If the ident comes from the body side, needs a Fresh
           let.body() == old )

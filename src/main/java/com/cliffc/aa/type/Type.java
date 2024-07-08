@@ -1046,6 +1046,12 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   }
   private static String stripIndent(String s){ return s.replace("\n","").replace(" ",""); }
 
+  // TODO: EVIL BAD HACK: KILL ALL EMBEDDED DISPLAY PTRS
+  // BAD BECAUSE THEY SHOULD BE LIVE AND PART OF THE REPORTED TYPE... BUT
+  // BAD2 BECAUSE THEY ARE NEARLY ALL DEAD AND LIVENESS SHOULD KILL... BUT
+  // BAD3 NEED COMPLEX "NO PRIVATE FIELDS ARE LIVE" LIVENESS
+  public Type hack_dsp() { return this; }
+
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
   }

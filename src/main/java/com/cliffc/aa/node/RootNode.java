@@ -122,8 +122,10 @@ public class RootNode extends Node {
       if( awork._len>0 ) {
         TypeStruct ts = tmem.at(awork.pop());
         for( TypeFld tfld : ts ) {
-          Type fld = tfld._t;
-          escs = _add_all(escs,awork,fwork,fld);
+          if( tfld.isPublic() ) {
+            Type fld = tfld._t;
+            escs = _add_all(escs,awork,fwork,fld);
+          }
         }
       }
       if( fwork._len>0 ) {
