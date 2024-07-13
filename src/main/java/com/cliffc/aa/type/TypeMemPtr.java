@@ -9,6 +9,9 @@ import java.util.function.BinaryOperator;
 // Loads and Stores.  They carry a set of aliased TypeObjs.
 
 public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
+  // IFF the _aliases is a single bit, then also the ptr (and hence _obj) is unique.
+  public boolean _con;
+
   // The _obj field is unused (trivially OBJ or XOBJ) for TMPs used as graph
   // node results, because memory contents are modified in TypeMems and
   // TypeStructs and NOT in pointers - hence this field "goes stale" rapidly as
@@ -19,15 +22,19 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   // function call args).
   public TypeStruct _obj; // Meet/join of aliases.  Unused in simple_ptrs in graph nodes.
 
-  private TypeMemPtr init(boolean any, boolean nil, boolean sub, BitsAlias aliases, TypeStruct obj ) {
+  private TypeMemPtr init(boolean any, boolean nil, boolean sub, BitsAlias aliases, boolean con, TypeStruct obj ) {
     super.init(any, nil, sub, aliases, BitsFun.EMPTY);
     assert !aliases.test(0); // No nil in aliases, use nil/sub instead
+    //assert con || aliases!=BitsAlias.EMPTY; // Empty is a "constant"
+    assert !con || (aliases.abit()!= -1 && !BitsAlias.TREE.is_parent(Math.abs(aliases.abit())));
+    _con=con;
     _obj=obj;
     return this;
   }
   @Override TypeMemPtr copy() {
     TypeMemPtr tmp = super.copy();
     tmp._aliases = _aliases;
+    tmp._con = _con;
     tmp._obj = _obj;
     return tmp;
   }
@@ -60,7 +67,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     if( this==o ) return true;
     if( !(o instanceof TypeMemPtr t2) ) return false;
     if( !super.equals(t2) ) return false;
-    if( _aliases != t2._aliases ) return false;
+    if( _aliases != t2._aliases || _con != t2._con ) return false;
     return _obj == t2._obj || (_obj!=null && t2._obj!=null && _obj.cycle_equals(t2._obj));
   }
 
@@ -78,6 +85,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     // Shortcut for printing boxed primitives
     if( is_clz_ptr() ) return P.p("*CLZ");
     P.p('*');
+    if( _con ) P.p('#');
     if( P.debug ) _aliases.str(P.sb);
     return _obj==null ? P.p("()") : _obj._str(P).p(_str_nil());
   }
@@ -88,11 +96,12 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
 
   static TypeMemPtr valueOf(Parse P, String cid, boolean any) {
     P.require('*');
+    boolean con = P.peek('#');
     var aliases = P.bits(BitsAlias.EMPTY);
     boolean haz_nil = aliases.test(0);
     boolean nil = any &  haz_nil;
     boolean sub = any | !haz_nil;
-    TypeMemPtr tmp = malloc(any, nil, sub, aliases.clear(0),(TypeStruct)null);
+    TypeMemPtr tmp = malloc(any, nil, sub, aliases.clear(0),con, (TypeStruct)null);
     if( cid!=null ) P._dups.put(cid,tmp);
     assert !tmp.interned();
     tmp._obj = (TypeStruct)P.type();
@@ -101,34 +110,34 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
 
 
   static { new Pool(TMEMPTR,new TypeMemPtr()); }
-  static TypeMemPtr malloc(boolean any, boolean nil, boolean sub, BitsAlias aliases, TypeStruct obj ) {
+  static TypeMemPtr malloc(boolean any, boolean nil, boolean sub, BitsAlias aliases, boolean con, TypeStruct obj ) {
     TypeMemPtr t1 = POOLS[TMEMPTR].malloc();
-    return t1.init(any,nil,sub,aliases,obj);
+    return t1.init(any,nil,sub,aliases,con,obj);
   }
   // Convenience for some callers, supports half as many choices
-  public static TypeMemPtr malloc(boolean any, boolean haz_nil, BitsAlias aliases, TypeStruct obj ) {
-    return malloc(any, any & haz_nil, any | !haz_nil, aliases, obj );
+  public static TypeMemPtr malloc(boolean any, boolean haz_nil, BitsAlias aliases, boolean con, TypeStruct obj ) {
+    return malloc(any, any & haz_nil, any | !haz_nil, aliases, con, obj );
   }
 
-  public static TypeMemPtr make(boolean haz_nil, BitsAlias aliases, TypeStruct obj ) {
+  public static TypeMemPtr make(boolean haz_nil, BitsAlias aliases, boolean con, TypeStruct obj ) {
     assert !aliases.is_empty(); // Ambiguous
-    return malloc(aliases.above_center(),haz_nil,aliases,obj).hashcons_free();
+    return malloc(aliases.above_center(),haz_nil,aliases,con,obj).hashcons_free();
   }
-  public static TypeMemPtr make(boolean any, boolean haz_nil, BitsAlias aliases, TypeStruct obj ) {
-    return malloc(any,haz_nil,aliases,obj).hashcons_free();
+  public static TypeMemPtr make(boolean any, boolean haz_nil, BitsAlias aliases, boolean con, TypeStruct obj ) {
+    return malloc(any,haz_nil,aliases,con,obj).hashcons_free();
   }
-  public static TypeMemPtr make(boolean any, boolean nil, boolean sub, BitsAlias aliases, TypeStruct obj ) {
-    return malloc(any,nil,sub,aliases,obj).hashcons_free();
+  public static TypeMemPtr make(boolean any, boolean nil, boolean sub, BitsAlias aliases, boolean con, TypeStruct obj ) {
+    return malloc(any,nil,sub,aliases,con,obj).hashcons_free();
   }
   TypeMemPtr malloc_from(TypeStruct obj) {
-    return malloc(_any, _nil, _sub, _aliases,obj);
+    return malloc(_any, _nil, _sub, _aliases, _con, obj);
   }
 
-  public static TypeMemPtr make( int alias, TypeStruct obj ) { return make(false,BitsAlias.make0(alias),obj); }
+  public static TypeMemPtr make( int alias, TypeStruct obj ) { return make(false,BitsAlias.make0(alias),true,obj); }
   public static TypeMemPtr make_simple( int alias ) { return make(alias,null); }
-  public static TypeMemPtr make_nil( int alias, TypeStruct obj ) { return make(true,BitsAlias.make0(alias),obj); }
+  public static TypeMemPtr make_nil( int alias, TypeStruct obj ) { return make(true,BitsAlias.make0(alias),true,obj); }
   public TypeMemPtr make_from( TypeStruct obj ) { return _obj==obj ? this : malloc_from(obj).hashcons_free(); }
-  public TypeMemPtr make_from( BitsAlias aliases ) { return _aliases==aliases ? this : make(aliases.test(0),aliases.clear(0),_obj); }
+  public TypeMemPtr make_from( BitsAlias aliases ) { return _aliases==aliases ? this : make(aliases.test(0),aliases.clear(0),_con,_obj); }
 
   // Legacy constructor for legacy HM tests
   public static TypeMemPtr make_str(String s) { return make_str(TypeInt.con(s.length()),TypeInt.con( s.isEmpty() ? 0 : s.charAt(0))); }
@@ -136,7 +145,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public static TypeMemPtr make_str(BitsAlias aliases, TypeInt len, TypeInt char0) {
     // Make a string object
     TypeStruct ts = TypeStruct.make_prim(TypeFld.make_clz(TypeStruct.XSTRZ()),TypeFld.make_prim(len));
-    return TypeMemPtr.make(aliases.test(0),aliases.clear(0),ts);
+    return TypeMemPtr.make(aliases.test(0),aliases.clear(0),false,ts);
   }
   public boolean is_str() { return _obj.is_str(); }
 
@@ -153,18 +162,18 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     TypeFld[] flds = TypeFlds.make(DISP_FLD);
     TypeStruct.RECURSIVE_MEET--;
     DISPLAY = TypeStruct.malloc(false,ALL,flds);
-    DISPLAY_PTR = malloc(false,false,BitsAlias.NALL,DISPLAY);
+    DISPLAY_PTR = malloc(false,false,BitsAlias.NALL,false,DISPLAY);
     DISP_FLD.setX(DISPLAY_PTR);
     TypeStruct ds = Cyclic.install(DISPLAY);
     assert ds==DISPLAY;
   }
 
-  public  static final TypeMemPtr ISUSED0= make(true ,BitsAlias.NALL,TypeStruct.ISUSED); // Includes nil
-  public  static final TypeMemPtr ISUSED = make(false,BitsAlias.NALL,TypeStruct.ISUSED); // Excludes nil
-  public  static final TypeMemPtr EMTPTR = malloc(false,false,BitsAlias.EMPTY,TypeStruct.UNUSED).hashcons_free();
-  public  static final TypeMemPtr DISP_SIMPLE= make(false,BitsAlias.NALL,TypeStruct.ISUSED); // closed display
-  public  static final TypeMemPtr INTPTR = TypeMemPtr.make(BitsAlias.INTX,TypeStruct.ISUSED);   // Simple ptr-to-wrapped int
-  public  static final TypeMemPtr FLTPTR = TypeMemPtr.make(BitsAlias.FLTX,TypeStruct.ISUSED);   // Simple ptr-to-wrapped flt
+  public  static final TypeMemPtr ISUSED0= make(true ,BitsAlias.NALL,false,TypeStruct.ISUSED); // Includes nil
+  public  static final TypeMemPtr ISUSED = make(false,BitsAlias.NALL,false,TypeStruct.ISUSED); // Excludes nil
+  public  static final TypeMemPtr EMTPTR = malloc(false,false,BitsAlias.EMPTY,false,TypeStruct.UNUSED).hashcons_free();
+  public  static final TypeMemPtr DISP_SIMPLE= make(false,BitsAlias.NALL,false,TypeStruct.ISUSED); // closed display
+  public  static final TypeMemPtr INTPTR = make(BitsAlias.INTX,TypeStruct.ISUSED);   // Simple ptr-to-wrapped int
+  public  static final TypeMemPtr FLTPTR = make(BitsAlias.FLTX,TypeStruct.ISUSED);   // Simple ptr-to-wrapped flt
   public  static final TypeMemPtr STRPTR = make_str(TypeInt.INT8,TypeInt.con('A'));
 
   static final Type[] TYPES = new Type[]{ISUSED0,EMTPTR,DISPLAY,DISPLAY_PTR};
@@ -176,7 +185,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     BitsAlias ad = _aliases.dual();
     TypeStruct od = _obj==null ? null : _obj._dual;
     boolean xor = _nil == _sub;
-    return malloc(!_any,_nil^xor,_sub^xor,ad,od);
+    return malloc(!_any,_nil^xor,_sub^xor,ad,_con,od);
   }
   @Override void rdual() { _dual._obj = _obj._dual; }
   @Override protected TypeMemPtr xmeet( Type t ) {
@@ -187,7 +196,9 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     boolean any = _any & ptr._any;
     boolean nil = _nil & ptr._nil;
     boolean sub = _sub & ptr._sub;
-    return malloc(any,nil,sub,aliases, to).hashcons_free();
+    boolean con = (_con&ptr._con) | (_con&ptr._any) | (_any&ptr._con);
+    con &= (aliases.abit()!=-1);
+    return malloc(any, nil, sub, aliases, con, to).hashcons_free();
   }
 
   // Widens, not lowers.
@@ -300,7 +311,8 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     if( !above_center() && _aliases!=BitsAlias.EMPTY ) {
       int alias = _aliases.abit();
       if( alias== -1 ) return false;
-      if( !cons.test(alias) ) return false;
+      //if( !cons.test(alias) ) return false;
+      if( !_con ) return false;
     }
     return _obj!=null && _obj.is_con(cons);
   }

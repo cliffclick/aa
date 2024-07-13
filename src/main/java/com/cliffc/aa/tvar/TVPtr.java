@@ -82,7 +82,7 @@ public class TVPtr extends TV3 {
     deps_add(dep);
     // Compatible escaped aliases
     BitsAlias aliases = Env.ROOT==null ? _aliases : Env.ROOT.matching_escaped_aliases(this, dep);
-    return TypeMemPtr.malloc(false,_may_nil,aliases,(TypeStruct)load()._as_flow(dep));
+    return TypeMemPtr.malloc(false,_may_nil,aliases,false,(TypeStruct)load()._as_flow(dep));
   }
 
   @Override void _widen( byte widen ) { }

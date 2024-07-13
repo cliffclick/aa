@@ -31,6 +31,8 @@ public class TestParse {
     DO_HMT=false;
     RSEED=0;
 
+    test("q=(2,3.14); (!q._,q._.sin())","*[21](_, int1, flt64)","*[21](_,int:int1,flt:flt64)", null, null, "[4,21]", null);
+
     test(
 """
 fcn = { ->

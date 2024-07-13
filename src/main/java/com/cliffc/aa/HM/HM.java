@@ -2510,7 +2510,7 @@ public class HM {
         // all escaping aliases that are compatible
         BitsAlias aliases = EXTStruct.estr(this)._aliases;
         TypeStruct tstr = deep ? (TypeStruct)arg("*")._as_flow(syn,deep) : TypeStruct.ISUSED;
-        return TypeMemPtr.make(false,_may_nil,aliases,tstr);
+        return TypeMemPtr.make(false,_may_nil,aliases,false,tstr);
       }
       if( is_nil() )
         return arg("?")._as_flow(syn,deep).meet(TypeNil.AND_XSCALAR);
@@ -3160,7 +3160,7 @@ public class HM {
           return (_widen == 0 ? TypeNil.SCALAR : TypeNil.make(false,false,false,BitsAlias.EXT,BitsFun.EMPTY)).dual();
         TypeStruct obj0 = tn instanceof TypeMemPtr tmp ? tmp._obj : tn.oob(TypeStruct.ISUSED);
         TypeStruct obj = (TypeStruct)arg("*")._hm_apply_lift(obj0,apply,test);
-        return TypeMemPtr.make(tn.above_center(),_may_nil&&tn.must_nil(),tn._aliases,obj);
+        return TypeMemPtr.make(tn.above_center(),_may_nil&&tn.must_nil(),tn._aliases,false,obj);
       }
       if( is_obj() ) return t; // expect ptrs to be simple, so t is ISUSED
 

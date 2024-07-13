@@ -154,9 +154,9 @@ public class TestType {
     int alias1 = BitsAlias.new_alias(alias0);
     int alias2 = BitsAlias.new_alias(alias1);
 
-    TypeMemPtr t0 = TypeMemPtr.make(alias2,TypeStruct.POINT3D);
-    TypeMemPtr t1 = TypeMemPtr.make(alias1,TypeStruct.POINT  );
-    TypeMemPtr t2 = TypeMemPtr.make(alias0,TypeStruct.ISUSED );
+    TypeMemPtr t0 = TypeMemPtr.make(false,BitsAlias.make0(alias2),false,TypeStruct.POINT3D);
+    TypeMemPtr t1 = TypeMemPtr.make(false,BitsAlias.make0(alias1),false,TypeStruct.POINT  );
+    TypeMemPtr t2 = TypeMemPtr.make(false,BitsAlias.make0(alias0),false,TypeStruct.ISUSED );
     assertTrue(t0.isa(t1));
     Type t02,t12,mt;
 
@@ -169,7 +169,7 @@ public class TestType {
     // also:  t1.join(t2) ==  mt
     //       [4] join [2] ==> [~2 + ~4]
 
-    t1 = TypeMemPtr.make_nil(alias1,TypeStruct.POINT);  // Same with nil
+    t1 = TypeMemPtr.make(true,BitsAlias.make0(alias1),false,TypeStruct.POINT);  // Same with nil
     t02 = t0.join(t2);        // join of unrelated bits2&5 []
     t12 = t1.join(t2);        // join of unrelated bits2&4 []
     mt  = t02.meet(t12);
@@ -272,15 +272,15 @@ public class TestType {
     Type pmem0= TypeMemPtr.ISUSED0;    // *[ALL]?
     Type pmem = TypeMemPtr.ISUSED ;    // *[ALL]
 
-    Type pstr0 = TypeMemPtr.make_nil(alias1,TypeStruct.POINT ); // STRPTR
-    TypeMemPtr pstr = TypeMemPtr.make(alias1,TypeStruct.POINT ); // *[str]
+    TypeMemPtr pstr0 = TypeMemPtr.make(true ,BitsAlias.make0(alias1),false,TypeStruct.POINT ); // STRPTR
+    TypeMemPtr pstr  = TypeMemPtr.make(false,BitsAlias.make0(alias1),false,TypeStruct.POINT ); // *[str]
     Type ptup0= TypeMemPtr.ISUSED0; // *[tup]?
     Type ptup = TypeMemPtr.ISUSED;  // *[tup]
 
-    TypeMemPtr pabc0= TypeMemPtr.make_nil(alias2,TypeStruct.POINT3D); // *["abc"]?
-    TypeMemPtr pabc = TypeMemPtr.make    (alias2,TypeStruct.POINT3D); // *["abc"]?
+    TypeMemPtr pabc0= TypeMemPtr.make(true ,BitsAlias.make0(alias2),false,TypeStruct.POINT3D); // *["abc"]?
+    TypeMemPtr pabc = TypeMemPtr.make(false,BitsAlias.make0(alias2),false,TypeStruct.POINT3D); // *["abc"]?
     TypeMemPtr pzer = TypeMemPtr.make(BitsAlias.new_alias(BitsAlias.LOCX),TypeStruct.ISUSED);// *[(0)]
-    TypeMemPtr pzer0= TypeMemPtr.make(true,pzer._aliases,TypeStruct.ISUSED);  // *[(0)]?
+    TypeMemPtr pzer0= TypeMemPtr.make(true,pzer._aliases,false,TypeStruct.ISUSED);  // *[(0)]?
     Type nil = TypeNil.NIL, xnil = TypeNil.XNIL;
 
     Type xtup = ptup .dual();
@@ -543,8 +543,8 @@ public class TestType {
     TypeFld fldn4 = TypeFld.malloc("n");
     TypeStruct as1 = TypeStruct.malloc_test(TypeStruct.XINTZ(),fldn1,fldvi);
     TypeStruct bs4 = TypeStruct.malloc_test(TypeStruct.XSTRZ(),fldn4,fldvf);
-    TypeMemPtr ap5 = TypeMemPtr.make(alias,as1);
-    TypeMemPtr bp2 = TypeMemPtr.make(alias,bs4);
+    TypeMemPtr ap5 = TypeMemPtr.make(false,BitsAlias.make0(alias),false,as1);
+    TypeMemPtr bp2 = TypeMemPtr.make(false,BitsAlias.make0(alias),false,bs4);
     fldn1.setX(bp2);
     fldn4.setX(ap5);
     Type.RECURSIVE_MEET--;
@@ -574,9 +574,9 @@ public class TestType {
     int alias0 = BitsAlias.ALLX;
     int alias1 = BitsAlias.new_alias(alias0);
     int alias2 = BitsAlias.new_alias(alias1);
-    TypeMemPtr t2 = TypeMemPtr.make(alias2,TypeStruct.POINT3D); // ABCPTR
-    TypeMemPtr t1 = TypeMemPtr.make(alias1,TypeStruct.POINT ); // STRPTR
-    TypeMemPtr t0 = TypeMemPtr.make(alias0,TypeStruct.ISUSED);
+    TypeMemPtr t2 = TypeMemPtr.make(false,BitsAlias.make0(alias2),false,TypeStruct.POINT3D); // ABCPTR
+    TypeMemPtr t1 = TypeMemPtr.make(false,BitsAlias.make0(alias1),false,TypeStruct.POINT ); // STRPTR
+    TypeMemPtr t0 = TypeMemPtr.make(false,BitsAlias.make0(alias0),false,TypeStruct.ISUSED);
     // All are ISA
     TypeMemPtr[] tmps = new TypeMemPtr[]{
       t1.dual(),

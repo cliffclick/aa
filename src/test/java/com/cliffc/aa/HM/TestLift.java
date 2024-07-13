@@ -35,13 +35,13 @@ public class TestLift {
     TypeFld fld1 = flds[2] = TypeFld.malloc("1",null,Access.Final);
     TypeFld fld2 = flds[3] = TypeFld.malloc("2",null,Access.Final);
     TypeStruct ts = TypeStruct.malloc(false,Type.ALL,flds);
-    TypeMemPtr ret1 = TypeMemPtr.malloc(false,false,B3,ts);
+    TypeMemPtr ret1 = TypeMemPtr.malloc(false,false,B3,true,ts);
     fld0.setX(ret1);
     fld1.setX(ret1);
     fld2.setX(ret1);
     Type.RECURSIVE_MEET--;
     ts = Cyclic.install(ts);
-    ret1 = TypeMemPtr.make(false,B3,ts);
+    ret1 = TypeMemPtr.make(false,B3,true,ts);
 
     // 917: *[3](^=any, _917$, SCALR, SCALR)
     TypeFld[] flds2 = TypeFlds.get(4);
@@ -51,11 +51,11 @@ public class TestLift {
     Type.RECURSIVE_MEET++;
     TypeFld fld20 = flds2[1] = TypeFld.malloc("0",null,Access.Final);
     TypeStruct ts2 = TypeStruct.malloc(false,Type.ALL,flds2);
-    TypeMemPtr ret2 = TypeMemPtr.make(false,B3,ts2);
+    TypeMemPtr ret2 = TypeMemPtr.make(false,B3,true,ts2);
     fld20.setX(ret2);
     Type.RECURSIVE_MEET--;
     ts2 = Cyclic.install(ts2);
-    ret2 = TypeMemPtr.make(false,B3,ts2);
+    ret2 = TypeMemPtr.make(false,B3,true,ts2);
 
     // Build rezt2 from HM.apply_lift
     T2 x00 = make3(frl,frl,fr3);
@@ -121,28 +121,28 @@ public class TestLift {
     Type.RECURSIVE_MEET++;
     TypeFld fld1 = TypeFld.malloc("0",null,Access.Final);
     TypeStruct ts1 = TypeStruct.malloc_test(Cons.CLZ_FLD,fld1);
-    TypeMemPtr ret1 = TypeMemPtr.make(false,B3,ts1);
+    TypeMemPtr ret1 = TypeMemPtr.make(false,B3,true,ts1);
     fld1.setX(ret1);
     Type.RECURSIVE_MEET--;
     ts1 = Cyclic.install(ts1);
-    ret1 = TypeMemPtr.make(false,B3,ts1);
+    ret1 = TypeMemPtr.make(false,B3,true,ts1);
 
     // 917: *[3](^=any, 0=SCALR)
     TypeFld fld2 = TypeFld.make_tup(TypeNil.SCALAR,ARG_IDX);
     TypeStruct ts2 = TypeStruct.make_test(Cons.CLZ_FLD,fld2);
-    TypeMemPtr ret2 = TypeMemPtr.make(false,B3,ts2);
-    
+    TypeMemPtr ret2 = TypeMemPtr.make(false,B3,true,ts2);
+
     // Build rezt2 from HM.apply_lift
     T2 x00 = T2.make_struct(FLDS1, new T2[]{frl.fresh()});
-    
+
     // Call hm_apply_lift with ret1
     T2.WDUPS.clear(true);
     Type lift1 = x00.hm_apply_lift(ret1,apply,true);
-    
+
     // Call hm_apply_lift with ret2
     T2.WDUPS.clear(true);
     Type lift2 = x00.hm_apply_lift(ret2,apply,true);
-    
+
     // Check monotonic
     assertTrue(ret1 .isa(ret2 ));
     assertTrue(lift1.isa(lift2));

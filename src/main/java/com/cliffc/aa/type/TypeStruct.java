@@ -286,10 +286,10 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
 
   // Remove default dups.  'flds' is not-interned.
   static TypeFld[] remove_dups(Type def, TypeFld[] flds) {
-    assert !TypeFlds.interned(flds);
     int cnt=0, i=0;
     for( TypeFld fld : flds )  if( fld._t == def )  cnt++;
     if( cnt==0 ) return flds;
+    assert !TypeFlds.interned(flds);
     TypeFld[] fs = TypeFlds.get(flds.length-cnt);
     for( TypeFld fld : flds )  if( fld._t != def )  fs[i++]=fld;
     TypeFlds.free(flds);

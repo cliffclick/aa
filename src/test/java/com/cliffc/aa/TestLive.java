@@ -87,7 +87,7 @@ public class TestLive {
     ptr.xliv();
     assertEquals(TypeMem.ALL,ptr._live);
     mmm.xliv();
-    assertEquals(TypeMem.EXTMEM,mmm._live); // Since ptr is scalar, all memory is alive
+    assertEquals(expected_live,mmm._live); // Since ptr is scalar, all memory is alive
     fdx.xliv();
     assertEquals(Type.ALL,fdx._live); // Since ptr is scalar, all memory is alive
     Combo.HM_FREEZE = false;          // Reset

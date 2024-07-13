@@ -134,6 +134,6 @@ public class TypeFlt extends TypeNil<TypeFlt> {
 
   // Shallow wrap
   public TypeMemPtr wrap() {
-    return TypeMemPtr.make(false,false,false,BitsAlias.EMPTY,TypeStruct.make_prim(TypeFld.make_clz(TypeMemPtr.FLTPTR),TypeFld.make_prim(this))); // Wrapped primitive
+    return TypeMemPtr.make(false,false,false,BitsAlias.EMPTY,false,TypeStruct.make_prim(TypeFld.make_clz(TypeMemPtr.FLTPTR),TypeFld.make_prim(this))); // Wrapped primitive
   }
 }
