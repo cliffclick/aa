@@ -1,6 +1,7 @@
 package com.cliffc.aa.exe;
 
 import com.cliffc.aa.AA;
+import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
@@ -20,7 +21,7 @@ import java.util.function.IntSupplier;
 import static com.cliffc.aa.AA.*;
 
 public class EXE {
-
+  static Object DUMMY = Env.PRIM; // Init order
   public static void main( String[] args ) throws IOException {
     for( String arg : args ) {
       if( arg.equals("-") ) repl();
@@ -481,7 +482,8 @@ public class EXE {
 
       // pred is a simple constant?  Unify one side
       int cmp=0;
-      if( _pred.tvar() instanceof TVBase base && base._t instanceof TypeNil tn ) {
+      TypeNil tn = _pred.tvar().isPrim();
+      if( tn!=null ) {
         if( tn._nil ) { cmp= -1; assert !tn._sub; }
         if( tn._sub )   cmp=  1;
         if( tn==TypeInt.ZERO || tn==TypeFlt.ZERO ) cmp = -1;
@@ -816,7 +818,8 @@ public class EXE {
           TV3 terr = syn.tvar().treeFind( tv -> tv instanceof TVErr );
           if( terr != null )
             throw new IllegalArgumentException(terr.toString());
-          if( syn.tvar() instanceof TVBase base && base._t instanceof TypeNil tn && tn.getClass()==TypeNil.class )
+          TypeNil tn = syn.tvar().isPrim();
+          if( tn!=null && tn.getClass()==TypeNil.class )
             throw new IllegalArgumentException("Mixing basic types");
           return null;
         },
@@ -838,9 +841,9 @@ public class EXE {
       {"ctl","mem",TypeFld.CLZ,"$dyn","arg1"},
       {"ctl","mem",TypeFld.CLZ,"$dyn","arg1","arg2"},
     };
-    static TV3 INT64() { return new TVBase(TypeInt.INT64); }
-    static TV3 FLT64() { return new TVBase(TypeFlt.FLT64); }
-    static TV3 STR  () { return new TVBase(TypeMemPtr.STRPTR); }
+    static TV3 INT64() { return TV3.from_flow(TypeInt.INT64); }
+    static TV3 FLT64() { return TV3.from_flow(TypeFlt.FLT64); }
+    static TV3 STR  () { return TV3.from_flow(TypeMemPtr.STRPTR); }
 
     final TV3[] _tvs;
     PrimSyn(TV3... tvs) {

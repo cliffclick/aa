@@ -1,6 +1,6 @@
 // Explicit closure style
-// Type: D:{ D -> D }
-// Eval: *[12]@{ Aflt=0.5f; AD=1; }
+// Type: { *[CLZ]@{ A:*[2]@{ $dyn=-;  ..., }; $dyn=B; f=C:{ A - C -> C };  ..., } - C -> C }
+// Eval: <*[4]@{ _ $dyn=0; f=<A:*[2]@{ _ $dyn=-; },LAM5>; },LAM3>
 
 //f = { x -> (x x) };
 //id = { y -> y };

@@ -1,5 +1,5 @@
 // Mutual recursion
-// Type: int64
+// Type: int:int64
 // Eval: 1
 is_even =
   is_odd = { n -> if n ? (- 1 (is_even (- n 1))) : 0 };

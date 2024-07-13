@@ -1,6 +1,5 @@
 // Simple struct test
-// Type: nint8
+// Type: int:nint8
 // Eval: 2
 tmp = if (rnd) ? @{x =2; y =3;} : @{x =3; z =4;};
 tmp.x
-

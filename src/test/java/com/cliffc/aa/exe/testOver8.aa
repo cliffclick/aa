@@ -1,5 +1,5 @@
 // One DynLoad, fcn needs DynTable
-// Type: int64
+// Type: int:int64
 // Eval: 7
 
 fcn = { ->
@@ -23,4 +23,3 @@ baz = { ->
   : (bar 3.9f)  // Passing in flt
 };
 (baz)
-  

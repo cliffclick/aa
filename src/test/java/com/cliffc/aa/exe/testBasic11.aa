@@ -1,5 +1,5 @@
 // Test of deBrujin indices
-// Type: 1
+// Type: int:1
 // Eval: 1
 x = 1;
 y = x;

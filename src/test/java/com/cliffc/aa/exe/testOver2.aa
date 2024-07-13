@@ -1,10 +1,8 @@
 // One DynLoad, no Fresh, resolves local
-// Type: *[8]( _, int64, flt64)
+// Type: *[8]( _, int:int64, flt:flt64)
 // Eval: *[8]( _, 4, 4.400000013411045f)
 inc = @{
   iinc ={ x -> ( + x 1   ) };
   finc ={ x -> (f+ x 1.1f) };
 };
 (pair (inc._ 3) (inc._ 3.3f))
-
-

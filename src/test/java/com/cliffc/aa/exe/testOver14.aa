@@ -1,9 +1,9 @@
 // 'x' has both a function field and a "struct with v field" field
 // See testOver13.aa
-// Type: str
+// Type: str:str
 // Eval: "abcmore"
 ({ x -> (x._ x._.v)}
-  @{ 
+  @{
      a = @{ v ="abc"; x =1.2f; };
      b = { s -> (s+ s "more")};
   }

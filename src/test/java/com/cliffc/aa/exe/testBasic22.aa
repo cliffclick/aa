@@ -1,4 +1,4 @@
 // Test of strings
-// Type: str
+// Type: str:str
 // Eval: "abcxyz"
 (s+ "abc" "xyz")

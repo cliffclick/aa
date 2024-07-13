@@ -1,5 +1,5 @@
 
-// Type: *[FLT]( _, 1, 2)
+// Type: *[FLT]( _, int:1, int:2)
 // Eval: *[7]( _, 1, 2)
 
 // Displays are closed & defined def-by-def.  So prior partial displays in the gen set.
@@ -12,5 +12,5 @@
 // a Fresh effect on "bound", so each call can resolve separate dyntables.
 // factorial, is_even/is_odd, mutually recursive defined in same display chunk
 
-fcn = { -> (pair @{a =1;} @{b =2;})._ }; 
+fcn = { -> (pair @{a =1;} @{b =2;})._ };
 (pair (fcn).a (fcn).b)

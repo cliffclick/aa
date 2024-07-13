@@ -1,5 +1,5 @@
 // One DynLoad, fcn needs DynTable
-// Type: flt64
+// Type: flt:flt64
 // Eval: 5.300000011920929f
 
 fcn = { x ->
@@ -9,4 +9,3 @@ fcn = { x ->
    }._ x)
 };
 if 0 ? (fcn 3) : (fcn 3.3f)
-

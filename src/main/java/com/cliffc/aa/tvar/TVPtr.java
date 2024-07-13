@@ -31,16 +31,19 @@ public class TVPtr extends TV3 {
 
   // -------------------------------------------------------------
   // Union aliases
-  @Override public void _union_impl(TV3 that) {
+  @Override public boolean _union_impl(TV3 that) {
     assert !unified();
     TVPtr ptr = (TVPtr)that;    // Invariant when called
-    ptr._aliases = _aliases.meet(ptr._aliases);
+    BitsAlias old = ptr._aliases;
+    ptr._aliases = _aliases.meet(old);
     // Special case for nil vs primitive
     if( ptr._may_nil && ptr.load().is_prim() ) {
       TVBase base = (TVBase)ptr.load().arg(1);
-      base._t = base._t.meet(TypeNil.NIL);
+      Type told = base._t;
+      base._t = told.meet(TypeNil.NIL);
+      if( told != base._t ) return true;
     }
-
+    return old != ptr._aliases;
   }
 
   @Override boolean _unify_impl(TV3 that ) {
@@ -88,6 +91,15 @@ public class TVPtr extends TV3 {
   boolean is_nil (TVStruct str) { return str.len()==0 &&  _aliases.is_empty() && _may_nil; }
   boolean is_0clz(TVStruct str) { return str.len()==0 && (_aliases.is_empty() || _aliases==BitsAlias.CLZ); }
   boolean is_prim(TVStruct str) { return str.is_prim() && _aliases==BitsAlias.EMPTY; }
+
+  // Return a TypeNil from a wrapped primitive, or null
+  @Override public TypeNil isPrim() {
+    return load().is_prim() &&
+      load().arg(TypeFld.PRIM) instanceof TVBase base &&
+      base._t instanceof TypeNil tn
+      ? tn : null;
+  }
+
 
   @Override public VBitSet _get_dups_impl(VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     if( _args.length == 0 || _args[0]==null ) return dups; // Broken ptr

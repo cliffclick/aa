@@ -1,5 +1,5 @@
 // Explicit closure style
-// Type: *[11]@{ AD=1; Aflt=0.5f; }
+// Type: *[11]@{ AD=int:1; Aflt=flt:0.5f; }
 // Eval: *[11]@{ Aflt=0.5f; AD=1; }
 
 // See https://www.epfl.ch/labs/lamp/wp-content/uploads/2019/01/acc16_05_closure-conversion.pdf

@@ -1,6 +1,6 @@
 // Gen counters
 // Simple test of captured environment
-// Type: *[8]( _, int64, int64)
+// Type: *[8]( _, int:int64, int:int64)
 // Eval: *[8]( _, 2, 1)
 gen = { ->
   inc = { cnt ->

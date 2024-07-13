@@ -1,5 +1,5 @@
 // Evil test, showing AA use of display.
-// Type: *[11]@{ AD=1; Aflt=3.100000001490116; }
+// Type: *[11]@{ AD=int:1; Aflt=flt:3.100000001490116; }
 // Eval: *[11]@{ Aflt=3.100000001490116f; AD=1; }
 
 // All functions make field-local display loads ONLY, never "look" outside their own scope.
@@ -35,7 +35,7 @@ dsp1 = @{
   dsp0 = dsp0; // Fresh Ident of dsp0
   A  = { x -> (dsp0.A0 dsp0 x) }; // Bind variant
   // These dsp1 come from LAMBDA, not Fresh
-  D0 = { dsp1x -> (dsp1x.A 1) }; // 
+  D0 = { dsp1x -> (dsp1x.A 1) }; //
 };
 dsp2 = @{
   dsp1 = dsp1;

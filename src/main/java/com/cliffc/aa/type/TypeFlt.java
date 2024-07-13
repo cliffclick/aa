@@ -77,7 +77,7 @@ public class TypeFlt extends TypeNil<TypeFlt> {
     return this;
   }
 
-  public static TypeFlt con(double con) { return make(false,false,true,0,con); }
+  public static TypeFlt con(double con) { return con==0 ? ZERO : make(false,false,true,0,con); }
 
   public static final TypeFlt FLT64 = make(false,false,false,64,0);
   public static final TypeFlt FLT32 = make(false,false,false,32,0);

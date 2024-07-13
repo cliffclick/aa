@@ -22,12 +22,12 @@ public class TVErr extends TV3 {
   static final int XMEM=6;
   static final int XDYN=7;
   static final int XMAX=8;
-  
+
   // Errors other than structural unify errors.
   public Ary<String> _errs;
 
   public Parse _bad;
-  
+
   public TVErr() { super(new TV3[XMAX+XMAX]); }
 
   @Override public TVStruct as_struct() { return (TVStruct)arg(XSTR); }
@@ -41,7 +41,7 @@ public class TVErr extends TV3 {
     assert _args[XSTR]==null;
     return (_args[XSTR] = new TVLeaf());
   }
-  
+
   //@Override TV3 find_nil() { return this; }
 
   // This is Fresh, that is TVErr and missing index i.
@@ -97,23 +97,23 @@ public class TVErr extends TV3 {
 
   // Make this tvar an error and add an error message
   @Override public boolean unify_err(String msg, TV3 extra, Parse bad, boolean test) { return false; }
-  
+
   // -------------------------------------------------------------
   // Union/merge subclass specific bits
-  @Override public void _union_impl(TV3 that) {
+  @Override public boolean _union_impl(TV3 that) {
     if( !(that instanceof TVErr terr) ) {
       TV3 err_part = arg(that.eidx());
-      if( err_part == null ) _args[that.eidx()] = that;
-      else err_part._union_impl(that);
-    } else {
-      // Merge error messages
-      for( String err : terr._errs )
-        if( _errs.find(err)== -1 )
-          throw TODO();         // Progress
-      for( String err : _errs )
-        if( terr._errs.find(err)== -1 )
-          throw TODO();         // Progress
+      if( err_part == null ) { _args[that.eidx()] = that; return true; }
+      return err_part._union_impl(that);
     }
+    // Merge error messages
+    for( String err : terr._errs )
+      if( _errs.find(err)== -1 )
+        throw TODO();         // Progress
+    for( String err : _errs )
+      if( terr._errs.find(err)== -1 )
+        throw TODO();         // Progress
+    return false;
   }
 
   @Override boolean _unify_impl(TV3 that ) {
@@ -126,7 +126,7 @@ public class TVErr extends TV3 {
     }
     return ptrue();
   }
-  
+
   // -------------------------------------------------------------
   @Override int _trial_unify_ok_impl( TV3 pat ) { throw TODO(); }
   @Override boolean _exact_unify_impl( TV3 tv3 ) { throw TODO(); }
@@ -150,7 +150,7 @@ public class TVErr extends TV3 {
       if( _args[i]!=null )
         arg(i).widen(widen,false);
   }
-    
+
   @Override public TVErr copy() {
     TVErr terr = (TVErr)super.copy();
     terr._errs = _errs.deepCopy();

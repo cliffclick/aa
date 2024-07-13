@@ -1,5 +1,5 @@
 // factorial
-// Type: int64
+// Type: int:int64
 // Eval: 6
 fact = { n ->
   if n

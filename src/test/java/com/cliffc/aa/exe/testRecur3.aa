@@ -1,5 +1,5 @@
 // factorial-like, but arbitrary op-by-2
-// Type: *[NIL]( _, int64, int64)
+// Type: *[NIL]( _, int:int64, int:int64)
 // Eval: *[5]( _, 16, 9)
 fun = { fx x ->
   if x

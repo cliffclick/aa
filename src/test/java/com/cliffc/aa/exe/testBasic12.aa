@@ -1,5 +1,5 @@
 // Test of deBrujin indices
-// Type: *[3]( _, 3, 4)
+// Type: *[3]( _, int:3, int:4)
 // Eval: *[3]( _, 3, 4)
 x = 1;
 y = 2;

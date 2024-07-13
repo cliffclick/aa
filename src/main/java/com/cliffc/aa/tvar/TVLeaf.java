@@ -33,9 +33,6 @@ public class TVLeaf extends TVExpanding {
     return this.union(that);
   }
 
-  // Leafs have no subclass specific parts to union.
-  @Override public void _union_impl(TV3 that) { }
-
   // Merge deps from this into that
   @Override public void _union_deps(TV3 that) {
     if( that._deps==null ) that._deps = _deps;

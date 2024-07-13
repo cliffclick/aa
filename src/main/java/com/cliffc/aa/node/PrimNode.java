@@ -107,7 +107,7 @@ public abstract class PrimNode extends Node {
     };
 
     PrimNode[][] STRS = new PrimNode[][] {
-      //{ new StrLen() }
+      { new StrLen() }
     };
 
     // Other primitives, not binary operators
@@ -208,6 +208,7 @@ public abstract class PrimNode extends Node {
   static TVPtr IFLT(TypeFlt tf) { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.tvar(),new TVBase(tf)},false)); }
   //static TVPtr INFLT() { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.tvar(),new TVBase(TypeFlt.NFLT64)},false)); }
   static TVPtr INIL(          ) { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PNIL.tvar().fresh(),new TVBase(TypeNil.NIL)},false)); }
+  static TVPtr ISTR(TypeMemPtr tmp) { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PSTR.tvar(),new TVBase(tmp)},false)); }
 
 
   // Used for test cases; changes the golden-rule expected alias/fidx based on
@@ -248,7 +249,7 @@ public abstract class PrimNode extends Node {
     addDef(mem);
     // Make a Parm for every formal
     for(int i = DSP_IDX; i<_formals.len(); i++ )
-      addDef(new ParmNode(i,fun,null,wrap(_formals.at(i))).init());
+      addDef(_formals.at(i)==Type.ANY ? null : new ParmNode(i,fun,null,wrap(_formals.at(i))).init());
     // The primitive, working on and producing wrapped prims
     init();
     // Return the result
@@ -394,6 +395,7 @@ public abstract class PrimNode extends Node {
     if( rez instanceof TypeInt ti ) return IINT(ti);
     if( rez instanceof TypeFlt tf ) return IFLT(tf);
     if( rez == TypeNil.NIL        ) return INIL();
+    if( rez instanceof TypeMemPtr tmp ) return ISTR(tmp);
     //if( rez == TypeInt. TRUE  )  return  IINT(TypeInt.TRUE );
     //if( rez == TypeInt. BOOL  )  return IBOOL();
     //if( rez == TypeFlt.NFLT64 )  return INFLT();

@@ -1,8 +1,8 @@
 // Recursive linked-list discovery, applied
-// Type: A:*[3]@{ n1=A; v1=int64; }?
+// Type: A:*[3]@{ n1=A; v1=int:int64; }?
 // Eval: *[3]@{ n1=nil; v1=4; }
 map = { fcn lst ->
-  if lst ? @{ n1 = (map fcn lst.n0); v1 = (fcn lst.v0); } : nil 
+  if lst ? @{ n1 = (map fcn lst.n0); v1 = (fcn lst.v0); } : nil
 };
 
 (map

@@ -1,4 +1,4 @@
-// Type: *[INT]( _, int64, int64)
+// Type: *[INT]( _, int:int64, int:int64)
 // Eval: *[6]( _, 124, 3)
 c = if (rnd)
      ? (pair 123 "red" )

@@ -44,9 +44,9 @@ import static com.cliffc.aa.AA.TODO;
 
 abstract public class TV3 implements Cloneable {
   public static final boolean WIDEN = true;
-
   private static int CNT=1;
   static int TV3UID = -1;
+
   private int uid() {
     if( CNT==TV3UID )
       System.out.println();
@@ -188,7 +188,7 @@ abstract public class TV3 implements Cloneable {
     if( _use_nil ) progress |= that.add_use_nil();
     if( that._may_nil && that._use_nil )
       { that=that.find(); }
-    _union_impl(that); // Merge subclass specific bits into that
+    progress |= _union_impl(that); // Merge subclass specific bits into that
     progress |= that.widen(_widen,false);
     assert _INIT0_CNT==99999 || that._uid >= _INIT0_CNT || !progress; // no updates to primitives
     assert _INIT0_CNT==99999 ||      _uid >= _INIT0_CNT || that._uid < _INIT0_CNT; // no unify primitive away
@@ -201,7 +201,7 @@ abstract public class TV3 implements Cloneable {
   }
 
   // Merge subclass specific bits
-  abstract public void _union_impl(TV3 that);
+  public boolean _union_impl(TV3 that) { return false; }
 
   // Push all dependent nodes onto the worklist
   public void _union_deps(TV3 that) {
@@ -681,7 +681,7 @@ abstract public class TV3 implements Cloneable {
     case TypeFunPtr tfp ->  tfp.is_full() ? new TVLeaf() // Generic Function Ptr
       : new TVLambda(tfp.nargs(),from_flow(tfp.dsp(),d),from_flow(tfp._ret,d));
     case TypeMemPtr tmp -> {
-      if( tmp==TypeMemPtr.STRPTR ) yield new TVBase(tmp);
+      if( tmp==TypeMemPtr.STRPTR ) yield PrimNode.wrap_base(tmp);
       TVStruct ts = tmp.is_simple_ptr() ? new TVStruct(true) : (TVStruct)from_flow(tmp._obj,d);
       StoreXNode.unify(tmp._aliases,ts,false);
       yield new TVPtr(tmp._aliases,ts);
@@ -837,6 +837,9 @@ abstract public class TV3 implements Cloneable {
     sb.p(VNAMES.computeIfAbsent((long) _uid,
                                 (k -> (vuid ? ((unified() ? "X" : "V") + k) : ((++VCNT) - 1 + 'A' < 'V' ? ("" + (char) ('A' + VCNT - 1)) : ("Z" + VCNT))))));
   }
+
+  // Return a TypeNil from a wrapped primitive, or null
+  public TypeNil isPrim() { return null; }
 
   // Debugging tool
   public TV3 f(int uid) { return _find(uid,new VBitSet()); }

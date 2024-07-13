@@ -155,9 +155,11 @@ public class TVStruct extends TVExpanding {
   @Override public TVStruct as_struct() { return this; }
 
   // -------------------------------------------------------------
-  @Override public void _union_impl( TV3 tv3 ) {
+  @Override public boolean _union_impl( TV3 tv3 ) {
     TVStruct ts = tv3.as_struct(); // Invariant when called
+    boolean old = ts._open;
     ts._open = ts._open & _open;
+    return old != ts._open;
   }
 
   // Unify this into that.  Ultimately "this" will be U-F'd into "that" and so
@@ -435,8 +437,8 @@ public class TVStruct extends TVExpanding {
   private boolean is_prim0() {
     return is_int_clz() || is_flt_clz() || is_str_clz() || is_math_clz() || is_top_clz();
   }
-  boolean is_prim() {
-    return _max==2 && idx(TypeFld.CLZ)!= -1 && idx(TypeFld.PRIM)!= -1 &&  arg(0).as_ptr().load().is_prim0();
+  public boolean is_prim() {
+    return _max==2 && idx(TypeFld.CLZ)!= -1 && idx(TypeFld.PRIM)!= -1;
   }
 
   @Override public VBitSet _get_dups_impl(VBitSet visit, VBitSet dups, boolean debug, boolean prims) {

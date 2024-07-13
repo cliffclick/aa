@@ -1,5 +1,5 @@
 // Evil test, showing AA use of display.
-// Type: 17
+// Type: int:17
 // Eval: 17
 
 // THIS IS MY CURRENT TEST_STABLE OVERFLOW TEST BUG
@@ -14,7 +14,7 @@
 
 dsp = @{
   fcn = { somedsp -> { -> 17 } };
-  bound = (dsp.fcn dsp);  // Bind 
+  bound = (dsp.fcn dsp);  // Bind
   // Display is never complete until end of program
   // But stuff here gets executed...
   rez = (dsp.bound);

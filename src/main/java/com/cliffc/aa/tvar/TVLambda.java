@@ -16,7 +16,7 @@ import static com.cliffc.aa.AA.*;
 public class TVLambda extends TV3 {
   public static final int UNKNOWN_NARGS = Integer.MAX_VALUE;
   private int _nargs;
-  
+
   public TVLambda( int nargs, TV3 dsp, TV3 ret ) {
     super(new TV3[nargs==UNKNOWN_NARGS ? ARG_IDX : nargs]);
     // Matches the _args array length if valid, or -1 if unknown args
@@ -44,8 +44,6 @@ public class TVLambda extends TV3 {
   //@Override TV3 find_nil() { return this; } // TODO: Push down to each child
 
   // -------------------------------------------------------------
-  @Override public void _union_impl( TV3 tv3) { }
-
   @Override boolean _unify_impl(TV3 that ) {
     TV3 thsi = this;
     int nlen = _args.length, tlen = ((TVLambda)that)._args.length;
@@ -54,7 +52,7 @@ public class TVLambda extends TV3 {
       if( _args[i]==null ) { assert that._args[i]==null; continue; }
       thsi.arg( i )._unify( that.arg( i ), false );
       thsi = thsi.find();
-      that = that.find();      
+      that = that.find();
     }
     int tnargs = ((TVLambda)that)._nargs;
     if( _nargs != tnargs && _nargs != UNKNOWN_NARGS ) {
@@ -111,7 +109,7 @@ public class TVLambda extends TV3 {
 
   @Override boolean _exact_unify_impl( TV3 tv3 ) { return true; }
 
-  
+
   // -------------------------------------------------------------
   @Override Type _as_flow( Node dep ) {
     // Compatible escaped fidxs
@@ -132,7 +130,7 @@ public class TVLambda extends TV3 {
     for( int i = DSP_IDX; i<nargs(); i++ )
       arg(i).widen((byte)2,false);
   }
-  
+
   @Override SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     sb.p("{ ");
     for( int i=DSP_IDX; i<nargs(); i++ ) {
@@ -142,7 +140,7 @@ public class TVLambda extends TV3 {
     }
     sb.p("-> ");
     // Return
-    _args[0]._str(sb,visit,dups,debug,prims).p(' ');    
+    _args[0]._str(sb,visit,dups,debug,prims).p(' ');
     return sb.p("}").p(_may_nil ? "?" : "");
   }
 

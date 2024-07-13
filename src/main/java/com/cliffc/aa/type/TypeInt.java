@@ -76,7 +76,7 @@ public class TypeInt extends TypeNil<TypeInt> {
     return this;
   }
 
-  public static TypeInt con(long con) { return make(false,false,true,0,con); }
+  public static TypeInt con(long con) { return con==0 ? ZERO : make(false,false,true,0,con); }
 
   public  static final TypeInt NINT64= make(false,false, true,64,0);
   public  static final TypeInt INT64 = make(false,false,false,64,0);

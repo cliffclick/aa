@@ -1,4 +1,4 @@
 // Test of unary int prim
-// Type: *[3]( _, int64, int64)
+// Type: *[3]( _, int:int64, int:int64)
 // Eval: *[3]( _, 1, 0)
 (pair (rnd) (rnd))

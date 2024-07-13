@@ -1,4 +1,4 @@
 // Test of string length
-// Type: int64
+// Type: int:int64
 // Eval: 3
 (# "abc")

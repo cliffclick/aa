@@ -243,10 +243,6 @@ public class TVDynTable extends TV3 {
   }
 
   // -------------------------------------------------------------
-  @Override public void _union_impl( TV3 tv3 ) {
-  }
-
-  // -------------------------------------------------------------
   @Override boolean _unify_impl( TV3 tv3 ) {
     return _unify_impl0((TVDynTable)tv3,0);
   }

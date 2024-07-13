@@ -1,5 +1,5 @@
 // One DynLoad, fcn needs DynTable
-// Type: *[FLT]( _, 1, 2)
+// Type: *[FLT]( _, int:1, int:2)
 // Eval: *[7]( _, 1, 2)
 
 fcn = { ->
