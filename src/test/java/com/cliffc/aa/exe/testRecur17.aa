@@ -1,0 +1,24 @@
+// Explicit closure style
+// Type: D:{ D -> D }
+// Eval: *[12]@{ Aflt=0.5f; AD=1; }
+
+//f = { x -> (x x) };
+//id = { y -> y };
+//(f id)
+
+
+//// Type : { A -> A }
+//id = { z -> z };
+//{ x -> (id (id x)) }
+
+//// Type : { A -> A }
+//id = { z -> z };
+//{ x -> ((id id) x) }
+
+//// Type : { A -> A }
+//({ f -> { x -> (f (f x)) } }
+// { z -> z })
+
+// Type : { A:{ A -> A } -> A }
+({ f -> { x -> ((f f) x) } }
+ { z -> z })
