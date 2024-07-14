@@ -196,7 +196,7 @@ public class LetRec extends ASTVars {
       // If assignment is new, add field
       if( stk.find(var)== -1 )
         stk.add_fld(var,Access.RW,Env.ANY,null);
-      scope.mem(new StoreNode(scope.mem(), scope.ptr(), rez, var, Access.RW, null ).peep());
+      scope.mem(new StoreNode(scope.mem(), scope.ptr(), rez, var, _accs.at(0), null ).peep());
       body().nodes(e);
       return;
     }
