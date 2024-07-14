@@ -725,7 +725,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   TypeStruct update( TypeFld fld, boolean precise ) {
     int idx = find(fld._fld);
     if( idx == -1 ) {
-      if( _def==Type.ALL ) return this; // No update if Final
+      //if( _def==Type.ALL ) return this; // No update if Final
       return add_fldx(fld);
     }
     TypeFld prior = _flds[idx];
@@ -765,10 +765,10 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     return make_from(flds);
   }
 
-  @Override public boolean is_con(BitsAlias pass) {
-    if( !_def.is_con(pass) ) return false;
+  @Override public boolean isCon() {
+    if( !_def.isCon() ) return false;
     for( TypeFld fld : _flds )
-      if( !fld.is_con(pass) )
+      if( !fld.isCon() )
         return false;
     return true;
   }

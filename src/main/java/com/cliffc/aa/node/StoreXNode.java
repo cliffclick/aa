@@ -22,14 +22,14 @@ public class StoreXNode extends StoreAbs {
 
   @Override Type _value( TypeMem tm, TypeMemPtr tmp ) {
     TypeStruct tvs = rez()._val instanceof TypeStruct tvs0 ? tvs0 : rez()._val.oob(TypeStruct.ISUSED);
-    return tm.update(tmp,tvs,NewNode.is_con(tmp._aliases));
+    return tm.update(tmp,tvs,tmp._con);
   }
 
   @Override Type _live_use( TypeMem live0, TypeMemPtr tmp, int i ) {
     TypeMem live1;
     if( tmp.above_center() ) {
       throw TODO();
-    } else if( NewNode.is_con(tmp._aliases) ) { // Constant ptr, so precise update
+    } else if( tmp._con ) { // Constant ptr, so precise update
       TypeStruct ts = rez()._val instanceof TypeStruct ts0 ? ts0.flatten_live_fields() : rez()._val.oob(TypeStruct.ISUSED);
       live1 = live0.update(tmp,ts,true);
     } else {                    // Imprecise update; everything remains live

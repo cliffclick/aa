@@ -129,7 +129,7 @@ public final class RetNode extends Node {
 
     // Collapsed to a constant?  Remove any control interior.
     Node ctl = ctl();
-    if( rez()._val.is_con(NewNode.CONS) && !rez()._val.above_center() && ctl!=fun() && // Profit: can change control and delete function interior
+    if( rez()._val.isCon() && !rez()._val.above_center() && ctl!=fun() && // Profit: can change control and delete function interior
         (mem==null || mem._val ==TypeMem.ANYMEM) ) // Memory has to be trivial also
       return setDef(0,fun());  // Gut function body
 

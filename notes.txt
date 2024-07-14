@@ -1,4 +1,17 @@
 =======================================
+07/13/2024
+
+Action for escapes:
+- TMP has a private bit for single aliases.  Does not apply for multi aliases.
+- TMEM has a private TObjs split from the main public ones.  Might switch over to a NBHML variant & simpler code
+- MEET preserves private bit if both inputs are private same alias
+- Phi will widen even if same type, because might be (recursive) different instances
+- TMP flip CON to private?
+
+
+
+
+=======================================
 07/08/2024
 
 So mid-upgrade to ASTParse to allow interleaving of Structs and Functions.
@@ -28,6 +41,42 @@ Goal here is AST/testBasic5.aa:
 Since *[22] escapes to Root, its memory is available on input to test with the
 A7 final store imprecisely updating the `tmp`, so reporting a final store on an
 already-final field
+
+----
+Some fixes:
+Keep a private/shared TMP
+Keep a private/shared TypeMem
+Assume (and prove later) a struct display *never* escapes.
+- Ponder "escapes" via upwards-exposed closure escapes
+"""
+// Factory to make lots of these
+factory = { @{
+  // Standard "method", no other args except the struct/display
+  fcn = { ->
+    ...
+  };
+
+  fld = fcn(); // Final assign via fcn
+  fld2 := 1;   // First update to field2
+  // Bad function binds "this" and returns a fcn operating on "this"
+  bad_fcn = { { idx ->
+    // Based on "idx" do any possible thing to self
+    idx==0 ? fld2 = 99 :
+    idx==1 ? fcn=... :
+    idx==2 ? ...;
+  }
+
+  // Pass off, duing construction, bad_fcn which includes a self
+  // reference which does a final assign...  so does "weirdo"
+  // every call "bad_fcn(0)" which does a fld2 final assign?
+  
+  wierdo(bad_fcn());
+  
+  // Is this final assignment OK?
+  fld2 = 2;
+
+} };
+
 
 
 =======================================

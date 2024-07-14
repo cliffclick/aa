@@ -117,7 +117,7 @@ public class Env implements AutoCloseable {
     _fun = fun;
     StructNode dsp = fref==null ? new StructNode(nargs,false,null,hint) : fref;
     dsp.add_fld("^",TypeFld.Access.Final,dsp_ptr,null).init();
-    NewNode ptr = new NewNode(hint,BitsAlias.new_alias(),par==null).init();
+    NewNode ptr = new NewNode(hint,BitsAlias.new_alias() ).init();
     mem = new StoreXNode(mem,ptr,dsp,null).init();
     // Install a top-level prototype mapping
     if( fref!=null ) {          // Forward ref?
@@ -136,7 +136,7 @@ public class Env implements AutoCloseable {
     _fun = null;
     StructNode dsp = new StructNode(0,false,null,hint) ;
     dsp.add_fld("^",TypeFld.Access.Final,scope.ptr(),null).init();
-    NewNode ptr = new NewNode(hint,BitsAlias.new_alias(),false).init();
+    NewNode ptr = new NewNode(hint,BitsAlias.new_alias() ).init();
     // See matching comment hack in Struct.java.
     // Struct is made before running the init code.
     Node mem = new StoreXNode(scope.mem(),ptr,dsp,null).init();

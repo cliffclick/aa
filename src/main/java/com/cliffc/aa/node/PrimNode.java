@@ -54,12 +54,12 @@ public abstract class PrimNode extends Node {
   public static final StructNode ZFLT = new StructNode(0,false,null,"FLT" );
   public static final StructNode ZSTR = new StructNode(0,false,null,"STR" );
   public static final StructNode ZMATH= new StructNode(0,false,null,"MATH");
-  public static final NewNode PCLZ = new NewNode("CLZ",BitsAlias.CLZX,true);
-  public static final NewNode PNIL = new NewNode("NIL",BitsAlias.NILX,true);
-  public static final NewNode PINT = new NewNode("INT",BitsAlias.INTX,true);
-  public static final NewNode PFLT = new NewNode("FLT",BitsAlias.FLTX,true);
-  public static final NewNode PSTR = new NewNode("STR",BitsAlias.STRX,true); // String clazz, not strings
-  public static final NewNode PMATH= new NewNode("MATH",BitsAlias.new_alias(),true);
+  public static final NewNode PCLZ = new NewNode("CLZ",BitsAlias.CLZX );
+  public static final NewNode PNIL = new NewNode("NIL",BitsAlias.NILX );
+  public static final NewNode PINT = new NewNode("INT",BitsAlias.INTX );
+  public static final NewNode PFLT = new NewNode("FLT",BitsAlias.FLTX );
+  public static final NewNode PSTR = new NewNode("STR",BitsAlias.STRX ); // String clazz, not strings
+  public static final NewNode PMATH= new NewNode("MATH",BitsAlias.new_alias() );
 
   private static PrimNode[] PRIMS = null; // All primitives
 
@@ -283,7 +283,7 @@ public abstract class PrimNode extends Node {
         // Some hacky name for the overload group; "f*" or "i!"
         String p = prims[0]._name;
         char op = p.charAt(0)=='_' ? p.charAt(1) : p.charAt(0);
-        ptr0 = new NewNode(""+clzname.charAt(0)+op+":",BitsAlias.new_alias(BitsAlias.LOCX),true).init();
+        ptr0 = new NewNode(""+clzname.charAt(0)+op+":",BitsAlias.new_alias(BitsAlias.LOCX) ).init();
         scp.mem(new StoreXNode(scp.mem(),ptr0,over,null));
       }
       clz.add_fld(prims[0]._name,Access.Final,ptr0,null);
@@ -335,7 +335,7 @@ public abstract class PrimNode extends Node {
           TypeNil tformal = (TypeNil)_formals.at(i);
           t = (TypeNil)tformal.dual().meet(bare);
           assert !(t instanceof TypeMemPtr); // Missing NewNode.CONS
-          if( !t.is_con(null) ) {
+          if( !t.isCon() ) {
             is_con = false;         // Some non-constant
             if( t.above_center() ) has_high=true;
           }
@@ -597,7 +597,7 @@ public abstract class PrimNode extends Node {
       if( !(t0 instanceof TypeInt t0i) || !(t1 instanceof TypeInt t1i) )
         return TypeInt.INT64;
       // If both are constant ints, return the constant math.
-      if( t0i.is_con(null) && t1i.is_con(null) ) {
+      if( t0i.isCon() && t1i.isCon() ) {
         long i2 = t0i.getl() & t1i.getl();
         return i2==0 ? TypeNil.NIL : TypeInt.con(i2);
       }

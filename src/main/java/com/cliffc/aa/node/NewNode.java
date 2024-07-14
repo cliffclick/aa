@@ -31,16 +31,14 @@ public class NewNode extends Node {
   // Just TMP.make(_alias,ISUSED)
   public TypeMemPtr _tptr;
 
-  public NewNode( String hint, int alias, boolean is_con ) {
+  public NewNode( String hint, int alias ) {
     super();
     _reset0_alias = alias;       // Allow a reset, if this alias splits and then we want to run a new test
-    if( is_con )
-      CONS = CONS.meet(BitsAlias.make0(alias));
     set_alias(alias);
     NEWS.setX(alias,this);
     _hint = hint;
   }
-  public NewNode( String hint ) { this(hint,BitsAlias.new_alias(),false); }
+  public NewNode( String hint ) { this(hint,BitsAlias.new_alias() ); }
 
   @Override public String label() {
     return  (_killed ? "X" : "*")+_alias+_hint;
@@ -102,7 +100,7 @@ public class NewNode extends Node {
   // clones during inlining all become unique new sites
   @Override public @NotNull NewNode copy(boolean copy_edges) {
     // Split the original '_alias' class into 2 sub-aliases
-    assert !_tptr.is_con(CONS);
+    assert !_tptr.isCon();
     NEWS.set(_alias,null);
     NewNode nnn = (NewNode)super.copy(copy_edges);
     nnn .set_alias(BitsAlias.new_alias(_alias)); // Children alias classes, split from parent
@@ -130,14 +128,4 @@ public class NewNode extends Node {
     // Split and renumbered in FunNode inline, fixup in NEWS
     throw TODO();
   }
-
-  public static BitsAlias CONS = BitsAlias.EMPTY; // Constant aliases
-  public static boolean is_con(BitsAlias bits) {
-    if( bits.above_center() ) return true; // Might be a constant
-    int alias = bits.abit();
-    if( alias == -1 ) return false; // Too many bits
-    return CONS.test(alias);
-  }
-
-
 }

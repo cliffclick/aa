@@ -196,7 +196,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
 
   @Override public boolean above_center() { return _t.above_center(); }
   @Override public TypeFld sharptr2( TypeMem mem ) { return make_from(_t.sharptr2(mem)); }
-  @Override public boolean is_con(BitsAlias pass) { return _t.is_con(pass); }
+  @Override public boolean isCon() { return _t.isCon(); }
   @Override public TypeFld simple_ptr() { return make_from(_t.simple_ptr()); }
 
   // Make a Type, replacing all dull pointers from the matching types in mem.

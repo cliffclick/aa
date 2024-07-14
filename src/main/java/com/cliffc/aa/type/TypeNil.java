@@ -247,7 +247,7 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
 
   @Override public boolean above_center() { return _any; }
 
-  @Override public boolean is_con(BitsAlias ignore) { return above_center(); }
+  @Override public boolean isCon() { return above_center(); }
 
   @Override public Type widen() { return this; }
 

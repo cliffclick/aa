@@ -93,7 +93,7 @@ public class TypeFlt extends TypeNil<TypeFlt> {
     types.put("flt"  ,FLT64);
   }
   // Return a double from a TypeFlt constant; assert otherwise.
-  @Override public double getd() { assert is_con(null); return _con; }
+  @Override public double getd() { assert isCon(); return _con; }
 
   @Override protected TypeFlt xdual() {
     if( _z==0 ) return this;
@@ -130,7 +130,7 @@ public class TypeFlt extends TypeNil<TypeFlt> {
     BitsAlias aliases = _aliases.above_center() ? _aliases.dual() : _aliases;
     return make(false,_nil,_sub,aliases,_fidxs);
   }
-  @Override public boolean is_con(BitsAlias ignore) { return _z==0; }
+  @Override public boolean isCon() { return _z==0; }
 
   // Shallow wrap
   public TypeMemPtr wrap() {

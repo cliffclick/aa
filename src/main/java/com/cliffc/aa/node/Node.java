@@ -703,7 +703,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // - Not an ErrNode AND
   // - Type.is_con()
   public boolean shouldCon() {
-    return !isPrim() && _val.is_con(NewNode.CONS);
+    return !isPrim() && _val.isCon();
   }
     //    this instanceof NewNode    || // Can be a constant, but need the alias info
     //    this instanceof ErrNode    || // Never touch an ErrNode

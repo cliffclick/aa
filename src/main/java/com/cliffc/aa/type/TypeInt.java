@@ -100,8 +100,8 @@ public class TypeInt extends TypeNil<TypeInt> {
     types.put("int"  ,INT64);
   }
   // Return a long from a TypeInt constant; assert otherwise.
-  @Override public long   getl() { assert is_con(null); return _con; }
-  @Override public double getd() { assert is_con(null) && (long)((double)_con)==_con; return _con; }
+  @Override public long   getl() { assert isCon(); return _con; }
+  @Override public double getd() { assert isCon() && (long)((double)_con)==_con; return _con; }
 
   @Override protected TypeInt xdual() {
     if( _z==0 ) return this;
@@ -144,7 +144,7 @@ public class TypeInt extends TypeNil<TypeInt> {
     return make(false,_nil,_sub,aliases,_fidxs);
   }
 
-  @Override public boolean is_con(BitsAlias ignore)  { return _z==0; }
+  @Override public boolean isCon()  { return _z==0; }
   public TypeInt minsize(TypeInt ti) {
     int zs =    _z==0 ? log(   _con) :    _z;
     int zi = ti._z==0 ? log(ti._con) : ti._z;

@@ -1986,7 +1986,7 @@ public class HM {
       Type x0 = flows[0];
       Type x1 = flows[1];
       if( x0.above_center() || x1.above_center() ) return TypeInt.BOOL.dual();
-      if( x0.is_con(null) && x1.is_con(null) && x0==x1 )
+      if( x0.isCon() && x1.isCon() && x0==x1 )
         return TypeInt.TRUE;
       // TODO: Can also know about nil/not-nil
       return TypeInt.BOOL;
@@ -2067,9 +2067,9 @@ public class HM {
       if( t0.above_center() || t1.above_center() )
         return TypeInt.INT64.dual();
       if( t0 instanceof TypeInt && t1 instanceof TypeInt ) {
-        if( t0.is_con(null) && t0.getl()==0 ) return TypeNil.XNIL;
-        if( t1.is_con(null) && t1.getl()==0 ) return TypeNil.XNIL;
-        if( t0.is_con(null) && t1.is_con(null) )
+        if( t0.isCon() && t0.getl()==0 ) return TypeNil.XNIL;
+        if( t1.isCon() && t1.getl()==0 ) return TypeNil.XNIL;
+        if( t0.isCon() && t1.isCon() )
           return TypeInt.con(t0.getl()*t1.getl());
       }
       return TypeInt.INT64;
@@ -2085,9 +2085,9 @@ public class HM {
       if( t0.above_center() || t1.above_center() )
         return TypeFlt.FLT64.dual();
       if( t0 instanceof TypeFlt && t1 instanceof TypeFlt ) {
-        if( t0.is_con(null) && t0.getd()==0 ) return TypeNil.XNIL;
-        if( t1.is_con(null) && t1.getd()==0 ) return TypeNil.XNIL;
-        if( t0.is_con(null) && t1.is_con(null) )
+        if( t0.isCon() && t0.getd()==0 ) return TypeNil.XNIL;
+        if( t1.isCon() && t1.getd()==0 ) return TypeNil.XNIL;
+        if( t0.isCon() && t1.isCon() )
           return TypeFlt.con(t0.getd()*t1.getd());
       }
       return TypeFlt.FLT64;
@@ -2102,8 +2102,8 @@ public class HM {
       if( t0.above_center() )
         return TypeFlt.FLT64.dual();
       if( t0 instanceof TypeInt ) {
-        if( t0.is_con(null) && t0.getl()==0 ) return TypeNil.XNIL;
-        if( t0.is_con(null) )
+        if( t0.isCon() && t0.getl()==0 ) return TypeNil.XNIL;
+        if( t0.isCon() )
           return TypeFlt.con((double)t0.getl());
       }
       return TypeFlt.FLT64;
@@ -2125,7 +2125,7 @@ public class HM {
       if( t0 == TypeNil.XNIL ) return t1.meet(TypeInt.INT64.dual());
       if( t1 == TypeNil.XNIL ) return t0.meet(TypeInt.INT64.dual());
       if( t0 instanceof TypeInt && t1 instanceof TypeInt &&
-          t0.is_con(null) && t1.is_con(null) )
+          t0.isCon() && t1.isCon() )
         return TypeInt.con(t0.getl()+t1.getl());
       return TypeInt.INT64;
     }
@@ -2139,7 +2139,7 @@ public class HM {
     @Override Type apply( Type[] flows) {
       Type t0 = flows[0];
       if( t0.above_center() ) return TypeInt.INT64.dual();
-      if( t0 instanceof TypeInt && t0.is_con(null) )
+      if( t0 instanceof TypeInt && t0.isCon() )
         return TypeInt.con(t0.getl()-1);
       return TypeInt.INT64;
     }
@@ -2159,7 +2159,7 @@ public class HM {
     @Override Type apply( Type[] flows) {
       Type i = flows[0];
       if( i.above_center() ) return TypeMemPtr.STRPTR.dual();
-      if( i instanceof TypeInt && i.is_con(null) )
+      if( i instanceof TypeInt && i.isCon() )
         return TypeMemPtr.make_str(String.valueOf(i.getl()).intern());
       return TypeMemPtr.STRPTR;
     }

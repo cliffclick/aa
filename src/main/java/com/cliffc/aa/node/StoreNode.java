@@ -1,16 +1,12 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
-import com.cliffc.aa.Env;
-import com.cliffc.aa.ErrMsg;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVPtr;
 import com.cliffc.aa.tvar.TVStruct;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 
-import static com.cliffc.aa.AA.TODO;
 import static com.cliffc.aa.type.TypeFld.Access;
 
 // Store a value into a named struct field.  Does its own nil-check and value
@@ -23,11 +19,11 @@ public class StoreNode extends StoreAbs {
     _fld = fld;
     _fin = fin;
   }
-  @Override public String label() { return "."+_fld+"="; }   // Self short name
+  @Override public String label() { return "."+_fld+(_fin==Access.Final ? "=" : ":="); }   // Self short name
 
 
   @Override Type _value( TypeMem tm, TypeMemPtr tmp ) {
-    return tm.update(tmp,TypeFld.make(_fld,rez()._val,_fin),NewNode.is_con(tmp._aliases));
+    return tm.update(tmp,TypeFld.make(_fld,rez()._val,_fin),tmp._con);
   }
 
   @Override Type _live_use( TypeMem live0, TypeMemPtr tmp, int i ) {

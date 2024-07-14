@@ -307,14 +307,13 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
 
   // Only a constant if the pointer AND object is a constant; we might have
   // dulled a precise constant object and the result is not a constant.
-  @Override public boolean is_con(BitsAlias cons) {
+  @Override public boolean isCon() {
     if( !above_center() && _aliases!=BitsAlias.EMPTY ) {
       int alias = _aliases.abit();
       if( alias== -1 ) return false;
-      //if( !cons.test(alias) ) return false;
       if( !_con ) return false;
     }
-    return _obj!=null && _obj.is_con(cons);
+    return _obj!=null && _obj.isCon();
   }
 
   @Override public Type hack_dsp() { return make_from(_obj.hack_dsp()); }

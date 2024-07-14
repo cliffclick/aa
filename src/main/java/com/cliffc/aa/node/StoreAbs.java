@@ -28,7 +28,7 @@ public abstract class StoreAbs extends Node {
     if( !(mem()._val instanceof TypeMem    tm ) ) return mem()._val.oob(TypeMem.ALLMEM);
     if( !(adr()._val instanceof TypeMemPtr tmp) ) return adr()._val.oob(TypeMem.ALLMEM);
     // Meet no aliases into memory
-    if( tmp.above_center() || tmp._aliases.is_empty() )  return tm;
+    if( tmp._aliases.is_empty() )  return tm;
     if( tmp._aliases==BitsAlias.NALL ) return TypeMem.ALLMEM; // Updates all of memory
     // Subclass defined behavior
     return _value(tm, tmp);
@@ -103,6 +103,8 @@ public abstract class StoreAbs extends Node {
             StructNode str = snew.struct();
             if( str.nUses()==1 && str.set_fld(sfld._fld,sfld._fin,rez(),false) ) {
               str.xval();
+              snew.xval();
+              snew._live = _live;
               // Delete self
               return snew;
             }

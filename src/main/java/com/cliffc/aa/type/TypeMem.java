@@ -491,7 +491,7 @@ public class TypeMem extends Type<TypeMem> {
   public TypeMem update( TypeMemPtr tmp, TypeStruct tvs, boolean is_con ) {
     // If precise, just replace whole struct
     if( is_con )
-      return set(tmp._aliases.getbit(),tvs);
+      return set(Math.abs(tmp._aliases.getbit()),tvs);
 
     // Must do struct-by-struct updates, doing inprecise meets
     Ary<TypeStruct> ss = new Ary<>( _objs.clone());
@@ -507,8 +507,7 @@ public class TypeMem extends Type<TypeMem> {
   public TypeMem update( TypeMemPtr tmp, TypeFld fld, boolean is_con ) {
     if( is_con ) {
       int alias = tmp._aliases.getbit();
-      //return set(alias,at(alias).update());
-      throw TODO();
+      return set(alias,at(alias).update(fld,is_con));
     }
 
     // Must do struct-by-struct updates
@@ -608,5 +607,5 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   @Override public boolean above_center() { return _objs[1].above_center(); }
-  @Override public boolean is_con(BitsAlias ignore) { return false;}
+  @Override public boolean isCon() { return false;}
 }
