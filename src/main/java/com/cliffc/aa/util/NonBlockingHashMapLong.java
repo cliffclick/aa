@@ -1068,6 +1068,24 @@ public class NonBlockingHashMapLong<TypeV>
 
   } // End of CHM
 
+  // --- RAW KEY ACCESS -------------------------------------------------------
+
+  // No copy-in-progress when returned.  _kesy table is valid until the next
+  // mutation, which might completely rewrite the table.  The matching _vals is
+  // valid, except might contain TOMBSTONE.
+  public CHM rawCHM() {
+    CHM topchm;
+    while( true ) {           // Verify no table-copy-in-progress
+      topchm = _chm;
+      if( topchm._newchm == null ) // No table-copy-in-progress
+        break;
+      // Table copy in-progress - so we cannot get a clean iteration.  We
+      // must help finish the table copy before we can start iterating.
+      topchm.help_copy_impl(true);
+    }
+    return topchm;
+  }
+
 
   // --- Snapshot ------------------------------------------------------------
   // The main class for iterating over the NBHM.  It "snapshots" a clean
@@ -1075,19 +1093,10 @@ public class NonBlockingHashMapLong<TypeV>
   private class SnapshotV implements Iterator<TypeV>, Enumeration<TypeV> {
     final CHM _sschm;
     public SnapshotV() {
-      CHM topchm;
-      while( true ) {           // Verify no table-copy-in-progress
-        topchm = _chm;
-        if( topchm._newchm == null ) // No table-copy-in-progress
-          break;
-        // Table copy in-progress - so we cannot get a clean iteration.  We
-        // must help finish the table copy before we can start iterating.
-        topchm.help_copy_impl(true);
-      }
       // The "linearization point" for the iteration.  Every key in this table
       // will be visited, but keys added later might be skipped or even be
       // added to a following table (also not iterated over).
-      _sschm = topchm;
+      _sschm = rawCHM();
       // Warm-up the iterator
       _idx = -1;
       next();

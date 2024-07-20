@@ -172,10 +172,10 @@ public class Env implements AutoCloseable {
     TV3 tval2 = tval.hack_dsp();
     BitsAlias aliases = Env.ROOT.ralias();
     BitsFun   fidxs   = Env.ROOT.rfidxs();
-    return new TypeEnv(val ,    // GCP result
+    return new TypeEnv(val2,    // GCP result
                        fidxs,   // Escaping FIDXS
                        aliases, // Escaping ALIASES
-                       tval ,
+                       tval2,
                        errs0.isEmpty() ? null : errs0);
   }
 

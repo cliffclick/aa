@@ -28,16 +28,17 @@ public class StoreNode extends StoreAbs {
 
   @Override Type _live_use( TypeMem live0, TypeMemPtr tmp, int i ) {
     assert !tmp.above_center();
-    // Not a precise store, so no kills
-    if( !NewNode.is_con(tmp._aliases) ) {
-      // Asking for live-in, give it
-      if( i==1 ) return live0;
-      TypeStruct luse = live0.ld(tmp);
-      assert i==2 || i==3;        // Address & value live
-      return luse.at_def(_fld);   // Address is ANY/ALL from field
-    }
 
-    throw TODO();
+    if( i==AA.MEM_IDX ) {
+      // Not a precise store, so no kills
+      if( !tmp._con )  return live0;
+      // Precise store kills named field from named alias
+      return live0.update(tmp,TypeFld.make(_fld,Type.ANY),true);
+    }
+    // Asking for live-in, give it
+    assert i==2 || i==3;        // Address & value live
+    TypeStruct luse = live0.ld(tmp);
+    return luse.at_def(_fld);   // Address is ANY/ALL from field liveness
   }
 
   @Override TypeMem _live_kill(TypeMem live0, TypeMemPtr tmp) {

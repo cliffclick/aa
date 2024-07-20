@@ -106,6 +106,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       _live._str(P);
       int dlen = sb.len()-old;
       if( dlen > 20 )  sb.unchar(dlen-20);
+      while( dlen < 20 ) { sb.p(' '); dlen++; }
     }
     // Print uid, label
     sb.p("%4d %-7.7s ".formatted(_uid,label()));

@@ -54,12 +54,12 @@ public abstract class PrimNode extends Node {
   public static final StructNode ZFLT = new StructNode(0,false,null,"FLT" );
   public static final StructNode ZSTR = new StructNode(0,false,null,"STR" );
   public static final StructNode ZMATH= new StructNode(0,false,null,"MATH");
-  public static final NewNode PCLZ = new NewNode("CLZ",BitsAlias.CLZX );
-  public static final NewNode PNIL = new NewNode("NIL",BitsAlias.NILX );
-  public static final NewNode PINT = new NewNode("INT",BitsAlias.INTX );
-  public static final NewNode PFLT = new NewNode("FLT",BitsAlias.FLTX );
-  public static final NewNode PSTR = new NewNode("STR",BitsAlias.STRX ); // String clazz, not strings
-  public static final NewNode PMATH= new NewNode("MATH",BitsAlias.new_alias() );
+  public static final NewNode PCLZ = new NewNode("CLZ",BitsAlias.CLZX);
+  public static final NewNode PNIL = new NewNode("NIL",BitsAlias.NILX);
+  public static final NewNode PINT = new NewNode("INT",BitsAlias.INTX);
+  public static final NewNode PFLT = new NewNode("FLT",BitsAlias.FLTX);
+  public static final NewNode PSTR = new NewNode("STR",BitsAlias.STRX); // String clazz, not strings
+  public static final NewNode PMATH= new NewNode("MATH",BitsAlias.new_alias());
 
   private static PrimNode[] PRIMS = null; // All primitives
 
