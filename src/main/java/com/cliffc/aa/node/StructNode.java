@@ -82,7 +82,7 @@ public class StructNode extends Node {
   }
 
   @Override String label() {
-    return "@"+_hint+(_closed ? "" : "?");
+    return ("@"+_hint+(_closed ? "" : "?")).intern();
   }
 
   // Only if closed

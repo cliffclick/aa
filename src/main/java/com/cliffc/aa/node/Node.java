@@ -92,13 +92,13 @@ public abstract class Node implements Cloneable, IntSupplier {
   @Override public final String toString() {
     Type.PENV P = new Type.PENV();
     if( _val!=null ) _val._str_dups(P);
-    return _printLine(P,false).toString();
+    return _printLine(P,false,true,false,null,null).toString();
   }
 
   // Print a node on 1 line, columnar aligned, as:
   // NNID NNAME DDEF DDEF  [[  UUSE UUSE  ]]  TYPE
   // 1234 sssss 1234 1234 1234 1234 1234 1234 tttttt
-  final Type.PENV _printLine( Type.PENV P, boolean live ) {
+  final Type.PENV _printLine( Type.PENV P, boolean prims, boolean flow, boolean live, VBitSet tvisit, VBitSet tvdups ) {
     SB sb = P.sb;
     // If live info requested, print
     if( live ) {
@@ -129,8 +129,8 @@ public abstract class Node implements Cloneable, IntSupplier {
       sb.p("     ");
     sb.p(" ]]  ");
     // Type print
-    if( _val!= null ) _val._str(P);
-    //if( _tvar!=null ) _tvar.str(sb,null,null,true,false);
+    if( flow && _val!= null ) _val._str(P);
+    if( tvisit!=null && _tvar!=null ) _tvar.str(sb,tvisit,tvdups,true,prims);
     return P.nl();
   }
 

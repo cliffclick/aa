@@ -10,22 +10,26 @@ import static com.cliffc.aa.AA.TODO;
 public abstract class NodePrinter {
 
   // Another bulk pretty-printer.  Makes more effort at basic-block grouping.
-  public static String prettyPrint(Node node, int depth, boolean prims) { return prettyPrint(node,depth,prims,false); }
-  public static String prettyPrint(Node node, int depth, boolean prims, boolean live) { return _pp(node,depth,prims,live).sb.toString(); }
+  public static String prettyPrint(Node node, int depth, boolean prims) { return prettyPrint(node,depth,prims,true,false,false); }
+  public static String prettyPrint(Node node, int depth, boolean prims, boolean live) { return _pp(node,depth,prims,true,live,false).sb.toString(); }
+  public static String prettyPrint(Node node, int depth, boolean prims, boolean flow, boolean live, boolean tvar) { return _pp(node,depth,prims,flow,live,tvar).sb.toString(); }
   public static String prettyPrint(Ary<Node> roots) {
     throw TODO();
   }
 
   // Another bulk pretty-printer.  Uses max depth better.
-  private static Type.PENV _pp(Node node, int depth, boolean prims, boolean live) {
+  private static Type.PENV _pp(Node node, int depth, boolean prims, boolean flow, boolean live, boolean tvar) {
     Type.PENV P = new Type.PENV();
-    
+
     // All Nodes within max depth
     VBitSet visit0 = new VBitSet();
     Ary<Ary<Node>> nss = new Ary(Ary.class);
-    _pvisit(node, depth, prims, nss, visit0,live,P);
+    VBitSet tvisit = tvar ? new VBitSet() : null;
+    VBitSet tvdups = tvar ? new VBitSet() : null;
+    _pvisit(node, depth, prims, nss, visit0,flow,live,tvar,P,tvisit,tvdups);
     P.visit.clr();
-    
+    if( tvar ) tvisit.clr();
+
     // Convert just that set to a post-order visit from the roots
     Ary<Node> rpos = new Ary<>(Node.class);
     VBitSet visit1 = new VBitSet();
@@ -42,31 +46,32 @@ public abstract class NodePrinter {
       Node n = rpos.at(i);
       if( n.isCFG() || n.isMultiHead() ) {
         if( !gap ) P.nl();      // Blank before multihead
-        n._printLine(P,live);   // Print head
+        n._printLine(P,prims,flow,live,tvisit,tvdups);   // Print head
         // Print MultiTails in a row
         while( --i >= 0 ) {
           Node t = rpos.at(i);
           if( !t.isMultiTail() ) { i++; break; }
-          t._printLine(P,live);
+          t._printLine(P,prims,flow,live,tvisit,tvdups);
         }
         P.nl();                 // Blank after multitail
         gap = true;
       } else {
-        n._printLine( P,live );
+        n._printLine( P,prims,flow,live,tvisit,tvdups );
         gap = false;
       }
     }
     return P;
   }
 
-  private static void _pvisit(Node n, int d, boolean prims, Ary<Ary<Node>> nss, VBitSet visit, boolean live, Type.PENV P) {
+  private static void _pvisit(Node n, int d, boolean prims, Ary<Ary<Node>> nss, VBitSet visit, boolean flow, boolean live, boolean tvar, Type.PENV P, VBitSet tvisit, VBitSet tvdups) {
     // Skip prims unless asked-for
     if( !prims && n.isPrim() ) return;
     // Already visited at equal or deeper depth
     if( visit.tset(n._uid) && !findDel(n,d,nss) )
       return;
     if( live && n._live!=null ) n._live._str_dups(P);
-    if(         n._val !=null ) n._val ._str_dups(P);
+    if( flow && n._val !=null ) n._val ._str_dups(P);
+    if( tvar && n._tvar!=null ) n._tvar._get_dups(tvisit,tvdups,true,prims);
     // Insert n into nss at depth d
     Ary<Node> ns = nss.atX(d);
     if( ns==null )              // Lazy make depths
@@ -77,14 +82,14 @@ public abstract class NodePrinter {
     if( d > 0 )
       for( Node def : n.defs() )
         if( def!=null )
-          _pvisit(def,d-1,prims,nss,visit,live,P);
+          _pvisit(def,d-1,prims,nss,visit,flow,live,tvar,P,tvisit,tvdups);
   }
 
   private static boolean findDel(Node n, int d, Ary<Ary<Node>> nss) {
     // Find it at shallower depth
     for( int i=0; i<d; i++ ) {
       Ary<Node> ns = nss.at(i);
-      if( ns!=null && ns.del(n)!=null ) 
+      if( ns!=null && ns.del(n)!=null )
         return true;            // Found at removed
     }
     return false;
@@ -127,7 +132,7 @@ public abstract class NodePrinter {
     rpos.add(n);
   }
 
-  
+
   //// Short string name
   //public String xstr() { return STRS[_op]; } // Self short name
   //String  str() { return xstr(); }    // Inline longer name

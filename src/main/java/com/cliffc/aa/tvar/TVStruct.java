@@ -312,8 +312,10 @@ public class TVStruct extends TVExpanding {
     // if not found, del right
     for( int i=0; i<that._max; i++ ) { // Walk right
       TV3 fthis = arg(that._flds[i]);  // Search left no CLZ
-      if( fthis == null )              // If not found
+      if( fthis == null ) {            // If not found
+        if( test ) return ptrue();
         progress |= that.del_fld(i--); // Remove extras right
+      }
     }
     return progress;
   }
@@ -339,25 +341,30 @@ public class TVStruct extends TVExpanding {
   // Closed on left, open on right.  Will jam a fresh CLZ into RHS.
   private boolean _fresh_unify_impl_mix_close(TVStruct that, boolean test) {
     if( test ) return ptrue();
+    assert !unified();
     that.close();                     // Progress, since closing
     for( int i=0; i<_max; i++ ) {     // Walk left
       TV3 fthat = that.arg(_flds[i]); // Search right
       if( fthat != null ) {
         arg(i)._fresh_unify(fthat,test);
         that = that.find();
+        assert !unified();
       } else {
         that.add_fld(_flds[i],arg(i)._fresh());
       }
     }
     TVStruct rhsclz = that.pclz()==null ? null : that.pclz().load(); // Must exist
+    assert !unified();
+    TVStruct thsi = this;
 
     for( int i=0; i<that._max; i++ ) { // Walk right
       TV3 tv3;
-      if( arg(that._flds[i])!=null ) {
+      if( thsi.arg(that._flds[i])!=null ) {
         // Already fresh_unified above, do nothing
       } else if( (tv3=(rhsclz==null ? null : rhsclz.arg_clz(that._flds[i]))) != null ) {
-        that.arg(i).unify(tv3,false); // New CLZ has same field, unify (not fresh) in rhsclz
+        that.arg(i)._unify(tv3,false); // New CLZ has same field, unify (not fresh) in rhsclz
         that.del_fld(i--);            // Folded into CLZ
+        thsi = thsi.find();
       } else {
         that.del_fld(i--);      // RHS does not exist in LHS, so yank from RHS
       }

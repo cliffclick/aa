@@ -1,6 +1,7 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.Node;
+import com.cliffc.aa.node.NodePrinter;
 
 import static com.cliffc.aa.AA.*;
 

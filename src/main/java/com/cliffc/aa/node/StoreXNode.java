@@ -30,8 +30,8 @@ public class StoreXNode extends StoreAbs {
     if( tmp.above_center() ) {
       throw TODO();
     } else if( tmp._con ) { // Constant ptr, so precise update
-      TypeStruct ts = rez()._val instanceof TypeStruct ts0 ? ts0.flatten_live_fields() : rez()._val.oob(TypeStruct.ISUSED);
-      live1 = live0.update(tmp,ts,true);
+      // Precuse update: whole struct is not demanded before here.
+      live1 = live0.update(tmp,TypeStruct.UNUSED,true);
     } else {                    // Imprecise update; everything remains live
       live1 = live0;
     }

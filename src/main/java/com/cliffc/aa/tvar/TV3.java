@@ -221,9 +221,10 @@ abstract public class TV3 implements Cloneable {
   public static final NonBlockingHashMapLong<TV3> DUPS = new NonBlockingHashMapLong<>();
   public boolean unify( TV3 that, boolean test ) {
     if( this==that ) return false;
-    assert DUPS.isEmpty();
+    assert DUPS.isEmpty() && VARS.isEmpty();
     boolean progress = _unify(that,test);
     DUPS.clear();
+    VARS.clear();
     return progress;
   }
 
@@ -233,6 +234,16 @@ abstract public class TV3 implements Cloneable {
   final boolean _unify(TV3 that, boolean test) {
     assert !unified() && !that.unified();
     if( this==that ) return false;
+    if( !_fresh && _INIT0_CNT!=99999 &&
+        ((_uid >= _INIT0_CNT) ^ (that._uid >= _INIT0_CNT)) ) {
+      assert false;             // THIS IS A HACK!  ALSO doesn't work needs a top-level FRESH like normal
+      //_fresh = true;
+      //boolean rez = _uid >= _INIT0_CNT
+      //  ? that._fresh_unify(this,test)
+      //  : this._fresh_unify(that,test);
+      //_fresh = false;
+      //return rez;
+    }
 
     // Any leaf immediately unifies with any non-leaf; triangulate
     if( !(this instanceof TVLeaf) && that instanceof TVLeaf ) return test || that._unify_impl(this);
@@ -316,13 +327,18 @@ abstract public class TV3 implements Cloneable {
   // A per-fresh-unify NONGEN
   static TV3[] NONGEN;
 
+  private boolean _fresh;
+
   public boolean fresh_unify( TV3[] nongen, TV3 that, boolean test ) {
     if( this==that ) return false;
     assert VARS.isEmpty() && DUPS.isEmpty() && NONGEN ==null;
+    assert !_fresh;
+    _fresh = true;
     NONGEN = nongen;
     boolean progress = _fresh_unify(that,test);
     VARS.clear();  DUPS.clear();
     NONGEN = null;
+    _fresh = false;
     return progress;
   }
 
@@ -394,7 +410,7 @@ abstract public class TV3 implements Cloneable {
           // Check for a cycle from the Fresh side to the That side.
           // If found, need to unify (not fresh).
           progress |= rhs.vcrisscross(test);
-          progress |= lhs._fresh_unify(rhs,test);
+          progress |= lhs.find()._fresh_unify(rhs,test);
         } else {
           progress |= _fresh_missing_rhs(that,i,test);
         }

@@ -23,7 +23,7 @@ public class StoreNode extends StoreAbs {
 
 
   @Override Type _value( TypeMem tm, TypeMemPtr tmp ) {
-    return tm.update(tmp,TypeFld.make(_fld,rez()._val,_fin),tmp._con);
+    return tm.update(tmp,TypeFld.make(_fld,tmp.above_center() ? Type.ANY : rez()._val,_fin),tmp._con);
   }
 
   @Override Type _live_use( TypeMem live0, TypeMemPtr tmp, int i ) {

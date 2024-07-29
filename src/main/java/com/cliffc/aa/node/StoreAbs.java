@@ -8,8 +8,8 @@ import com.cliffc.aa.type.*;
 import static com.cliffc.aa.AA.MEM_IDX;
 import static com.cliffc.aa.AA.TODO;
 
-// Store a value into a named struct field.  Does it's own nil-check and value
-// testing; also checks final field updates.
+// Store a value into a struct.  Might be a field or whole struct.  Does it's
+// own nil-check and value testing; also checks final field updates.
 public abstract class StoreAbs extends Node {
   private final Parse _bad;
   public StoreAbs( Node mem, Node adr, Node val, Parse bad ) {
@@ -103,6 +103,7 @@ public abstract class StoreAbs extends Node {
             StructNode str = snew.struct();
             if( str.nUses()==1 && str.set_fld(sfld._fld,sfld._fin,rez(),false) ) {
               str.xval();
+              str._live = _live;
               snew.xval();
               snew._live = _live;
               // Delete self

@@ -69,7 +69,7 @@ public class TypeMem extends Type<TypeMem> {
   // not part of the hash/equals checks.  Optional.  Lazily filled in.
   private HashMap<BitsAlias,TypeMemPtr> _sharp_cache;
 
-  private TypeMem init(TypeStruct[] objs, NonBlockingHashMapLong xobjs) {
+  private TypeMem init(TypeStruct[] objs, NonBlockingHashMapLong<TypeStruct> xobjs) {
     super.init();
     assert check(objs,xobjs);    // Caller has canonicalized arrays already
     _objs = objs;
@@ -79,6 +79,9 @@ public class TypeMem extends Type<TypeMem> {
   // False if not 'tight' (no trailing null pairs) or any matching pairs (should
   // collapse to their parent) or any mixed parent/child.
   private static boolean check(TypeStruct[] as, NonBlockingHashMapLong<TypeStruct> xobjs ) {
+    return check(as) && check(xobjs,as);
+  }
+  private static boolean check(TypeStruct[] as ) {
     if( as.length < 2 ) return false;
     if( as[0]!=null ) return false;
     if( as[1]!=TypeStruct.ISUSED && as[1]!=TypeStruct.UNUSED && as[1]!= null )
@@ -95,6 +98,9 @@ public class TypeMem extends Type<TypeMem> {
             break;
           }
 
+    return true;
+  }
+  private static boolean check(NonBlockingHashMapLong<TypeStruct> xobjs, TypeStruct[] as ) {
     if( xobjs==null ) return true;
     // No ties, thats same as using the escaped alias
     for( long alias : xobjs.keySetLong() ) {
@@ -105,9 +111,9 @@ public class TypeMem extends Type<TypeMem> {
       if( BitsAlias.next_kid((int)alias,(int)alias)!=0 )
         return false;
     }
-
     return true;
   }
+
   @Override public long static_hash( ) { return _objs.length; }
 
   // ----------
@@ -209,9 +215,10 @@ public class TypeMem extends Type<TypeMem> {
   //
   public TypeStruct[] alias2objs() { return _objs; }
   public int len() { return _objs.length; }
+  public TypeStruct atX(int alias) { return _xobjs==null ? null : _xobjs.get(alias); }
 
   static { new Pool(TMEM,new TypeMem()); }
-  private static TypeMem make(TypeStruct[] objs, NonBlockingHashMapLong xobjs) {
+  private static TypeMem make(TypeStruct[] objs, NonBlockingHashMapLong<TypeStruct> xobjs) {
     Pool P = POOLS[TMEM];
     TypeMem t1 = P.malloc();
     return t1.init(objs,xobjs).hashcons_free();
@@ -242,9 +249,12 @@ public class TypeMem extends Type<TypeMem> {
   }
   private static NonBlockingHashMapLong<TypeStruct> dedup( TypeStruct[] as, NonBlockingHashMapLong<TypeStruct> xobj ) {
     if( xobj==null ) return xobj;
+    boolean clone=false;
     for( long alias : xobj.keySetLong() )
-      if( at(as,(int)alias) == xobj.get(alias) )
-          { xobj.remove(alias); break; }
+      if( at(as,(int)alias) == xobj.get(alias) ) {
+        if( !clone ) { clone=true; xobj = xobj.clone(); }
+        xobj.remove(alias);
+      }
     return xobj.isEmpty() ? null : xobj;
   }
 
@@ -275,7 +285,7 @@ public class TypeMem extends Type<TypeMem> {
   public TypeMem make_from(int alias, TypeStruct oop) {
     TypeStruct[] as = Arrays.copyOf( _objs,Math.max( _objs.length,alias+1));
     as[alias] = oop;
-    return make0(as);
+    return make0(as, _xobjs);
   }
 
   public static final TypeMem ANYMEM,ALLMEM,EXTMEM; // Every alias is unused (so above XOBJ or below OBJ)
@@ -353,9 +363,13 @@ public class TypeMem extends Type<TypeMem> {
       return TypeStruct.ISUSED;
     if( this==ALLMEM ) return TypeStruct.ISUSED;
     if( this==ANYMEM ) return TypeStruct.UNUSED;
-    return ld( _objs,ptr._aliases);
+    return ld( _objs, _xobjs, ptr._aliases, ptr instanceof TypeMemPtr tmp && tmp._con);
   }
-  private static TypeStruct ld( TypeStruct[] tos, BitsAlias aliases ) {
+  private static TypeStruct ld( TypeStruct[] tos, NonBlockingHashMapLong<TypeStruct> xobjs, BitsAlias aliases, boolean con ) {
+    if( con ) {
+      TypeStruct ts = xobjs==null ? null : xobjs.get(Math.abs(aliases.getbit()));
+      if( ts != null ) return ts;
+    }
     boolean any = aliases.above_center();
     // Any alias, plus all of its children, are meet/joined.  This does a
     // tree-based scan on the inner loop.
@@ -482,8 +496,11 @@ public class TypeMem extends Type<TypeMem> {
       if( aliases.above_center() ) throw TODO();
       TypeStruct t = TypeStruct.UNUSED;
       for( int alias : aliases )
-        for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
+        for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) ) {
           t = (TypeStruct)t.meet(at(kid));
+          if( _xobjs!=null && _xobjs.get(kid)!=null )
+            t = (TypeStruct)t.meet(_xobjs.get(kid));
+        }
 
       DULLV.clear();
       if( _is_sharp(t)==null )       // If sharp, install and return
@@ -551,7 +568,7 @@ public class TypeMem extends Type<TypeMem> {
     for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
       if( kid < max ) tos[kid] = null;
     tos[alias] = obj;
-    return make0(tos);
+    return make0(tos,_xobjs);
   }
   private boolean _set_fast(int alias ) {
     for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
@@ -560,7 +577,7 @@ public class TypeMem extends Type<TypeMem> {
     return true;
   }
 
-  // Struct store into a conservative set of aliases.
+  // Struct store into a set of aliases.
   // 'precise' is replace, imprecise is MEET.
   public TypeMem update( TypeMemPtr tmp, TypeStruct tvs, boolean is_con ) {
     // If precise, just replace whole struct
@@ -576,13 +593,20 @@ public class TypeMem extends Type<TypeMem> {
     return make0(ss.asAry());
   }
 
+  // Field store into a precise alias
+  private TypeMem _setX( int alias, TypeFld fld ) {
+    NonBlockingHashMapLong<TypeStruct> xobjs = _xobjs==null ? new NonBlockingHashMapLong<>() : _xobjs.clone();
+    TypeStruct ts = xobjs.get(alias);
+    if( ts==null ) ts = at(alias);
+    xobjs.put(alias,ts.update(fld,true));
+    return make0(_objs,xobjs);
+  }
+
   // Field store into a conservative set of aliases.
   // 'precise' is replace, imprecise is MEET.
   public TypeMem update( TypeMemPtr tmp, TypeFld fld, boolean is_con ) {
-    if( is_con ) {
-      int alias = tmp._aliases.getbit();
-      return setX(alias,at(alias).update(fld,true));
-    }
+    if( is_con )
+      return _setX(Math.abs(tmp._aliases.getbit()),fld);
 
     // Must do struct-by-struct updates
     Ary<TypeStruct> ss = new Ary<>( _objs.clone());
