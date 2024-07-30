@@ -91,7 +91,7 @@ public class NewNode extends Node {
     return false;
   }
 
-  @Override public boolean has_tvar() { /*assert used(); */ return true; }
+  @Override public boolean has_tvar() { return true; }
 
   @Override public TV3 _set_tvar() {
     return this==PrimNode.PCLZ ? TVPtr.PTRCLZ : new TVPtr(BitsAlias.make0(_alias), new TVStruct(true) );

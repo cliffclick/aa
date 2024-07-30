@@ -163,10 +163,15 @@ public abstract class PrimNode extends Node {
     Env.ROOT.setDef(MEM_IDX,Env.MEM_0);
     Env.ROOT.setDef(REZ_IDX,Env.ALL);
 
-    // Set all TVars
-    PNIL.set_tvar();
-    PINT.set_tvar();
-    PFLT.set_tvar();
+    // Set primitive class tvars
+    PNIL._tvar = PTR_NIL.load().arg("^");
+    PINT._tvar = PTR_INT.load().arg("^");
+    PFLT._tvar = PTR_FLT.load().arg("^");
+    PSTR._tvar = PTR_STR.load().arg("^");
+    Env.XSCALAR._tvar = new TVPtr( BitsAlias.make0(0), new TVStruct(true) );
+    Env.XNIL   ._tvar = new TVPtr( BitsAlias.make0(0), new TVStruct(true) );
+    Env. NIL   ._tvar = PTR_NIL;
+    // Set all primitive tvars
     Env.ROOT.walk( n -> {
         Env.GVN.add_flow(n);
         if( n.has_tvar() ) n.set_tvar();
@@ -200,16 +205,6 @@ public abstract class PrimNode extends Node {
     boolean b = b0 && b1 && b2;
     return b;
   }
-
-
-  // Make a fresh HMT wrapped int
-  private static final String[] ss  = new String[]{TypeFld.CLZ,TypeFld.PRIM};
-  static TVPtr IINT(TypeInt ti) { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PINT.tvar(),new TVBase(ti)},false)); }
-  static TVPtr IFLT(TypeFlt tf) { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.tvar(),new TVBase(tf)},false)); }
-  //static TVPtr INFLT() { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PFLT.tvar(),new TVBase(TypeFlt.NFLT64)},false)); }
-  static TVPtr INIL(          ) { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PNIL.tvar().fresh(),new TVBase(TypeNil.NIL)},false)); }
-  static TVPtr ISTR(TypeMemPtr tmp) { return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss, new TV3[]{PSTR.tvar(),new TVBase(tmp)},false)); }
-
 
   // Used for test cases; changes the golden-rule expected alias/fidx based on
   // how many get consumed by the primitives.  Means I can add/remove prims and
@@ -296,7 +291,8 @@ public abstract class PrimNode extends Node {
   // Build and install math package
   private static NewNode make_math(PrimNode rand) {
     ZMATH.add_fld(TypeFld.CLZ,Access.Final,PCLZ,null);
-    Node pi = con(TypeFlt.PI.wrap());
+    Node pi = con(TypeFlt.PI);
+    pi._tvar = wrap_prim(TypeFlt.PI);
     ZMATH.add_fld("pi",Access.Final,pi,null);
     FunPtrNode rptr = rand.as_fun();
     rptr.setDef(1,Env.XSCALAR); // Rand is bound XSCALAR for no-display
@@ -375,32 +371,84 @@ public abstract class PrimNode extends Node {
     // All arguments are pre-unified to unique bases, wrapped in a primitive
     // with a clazz reference
     if( in(0) != null )
-      in(0).set_tvar().unify(wrap_base(_formals.at(DSP_IDX)),false);
+      in(0).set_tvar().unify(prim((TypeNil)_formals.at(DSP_IDX)),false);
     // Skip dyntable, dead in all primitives
     assert in(1) == null;
     // 2-arg primitive sets next arg
     if( len()>2 ) {
-      in(2).set_tvar().unify(wrap_base(_formals.at(ARG_IDX+1)),false);
+      in(2).set_tvar().unify(wrap_prim((TypeNil)_formals.at(ARG_IDX+1)),false);
       assert len()==3;
     }
 
     // Return is some primitive
-    return wrap_base(_ret);
+    return wrap_prim(_ret);
   }
 
-  // Make a TV3
-  public static TV3 wrap_base(Type rez) {
+  // Pattern: all primitive fcn wrappers have the "this" arg pre-unified to the
+  // canonical Base int/flt - as-if the prim use happens inside the prim def.
+  // Standard LET-REC rules.
+  private static final String[] ss = new String[]{TypeFld.CLZ,TypeFld.PRIM};
+  private static TVPtr wrap_prim(TV3 clz, TV3 base ) {
+    assert TV3._INIT0_CNT == 99999;
+    return new TVPtr(BitsAlias.EMPTY, new TVStruct(ss,new TV3[]{clz,base}));
+  }
+  // Canonical Base for int,flt,str,nil
+  private static final TVBase BASE_NIL = new TVBase(TypeNil.NIL);
+  private static final TVBase BASE_INT = new TVBase(TypeInt.INT64);
+  private static final TVBase BASE_FLT = new TVBase(TypeFlt.FLT64);
+  private static final TVBase BASE_STR = new TVBase(TypeMemPtr.STRPTR);
+  // Canonical wrapped prim; ptr-to-prim[clz,base]
+  private static final TVPtr PTR_NIL = wrap_prim(new TVLeaf(),BASE_NIL);
+  private static final TVPtr PTR_INT = wrap_prim(new TVLeaf(),BASE_INT);
+  private static final TVPtr PTR_FLT = wrap_prim(new TVLeaf(),BASE_FLT);
+  private static final TVPtr PTR_STR = wrap_prim(new TVLeaf(),BASE_STR);
+
+  // This version is for mid-def of prims; it makes a base that is NOT the
+  // "this" argument, used for e.g. returns or 2nd args.
+  private static TV3 wrap_prim(TypeNil rez) {
+    if( rez instanceof TypeInt ti ) return wrap_prim(PTR_INT.load().arg("^"),new TVBase(ti));
+    if( rez instanceof TypeFlt tf ) return wrap_prim(PTR_FLT.load().arg("^"),new TVBase(tf));
     if( rez == TypeNil.SCALAR )  return new TVLeaf();
-    if( rez == TypeNil.XSCALAR || rez == TypeNil.XNIL )  return new TVPtr( BitsAlias.make0(0), new TVStruct(true) );
-    if( rez instanceof TypeInt ti ) return IINT(ti);
-    if( rez instanceof TypeFlt tf ) return IFLT(tf);
-    if( rez == TypeNil.NIL        ) return INIL();
-    if( rez instanceof TypeMemPtr tmp ) return ISTR(tmp);
+    throw TODO();
+  }
+
+  // Using a flow Type, return the canonical HMT primitive
+  private static TVPtr prim(TypeNil rez) {
+    if( rez == TypeNil.NIL   ) return PTR_NIL;
+    if( rez == TypeInt.INT64 ) return PTR_INT;
+    if( rez == TypeFlt.FLT64 ) return PTR_FLT;
+    throw TODO();
+  }
+
+  // This version is for making prims AFTER the def; the CLZ is made FRESH and
+  // the base is unified to "this" in all fcns.
+  public static TV3 wrap_base(TypeNil rez) {
+    if( rez == TypeNil.NIL        ) return wrap_base(PTR_NIL.load().arg("^"),TypeNil.NIL);
+    if( rez instanceof TypeInt ti ) return wrap_base(PTR_INT.load().arg("^"),ti);
+    if( rez instanceof TypeFlt tf ) return wrap_base(PTR_FLT.load().arg("^"),tf);
+
+    //if( rez == TypeNil.SCALAR )  return new TVLeaf();
+    //if( rez == TypeNil.XSCALAR || rez == TypeNil.XNIL )  return new TVPtr( BitsAlias.make0(0), new TVStruct(true) );
+    //if( rez instanceof TypeMemPtr tmp )
+    //  throw TODO(); //return ISTR(tmp);
     //if( rez == TypeInt. TRUE  )  return  IINT(TypeInt.TRUE );
     //if( rez == TypeInt. BOOL  )  return IBOOL();
     //if( rez == TypeFlt.NFLT64 )  return INFLT();
     throw TODO();
   }
+  // Make a fresh HMT wrapped int post-def of prims
+  private static TVPtr wrap_base( TV3 clz, TypeNil tn ) {
+    assert TV3._INIT0_CNT < 99999;
+    TVPtr fclz = (TVPtr)clz.fresh();
+    TVPtr over = (TVPtr)fclz.load().arg(2);
+    TVLambda sample = (TVLambda)over.load().arg(1);
+    TVPtr prim = (TVPtr)sample.arg(DSP_IDX);
+    TVBase base = (TVBase)prim.load().arg("_");
+    base._t = tn;
+    return prim;
+  }
+
+
 
   // All work done in set_tvar, no need to unify
   @Override public boolean unify( boolean test ) { return false; }
@@ -721,13 +769,17 @@ public abstract class PrimNode extends Node {
     @Override TV3 _set_tvar() {
       // All arguments are pre-unified to unique bases, wrapped in a
       // primitive with a clazz reference
-      for( int i=DSP_IDX; i<_formals.len(); i++ )
-        if( _formals.at(i)!=Type.ANY )
-          // Only StrLen has a Memory input, so the offset here is off-by-one
-          // from the default _set_tvar
-          in(i-MEM_IDX).set_tvar().unify(wrap_base(_formals.at(i)),false);
-      // Return is some primitive
-      return wrap_base(_ret);
+      if( in(DSP_IDX) != null )
+        //in(0).set_tvar().unify(wrap_prim(_formals.at(DSP_IDX)),false);
+        throw TODO(); // Should be the "this"
+
+      //for( int i=DSP_IDX; i<_formals.len(); i++ )
+      //  if( _formals.at(i)!=Type.ANY )
+      //    // Only StrLen has a Memory input, so the offset here is off-by-one
+      //    // from the default _set_tvar
+      //    in(i-MEM_IDX).set_tvar().unify(wrap_prim((TypeNil)_formals.at(i)),false);
+      //// Return is some primitive
+      return wrap_prim(_ret);
     }
   }
 

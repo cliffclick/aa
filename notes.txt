@@ -1,4 +1,65 @@
 =======================================
+07/29/2024
+
+JCrete - getting unification of the primitives with others.
+
+Root cause I think is not making a FRESH copy of the int primitives, when
+loading from an INT.
+
+Wondering if i can move to EXE & duplicate the problem?
+Really wondering if that's the right semantic:
+
+"2" -> from-whole-cloth like a let-rec use of an ident.
+  Clones the INT clazz functions with a "2" on LHS.
+  If not cloning, then "!" is a fcn {2->int1} when unifies with {x->int8}
+  unifies int1 with int8 & I lose the sharpness of int1.
+
+I think in EXE I had to clone all the INT's at every use as well.
+
+"AS IF", making a "@{ ^=INT, _=2 }" makes FRESH all the INT CLAZZ
+
+
+So... mark the PRIM struct as a PRIM - so can tell it apart.
+If unify PRIM with non, keep PRIM:
+   @{ ^=INT, _=int1 }  // PRIM int1
+   @{ ^=???, _=int8 }  // UNKNOWN class
+   @{ ^=INT, _=???? }  // UNKNOWN prim value
+
+And then when LOAD loads from a PRIM, and searchs INT CLAZZ.... DELAYED FRESH TRIGGERS.
+
+Can I accidentally make a prim-like thing, and then FRESH when I should not?
+Is the rule always that I FRESH on CLZ load?  (No?)
+Normal rule: FRESH on making a primitive?
+
+Suppose user makes Matrix class & Matrix instance.  Matrix instance needs to be FRESH of CLZ
+and pre-bound to LHS.
+
+User writes "new Matrix", this makes a Fresh copy -
+INTCLZ = @{ !_ = { /*FULL WRAPPED INT*/@{^=INTCLZ, int:int } -> /*OTHER WRAPPED INT*/@{ ^=INTCLZ, int:int1 } }, ... other int fcns };
+"2" ==>>  @{ ^=@{ !_ = { 2 -> INTCLZ:int1 }, ... }, _=2:int }
+
+So definitely needs to FRESH-UNIFY on making a primitive "2".
+
+Now we're on to OPTIMIZATION:
+Idea: lazy_fresh fields; when Loading from a Lazy_Fresh field, Load does a FRESH instead of a UNIFY.
+
+"2" ==>>
+@{ LAZY_FRESH_^ = INTCLZ, _=2:int } // Per-field Lazy-Fresh
+
+Now, can I tell if unknown fields are LAZY?  
+Every instance-new makes a LAZY_CLAZZ field.
+Can delay Fresh even more...
+
+Comes down to: need a LAZY FRESH all over the place....
+
+Plan B: Get It Working, then Get It Fast.
+So.... just 'ffing be eager Fresh on numbers.
+:-P
+
+
+
+
+=======================================
 07/13/2024
 
 Action for escapes:
@@ -8,7 +69,7 @@ Action for escapes:
 - Phi will widen even if same type, because might be (recursive) different instances
 - TMP flip CON to private?
 
-
+Mostly success here, although only partly thru the stable tests
 
 
 =======================================

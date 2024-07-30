@@ -234,16 +234,9 @@ abstract public class TV3 implements Cloneable {
   final boolean _unify(TV3 that, boolean test) {
     assert !unified() && !that.unified();
     if( this==that ) return false;
-    if( !_fresh && _INIT0_CNT!=99999 &&
-        ((_uid >= _INIT0_CNT) ^ (that._uid >= _INIT0_CNT)) ) {
-      assert false;             // THIS IS A HACK!  ALSO doesn't work needs a top-level FRESH like normal
-      //_fresh = true;
-      //boolean rez = _uid >= _INIT0_CNT
-      //  ? that._fresh_unify(this,test)
-      //  : this._fresh_unify(that,test);
-      //_fresh = false;
-      //return rez;
-    }
+    // THIS IS A HACK!  ALSO doesn't work needs a top-level FRESH like normal
+    assert _INIT0_CNT == 99999 ||
+            (_uid >= _INIT0_CNT == that._uid >= _INIT0_CNT);
 
     // Any leaf immediately unifies with any non-leaf; triangulate
     if( !(this instanceof TVLeaf) && that instanceof TVLeaf ) return test || that._unify_impl(this);
@@ -327,18 +320,13 @@ abstract public class TV3 implements Cloneable {
   // A per-fresh-unify NONGEN
   static TV3[] NONGEN;
 
-  private boolean _fresh;
-
   public boolean fresh_unify( TV3[] nongen, TV3 that, boolean test ) {
     if( this==that ) return false;
     assert VARS.isEmpty() && DUPS.isEmpty() && NONGEN ==null;
-    assert !_fresh;
-    _fresh = true;
     NONGEN = nongen;
     boolean progress = _fresh_unify(that,test);
     VARS.clear();  DUPS.clear();
     NONGEN = null;
-    _fresh = false;
     return progress;
   }
 
@@ -697,7 +685,8 @@ abstract public class TV3 implements Cloneable {
     case TypeFunPtr tfp ->  tfp.is_full() ? new TVLeaf() // Generic Function Ptr
       : new TVLambda(tfp.nargs(),from_flow(tfp.dsp(),d),from_flow(tfp._ret,d));
     case TypeMemPtr tmp -> {
-      if( tmp==TypeMemPtr.STRPTR ) yield PrimNode.wrap_base(tmp);
+      if( tmp==TypeMemPtr.STRPTR )
+        throw TODO(); //yield PrimNode.wrap_base(tmp);
       TVStruct ts = tmp.is_simple_ptr() ? new TVStruct(true) : (TVStruct)from_flow(tmp._obj,d);
       StoreXNode.unify(tmp._aliases,ts,false);
       yield new TVPtr(tmp._aliases,ts);
