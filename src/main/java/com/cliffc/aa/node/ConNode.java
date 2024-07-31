@@ -37,7 +37,7 @@ public class ConNode<T extends Type> extends Node {
   // Each constant has a copy - a *FRESH* copy of the associated class baked
   // into associated phat prim value.  Example for int:17:
   //   *[INTX]{ ^ = @{INTCLZ}, _ = int:17 }
-  // This is a *fresh* copy of the integer clazz.  However the integer clazz
+  // This is a *fresh* copy of the integer clazz.  However, the integer clazz
   // has no type variables, so fresh-or-not makes no difference.
   //
   // However, the NIL clazz is full of type variables

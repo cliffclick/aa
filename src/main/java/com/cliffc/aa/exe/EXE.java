@@ -482,7 +482,7 @@ public class EXE {
 
       // pred is a simple constant?  Unify one side
       int cmp=0;
-      TypeNil tn = _pred.tvar().isPrim();
+      TypeNil tn = _pred.tvar().getPrim();
       if( tn!=null ) {
         if( tn._nil ) { cmp= -1; assert !tn._sub; }
         if( tn._sub )   cmp=  1;
@@ -818,7 +818,7 @@ public class EXE {
           TV3 terr = syn.tvar().treeFind( tv -> tv instanceof TVErr );
           if( terr != null )
             throw new IllegalArgumentException(terr.toString());
-          TypeNil tn = syn.tvar().isPrim();
+          TypeNil tn = syn.tvar().getPrim();
           if( tn!=null && tn.getClass()==TypeNil.class )
             throw new IllegalArgumentException("Mixing basic types");
           return null;

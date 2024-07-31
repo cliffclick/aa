@@ -377,8 +377,10 @@ public class LoadNode extends Node {
               Env.ROOT.deps_add_live(ldst); // Revisit if fewer escapes
               return mem;
             }
+            // Check for returned aliases
+            Type t = ((TypeTuple)cepi._val)._ts[REZ_IDX];
+            BitsAlias as = t instanceof TypeNil tn ? tn._aliases : BitsAlias.EMPTY;
             // Compute direct call argument set
-            BitsAlias as = BitsAlias.EMPTY;
             for( int i=DSP_IDX; i<call.nargs(); i++ ) {
               Type targ = call.val(i);
               if( targ instanceof TypeFunPtr tfp ) targ = tfp.dsp();

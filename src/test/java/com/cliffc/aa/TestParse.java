@@ -28,10 +28,13 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
     DO_GCP=true;
-    DO_HMT=false;
+    DO_HMT=true;
     RSEED=0;
 
-    test("q=(2,3.14); (!q._,q._.sin())","*#[22]( _, nil, 0.0015926529164868282)","*[21](_,int:int1,flt:flt64)", null, null, "[4,21]", null);
+    test("fcn = {(@{a=1;},@{b=2;})._}; (fcn().a, fcn().b)",
+         "*#[25](_, %[2,25][2]?, %[2,25][2]?)",
+         "*[25](_,int:1,int:2)",
+         null, null, "[2,25]", null);
 
     test(
 """

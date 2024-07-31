@@ -218,7 +218,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     public final boolean debug;        // dump raw aliases and fidxs
     public final boolean indent;       // indent the output (more than 1 line outout)
     public final boolean mem;          // dump memory
-    int _fld, _tmp, _tfp, _ts;  // Counters for fancy printing
+    int _fld, _tmp, _tfp, _ts, _mem;   // Counters for fancy printing
     public PENV() { this(true,false,false); }
     public PENV(boolean debug, boolean indent, boolean mem) { this(new SB(),debug,indent,mem); }
     public PENV(SB sb, boolean debug, boolean indent, boolean mem) {

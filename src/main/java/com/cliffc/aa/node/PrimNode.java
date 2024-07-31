@@ -368,20 +368,38 @@ public abstract class PrimNode extends Node {
   // In the test HM, all primitives are a Lambda without a body.  Here they are
   // effectively Applies/Calls and the primitive computes a result.
   @Override TV3 _set_tvar() {
+    if( _PRIM_CNT==0 ) {
+      // All arguments are pre-unified to unique bases, wrapped in a primitive
+      // with a clazz reference
+      if( in(0) != null )
+        in(0).set_tvar().unify(prim((TypeNil)_formals.at(DSP_IDX)),false);
+      // Skip dyntable, dead in all primitives
+      assert in(1) == null;
+      // 2-arg primitive sets next arg
+      if( len()>2 ) {
+        in(2).set_tvar().unify(wrap_prim((TypeNil)_formals.at(ARG_IDX+1)),false);
+        assert len()==3;
+      }
+
+      // Return is some primitive
+      return wrap_prim(_ret);
+    }
+    assert !isPrim(); // Is a inlined/cloned; normal rules apply
+
     // All arguments are pre-unified to unique bases, wrapped in a primitive
     // with a clazz reference
     if( in(0) != null )
-      in(0).set_tvar().unify(prim((TypeNil)_formals.at(DSP_IDX)),false);
+      in(0).set_tvar().unify(wrap_base((TypeNil)_formals.at(DSP_IDX)),false);
     // Skip dyntable, dead in all primitives
     assert in(1) == null;
     // 2-arg primitive sets next arg
     if( len()>2 ) {
-      in(2).set_tvar().unify(wrap_prim((TypeNil)_formals.at(ARG_IDX+1)),false);
+      in(2).set_tvar().unify(wrap_base((TypeNil)_formals.at(ARG_IDX+1)),false);
       assert len()==3;
     }
 
     // Return is some primitive
-    return wrap_prim(_ret);
+    return wrap_base(_ret);
   }
 
   // Pattern: all primitive fcn wrappers have the "this" arg pre-unified to the
@@ -426,9 +444,8 @@ public abstract class PrimNode extends Node {
     if( rez == TypeNil.NIL        ) return wrap_base(PTR_NIL.load().arg("^"),TypeNil.NIL);
     if( rez instanceof TypeInt ti ) return wrap_base(PTR_INT.load().arg("^"),ti);
     if( rez instanceof TypeFlt tf ) return wrap_base(PTR_FLT.load().arg("^"),tf);
-
-    //if( rez == TypeNil.SCALAR )  return new TVLeaf();
-    //if( rez == TypeNil.XSCALAR || rez == TypeNil.XNIL )  return new TVPtr( BitsAlias.make0(0), new TVStruct(true) );
+    if( rez == TypeNil.SCALAR )  return new TVLeaf();
+    if( rez == TypeNil.XSCALAR || rez == TypeNil.XNIL )  return new TVPtr( BitsAlias.make0(0), new TVStruct(true) );
     //if( rez instanceof TypeMemPtr tmp )
     //  throw TODO(); //return ISTR(tmp);
     //if( rez == TypeInt. TRUE  )  return  IINT(TypeInt.TRUE );
@@ -612,7 +629,7 @@ public abstract class PrimNode extends Node {
   static class ModI64 extends Prim2OpI64 { ModI64() { super("_%_"); } long op( long l, long r ) { return r==0 ? 0 : l%r; } }
 
   abstract static class Prim2OpIF64 extends PrimNode {
-    Prim2OpIF64( String name ) { super(name,TypeTuple.INT64_NFLT64,TypeFlt.FLT64); }
+    Prim2OpIF64( String name ) { super(name,TypeTuple.INT64_FLT64,TypeFlt.FLT64); }
     @Override public TypeFlt apply( TypeNil[] args ) { return TypeFlt.con(op(args[0].getl(),args[2].getd())); }
     abstract double op( long x, double y );
   }
@@ -676,7 +693,7 @@ public abstract class PrimNode extends Node {
   public static class NE_I64 extends Prim2RelOpI64 { public NE_I64() { super("_!=_"); } boolean op( long l, long r ) { return l!=r; } }
 
   abstract static class Prim2RelOpIF64 extends PrimNode {
-    Prim2RelOpIF64( String name ) { super(name,TypeTuple.INT64_NFLT64,TypeInt.BOOL); }
+    Prim2RelOpIF64( String name ) { super(name,TypeTuple.INT64_FLT64,TypeInt.BOOL); }
     @Override public TypeNil apply( TypeNil[] args ) { return op(args[0].getl(),args[1].getd()) ? TypeInt.TRUE : TypeNil.NIL; }
     abstract boolean op( long x, double y );
   }

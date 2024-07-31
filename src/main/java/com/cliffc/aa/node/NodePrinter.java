@@ -19,7 +19,7 @@ public abstract class NodePrinter {
 
   // Another bulk pretty-printer.  Uses max depth better.
   private static Type.PENV _pp(Node node, int depth, boolean prims, boolean flow, boolean live, boolean tvar) {
-    Type.PENV P = new Type.PENV();
+    Type.PENV P = new Type.PENV(true,false,true);
 
     // All Nodes within max depth
     VBitSet visit0 = new VBitSet();

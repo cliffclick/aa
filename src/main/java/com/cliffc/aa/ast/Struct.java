@@ -30,10 +30,15 @@ public class Struct extends AST {
       for( int i=0; i<_vars._len; i++ )
         s.add_fld(_vars.at(i),Access.RW,Env.ANY,null);
       s.close();
+
+      StructNode s2 = new StructNode(0,false,null,s._hint);
+      s2.add_fld("^",Access.Final,s.in(0),null).init();
       for( int i=0; i<_vars._len; i++ ) {
         _kids.at(i).nodes(eStruct);
-        inScope.mem( new StoreNode( inScope.mem(),inScope.ptr(),inScope.rez(),_vars.at(i),Access.Final,null));
+        s2.add_fld(_vars.at(i),Access.Final,inScope.rez(),null);
       }
+      s2.close();
+      inScope.mem( new StoreXNode( inScope.mem(),inScope.ptr(),s2,null).init());
 
       //// See matching comment hack in Env.java
       // The init code runs, then all fields are filled in at once.

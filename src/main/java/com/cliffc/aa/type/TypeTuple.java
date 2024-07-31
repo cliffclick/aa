@@ -117,6 +117,7 @@ public class TypeTuple extends Type<TypeTuple> {
   public  static final TypeTuple FLT64      = make(CTRL, TypeMem.ALLMEM, TypeFlt.FLT64, ANY); // { flt dyn -> }
   public  static final TypeTuple INT64_INT64= make(CTRL, TypeMem.ALLMEM, TypeInt.INT64, ANY,TypeInt. INT64); // { int dyn  int -> }
   public  static final TypeTuple INT64_NFLT64=make(CTRL, TypeMem.ALLMEM, TypeInt.INT64, ANY,TypeFlt.NFLT64); // { int dyn nflt -> }
+  public  static final TypeTuple INT64_FLT64= make(CTRL, TypeMem.ALLMEM, TypeInt.INT64, ANY,TypeFlt. FLT64); // { int dyn nflt -> }
   public  static final TypeTuple FLT64_FLT64= make(CTRL, TypeMem.ALLMEM, TypeFlt.FLT64, ANY,TypeFlt. FLT64); // { flt dyn  flt -> }
   public  static final TypeTuple FLT64_INT64= make(CTRL, TypeMem.ALLMEM, TypeFlt.FLT64, ANY,TypeInt. INT64); // { flt dyn  int -> }
   public  static final TypeTuple STR        = make(CTRL, TypeMem.ALLMEM, TypeMemPtr.STRPTR, ANY);            // { str dyn -> }

@@ -114,11 +114,8 @@ public abstract class StoreAbs extends Node {
             // If not wiping out an error, wipe out the first store
             // Works for a StoreX wiping out a prior Store or StoreX.
             // Works for a Store  wiping out a prior Store same field.
-            if( st.rez()==null || st.rez().err(true)==null ) {
-              //            set_def(1,st.mem());
-              //            return this;
-              throw TODO();
-            }
+            if( st.rez()==null || st.rez().err(true)==null )
+              return setDef(1,st.mem());
           }
         }
       }

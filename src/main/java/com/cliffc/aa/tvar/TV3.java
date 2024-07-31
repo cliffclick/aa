@@ -190,8 +190,8 @@ abstract public class TV3 implements Cloneable {
       { that=that.find(); }
     progress |= _union_impl(that); // Merge subclass specific bits into that
     progress |= that.widen(_widen,false);
-    assert _INIT0_CNT==99999 || that._uid >= _INIT0_CNT || !progress; // no updates to primitives
-    assert _INIT0_CNT==99999 ||      _uid >= _INIT0_CNT || that._uid < _INIT0_CNT; // no unify primitive away
+    assert _INIT0_CNT==99999 || !that.isPrim() || !progress; // no updates to primitives
+    assert !this.isPrim() || that.isPrim(); // no unify primitive away
 
     // Add Node updates to _work_flow list
     that._union_deps(this);
@@ -234,13 +234,11 @@ abstract public class TV3 implements Cloneable {
   final boolean _unify(TV3 that, boolean test) {
     assert !unified() && !that.unified();
     if( this==that ) return false;
-    // THIS IS A HACK!  ALSO doesn't work needs a top-level FRESH like normal
-    assert _INIT0_CNT == 99999 ||
-            (_uid >= _INIT0_CNT == that._uid >= _INIT0_CNT);
 
     // Any leaf immediately unifies with any non-leaf; triangulate
     if( !(this instanceof TVLeaf) && that instanceof TVLeaf ) return test || that._unify_impl(this);
     if( !(that instanceof TVLeaf) && this instanceof TVLeaf ) return test || this._unify_impl(that);
+    //assert this.isPrim()==that.isPrim();
 
     //// Nil can unify with a non-nil anything, typically
     //if( !(this instanceof TVNil) && that instanceof TVNil nil ) return nil._unify_nil(this,test);
@@ -844,7 +842,7 @@ abstract public class TV3 implements Cloneable {
   }
 
   // Return a TypeNil from a wrapped primitive, or null
-  public TypeNil isPrim() { return null; }
+  public TypeNil getPrim() { return null; }
 
   // Debugging tool
   public TV3 f(int uid) { return _find(uid,new VBitSet()); }
@@ -898,6 +896,7 @@ abstract public class TV3 implements Cloneable {
   public static void init0() {
     _INIT0_CNT = CNT;
   }
+  public boolean isPrim() { return _uid < _INIT0_CNT || _INIT0_CNT==99999; }
   public static void reset_to_init0() {
     CNT=_INIT0_CNT;
     TVStruct.reset_to_init0();

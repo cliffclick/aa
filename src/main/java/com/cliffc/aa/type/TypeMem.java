@@ -149,10 +149,18 @@ public class TypeMem extends Type<TypeMem> {
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
 
   @Override public void _str_dups( PENV P ) {
-    if( P.mem )
-      for( int i = 1; i< _objs.length; i++ )
-        if( _objs[i]!=null )
-          _objs[i]._str_dups(P);
+    if( !P.mem ) return;
+    if( P.visit.tset(_uid) ) {
+      if( !P.dups.containsKey(_uid) )
+        P.dups.put(_uid,"M"+(char)('A'+P._mem++));
+      return;
+    }
+    for( TypeStruct ts : _objs )
+      if( ts!=null )
+        ts._str_dups(P);
+    if( _xobjs != null )
+      for( TypeStruct ts : _xobjs.values() )
+        ts._str_dups(P);
   }
 
   @Override PENV _str0( PENV P ) {
@@ -378,6 +386,11 @@ public class TypeMem extends Type<TypeMem> {
       for( int kid=alias; kid!=0; kid=BitsAlias.next_kid(alias,kid) ) {
         TypeStruct x = at(tos,kid);
         obj1 = (TypeStruct)(any ? obj1.join(x) : obj1.meet(x));
+        if( xobjs != null ) {
+          TypeStruct y = xobjs.get(alias);
+          if( y!=null )
+            obj1 = (TypeStruct)(any ? obj1.join(y) : obj1.meet(y));
+        }
       }
     return obj1;
   }

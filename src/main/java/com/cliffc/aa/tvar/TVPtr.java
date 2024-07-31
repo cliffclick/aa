@@ -93,7 +93,7 @@ public class TVPtr extends TV3 {
   boolean is_prim(TVStruct str) { return str.is_prim() && _aliases==BitsAlias.EMPTY; }
 
   // Return a TypeNil from a wrapped primitive, or null
-  @Override public TypeNil isPrim() {
+  @Override public TypeNil getPrim() {
     return load().is_prim() &&
       load().arg(TypeFld.PRIM) instanceof TVBase base &&
       base._t instanceof TypeNil tn
