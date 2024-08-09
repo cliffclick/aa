@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
+import com.cliffc.aa.Combo;
 import com.cliffc.aa.tvar.TV3;
 import com.cliffc.aa.tvar.TVLambda;
 import com.cliffc.aa.tvar.TVLeaf;
@@ -84,8 +85,10 @@ public final class FunPtrNode extends Node {
     if( i==0 ) {
       // The RET is alive, but the FunPtr does not itself demand any memory.
       // Instead, either it escapes and Root demands memory, or it is called
-      // and the Call demands memory.
-      return _live!=Type.ANY ? TypeMem.ANYMEM : Type.ANY;
+      // and the Call demands memory.  Pre-Combo, however, if the FunPtr
+      // exists and may-be-wired, then it acts as a proxy for some future
+      // wired Call.
+      return _live!=Type.ANY ? (Combo.pre() ? RootNode.removeKills(this) : TypeMem.ANYMEM) : Type.ANY;
     } else {
       // Display passes live along
       return _live;

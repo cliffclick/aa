@@ -85,8 +85,16 @@ public abstract class StoreAbs extends Node {
 
     // Is this Store dead from below?
     if( adr._val instanceof TypeMemPtr tmp && _live instanceof TypeMem lmem &&
-        !_is_live(lmem.ld(tmp)) )
-      return kill_rez_stall_till_live();
+        !_is_live(lmem.ld(tmp)) ) {
+      // No need for rez
+      if( rez()!=Env.ANY )
+        Env.GVN.add_reduce(setDef(3,Env.ANY)).add_work();
+      // Remove when liveness AND value aligns
+      if( _live.isa(mem._live) &&
+          mem._val .isa(_val ) )
+        return mem;
+      return null;
+    }
 
     // Store of a Store, same address
     if( mem instanceof StoreAbs st ) {

@@ -139,7 +139,8 @@ public class Env implements AutoCloseable {
     NewNode ptr = new NewNode(hint,BitsAlias.new_alias() ).init();
     // See matching comment hack in Struct.java.
     // Struct is made before running the init code.
-    Node mem = new StoreXNode(scope.mem(),ptr,dsp,null).init();
+    Node mem = scope.mem();
+    //mem = new StoreXNode(mem,ptr,dsp,null).init();
     _scope = new ScopeNode(new HashMap<>(),scope.ctrl(),mem,ptr,ptr,dsp,hint).init();
     // Struct is made after all field inits are generated, then struct is
     // initialized all at once.
