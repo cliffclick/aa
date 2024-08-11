@@ -1,0 +1,11 @@
+// One DynLoad, fcn needs DynTable
+// Type: *[FLT]( _, int:2, flt:3.300000011920929)
+// Eval: *[7]( _, 2, 3.300000011920929f)
+
+fcn = { x ->
+  (@{
+     qi ={ x -> x.a };
+     qf ={ x -> x.b };
+   }._ x)   // Which of {q*} should be picked?
+};
+(pair (fcn @{a =2;}) (fcn @{b =3.3f;}) )

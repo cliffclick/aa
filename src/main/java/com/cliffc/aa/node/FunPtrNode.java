@@ -88,7 +88,7 @@ public final class FunPtrNode extends Node {
       // and the Call demands memory.  Pre-Combo, however, if the FunPtr
       // exists and may-be-wired, then it acts as a proxy for some future
       // wired Call.
-      return _live!=Type.ANY ? (Combo.pre() ? RootNode.removeKills(this) : TypeMem.ANYMEM) : Type.ANY;
+      return _live!=Type.ANY ? (Combo.pre() ? RootNode.removeKills(ret()) : TypeMem.ANYMEM) : Type.ANY;
     } else {
       // Display passes live along
       return _live;

@@ -64,11 +64,15 @@ public class Lambda extends ASTVars {
       _fun.unkeep();
       RetNode ret = new RetNode(inScope.ctrl(),inScope.mem(),inScope.rez(),rpc,_fun).init();
 
-      // The outer scope is a shared closure.
+      // We need the next outer enclosing closure.
+      Env e_cloz = outer;
+      while( !e_cloz._scope.stk().is_closure() )
+        e_cloz = e_cloz._par;
+      
       // Take just the prefix of scope variables declared up through now (after
       // sorting for mutual-let-rec); add the mut-let-rec set to the nongens.
-      Node frsh = new PartialScopeFreshNode(outScope).peep();
-      frsh.addDef(outScope.ptr());
+      Node frsh = new PartialScopeFreshNode(e_cloz._scope).peep();
+      frsh.addDef(e_cloz._scope.ptr());
       // TODO: expecting to have to repeat this up-scope
       for( AST par = _par, old = this; par!=null; old = par, par = par._par )
         if( par instanceof LetRec let && old==let.body() && let._frefs != null )

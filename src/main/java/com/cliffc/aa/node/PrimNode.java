@@ -446,8 +446,8 @@ public abstract class PrimNode extends Node {
     if( rez instanceof TypeFlt tf ) return wrap_base(PTR_FLT.load().arg("^"),tf);
     if( rez == TypeNil.SCALAR )  return new TVLeaf();
     if( rez == TypeNil.XSCALAR || rez == TypeNil.XNIL )  return new TVPtr( BitsAlias.make0(0), new TVStruct(true) );
-    //if( rez instanceof TypeMemPtr tmp )
-    //  throw TODO(); //return ISTR(tmp);
+    if( rez instanceof TypeMemPtr tmp )
+      return wrap_base(PTR_STR.load().arg("^"),tmp);
     //if( rez == TypeInt. TRUE  )  return  IINT(TypeInt.TRUE );
     //if( rez == TypeInt. BOOL  )  return IBOOL();
     //if( rez == TypeFlt.NFLT64 )  return INFLT();
