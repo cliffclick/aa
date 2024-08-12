@@ -68,7 +68,7 @@ public class Lambda extends ASTVars {
       Env e_cloz = outer;
       while( !e_cloz._scope.stk().is_closure() )
         e_cloz = e_cloz._par;
-      
+
       // Take just the prefix of scope variables declared up through now (after
       // sorting for mutual-let-rec); add the mut-let-rec set to the nongens.
       Node frsh = new PartialScopeFreshNode(e_cloz._scope).peep();

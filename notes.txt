@@ -1,4 +1,13 @@
 =======================================
+08/11/2024
+
+Running testOverA7.aa in parallel between EXE and ASTParse.
+ASTParse is getting wrong answer, getting conflicts.
+Fixed a wrong-DSP already.
+Probably missing a Fresh somewhere.
+
+
+=======================================
 07/29/2024
 
 JCrete - getting unification of the primitives with others.
