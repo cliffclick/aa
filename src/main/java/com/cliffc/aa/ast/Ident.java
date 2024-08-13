@@ -27,8 +27,15 @@ public class Ident extends AST {
     // loads along the way.
     Env e2 = e;
     Node ptr = e2._scope.ptr();
-    while( e2._scope.stk().find(_name) == -1 || !e2._scope.stk().is_closure() ) {
-      ptr = new LoadNode(e._scope.mem(),ptr,"^",null).peep();
+    while( e2._scope.stk().find(_name) == -1 ) {
+      // Looking up through a closure?
+      ptr = e2._scope.stk().is_closure()
+        // Need to walk the display ptr chain
+        ? new LoadNode(e._scope.mem(),ptr,"^",null).peep()
+        // Otherwise just access
+        // CNC; TODO; Confused; doesn't work to "do nothing", but expect
+        // a linear display walk, skipping Envs for structs
+        : e2._par._scope.ptr();
       e2 = e2._par;
     }
     assert e2._scope.stk().is_closure();

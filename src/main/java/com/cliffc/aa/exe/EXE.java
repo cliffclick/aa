@@ -241,6 +241,23 @@ public class EXE {
     @Override final public String toString() { return str(new SB()).toString(); }
     abstract SB str(SB sb);
 
+    final public String dump() {
+      VBitSet dups = new VBitSet(), visit = new VBitSet();
+      visit( syn -> syn._tvar._get_dups(visit,dups,true,false),
+             (a,b) -> null );
+      visit.clear();
+      return dump1(new SB(),visit,dups).toString();
+    }
+    final SB dump1(SB sb, VBitSet visit, VBitSet dups) {
+      // Dump 1 line, then the TVAR
+      dump0(sb).p(" // ");
+      _tvar.str(sb,visit,dups,true,false).nl();
+      // Dump 0 or more lines with increased indent
+      return dump2(sb,visit,dups);
+    }
+    abstract SB dump0(SB sb);
+    SB dump2(SB sb, VBitSet visit, VBitSet dups) { return sb; }
+
     // First pass
     abstract void prep_tree(Ary<TV3> nongen, TVPtr penv);
 
@@ -270,6 +287,7 @@ public class EXE {
     Con( double con ) { _con = new FltVal(con); }
     Con( String con ) { _con = new StrVal(con); }
     @Override final SB str(SB sb) { return _con.str(sb); }
+    @Override SB dump0(SB sb) { return _con.str(sb); }
     @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) { _tvar = TV3.from_flow(_con.as_flow()); }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
     @Override Val eval0( PtrVal penv ) { return _con; }
@@ -278,6 +296,7 @@ public class EXE {
   // --- Nil ------------------------
   static class Nil extends Syntax {
     @Override SB str(SB sb) { return sb.p("nil"); }
+    @Override SB dump0(SB sb) { return sb.p("nil"); }
     @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) { _tvar = new TVPtr(BitsAlias.EMPTY,new TVStruct(true)); _tvar.add_may_nil(false); }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
     @Override NilVal eval0( PtrVal penv ) { return NilVal.NIL; }
@@ -291,6 +310,7 @@ public class EXE {
 
     Ident( String name ) { _name=name; }
     @Override SB str(SB sb) { return sb.p(_name); }
+    @Override SB dump0(SB sb) { return sb.p(_name); }
     @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
 
       for( ; penv!=null; penv = penv.load().pclz() ) {
@@ -357,6 +377,16 @@ public class EXE {
         sb.p(_args[i]).p(' ');
       return _body.str(sb.p("-> ")).p(" }");
     }
+    @Override SB dump0(SB sb) {
+      sb.p(_fid).p("{ ");
+      for( int i=AA.DSP_IDX; i< nargs(); i++ )
+        sb.p(_args[i]).p(' ');
+      return sb.p("-> ");
+    }
+    @Override SB dump2(SB sb, VBitSet visit, VBitSet dups) {
+      _body.dump1(sb.ii(1).i(),visit,dups);
+      return sb.di(1).i().p("}").nl();
+    }
     void strShort( SB sb ) {sb.p( "LAM" ).p( _fid );}
     int nargs() { return _args.length; }
     TV3 arg(int i) { return tvar().arg(i); }
@@ -419,6 +449,15 @@ public class EXE {
     }
     int nargs() { return _args.length; }
 
+    @Override SB dump0(SB sb) { return sb.p("("); }
+    @Override SB dump2(SB sb, VBitSet visit, VBitSet dups) {
+      _fun.dump1(sb.ii(1).i(),visit,dups);
+      for( Syntax arg : _args )
+        if( arg != null )
+          arg.dump1(sb.i(),visit,dups);
+      return sb.di(1).i().p(")").nl();
+    }
+
     @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
       _tvar = new TVLeaf();
       _fun.prep_tree(nongen,penv);
@@ -474,6 +513,16 @@ public class EXE {
       _fals.str(sb.p(" : "));
       return sb;
     }
+
+    @Override SB dump0(SB sb) { return sb.p("if"); }
+    @Override SB dump2(SB sb, VBitSet visit, VBitSet dups) {
+      sb.ii(1);
+      _pred.dump1(sb.i(),visit,dups);
+      _true.dump1(sb.i().p("? "),visit,dups);
+      _fals.dump1(sb.i().p(": "),visit,dups);
+      return sb.di(1);
+    }
+
     @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
       _tvar = new TVLeaf();
       _pred.prep_tree(nongen,penv);
@@ -538,6 +587,15 @@ public class EXE {
       LETS.setX(_uid,this);
     }
     @Override SB str(SB sb) { return _body.str(_def.str(sb.p(_arg).p(" = ")).p("; ")); }
+
+    @Override SB dump0(SB sb) { return sb.p(_arg).p(" = "); }
+    @Override SB dump2(SB sb, VBitSet visit, VBitSet dups) {
+      _def.dump1(sb.ii(1).i(),visit,dups);
+      sb.i().p(";").nl();
+      _body.dump1(sb.i(),visit,dups);
+      return sb.di(1);
+    }
+
     @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
       // Nice frame-id matching for assert
       _fid = penv.aliases().getbit();
@@ -615,6 +673,14 @@ public class EXE {
         fld(i).str(sb.p(_labels.at(i)).p(" = ")).p("; ");
       return sb.unchar(1).p("}");
     }
+    SB dump0(SB sb) { return sb.p('*').p(_fid).p("@{ "); }
+    @Override SB dump2(SB sb, VBitSet visit, VBitSet dups) {
+      sb.ii(1);
+      for( int i=0; i<_flds._len; i++ )
+        fld(i).dump1(sb.i().p(_labels.at(i)).p(" = "),visit,dups);
+      return sb.di(1).i().p("}").nl();
+    }
+
     @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
       TVStruct str = new TVStruct(_labels);
       _tvar = new TVPtr(BitsAlias.make0(_fid),str);
@@ -648,6 +714,11 @@ public class EXE {
     Syntax _ptr;
     Field( String lab, Syntax ptr ) { _ptr = ptr; ptr._par = this; _lab=lab; }
     @Override SB str(SB sb) { return _ptr.str(sb).p(".").p(_lab); }
+    SB dump0(SB sb) { return sb.p(".").p(_lab); }
+    @Override SB dump2(SB sb, VBitSet visit, VBitSet dups) {
+      return _ptr.dump1(sb.ii(1).i(),visit,dups).di(1);
+    }
+
     @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
       _tvar = new TVLeaf();
       _ptr.prep_tree(nongen,penv);
@@ -673,6 +744,11 @@ public class EXE {
     Syntax _ptr;
     AField( Syntax ptr ) { _ptr = ptr; ptr._par = this; }
     @Override SB str(SB sb) { return _ptr.str(sb).p(".A").p(_par._uid); }
+    SB dump0(SB sb) { return sb.p(".A").p(_par._uid); }
+    @Override SB dump2(SB sb, VBitSet visit, VBitSet dups) {
+      return _ptr.dump1(sb.ii(1).i(),visit,dups).di(1);
+    }
+
     @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
       _tvar = new TVLeaf();
       _ptr.prep_tree(nongen,penv);
@@ -741,6 +817,14 @@ public class EXE {
       _label = (_uid+"Load").intern(); // Generated by TVDynTable
     }
     @Override SB str(SB sb) { return _ptr.str(sb).p("._"); }
+    SB dump0(SB sb) { return sb.p("._"); }
+    @Override SB dump2(SB sb, VBitSet visit, VBitSet dups) {
+      sb.ii(1);
+      _ptr.dump1(sb.i(),visit,dups);
+      _dyn.dump1(sb.i(),visit,dups);
+      return sb.di(1);
+    }
+
     @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
       _tvar = new TVLeaf();
       _ptr.prep_tree(nongen,penv);
@@ -749,7 +833,7 @@ public class EXE {
       _ptr.tvar().unify(ptr,false);
       TVDynTable dyn = new TVDynTable();
       _dyn.tvar().unify(dyn,false);
-      dyn = (TVDynTable)dyn.find();
+      dyn = dyn.find();
       dyn.add_dyn(this,ptr.find(),_tvar);
     }
 
@@ -784,6 +868,11 @@ public class EXE {
       _dyn = new TVDynTable();
     }
     @Override SB str( SB sb ) { return _prog.str(sb.p("Root ")); }
+    SB dump0(SB sb) { return sb.p("ROOT"); }
+    @Override SB dump2(SB sb, VBitSet visit, VBitSet dups) {
+      return _prog.dump1(sb.ii(1).i(),visit,dups).di(1);
+    }
+
     @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
       _prog.prep_tree(nongen,penv);
       _tvar = _prog.tvar();
@@ -829,6 +918,7 @@ public class EXE {
       if( !_dyn.all_resolved() )
         throw new IllegalArgumentException("Unresolved dynamic field");
       // TODO: Worklist based HM typing
+      System.out.println(dump());
       return this;
     }
   }
@@ -853,6 +943,8 @@ public class EXE {
     abstract PrimSyn make();
     abstract String name();
     @Override final SB str(SB sb) { return sb.p(name()); }
+    @Override SB dump0(SB sb) { return sb.p(name()); }
+    @Override SB dump2(SB sb, VBitSet visit, VBitSet dups) { return sb; }
 
     @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
       TV3 tret = _tvs[_tvs.length-1];

@@ -256,7 +256,7 @@ public class StructNode extends Node {
     for( int i=0; i<len(); i++ )
       ts.arg(i).unify(in(i)==Env.ANY ? new TVLeaf() : in(i).set_tvar(),false); // Unify (possible cycle)
     // Force slot 0 to be a sensible CLZ for all but CLZCLZ
-    if( this!=PrimNode.ZCLZ ) {
+    if( is_closure() && this!=PrimNode.ZCLZ ) {
       assert Util.eq(ts.fld(0),TypeFld.CLZ);
       if( ts.arg(0) instanceof TVLeaf leaf ) {
         TypeMemPtr tmp = (TypeMemPtr)val(0); // Expect this to always be known display ptr

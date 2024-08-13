@@ -32,7 +32,6 @@ public class Struct extends AST {
       s.close();
 
       StructNode s2 = new StructNode(0,false,null,s._hint);
-      s2.add_fld("^",Access.Final,s.in(0),null).init();
       for( int i=0; i<_vars._len; i++ ) {
         _kids.at(i).nodes(eStruct);
         s2.add_fld(_vars.at(i),Access.Final,inScope.rez(),null);
