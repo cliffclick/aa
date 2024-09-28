@@ -232,27 +232,6 @@ public abstract class PrimNode extends Node {
     return new FunPtrNode(_name,ret,null).init();
   }
 
-  // Primitive wrapped as a simple function.
-  // String memory, then DSP as first arg.
-  FunPtrNode as_fun_str( ) {
-    assert !_is_lazy;           // No lazy operators here
-    // Lazily discover operators
-    if( is_oper() ) Oper.make(_name,false);
-    FunNode fun = new FunNode(this,_name).init();
-    ParmNode rpc = new ParmNode(0      ,fun,null,TypeRPC.ALL_CALL).init();
-    ParmNode mem = new ParmNode(MEM_IDX,fun,null,TypeMem.STRMEM  ).init();
-    addDef(mem);
-    // Make a Parm for every formal
-    for(int i = DSP_IDX; i<_formals.len(); i++ )
-      addDef(_formals.at(i)==Type.ANY ? null : new ParmNode(i,fun,null,wrap(_formals.at(i))).init());
-    // The primitive, working on and producing wrapped prims
-    init();
-    // Return the result
-    RetNode ret = new RetNode(fun,mem,this,rpc,fun).init();
-    // FunPtr is UNBOUND here, will be bound when loaded through a named struct to the Clazz.
-    return new FunPtrNode(_name,ret,null).init();
-  }
-
   // Make and install a primitive Clazz.
   private static void make_prim( StructNode clz, String clzname, NewNode ptr, PrimNode[][] primss ) {
     ScopeNode scp = Env.SCP_0;
@@ -435,33 +414,38 @@ public abstract class PrimNode extends Node {
     if( rez == TypeNil.NIL   ) return PTR_NIL;
     if( rez == TypeInt.INT64 ) return PTR_INT;
     if( rez == TypeFlt.FLT64 ) return PTR_FLT;
+    if( rez == TypeMemPtr.STRPTR ) return PTR_STR;
     throw TODO();
   }
 
   // This version is for making prims AFTER the def; the CLZ is made FRESH and
   // the base is unified to "this" in all fcns.
   public static TV3 wrap_base(TypeNil rez) {
-    if( rez == TypeNil.NIL        ) return wrap_base(PTR_NIL.load().arg("^"),TypeNil.NIL);
-    if( rez instanceof TypeInt ti ) return wrap_base(PTR_INT.load().arg("^"),ti);
-    if( rez instanceof TypeFlt tf ) return wrap_base(PTR_FLT.load().arg("^"),tf);
+    if( rez == TypeNil.NIL            ) return wrap_base(PTR_NIL.load().arg("^"),TypeNil.NIL);
+    if( rez instanceof TypeInt    ti  ) return wrap_base(PTR_INT.load().arg("^"),ti);
+    if( rez instanceof TypeFlt    tf  ) return wrap_base(PTR_FLT.load().arg("^"),tf);
+    if( rez instanceof TypeMemPtr tmp ) return wrap_base(PTR_STR.load().arg("^"),tmp);
     if( rez == TypeNil.SCALAR )  return new TVLeaf();
     if( rez == TypeNil.XSCALAR || rez == TypeNil.XNIL )  return new TVPtr( BitsAlias.make0(0), new TVStruct(true) );
-    if( rez instanceof TypeMemPtr tmp )
-      return wrap_base(PTR_STR.load().arg("^"),tmp);
     //if( rez == TypeInt. TRUE  )  return  IINT(TypeInt.TRUE );
     //if( rez == TypeInt. BOOL  )  return IBOOL();
     //if( rez == TypeFlt.NFLT64 )  return INFLT();
     throw TODO();
   }
-  // Make a fresh HMT wrapped int post-def of prims
+
+  // Make a fresh HMT wrapped int post-def of prims.  e.g. is (2+3) is called,
+  // then the "int:2" is a boxed Integer with all display pointers in a lambdas
+  // set to "2".  i.e., the Clazz of "int:2" is
+  //      "@{ ^=INT, _+_ = ( { 2 int -> 2+int }, { 2 flt -> 2+flt } ),..."
+  // And repeat for all operators _*_, _-_, _/_, etc
   private static TVPtr wrap_base( TV3 clz, TypeNil tn ) {
     assert TV3._INIT0_CNT < 99999;
-    TVPtr fclz = (TVPtr)clz.fresh();
-    TVPtr over = (TVPtr)fclz.load().arg(2);
-    TVLambda sample = (TVLambda)over.load().arg(1);
-    TVPtr prim = (TVPtr)sample.arg(DSP_IDX);
-    TVBase base = (TVBase)prim.load().arg("_");
-    base._t = tn;
+    TVPtr fclz = (TVPtr)clz.fresh(); // Fresh copy of the int class (thats a large copy!)
+    TVPtr over = (TVPtr)fclz.load().arg(1);         // Overload of first primitive
+    TVLambda sample = (TVLambda)over.load().arg(1); // First Lambda of first primitive
+    TVPtr prim = (TVPtr)sample.arg(DSP_IDX);        // Shared display (wrapped primitive) across all Lambdas
+    TVBase base = (TVBase)prim.load().arg("_");     // Shared Base of wrapped primitive
+    base._t = tn;                                   // Update the fresh'd copy to the sharper Type
     return prim;
   }
 
@@ -775,28 +759,10 @@ public abstract class PrimNode extends Node {
     public StrLen() { super("#_",TypeTuple.STR,TypeInt.INT64); }
     @Override public TypeNil apply( TypeNil[] args ) { throw TODO(); }
     @Override public Type value() {
-      if( !(val(1) instanceof TypeMemPtr tmp) ||
+      if( !(val(0) instanceof TypeMemPtr tmp) ||
           !tmp.is_str() )
-        return val(1).oob(TypeInt.INT64);
+        return val(0).oob(TypeInt.INT64);
       return tmp.oob(TypeInt.INT64);
-    }
-    @Override FunPtrNode as_fun() { return as_fun_str(); }
-    // In the test HM, all primitives are a Lambda without a body.  Here they are
-    // effectively Applies/Calls and the primitive computes a result.
-    @Override TV3 _set_tvar() {
-      // All arguments are pre-unified to unique bases, wrapped in a
-      // primitive with a clazz reference
-      if( in(DSP_IDX) != null )
-        //in(0).set_tvar().unify(wrap_prim(_formals.at(DSP_IDX)),false);
-        throw TODO(); // Should be the "this"
-
-      //for( int i=DSP_IDX; i<_formals.len(); i++ )
-      //  if( _formals.at(i)!=Type.ANY )
-      //    // Only StrLen has a Memory input, so the offset here is off-by-one
-      //    // from the default _set_tvar
-      //    in(i-MEM_IDX).set_tvar().unify(wrap_prim((TypeNil)_formals.at(i)),false);
-      //// Return is some primitive
-      return wrap_prim(_ret);
     }
   }
 

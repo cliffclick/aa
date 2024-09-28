@@ -683,8 +683,8 @@ abstract public class TV3 implements Cloneable {
     case TypeFunPtr tfp ->  tfp.is_full() ? new TVLeaf() // Generic Function Ptr
       : new TVLambda(tfp.nargs(),from_flow(tfp.dsp(),d),from_flow(tfp._ret,d));
     case TypeMemPtr tmp -> {
-      if( tmp==TypeMemPtr.STRPTR )
-       yield PrimNode.wrap_base(tmp);
+      if( tmp._aliases==BitsAlias.STR )
+        yield PrimNode.wrap_base(tmp);
       TVStruct ts = tmp.is_simple_ptr() ? new TVStruct(true) : (TVStruct)from_flow(tmp._obj,d);
       StoreXNode.unify(tmp._aliases,ts,false);
       yield new TVPtr(tmp._aliases,ts);

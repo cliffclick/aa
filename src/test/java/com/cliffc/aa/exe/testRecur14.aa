@@ -1,5 +1,5 @@
 // Unreported missing-field errors
-// Type: [Missing field 'envA'*[]@{ foo={ - - @{ *[INT]int; _=1; } -> @{ *[INT]int; _=1; } };  ..., }]
+// Type: [Missing field 'envA'*[]@{ foo={ - - @{ *[]int; _=1; } -> @{ *[]int; _=1; } };  ..., }]
 // Eval: CRASH
 
 Acode = { dsp0 x -> if (rnd) ? (dsp0.foo x) : x };

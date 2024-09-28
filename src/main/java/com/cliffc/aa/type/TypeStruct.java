@@ -310,8 +310,8 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   // A fake Type Clazz hierarchy.  Fake because it does not have all the fields
   // found in PrimNode.  Useful for testing.
   public static final TypeStruct XCLZCLZ = ISUSED;
-  public static final TypeStruct XSTRZ() { return make_test(TypeFld.make_dsp(XCLZCLZ), TypeFld.make("#_",UNUSED)); }
-  public static final TypeStruct XINTZ() { return make_test(TypeFld.make_dsp(XCLZCLZ), TypeFld.make("!_",UNUSED)); }
+  public static TypeStruct XSTRZ() { return make_test(TypeFld.make_dsp(XCLZCLZ), TypeFld.make("#_",UNUSED)); }
+  public static TypeStruct XINTZ() { return make_test(TypeFld.make_dsp(XCLZCLZ), TypeFld.make("!_",UNUSED)); }
 
   // A bunch of types for tests
   public  static final TypeStruct POINT = make_test(TypeFld.make("x",TypeFlt.FLT64),TypeFld.make("y",TypeFlt.FLT64));

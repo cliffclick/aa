@@ -918,7 +918,7 @@ public class EXE {
       if( !_dyn.all_resolved() )
         throw new IllegalArgumentException("Unresolved dynamic field");
       // TODO: Worklist based HM typing
-      System.out.println(dump());
+      //System.out.println(dump());
       return this;
     }
   }
@@ -933,7 +933,7 @@ public class EXE {
     };
     static TV3 INT64() { return TV3.from_flow(TypeInt.INT64); }
     static TV3 FLT64() { return TV3.from_flow(TypeFlt.FLT64); }
-    static TV3 STR  () { return new TVLeaf(); /*TV3.from_flow(TypeMemPtr.STRPTR);*/ }
+    static TV3 STR  () { return TV3.from_flow(TypeMemPtr.STRPTR); }
 
     final TV3[] _tvs;
     PrimSyn(TV3... tvs) {
