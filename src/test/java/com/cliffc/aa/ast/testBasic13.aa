@@ -1,0 +1,5 @@
+// Self def
+// GCP: Unknown ref 'a'
+// HMT: CRASH
+a = a;
+a

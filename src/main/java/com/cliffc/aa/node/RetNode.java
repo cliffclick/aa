@@ -77,6 +77,15 @@ public final class RetNode extends Node {
     return TypeTuple.make(ctl,mem,val);
   }
 
+  @Override public Type live() {
+    FunNode fun = fun();
+    if( fun==null ) return _live; // Dying, freeze in place
+    if( fun.unknown_callers() )
+      // Since unknown callers, assume future callers use all
+      return RootNode.defMem(this).flatten_live_fields();
+    // Meet over all callers' liveness
+    return super.live();
+  }
   @Override public Type live_use( int i ) {
     return i==MEM_IDX ? _live : Type.ALL;
   }

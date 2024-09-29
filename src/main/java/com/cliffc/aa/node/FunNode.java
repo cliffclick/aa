@@ -70,7 +70,7 @@ public class FunNode extends Node {
   @Override String label() { return _name==null ? "Fun["+_fidx+"]" : "Fun_"+_name; }
   @Override public boolean isMultiHead() { return true; }
   @Override public boolean isCFG() { return true; }
-  
+
   // Used to make the primitives at boot time.  Note the empty displays: in
   // theory Primitives should get the top-level primitives-display, but in
   // practice most primitives neither read nor write their own scope.
@@ -120,7 +120,7 @@ public class FunNode extends Node {
 
   // This function has disabled inlining
   public boolean noinline() {
-    return in(0)==null && _name!=null && _name.startsWith("noinline");
+    return in(0)==null && _name!=null && _name.contains("noinline");
   }
 
   // Never inline with a nested function
@@ -209,11 +209,10 @@ public class FunNode extends Node {
     if( def==this ) return Type.ANY; // Dead self-copy
     assert def instanceof CallNode;
     ParmNode pmem = parm(MEM_IDX);
-    if( pmem==null ) return TypeMem.ANYMEM; // No mem parm, so pure function
+    if( pmem==null )            // No parm, function is pure BUT...
+      return ret()._live;       // Pass-thru Ret liveness
     pmem.deps_add_live(def);
-    if( !(pmem._live instanceof TypeMem mem) ) return Type.ANY;
-    // Pass through mem liveness
-    return mem.kill(RootNode.KILL_ALIASES);
+    return pmem._live;
   }
 
   // ----
@@ -304,7 +303,7 @@ public class FunNode extends Node {
         // Still clone in function body, if only used in function body
         if( n.len() > 0 ) continue;
         boolean external_use=false;
-        for( int i=0; i<n.nUses(); i++ ) 
+        for( int i=0; i<n.nUses(); i++ )
           if( !freached.get(n.use(i)._uid) )
             { external_use=true; break; }
         if( external_use ) continue;         // Uses from outside function
@@ -322,7 +321,7 @@ public class FunNode extends Node {
   private int split_type( Ary<Node> body, Node[] parms ) {
     return 0;
   }
-  
+
   // Split a single-use copy (e.g. fully inline) if the function is "small
   // enough".  Include anything with just a handful of primitives, or a single
   // call, possible with a single if.  Disallow functions returning a new

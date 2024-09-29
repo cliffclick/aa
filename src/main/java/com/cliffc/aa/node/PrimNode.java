@@ -506,7 +506,11 @@ public abstract class PrimNode extends Node {
     AddNil() { super("_+_", TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, TypeNil.NIL, Type.ANY,TypeNil.SCALAR),TypeNil.SCALAR); }
     @Override public Type value() { return val(2); } // dsp is nil, skip dyn, return other arg
     @Override public TypeNil apply(TypeNil[] ignore) { throw AA.TODO(); }
-    @Override TV3 _set_tvar() { return in(2).set_tvar();  } // ID function on RHS argument
+    @Override TV3 _set_tvar() {
+      in(0).set_tvar().unify(PTR_NIL,false);
+      // ID function on RHS argument
+      return in(2).set_tvar();
+    }
   }
   static class NotNil extends PrimNode {
     NotNil() { super("!_", TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, TypeNil.NIL, Type.ANY),TypeInt.TRUE); }

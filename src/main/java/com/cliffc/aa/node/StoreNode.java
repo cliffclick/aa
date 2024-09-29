@@ -23,18 +23,18 @@ public class StoreNode extends StoreAbs {
 
 
   @Override Type _value( TypeMem tm, TypeMemPtr tmp ) {
-    return tm.update(tmp,TypeFld.make(_fld,tmp.above_center() ? Type.ANY : rez()._val,_fin),tmp._con);
+    return tm.update(tmp,TypeFld.make(_fld,tmp.above_center() ? Type.ANY : rez()._val,_fin));
   }
 
   @Override Type _live_use( TypeMem live0, TypeMemPtr tmp, int i ) {
     assert !tmp.above_center();
 
-    if( i==AA.MEM_IDX ) {
-      // Not a precise store, so no kills
-      if( !tmp._con )  return live0;
-      // Precise store kills named field from named alias
-      return live0.update(tmp,TypeFld.make(_fld,Type.ANY),true);
-    }
+    if( i==AA.MEM_IDX )
+      return tmp._con
+        // Precise store kills named field from named alias
+        ? live0.update(tmp,TypeFld.make(_fld,Type.ANY))
+        // Not a precise store, so no kills
+        : live0;
     // Asking for live-in, give it
     assert i==2 || i==3;        // Address & value live
     TypeStruct luse = live0.ld(tmp);

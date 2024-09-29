@@ -149,12 +149,8 @@ public class RootNode extends Node {
     // Now build the memory reachable from escapes
     TypeMem xmem = primem.make_from(BitsAlias.EXTX,extstr2);
     for( int alias : escs._aliases )
-      if( alias!=BitsAlias.EXTX ) {
+      if( alias!=BitsAlias.EXTX )
         xmem = xmem.make_from(alias,tmem.at(alias));
-        TypeStruct precise = tmem.atX(alias);
-        if( precise!=null )
-          xmem = xmem.setX(alias,precise);
-      }
 
     // RootNode value is a 4-pack.  The *memory* is PRIM memory, as the starting
     // point for what Root calls.  The *control* is also an input
@@ -223,7 +219,6 @@ public class RootNode extends Node {
   static void kill_alias( int alias ) {
     if( KILL_ALIASES.test_recur(alias) ) return;
     KILL_ALIASES = KILL_ALIASES.set(alias);
-    //TypeMem tmem = CACHE_DEF_MEM.set(alias,TypeStruct.UNUSED);
     TypeMem tmem = CACHE_DEF_MEM.setX(alias,TypeStruct.UNUSED);
     setCacheDef(tmem);
     Env.GVN.add_flow(Env.ROOT);
@@ -245,7 +240,7 @@ public class RootNode extends Node {
     if( n!=null && PROGRESS.find(n)==-1 ) PROGRESS.push(n);
     TypeMem mem = (t==null||t==Type.ALL) ? TypeMem.ALLMEM : (TypeMem)t;
     for( int alias : KILL_ALIASES )
-      mem = mem.set(alias,TypeStruct.UNUSED).setX(alias,TypeStruct.UNUSED);
+      mem = mem.set(alias,TypeStruct.UNUSED);
     return mem;
   }
 

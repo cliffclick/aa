@@ -38,15 +38,15 @@ public class TestAST {
     String prog = Files.readString( f.toPath());
 
     TypeEnv te = Exec.test("test",prog,rseed,true,true);
+    String expectGCPStr  = get_expected(prog,"// GCP: ",false);
+    String expectHMTStr  = get_expected(prog,"// HMT: ",false);
     if( te._errs == null ) {
       // Check the GCP type
-      String expectGCPStr  = get_expected(prog,"// GCP: ",false);
       Type   expectGCPType = Type.valueOf(expectGCPStr);
       Type   actualGCPType = te._t;
       assertEquals(expectGCPType,actualGCPType);
 
       // Check the HM type
-      String expectHMTStr  = get_expected(prog,"// HMT: ",false);
       TV3    actualHMTType = te._hmt;
       String actualHMTStr  = actualHMTType.p();
       assertEquals(stripIndent(expectHMTStr),stripIndent(actualHMTStr));
@@ -56,7 +56,8 @@ public class TestAST {
       //throw AA.TODO();
 
     } else {
-      throw AA.TODO();
+      assertEquals( te._errs.get(0)._msg, expectGCPStr );
+      assertEquals( "CRASH"             , expectHMTStr );
     }
   }
 

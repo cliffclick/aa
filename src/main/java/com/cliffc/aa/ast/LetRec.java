@@ -193,6 +193,8 @@ public class LetRec extends ASTVars {
       _kids.at(0).nodes(e);     // Go ahead and get the one kid def
       Node rez = scope.rez();
       String var = _vars.at(0);
+      // Debug binding
+      if( rez instanceof FunPtrNode fptr ) fptr.bind(var);
       // If assignment is new, add field
       if( stk.find(var)== -1 )
         stk.add_fld(var,Access.RW,Env.ANY,null);
@@ -224,8 +226,8 @@ public class LetRec extends ASTVars {
       _frefs[i] = def;
       // Assign def to name
       //stk.set_fld(_vars.at(i), Access.Final,def,true);
-      // Close the fref cycle, and remove.
-      if( !fref.isDead() ) {
+      // Close the fref cycle, and remove (except for self-def cycles "a=a" which are left as errors)
+      if( def != fref && !fref.isDead() ) {
         fref.self();
         fref.close();
         fref.subsume(def);

@@ -6,6 +6,6 @@
 
 var := 1;
 A_noinline := { -> @{ fld = var; } };
-A1 := A_noinline();
+x := A_noinline();
 var := 7;
-@{ A1 = A1; A7 = A_noinline(); }
+@{ A1 = x; A7 = A_noinline(); }

@@ -288,7 +288,13 @@ public final class CallEpiNode extends Node {
   CallEpiNode unwire(CallNode call, Node ret, Node fun) {
     assert is_CG(true);
     del(ret);
-    fun.del(call);
+    int path = fun.findDef(call);
+    fun.del(path);
+    // Remove Parm edges also
+    for( Node use : fun.uses() )
+      if( use instanceof ParmNode parm )
+        parm.del(path);
+
     GVN.add_flow_uses(fun); // One less caller of function, parms can lift
     GVN.add_flow(fun);
     return this;
@@ -440,13 +446,14 @@ public final class CallEpiNode extends Node {
         // Add edge from CallEpi to Ret
         addDef(ret);
         fun.addDef(call);
+        // Add Parm edges also
+        for( Node use : fun.uses() )
+          if( use instanceof ParmNode parm )
+            // Call args depend on parms being alive
+            parm.addDef(call.in(parm._idx)).deps_add_live(call.in(parm._idx));
         Env.GVN.add_flow(fun);
         Env.GVN.add_flow_uses(fun); // Parms have new inputs
         Env.GVN.add_reduce(fun);    // Last caller wired
-        // Call args depend on parms being alive
-        for( Node use : fun.uses() )
-          if( use instanceof ParmNode parm )
-            parm.deps_add_live(call.in(parm._idx));
         // Swap so ROOT remains last
         if(     in(    len()-2)==Env.ROOT )     swap_last();
         if( fun.in(fun.len()-2)==Env.ROOT ) fun.swap_last();
@@ -471,7 +478,7 @@ public final class CallEpiNode extends Node {
   @Override public Type live_use( int i ) {
     Node def = in(i);
     if( _is_copy ) {            // A copy
-      if( isKeep() ) return def._live;
+      //if( isKeep() ) return def._live;
       ProjNode p = ProjNode.proj(this,i);
       if( p==null ) return Type.ANY;
       p.deps_add(in(i));

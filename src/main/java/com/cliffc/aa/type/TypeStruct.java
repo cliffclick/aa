@@ -721,20 +721,30 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
 
   // If the field does not exist, use a Final _def.
   // If the prior field is final, do no updates. (error situation)
-  // If the update is precise, replace the field else meet the field.
-  TypeStruct update( TypeFld fld, boolean precise ) {
+  TypeStruct update( TypeFld fld ) {
     int idx = find(fld._fld);
+    Type old;
     if( idx == -1 ) {
-      //if( _def==Type.ALL ) return this; // No update if Final
-      return add_fldx(fld);
+      old = _def;
+    } else {
+      if( _flds[idx]._access != Access.RW ) return this; // No update if RO or Final
+      old = _flds[idx]._t;
     }
-    TypeFld prior = _flds[idx];
-    if( prior._access != Access.RW ) return this; // No update if RO or Final
-    TypeFld nfld = precise ? fld : (TypeFld)fld.meet(prior);
-    if( nfld == prior ) return this; // No update anyways
+    Type n = fld._t.meet(old);
+    if( n == old ) return this; // No update anyways
+    TypeFld nfld = fld.make_from(n);
     TypeStruct ts = copy2();
+    if( idx == -1 )
+      return add_fldx(nfld);
     ts._flds[idx] = nfld;
     return ts.remove_dups_hashcons().hashcons_free();
+  }
+
+  // Field store into precise struct
+  TypeStruct setX( TypeFld fld ) {
+    Type t = at_def(fld._fld);
+    if( t == fld._t ) return this;
+    throw TODO();
   }
 
   // Flatten fields for LIVE: only need a per-field any/all indication

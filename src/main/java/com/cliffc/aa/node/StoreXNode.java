@@ -22,16 +22,16 @@ public class StoreXNode extends StoreAbs {
 
   @Override Type _value( TypeMem tm, TypeMemPtr tmp ) {
     TypeStruct tvs = rez()._val instanceof TypeStruct tvs0 ? tvs0 : rez()._val.oob(TypeStruct.ISUSED);
-    return tm.update(tmp,tvs,tmp._con);
+    return tm.update(tmp,tvs);
   }
 
   @Override Type _live_use( TypeMem live0, TypeMemPtr tmp, int i ) {
     TypeMem live1;
     if( tmp.above_center() ) {
       throw TODO();
-    } else if( tmp._con ) { // Constant ptr, so precise update
-      // Precuse update: whole struct is not demanded before here.
-      live1 = live0.update(tmp,TypeStruct.UNUSED,true);
+    } else if( tmp._con ) { // Constant ptr, so a precise update.
+      // Precise update: whole struct is not demanded before here.
+      live1 = live0.update(tmp,TypeStruct.UNUSED);
     } else {                    // Imprecise update; everything remains live
       live1 = live0;
     }
