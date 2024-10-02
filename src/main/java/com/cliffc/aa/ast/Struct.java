@@ -57,4 +57,5 @@ public class Struct extends AST {
       outScope.mem (inScope.mem ());
       outScope.rez (inScope.ptr ());
     }
+  }
 }
