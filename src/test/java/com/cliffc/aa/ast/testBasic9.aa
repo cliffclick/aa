@@ -1,6 +1,6 @@
 // Mutually recursive
-// GCP: *[25]@{ _; someC=%[6,7][]; someD=%[6,7][]   }
-// HMT: *[25]@{ _; someC=flt:3.14; someD=int:nint8; }
+// GCP: *[26]@{someC=%[6,7][]; someD=%[6,7][]  }
+// HMT: *[26]@{someC=flt:3.14; someD=int:nint8;}
 A = { x -> E() ? B(x) : x };
 D = {   -> E() ? B(1) : C(2) };
 C = { x -> A(x) };

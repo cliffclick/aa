@@ -110,6 +110,9 @@ public final class CallEpiNode extends Node {
     // If the function does nothing with memory, then use the call memory directly.
     if( rmem==null || (rmem instanceof ParmNode && rmem.in(CTL_IDX) == fun) || rmem._val ==TypeMem.ANYMEM )
       rmem = cmem;
+    else
+      ret.deps_add_live(this); // If ret memory becomes trivial, might revisit
+
     // Check that function return memory and post-call memory are compatible
     if( !(_val instanceof TypeTuple ttval) ) return progress;
     Type selfmem = ttval.at(MEM_IDX);
@@ -292,7 +295,7 @@ public final class CallEpiNode extends Node {
     fun.del(path);
     // Remove Parm edges also
     for( Node use : fun.uses() )
-      if( use instanceof ParmNode parm )
+      if( use instanceof ParmNode parm && parm._idx != 0 )
         parm.del(path);
 
     GVN.add_flow_uses(fun); // One less caller of function, parms can lift
@@ -448,7 +451,7 @@ public final class CallEpiNode extends Node {
         fun.addDef(call);
         // Add Parm edges also
         for( Node use : fun.uses() )
-          if( use instanceof ParmNode parm )
+          if( use instanceof ParmNode parm && parm._idx != 0 )
             // Call args depend on parms being alive
             parm.addDef(call.in(parm._idx)).deps_add_live(call.in(parm._idx));
         Env.GVN.add_flow(fun);

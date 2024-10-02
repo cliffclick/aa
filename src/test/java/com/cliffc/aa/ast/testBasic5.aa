@@ -1,8 +1,8 @@
 // Uses the display in a meaningful way (sorta).
 // Intended to force keeping the display Parm alive in the functions and test display loading
 
-// GCP: *[22]@{ _; A1=PA:*[21]@{ _; fld=    nint8};   A7= PA                          }
-// HMT: *[22]@{ _; A1=   *[21]@{ _; fld=int:nint8; }; A7=*[21]@{ _; fld=int:nint8; }; }
+// GCP: *[23]@{A1=PA:*[22]@{fld=    nint8 };A7=PA                     }
+// HMT: *[23]@{A1=   *[22]@{fld=int:nint8;};A7=*[22]@{fld=int:nint8;};}
 
 var := 1;
 A_noinline := { -> @{ fld = var; } };

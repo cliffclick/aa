@@ -395,36 +395,42 @@ public abstract class PrimNode extends Node {
   private static final TVBase BASE_FLT = new TVBase(TypeFlt.FLT64);
   private static final TVBase BASE_STR = new TVBase(TypeMemPtr.STRPTR);
   // Canonical wrapped prim; ptr-to-prim[clz,base]
-  private static final TVPtr PTR_NIL = wrap_prim(new TVLeaf(),BASE_NIL);
-  private static final TVPtr PTR_INT = wrap_prim(new TVLeaf(),BASE_INT);
-  private static final TVPtr PTR_FLT = wrap_prim(new TVLeaf(),BASE_FLT);
-  private static final TVPtr PTR_STR = wrap_prim(new TVLeaf(),BASE_STR);
+  private static TVPtr PTR_NIL = wrap_prim(new TVLeaf(),BASE_NIL);
+  private static TVPtr PTR_INT = wrap_prim(new TVLeaf(),BASE_INT);
+  private static TVPtr PTR_FLT = wrap_prim(new TVLeaf(),BASE_FLT);
+  private static TVPtr PTR_STR = wrap_prim(new TVLeaf(),BASE_STR);
+
+  private static TVPtr PTR_NIL() { TV3 x = PTR_NIL.find(); return PTR_NIL==x ? PTR_NIL : (PTR_NIL = (TVPtr)x); }
+  private static TVPtr PTR_INT() { TV3 x = PTR_INT.find(); return PTR_INT==x ? PTR_INT : (PTR_INT = (TVPtr)x); }
+  private static TVPtr PTR_FLT() { TV3 x = PTR_FLT.find(); return PTR_FLT==x ? PTR_FLT : (PTR_FLT = (TVPtr)x); }
+  private static TVPtr PTR_STR() { TV3 x = PTR_STR.find(); return PTR_STR==x ? PTR_STR : (PTR_STR = (TVPtr)x); }
+
 
   // This version is for mid-def of prims; it makes a base that is NOT the
   // "this" argument, used for e.g. returns or 2nd args.
   private static TV3 wrap_prim(TypeNil rez) {
-    if( rez instanceof TypeInt ti ) return wrap_prim(PTR_INT.load().arg("^"),new TVBase(ti));
-    if( rez instanceof TypeFlt tf ) return wrap_prim(PTR_FLT.load().arg("^"),new TVBase(tf));
+    if( rez instanceof TypeInt ti ) return wrap_prim(PTR_INT().load().arg("^"),new TVBase(ti));
+    if( rez instanceof TypeFlt tf ) return wrap_prim(PTR_FLT().load().arg("^"),new TVBase(tf));
     if( rez == TypeNil.SCALAR )  return new TVLeaf();
     throw TODO();
   }
 
   // Using a flow Type, return the canonical HMT primitive
   private static TVPtr prim(TypeNil rez) {
-    if( rez == TypeNil.NIL   ) return PTR_NIL;
-    if( rez == TypeInt.INT64 ) return PTR_INT;
-    if( rez == TypeFlt.FLT64 ) return PTR_FLT;
-    if( rez == TypeMemPtr.STRPTR ) return PTR_STR;
+    if( rez == TypeNil.NIL   ) return PTR_NIL();
+    if( rez == TypeInt.INT64 ) return PTR_INT();
+    if( rez == TypeFlt.FLT64 ) return PTR_FLT();
+    if( rez == TypeMemPtr.STRPTR ) return PTR_STR();
     throw TODO();
   }
 
   // This version is for making prims AFTER the def; the CLZ is made FRESH and
   // the base is unified to "this" in all fcns.
   public static TV3 wrap_base(TypeNil rez) {
-    if( rez == TypeNil.NIL            ) return wrap_base(PTR_NIL.load().arg("^"),TypeNil.NIL);
-    if( rez instanceof TypeInt    ti  ) return wrap_base(PTR_INT.load().arg("^"),ti);
-    if( rez instanceof TypeFlt    tf  ) return wrap_base(PTR_FLT.load().arg("^"),tf);
-    if( rez instanceof TypeMemPtr tmp ) return wrap_base(PTR_STR.load().arg("^"),tmp);
+    if( rez == TypeNil.NIL            ) return wrap_base(PTR_NIL().load().arg("^"),TypeNil.NIL);
+    if( rez instanceof TypeInt    ti  ) return wrap_base(PTR_INT().load().arg("^"),ti);
+    if( rez instanceof TypeFlt    tf  ) return wrap_base(PTR_FLT().load().arg("^"),tf);
+    if( rez instanceof TypeMemPtr tmp ) return wrap_base(PTR_STR().load().arg("^"),tmp);
     if( rez == TypeNil.SCALAR )  return new TVLeaf();
     if( rez == TypeNil.XSCALAR || rez == TypeNil.XNIL )  return new TVPtr( BitsAlias.make0(0), new TVStruct(true) );
     //if( rez == TypeInt. TRUE  )  return  IINT(TypeInt.TRUE );

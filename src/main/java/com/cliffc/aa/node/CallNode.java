@@ -246,6 +246,7 @@ public class CallNode extends Node {
             for( Node fuse : fun.uses() )
               if( fuse instanceof ParmNode parm ) {
                 abits &= ~(1<<parm._idx); // Arg is used
+                parm.deps_add_live(this);
               }
           } else abits=0; // Root uses all
           if( abits==0 ) break;

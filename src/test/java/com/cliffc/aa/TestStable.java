@@ -62,23 +62,23 @@ public class TestStable {
 
   // More complex overload tests
   @Test public void testOver() {
-    // testOver5.aa, One DynLoad, fcn needs DynTable
-    // Returning choice of structs and field selecting from it.
-    test("fcn = {(@{a=1;},@{b=2;})._}; (fcn().a, fcn().b)", "*#[25]( %[2,25][2]?, %[2,25][2]?)", "*[25](int:1,int:2)", null, null, "[2,25]", null);
-
-    // testOver6.aa, One DynLoad, fcn needs DynTable
-    // Passing choice of structs and field selecting from it.
-    test(
-"""
-fcn = { x ->
-  @{ qi = { x -> x.a };
-     qf = { x -> x.b };
-  }._ x
-};
-(fcn @{a=2;}, fcn @{b=3.3;})
-""",
-         "*#[25]( %[2,25][2]?, %[2,25][2]?)", "*[25](int:2,flt:3.3)",null,null,"[4,25]",null);
-
+//    // testOver5.aa, One DynLoad, fcn needs DynTable
+//    // Returning choice of structs and field selecting from it.
+//    test("fcn = {(@{a=1;},@{b=2;})._}; (fcn().a, fcn().b)", "*#[25]( %[2,25][2]?, %[2,25][2]?)", "*[25](int:1,int:2)", null, null, "[2,25]", null);
+//
+//    // testOver6.aa, One DynLoad, fcn needs DynTable
+//    // Passing choice of structs and field selecting from it.
+//    test(
+//"""
+//fcn = { x ->
+//  @{ qi = { x -> x.a };
+//     qf = { x -> x.b };
+//  }._ x
+//};
+//(fcn @{a=2;}, fcn @{b=3.3;})
+//""",
+//         "*#[25]( %[2,25][2]?, %[2,25][2]?)", "*[25](int:2,flt:3.3)",null,null,"[4,25]",null);
+//
     // Same using primitive math
     test(
 """

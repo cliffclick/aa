@@ -64,10 +64,8 @@ public class Lambda extends ASTVars {
       _fun.unkeep();
       RetNode ret = new RetNode(inScope.ctrl(),inScope.mem(),inScope.rez(),rpc,_fun).init();
 
-      // We need the next outer enclosing closure.
+      // The containing scope - it might be a struct scope, not just a closure scope
       Env e_cloz = outer;
-      while( !e_cloz._scope.stk().is_closure() )
-        e_cloz = e_cloz._par;
 
       // Take just the prefix of scope variables declared up through now (after
       // sorting for mutual-let-rec); add the mut-let-rec set to the nongens.

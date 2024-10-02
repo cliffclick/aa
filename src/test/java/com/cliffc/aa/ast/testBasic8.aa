@@ -3,8 +3,8 @@
 // Intended to force keeping the display Parm alive in the functions, while
 // keeping the types of {A,B} still polymorphic
 
-// GCP: *[25]@{ _; init=    int8; rez0=PA:*[21]@{ _; afld=*[23,24] ( _             ); bfld=    int8  }; rez1=PA }
-// HMT: *[25]@{ _; init=int:int8; rez0=   *[21]@{ _; afld=*[23   ]@{ _; d=flt:1.2; }; bfld=int:int8; }; rez1=*[21]@{ _; afld=*[24]@{ _; c=int:3; }; bfld=int:int8; }; }
+// GCP: *[26]@{ Xinit=     int8; Xrez0=PA:*[22]@{ afld=*[24,25] (            ); bfld=    int8  }; Xrez1=PA }
+// HMT: *[26]@{ Xinit=int:int64; Xrez0=   *[22]@{ afld=*[24   ]@{ d=flt:1.2; }; bfld=int:int64;}; Xrez1=*[22]@{afld=*[25]@{ c=int:3; }; bfld=int:int64;}; }
 
 init := 0;
 A_noinline = { x -> math.rand(2) ? B_noinline(x) : @{afld = x; bfld = init; } };
@@ -12,4 +12,4 @@ B_noinline = { x -> A_noinline(x) };
 rez0 := A_noinline(@{d=1.2; });
 init := 7;
 rez1 := B_noinline(@{c=3; });
-@{ rez0=rez0; rez1=rez1; init=init; }
+@{ Xrez0=rez0; Xrez1=rez1; Xinit=init; }

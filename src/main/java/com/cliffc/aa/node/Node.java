@@ -306,6 +306,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       Node u = _uses[--_ulen];  // Old use
       u._defs[u.findDef(this)] = nnn;// was this now nnn
       nnn._addUse(u);
+      u.deps_work_clear();
     }
   }
 

@@ -67,7 +67,10 @@ public class FunNode extends Node {
 
   private boolean _unknown_callers;
 
-  @Override String label() { return _name==null ? "Fun["+_fidx+"]" : "Fun_"+_name; }
+  @Override String label() {
+    String fun = isCopy(0)==null ? "Fun" : "CopyFun";
+    return _name==null ? fun+"["+_fidx+"]" : fun+"_"+_name;
+  }
   @Override public boolean isMultiHead() { return true; }
   @Override public boolean isCFG() { return true; }
 
@@ -182,7 +185,7 @@ public class FunNode extends Node {
   @Override public Type value() {
     if( unknown_callers() ) return Type.CTRL;
     if( in(0)==this )           // is_copy
-      return val(1).oob(Type.CTRL);
+      return len()==1 ? Type.XCTRL : val(1).oob(Type.CTRL);
     for( int i=1; i<len(); i++ ) {
       if( in(i)==this ) continue; // Ignore self-loop
       Type c = in(i)._val;
