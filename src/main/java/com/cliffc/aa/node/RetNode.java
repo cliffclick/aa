@@ -133,8 +133,13 @@ public final class RetNode extends Node {
 
     // Function is 'pure', nuke memory edge.
     Node mem = mem();
-    if( mem instanceof ParmNode && mem.in(0)==fun() )
+    if( mem instanceof ParmNode && mem.in(0)==fun() ) {
+      // Revisit all wired call mem users
+      for( Node cepi : uses() )
+        if( cepi instanceof CallEpiNode )
+          Env.GVN.add_reduce(ProjNode.proj(cepi,MEM_IDX));
       return setDef(1,null);
+    }
 
     // Collapsed to a constant?  Remove any control interior.
     Node ctl = ctl();

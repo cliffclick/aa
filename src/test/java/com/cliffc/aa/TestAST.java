@@ -16,7 +16,7 @@ import static org.junit.Assert.assertEquals;
 
 public class TestAST {
   @Ignore @Test public void testJig() throws IOException {
-    testOne(0,new File("src/test/java/com/cliffc/aa/ast/testBasic5.aa"));
+    testOne(0,new File("src/test/java/com/cliffc/aa/ast/testBasic11.aa"));
   }
 
   @Test public void testAll() throws IOException {
@@ -56,8 +56,8 @@ public class TestAST {
       //throw AA.TODO();
 
     } else {
-      assertEquals( te._errs.get(0)._msg, expectGCPStr );
-      assertEquals( "CRASH"             , expectHMTStr );
+      assertEquals( expectGCPStr, te._errs.get(0)._msg );
+      assertEquals( expectHMTStr, "CRASH"              );
     }
   }
 

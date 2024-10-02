@@ -451,12 +451,18 @@ public final class CallEpiNode extends Node {
         fun.addDef(call);
         // Add Parm edges also
         for( Node use : fun.uses() )
-          if( use instanceof ParmNode parm && parm._idx != 0 )
+          if( use instanceof ParmNode parm &&
+              // Don't wire RPC, its only alive inside the function
+              parm._idx != 0 )
             // Call args depend on parms being alive
             parm.addDef(call.in(parm._idx)).deps_add_live(call.in(parm._idx));
         Env.GVN.add_flow(fun);
         Env.GVN.add_flow_uses(fun); // Parms have new inputs
         Env.GVN.add_reduce(fun);    // Last caller wired
+        // Function is pure (no memory effects)
+        if( ret instanceof RetNode rret && rret.mem()==null )
+          // CallEpi memory can bypass call
+          Env.GVN.add_reduce(ProjNode.proj(this,MEM_IDX));
         // Swap so ROOT remains last
         if(     in(    len()-2)==Env.ROOT )     swap_last();
         if( fun.in(fun.len()-2)==Env.ROOT ) fun.swap_last();

@@ -185,6 +185,6 @@ public class StoreNode extends StoreAbs {
     TypeStruct ts = mem.ld(ptr);
     TypeFld fld = ts.get(_fld);
     if( fld==null ) return ts._def==Type.ANY ? null : ErrMsg.FAST;
-    return fld._access==Access.RW ? null : ErrMsg.FAST;
+    return fld._access==Access.RW ? null : (fast ? ErrMsg.FAST : ErrMsg.field(_bad,"Possible 2nd write to final",fld._fld,false,ts));
   }
 }

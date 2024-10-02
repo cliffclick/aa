@@ -30,8 +30,13 @@ public class Struct extends AST {
       for( int i=0; i<_vars._len; i++ )
         s.add_fld(_vars.at(i),Access.RW,Env.ANY,null);
       s.close();
+      // Initial write, to set the display at least
+      inScope.mem( new StoreXNode( inScope.mem(),inScope.ptr(),s,null).init());
 
+      // Now we make a bulk update again, but code within the fields can use
+      // the struct display to find things in outer scopes.
       StructNode s2 = new StructNode(0,false,null,s._hint);
+      s2.add_fld("^",Access.Final,outScope.ptr(),null);
       for( int i=0; i<_vars._len; i++ ) {
         _kids.at(i).nodes(eStruct);
         s2.add_fld(_vars.at(i),Access.Final,inScope.rez(),null);
@@ -52,5 +57,4 @@ public class Struct extends AST {
       outScope.mem (inScope.mem ());
       outScope.rez (inScope.ptr ());
     }
-  }
 }
