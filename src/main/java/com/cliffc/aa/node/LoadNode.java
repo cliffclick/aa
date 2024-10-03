@@ -365,38 +365,35 @@ public class LoadNode extends Node {
         case PrimNode     prim -> { return mem; }
         case CallEpiNode  cepi -> {
           Node copymem = cepi.isCopy(MEM_IDX); // Skip thru a copy
-          if( copymem == null ) {
-            CallNode call = cepi.call();
-            assert call.isCopy(0)==null;
-            // The load is allowed to bypass the call if the alias is not killed.
-            // Conservatively: the alias is not available to any called function,
-            // so it's not in the reachable argument alias set and not globally escaped.
-            BitsAlias esc_aliases = Env.ROOT.ralias();
-            // Collides, might be use/def by call
-            if( aliases.overlaps(esc_aliases) ) {
-              Env.ROOT.deps_add_live(ldst); // Revisit if fewer escapes
-              return mem;
-            }
-            // Check for returned aliases
-            Type t = ((TypeTuple)cepi._val)._ts[REZ_IDX];
-            BitsAlias as = t instanceof TypeNil tn ? tn._aliases : BitsAlias.EMPTY;
-            // Compute direct call argument set
-            for( int i=DSP_IDX; i<call.nargs(); i++ ) {
-              Type targ = call.val(i);
-              if( targ instanceof TypeFunPtr tfp ) targ = tfp.dsp();
-              if( targ instanceof TypeMemPtr tmp ) as = as.meet(tmp.aliases());
-            }
-            // Check for overlap with the reachable aliases
-            TypeMem cmem = CallNode.emem((TypeTuple)call._val);
-            if( aliases.overlaps(as) || aliases.overlaps(cmem.all_reaching_aliases(as)) ) {
-              call.deps_add(ldst); // Revisit if fewer escapes
-              return mem;
-            }
-            // Peek through call
-            mem = call.mem();
-          } else {
-            mem = copymem;
+          if( copymem != null ) return mem;    // If copy, wait for copy-elim
+          CallNode call = cepi.call();
+          assert call.isCopy(0)==null;
+          // The load is allowed to bypass the call if the alias is not killed.
+          // Conservatively: the alias is not available to any called function,
+          // so it's not in the reachable argument alias set and not globally escaped.
+          BitsAlias esc_aliases = Env.ROOT.ralias();
+          // Collides, might be use/def by call
+          if( aliases.overlaps(esc_aliases) ) {
+            Env.ROOT.deps_add_live(ldst); // Revisit if fewer escapes
+            return mem;
           }
+          // Check for returned aliases
+          Type t = ((TypeTuple)cepi._val)._ts[REZ_IDX];
+          BitsAlias as = t instanceof TypeNil tn ? tn._aliases : BitsAlias.EMPTY;
+          // Compute direct call argument set
+          for( int i=DSP_IDX; i<call.nargs(); i++ ) {
+            Type targ = call.val(i);
+            if( targ instanceof TypeFunPtr tfp ) targ = tfp.dsp();
+            if( targ instanceof TypeMemPtr tmp ) as = as.meet(tmp.aliases());
+          }
+          // Check for overlap with the reachable aliases
+          TypeMem cmem = CallNode.emem((TypeTuple)call._val);
+          if( aliases.overlaps(as) || aliases.overlaps(cmem.all_reaching_aliases(as)) ) {
+            call.deps_add(ldst); // Revisit if fewer escapes
+            return mem;
+          }
+          // Peek through call
+          mem = call.mem();
         }
 
         case null, default -> throw TODO(); // decide cannot be equal, and advance, or maybe-equal and return null

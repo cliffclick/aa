@@ -1,6 +1,6 @@
 // Function in a struct needs proper display/self/this
-// GCP: *[25]( 3, 7 )
-// HMT: *[25]( int:3, int:7 )
+// GCP: *[24]( _,     nint8,     nint8)
+// HMT: *[24]( _, int:nint8, int:nint8)
 gen = { init ->
   @{
     fld := init;

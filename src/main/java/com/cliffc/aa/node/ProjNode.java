@@ -4,14 +4,11 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV3;
 
-import static com.cliffc.aa.AA.MEM_IDX;
-
 // Proj data
 public class ProjNode extends Node {
   public int _idx;
-  //public ProjNode( int idx, Node... ns ) { super(ns); _idx=idx; }
   public ProjNode( Node head, int idx ) { super(head); _idx=idx; }
-  
+
   @Override public String label() { return "DProj"+_idx; }
   @Override public boolean isMultiTail() { return true; }
 
@@ -22,7 +19,7 @@ public class ProjNode extends Node {
     if( c!=Type.ANY && c!=Type.ALL ) return c;
     return c.oob(TypeNil.SCALAR);
   }
-  
+
   // Strictly reducing
   @Override public Node ideal_reduce() {
     Node c = in(0).isCopy(_idx);

@@ -158,8 +158,9 @@ public final class CallEpiNode extends Node {
       // Return is all projections from the primitive
       if( rmem instanceof MProjNode && rmem.in(0)==prim &&
           rrez instanceof  ProjNode && rrez.in(0)==prim &&
-          prim.in(CTL_IDX) == fun ) {
-        //// Prim inputs all from Parms
+          prim.in(CTL_IDX) == fun &&
+          ((CallEpiNode)prim).isCopy(0)==null ) {
+        // Prim inputs all from Parms
         //for( int i=MEM_IDX; i<prim.len(); i++ )
         //  if( !(prim.in(i) instanceof ParmNode && prim.in(i).in(0)==fun) )
         //    { can_inline=false; break; }
