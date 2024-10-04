@@ -29,5 +29,6 @@ public class Root extends ASTVars {
   @Override int addEdge(int to) { return 0; }
 
   // Add non-generative $dyn edge to a Fresh
-  @Override void addNonGen(FreshNode frsh) { frsh.addDef(_dyn); }
+  // Same as EXE, root does not have "$dyn" as Fresh, just a plain argument.
+  @Override void addNonGen(FreshNode frsh) { /*frsh.addDef(_dyn);*/ }
 }
