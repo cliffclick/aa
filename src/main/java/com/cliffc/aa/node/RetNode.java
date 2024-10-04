@@ -78,6 +78,7 @@ public final class RetNode extends Node {
   }
 
   @Override public Type live() {
+    if( isCopy() ) return _live; // Dying, freeze in place
     FunNode fun = fun();
     if( fun==null ) return _live; // Dying, freeze in place
     if( fun.unknown_callers() )
