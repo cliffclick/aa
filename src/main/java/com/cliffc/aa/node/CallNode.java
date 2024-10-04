@@ -337,19 +337,7 @@ public class CallNode extends Node {
     if( cepi().unknown_callers() )
       // Since not wired, assume future callers use all
       return RootNode.defMem(this).flatten_live_fields();
-    else {
-      // Normal Node.live, except wired; no uses from CEPI, all from FunNode instead.
-      Type live = Type.ANY;            // Start at lattice top
-      for( int j=0; j<nUses(); j++ ) { // Computed across all uses
-        Node use = use(j);
-        if( use instanceof CallEpiNode ) continue;
-        assert use instanceof FunNode;
-        if( use._live == Type.ANY ) continue; // Function call is dead, shortcut
-        Type ulive = use.live_use(use.findDef(this));
-        live = live.meet(ulive); // Make alive used fields
-      }
-      return live;
-    }
+    return super.live();
   }
 
   static final Type FP_LIVE = TypeStruct.UNUSED.add_fldx(TypeFld.make("fp",Type.ALL));
