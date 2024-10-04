@@ -520,7 +520,11 @@ public final class CallEpiNode extends Node {
     while( nwired()>0 ) {
       Node w = popKeep(), fun=w;
       if( w instanceof RetNode ret ) fun = ret.fun();
-      fun.del(call());
+      int path = fun.findDef(call());
+      fun.del(path);
+      for( Node use : fun.uses() )
+        if( use instanceof ParmNode parm && parm._idx!=0 )
+          parm.del(path);
     }
     assert is_CG(false);
 
