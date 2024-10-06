@@ -192,13 +192,17 @@ public class TVStruct extends TVExpanding {
 
 
   @Override boolean _unify_impl( TV3 tv3 ) {
-    TVStruct lhs = this;
-    TVStruct rhs = (TVStruct)tv3; // Invariant when called
+    // If LHS has a class (fresh)unify into RHS class.  If this changes the RHS
+    // class, unify matching RHS fields into RHS class.
+    _unify_clz((TVStruct)tv3,false,false);
+
+    TVStruct lhs = this.find();
+    TVStruct rhs = (TVStruct)tv3.find(); // Invariant when called
     assert !lhs.unified() && !rhs.unified();
     // Either no CLZ or it is in slot 0
     assert lhs.idx(TypeFld.CLZ) <= 0 && rhs.idx(TypeFld.CLZ) <= 0;
-    // Assert if closed, parent clazzes are closed:
     TVPtr plhs = lhs.pclz(), prhs = rhs.pclz();
+    // Assert if closed, parent clazzes are closed:
     //assert lhs._open || plhs==null || !plhs.load()._open;
     //assert rhs._open || prhs==null || !prhs.load()._open;
 
@@ -216,7 +220,8 @@ public class TVStruct extends TVExpanding {
       assert !lhs.unified() && !rhs.unified();
       String fld = lhs._flds[i];
       TV3 flhs = lhs.arg(i);
-      TV3 frhs = lhsOpen ? rhs.arg_clz(fld) : rhs.arg(fld); // Search right
+      TV3 frhs = rhs.arg_clz(fld); // Search right
+      //TV3 frhs = lhsOpen ? rhs.arg_clz(fld) : rhs.arg(fld); // Search right
       if( frhs != null ) { // Found RHS
         // Unify the two fields
         flhs._unify(frhs,false);
@@ -261,6 +266,32 @@ public class TVStruct extends TVExpanding {
     return true;
   }
 
+
+  // If LHS has a class (fresh)unify into RHS class.  If this changes the RHS
+  // class, unify matching RHS fields into RHS class.
+  private boolean _unify_clz( TVStruct rhs, boolean fresh, boolean test ) {
+    TVPtr plhs = pclz(), prhs = rhs.pclz();
+    if( plhs==null ) return false;
+    // Unify the two classes; RHS now has a class
+    boolean progress = prhs==null
+      // Just add it
+      ? (test ? true : rhs.add_fld(TypeFld.CLZ,prhs=plhs))
+      // Unify the two classes
+      : (fresh ? plhs._fresh_unify(prhs,test) : plhs._unify(prhs,test));
+    if( !progress || test ) return progress;
+    prhs = prhs.find();
+    // See if we need to move any RHS local fields into the RHS class fields.
+    for( int i=1; i<rhs._max; i++ ) {
+      TV3 fcls = prhs.load().arg(rhs._flds[i]);
+      if( fcls != null ) {
+        TV3 frhs = rhs.arg(i);
+        rhs.del_fld(i--);
+        frhs._unify(fcls,false);
+      }
+    }
+    return true;
+  }
+
   // -------------------------------------------------------------
 
 
@@ -281,11 +312,11 @@ public class TVStruct extends TVExpanding {
     // Walk left, search right
     // If found, unify
     // else add right
-    boolean progress = false;
+    boolean progress = _unify_clz(that,true,test);
+
     for( int i=0; i<_max; i++ ) {         // Walk left (Fresh)
-      TV3 fthat = that.arg(_flds[i]);     // Local search right (that)
+      TV3 fthat = that.arg_clz(_flds[i]); // Search right (that)
       if( fthat != null ) {
-        progress |= fthat.vcrisscross(test); // If cross-coss, normal unify
         progress |= arg(i)._fresh_unify(fthat,test); // Fresh-Unify
       } else {
         progress |= that.add_fld(_flds[i],arg(i)._fresh()); // Not found so add fresh
@@ -303,7 +334,6 @@ public class TVStruct extends TVExpanding {
     for( int i=0; i<_max; i++ ) {     // Walk left
       TV3 fthat = that.arg(_flds[i]); // Search right
       if( fthat != null ) {
-        progress |= fthat.vcrisscross(test);
         progress |= arg(i)._fresh_unify(fthat,test);
         that = that.find();
       }
@@ -329,7 +359,6 @@ public class TVStruct extends TVExpanding {
     for( int i=0; i<_max; i++ ) {         // Walk left
       TV3 fthat = that.arg_clz(_flds[i]); // Search right (with CLZ)
       if( fthat != null ) {
-        progress |= fthat.vcrisscross(test);
         progress |= arg(i)._fresh_unify(fthat,test);
       } else {
         that._unify_err("Missing field '"+_flds[i]+"'",arg(i),null,test);
@@ -342,7 +371,6 @@ public class TVStruct extends TVExpanding {
   private boolean _fresh_unify_impl_mix_close(TVStruct that, boolean test) {
     if( test ) return ptrue();
     assert !unified();
-    that.close();                     // Progress, since closing
     for( int i=0; i<_max; i++ ) {     // Walk left
       TV3 fthat = that.arg(_flds[i]); // Search right
       if( fthat != null ) {
@@ -369,6 +397,7 @@ public class TVStruct extends TVExpanding {
         that.del_fld(i--);      // RHS does not exist in LHS, so yank from RHS
       }
     }
+    that.close();               // Progress, since closing
     return ptrue();             // Always progress, since closing
   }
 
@@ -396,7 +425,7 @@ public class TVStruct extends TVExpanding {
     for( int i=0; i<_max; i++ )
       if( pat.arg_clz(_flds[i])==null ) // Missing key in RHS
         return 7;                       // Fails, no match for label in pattern
-    return 1;                   // Since pattern is closed, all fields matched
+    return cmp;            // Since pattern is closed, all fields matched
   }
 
 
