@@ -5,8 +5,11 @@ import com.cliffc.aa.Parse;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
+
+import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.function.Predicate;
+
 import static com.cliffc.aa.AA.TODO;
 
 /** Type variable base class
@@ -323,6 +326,39 @@ abstract public class TV3 implements Cloneable {
     assert VARS.isEmpty() && DUPS.isEmpty() && NONGEN ==null;
     NONGEN = nongen;
     boolean progress = _fresh_unify(that,test);
+
+    // Major criss-cross rewrite: instead of dealing with vcrisscross
+    // incrementally, we do it all at the end.  We do it bulk stupid because
+    // I'm tired of trying to be clever, and I just want it correct.
+    boolean done = false;
+    while( !done ) {
+      if( test && progress ) break;
+      ArrayList<TV3> vs = new ArrayList<>(VARS.keySet());
+      ArrayList<TV3> ts = new ArrayList<>(VARS.values());
+      VARS.clear();
+      for( int i=0; i<vs.size(); i++ ) {
+        TV3 v = vs.get(i).find(), t = ts.get(i).find();
+        vs.set(i,v);  ts.set(i,t);
+        TV3 told = VARS.get(v);
+        if( told!=null && told!=t )
+          progress |= told._unify(t,test);
+        VARS.put(v, t);
+      }
+      for( int i=0; i<vs.size(); i++ ) {
+        TV3 vthat = ts.get(i);
+        if( vthat.unified() ) ts.set(i,vthat = vthat.find());
+        TV3 other = VARS.get(vthat);
+        if( other!=null && other!=vthat ) {
+          if( other.unified() ) VARS.put(vthat,other=other.find());
+          progress |= other._unify(vthat,test);
+        }
+      }
+      done=true;
+      for( TV3 v : vs )
+        if( v.unified() )
+          { done = false; break; }
+    }
+
     VARS.clear();  DUPS.clear();
     NONGEN = null;
     return progress;
@@ -348,14 +384,8 @@ abstract public class TV3 implements Cloneable {
       if( !test ) lf.add_delay_fresh();
       return vput(that,false);
     }
-    if( that instanceof TVLeaf ) { // RHS is a tvar; union with a deep copy of LHS
-      if( test ) return true;
-      // Must call _fresh first to trigger vcrisscross.
-      // This handles the case where 'that' is a Leaf and appears inside 'this'.
-      TV3 frsh = _fresh();
-      that.vcrisscross(test);
-      return that.union(frsh);
-    }
+    if( that instanceof TVLeaf ) // RHS is a tvar; union with a deep copy of LHS
+      return test || that.union(_fresh());
 
     //// Special handling for nilable
     //if( !(that instanceof TVNil) && this instanceof TVNil nil ) return vput(that,nil._unify_nil_l(that,test));
@@ -395,7 +425,6 @@ abstract public class TV3 implements Cloneable {
           TV3 rhs = that.arg(i);  // Never null
           // Check for a cycle from the Fresh side to the That side.
           // If found, need to unify (not fresh).
-          progress |= rhs.vcrisscross(test);
           progress |= lhs.find()._fresh_unify(rhs,test);
         } else {
           progress |= _fresh_missing_rhs(that,i,test);
@@ -412,7 +441,6 @@ abstract public class TV3 implements Cloneable {
 
   private boolean vput(TV3 that, boolean progress) {
     VARS.put(this,that);
-    VARS.put(that,that);
     return progress;
   }
 
@@ -422,13 +450,6 @@ abstract public class TV3 implements Cloneable {
     if( val!=null && val.unified() )
       VARS.put(this,val=val.find());
     return val;
-  }
-
-  boolean vcrisscross(boolean test) {
-    // Check for a cycle from the Fresh side to the That side.
-    // If found, need to unify (not fresh).
-    TV3 cyclic = vget();
-    return cyclic !=null && this != cyclic && cyclic._unify(this,test);
   }
 
   // This is fresh, and neither is a TVErr, and they are different classes
@@ -535,12 +556,12 @@ abstract public class TV3 implements Cloneable {
   // Report back 7 for hard-no, 1 for hard-yes, and 3 for maybe.
   // No change to either side, this is a trial only.
   private static final NonBlockingHashMapLong<String> TDUPS = new NonBlockingHashMapLong<>();
-  public int trial_unify_ok(TV3 pat) {
+  public final int trial_unify_ok(TV3 pat) {
     TDUPS.clear();
     LEAFS.clear();
     return _trial_unify_ok(pat);
   }
-  int _trial_unify_ok(TV3 pat) {
+  final int _trial_unify_ok(TV3 pat) {
     if( this==pat ) return 1; // hard-yes
     assert !unified() && !pat.unified();
 
@@ -893,9 +914,7 @@ abstract public class TV3 implements Cloneable {
 
   // Initial state after loading e.g. primitives.
   public static int _INIT0_CNT = 99999;
-  public static void init0() {
-    _INIT0_CNT = CNT;
-  }
+  public static void init0() { _INIT0_CNT = CNT; }
   public boolean isPrim() { return _uid < _INIT0_CNT || _INIT0_CNT==99999; }
   public static void reset_to_init0() {
     CNT=_INIT0_CNT;

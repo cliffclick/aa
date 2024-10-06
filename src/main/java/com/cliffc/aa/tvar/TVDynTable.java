@@ -302,13 +302,7 @@ public class TVDynTable extends TV3 {
 
       } else {
         assert is_dyn(i) == that.is_dyn(idx);
-        TV3 cyclic = that.first(idx).vget();
-        if( cyclic !=null && that.first(idx) != cyclic)
-          throw TODO();         // vcrisscross
         if( is_dyn(i) ) {
-          cyclic = that.secnd(idx).vget();
-          if( cyclic !=null && that.secnd(idx) != cyclic)
-            throw TODO();         // vcrisscross
 
           // Unify match on match
           progress |= first(i)._fresh_unify(that.first(idx),test);
