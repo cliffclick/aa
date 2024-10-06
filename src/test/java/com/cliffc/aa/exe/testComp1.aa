@@ -1,4 +1,4 @@
 // Function composition
-// Type: { *[2]@{ $dyn=-;  ..., } - { - - A -> B } A -> B }
+// Type: { *[2]@{ $dyn=-; } - { - - A -> B } A -> B }
 // Eval: <*[2]@{ _ $dyn=-; },LAM3>
 { f g -> (f g)}

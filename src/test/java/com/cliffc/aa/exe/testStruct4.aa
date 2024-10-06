@@ -1,6 +1,5 @@
 // Simple OPEN struct test
-// Type: { A:*[2]@{ $dyn=-; x={ A - B -> B };  ..., } - *[]@{ u=C;  ..., } -> C }
+// Type: { *[2]@{ $dyn=A:-; x=B:{ *[2]@{ $dyn=A; x=B; } - C -> C }; } - *[]@{ u=D;  ..., } -> D }
 // Eval: <A:*[2]@{ _ $dyn=-; x=<A,LAM3>; },LAM4>
 
 x = { z -> z}; (x { y -> y.u})
-

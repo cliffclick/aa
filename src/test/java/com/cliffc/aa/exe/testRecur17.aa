@@ -1,5 +1,5 @@
 // Explicit closure style
-// Type: { *[CLZ]@{ A:*[2]@{ $dyn=-;  ..., }; $dyn=B; f=C:{ A - C -> C };  ..., } - C -> C }
+// Type: { *[CLZ]@{ *[2]@{ $dyn=A:-; }; $dyn=B; f=C:{ *[2]@{ $dyn=A; } - C -> C }; } - C -> C }
 // Eval: <*[4]@{ _ $dyn=0; f=<A:*[2]@{ _ $dyn=-; },LAM5>; },LAM3>
 
 //f = { x -> (x x) };

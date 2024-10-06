@@ -1,5 +1,5 @@
 // The type shows "M32:0=..." is pre-bound to the correct field
-// Type: { *[2]@{ $dyn=-;  ..., } A:[[  27Call: B, 45Call: C, 33Load: 0=D:{ E:*[11]@{ *[2]@{ $dyn=-;  ..., }; $dyn=A; fx=F:*[3]( _, D, { E - flt:flt64 -> flt:flt64 }); pred=G;  ..., } H:- int:int64 -> int:int64 }, 37Call: H, 40Load: 1=I:{ J:*[11]@{ *[2]@{ $dyn=-;  ..., }; $dyn=A; fx=K:*[3]( _, { J - int:int64 -> int:int64 }, I); pred=G;  ..., } L:- flt:flt64 -> flt:flt64 }, 44Call: L]] G -> *[10]( _, int:int64, flt:flt64) }
+// Type: { *[2]@{ $dyn=-; } A:[[  27Call: B, 45Call: C, 33Load: 0=D:{ *[11]@{ E:*[2]@{ $dyn=-; }; $dyn=A; fx=F:*[3]( _, D, { *[11]@{ E; $dyn=A; fx=F; pred=G; } - flt:flt64 -> flt:flt64 }); pred=G; } H:- int:int64 -> int:int64 }, 37Call: H, 40Load: 1=I:{ *[11]@{ J:*[2]@{ $dyn=-; }; $dyn=A; fx=K:*[3]( _, { *[11]@{ J; $dyn=A; fx=K; pred=G; } - int:int64 -> int:int64 }, I); pred=G; } L:- flt:flt64 -> flt:flt64 }, 44Call: L]] G -> *[10]( _, int:int64, flt:flt64) }
 // Eval: <*[2]@{ _ $dyn=-; },LAM11>
 { pred ->
   fx = (pair if pred ? { x -> (* x 2)} : { x -> (* x 3)}

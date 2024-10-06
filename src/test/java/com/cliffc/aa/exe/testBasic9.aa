@@ -1,5 +1,5 @@
 // Combo of simple
-// Type: *[CLZ]( _, int:nint8, A:{ *[2]@{ $dyn=-; fun=A;  ..., } - B -> int:nint8 })
+// Type: *[CLZ]( _, int:nint8, A:{ *[2]@{ $dyn=-; fun=A; } - B -> int:nint8 })
 // Eval: *[4]( _, 5, A:<*[2]@{ _ $dyn=-; fun=A; },LAM3>)
 fun = { p -> if p ? 4 : 5 };
 (pair (fun 0) fun)

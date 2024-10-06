@@ -392,7 +392,13 @@ public class EXE {
     TV3 arg(int i) { return tvar().arg(i); }
 
     @Override void prep_tree(Ary<TV3> nongen, TVPtr penv) {
-      _tvar = new TVLambda(nargs(),penv,new TVLeaf());
+      // Clone a partial prefix of penv; this is the part of the env that is
+      // lexically visible to the Lambda.
+      TVStruct env2 = penv.load().copy();
+      env2.close();
+      TVPtr penv2 = new TVPtr(penv.aliases(),env2);
+      _tvar = new TVLambda(nargs(),penv2,new TVLeaf());
+
       // Extend the environment with a new call-stack/nested env
       String[] args = Arrays.copyOfRange(_args,DSP_IDX,_args.length);
       TV3[] vals = new TV3[args.length];
@@ -400,6 +406,7 @@ public class EXE {
         vals[i-DSP_IDX] = arg(i);
       TVStruct env = new TVStruct(args,vals,true);
       penv = new TVPtr(BitsAlias.make0(_fid),env);
+
       // Extend the nongen set by the new variables
       for( int i=ARG_IDX; i<nargs(); i++ ) nongen.push(arg(i));
       // Prep the body

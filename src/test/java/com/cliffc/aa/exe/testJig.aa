@@ -1,0 +1,21 @@
+// Gen counters
+// Simple test of captured environment
+// Type: *[NIL]( _, A:{ *[CLZ]@{ B:*[2]@{ $dyn=-; gen={ B - int:3 -> A }; }; $dyn=C; init=int:3; } - -> int:3 }, D:{ *[CLZ]@{ E:*[2]@{ $dyn=-; gen={ E - int:7 -> D }; }; $dyn=F; init=int:7; } - -> int:7 })
+// Eval: *[5]( _, B:<*[4]@{ _ $dyn=0; init=3; },LAM3>, C:<*[4]@{ _ $dyn=0; init=7; },LAM3>)
+
+
+// Even EXE doesn't "close the loop" here.  The first result for "xx" has a SANE DSP that does not mention "yy" but allows for it.
+// The SECOND result for "xx" mentions "yy", but "xx" is a clone of a recursive version of the first result.
+//
+
+gen = { init ->
+  // Environment for this function cannot know about xx
+  { -> init }
+};
+
+// When parsing HERE, GEN is DEF'd so FRESH and XX is NOT DEFINED
+xx = (gen 3);
+
+yy = (gen 7);
+
+(pair xx yy)
