@@ -2,7 +2,7 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
-import org.junit.Ignore;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
@@ -11,6 +11,13 @@ import static org.junit.Assert.*;
 public class TestTVar {
   private static final String[] FLD = new String[]{TypeFld.CLZ,"fld"};
   private static final String[] CLZ = new String[]{TypeFld.CLZ};
+
+  @BeforeClass
+  public static void setup() {
+    Object dummy = TVPtr.PTRCLZ;
+    TV3.init0();
+    TV3.reset_to_init0();
+  }
 
   // Simply unify leaf and lambda
   private static TV3[] _testUnify() {
@@ -159,7 +166,7 @@ public class TestTVar {
   // Make a TVStruct with no Clz, and 1 field which should be in the Clz.
   //   @{ fld=V1, ... }
   // Make a TVStruct with a CLz and the fld in the class.
-  //   @{ ^=@{ ^=PTRCLZ, fld=V2:{ V3 -> V4 } }
+  //   @{ ^=@{ ^=PTRCLZ, fld=V2:{ V3 -> V4 } }, fld2=V5 }
   // During normal unify, both use the same clz, and V1 should unify with V2
   private static TV3[] _testUnifyClz0() {
     TVLambda vlam2 = new TVLambda(AA.ARG_IDX,new TVLeaf(),new TVLeaf());
@@ -178,6 +185,8 @@ public class TestTVar {
     // Normal unify, fld moves up to shared CLZ and unifies
     { TV3[] tvs = _testUnifyClz0();
       TV3 vs1 = tvs[0], vs3 = tvs[1], v0 = tvs[2], vlam2 = tvs[3];
+      assertEquals( 3, vs1.trial_unify_ok( vs3 ));
+      assertEquals( 3, vs3.trial_unify_ok( vs1 ));
       boolean rez = vs3.unify(vs1,false);
       assertTrue(rez);
       assertSame(v0.find(),vlam2.find());
@@ -402,9 +411,6 @@ lam1={
     return tvs;
   }
 
-  // CNC - 2/3/2024
-  // This test is now no good, as new invariant is that CLZs are never open
-  // and that open structs have no CLZ.
   private static TV3[] _testUnifyClz1() {
     // Should get cross-fields from both and unify with the CLZ field in the other.
     //   @{ ^=@{ fld0={ int -> V2 }, ...}, fld1= { int -> V4} }
@@ -429,7 +435,7 @@ lam1={
 
     return new TV3[]{ vs0, vs1, vlam0, vlam1, vlam3, vlam4 };
   }
-  @Ignore @Test public void testUnifyClz1() {
+  @Test public void testUnifyClz1() {
     { TV3[] tvs = _testUnifyClz1();
       TV3 vs0 = tvs[0], vs1 = tvs[1], vlam0 = tvs[2], vlam1 = tvs[3], vlam3 = tvs[4], vlam4 = tvs[5];
       boolean rez = vs0.unify(vs1,false);
@@ -444,31 +450,28 @@ lam1={
       TV3 vs0 = tvs[0], vs1 = tvs[1], vlam0 = tvs[2], vlam1 = tvs[3], vlam3 = tvs[4], vlam4 = tvs[5];
       boolean rez = vs0.fresh_unify(null,vs1,false);
       assertTrue(rez);
-      // Both look alike
-      assertEquals( 1, vs0.find().trial_unify_ok( vs1 ) ); // Always a hard yes in a trial
-      // Instance fields from either unified with same from CLZ in other
-      assertEquals( 1, vlam0.find().trial_unify_ok( vlam4.find() ) );
-      assertEquals( 1, vlam1.find().trial_unify_ok( vlam3.find() ) );
       assertTrue( ((TVLambda)vlam3).dsp() instanceof TVBase base && base._t==TypeInt.INT64);
       assertTrue( ((TVLambda)vlam4).dsp() instanceof TVBase base && base._t==TypeInt.INT64);
+      // Instance fields from either unified with same from CLZ in other
+      assertEquals( 3, vlam0.find().trial_unify_ok( vlam4.find() ) );
+      assertEquals( 3, vlam1.find().trial_unify_ok( vlam3.find() ) );
+      // Both look alike
+      assertEquals( 3, vs0.find().trial_unify_ok( vs1 ) ); // Always a hard yes in a trial
     }
     { TV3[] tvs = _testUnifyClz1();
       TV3 vs0 = tvs[0], vs1 = tvs[1], vlam0 = tvs[2], vlam1 = tvs[3], vlam3 = tvs[4], vlam4 = tvs[5];
       boolean rez = vs1.fresh_unify(null,vs0,false);
       assertTrue(rez);
       // Both look alike
-      assertEquals( 1, vs1.find().trial_unify_ok( vs0 ) ); // Always a hard yes in a trial
+      assertEquals( 3, vs1.find().trial_unify_ok( vs0 ) ); // Always a hard yes in a trial
       // Instance fields from either unified with same from CLZ in other
-      assertEquals( 1, vlam0.find().trial_unify_ok( vlam4.find() ) );
-      assertEquals( 1, vlam1.find().trial_unify_ok( vlam3.find() ) );
+      assertEquals( 3, vlam0.find().trial_unify_ok( vlam4.find() ) );
+      assertEquals( 3, vlam1.find().trial_unify_ok( vlam3.find() ) );
       assertTrue( ((TVLambda)vlam0).ret() instanceof TVBase base && base._t==TypeFlt.FLT64);
       assertTrue( ((TVLambda)vlam1).ret() instanceof TVBase base && base._t==TypeFlt.FLT64);
     }
   }
 
-  // CNC - 2/3/2024
-  // This test is now no good, as new invariant is that CLZs are never open
-  // and that open structs have no CLZ.
   // 3 CLZs deep.
   // CLZA open, empty        <<== CLZB, closed field1 <<== INST C, has unpinned field0, open
   // CLZA closed, has field0 <<== CLZB, closed field1 <<== INST C, has pinned field 2.
@@ -506,7 +509,7 @@ lam1={
     return new TV3[]{ vclzC0, vclzC1, v0, v2_0, v1_0, v1_1 };
   }
 
-  @Ignore @Test public void testUnifyClz2() {
+  @Test public void testUnifyClz2() {
     { TV3[] tvs = _testUnifyClz2();
       TVStruct vclzC0 = (TVStruct)tvs[0], vclzC1 = (TVStruct)tvs[1];
       TV3 v0 = tvs[2], v2_0 = tvs[3], v1_0 = tvs[4], v1_1 = tvs[5];
@@ -525,7 +528,7 @@ lam1={
       boolean rez = vclzC0.fresh_unify(null,vclzC1,false);
       assertTrue(rez);
       // Both look alike
-      assertEquals( 1, vclzC0.find().trial_unify_ok( vclzC1 ) ); // Always a hard yes in a trial
+      assertEquals( 3, vclzC0.find().trial_unify_ok( vclzC1 ) ); // Always a hard yes in a trial
       assertTrue( vclzC0.pclz().aliases().abit() > 0 );           // Single alias
       assertEquals( -1, vclzC1.pclz().aliases().abit() );         // Unified aliases
     }
@@ -535,11 +538,13 @@ lam1={
       boolean rez = vclzC1.fresh_unify(null,vclzC0,false);
       assertTrue(rez);
       // Both look alike
-      assertEquals( 1, vclzC1.find().trial_unify_ok( vclzC0 ) ); // Always a hard yes in a trial
+      assertEquals( 3, vclzC1.find().trial_unify_ok( vclzC0 ) ); // Always a hard yes in a trial
       assertTrue( vclzC1.pclz().aliases().abit() > 0 );           // Single alias
       assertEquals( -1, vclzC0.pclz().aliases().abit() );         // Unified aliases
       assertEquals( -1, vclzC0.idx( "fld0" ) );
       assertTrue(vclzC0.idx("fld2") > 0  );
     }
   }
+
+
 }
