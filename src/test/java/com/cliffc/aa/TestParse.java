@@ -31,7 +31,18 @@ public class TestParse {
     DO_HMT=true;
     RSEED=0;
 
-    test("q=(2,3.14); (!q._,q._.sin())","*#[22](nil, 0.0015926529164868282)","*[22](int:int1,flt:flt64)", null, null, "[4,22]", null);
+    test("q=(2,3.14); (!q._,q._.sin())","*[22]( _, int1, flt64)","*[22](_, int:int1,flt:flt64)", null, null, "[4,22]", null);
+
+    test(
+"""
+fcn = { y ->
+  @{ qi = { x -> x.a };
+     qf = { x -> x.b };
+  }._ y
+};
+(fcn @{a=2;}, fcn @{b=3.3;})
+""",
+"*[25]( _, %[2,25][2]?, %[2,25][2]?)", "*[25](_,int:2,flt:3.3)",null,null,"[4,25]",null);
 
 
 //    test(
