@@ -190,6 +190,7 @@ public class LetRec extends ASTVars {
     // Single variables can be re-definitions or StoreNodes
     if( !_cyclic ) {
       assert _vars._len==1 && _kids._len==2;
+      _oldx = 1; // Stack-slot-zero is "^", which not mid-def
       _kids.at(0).nodes(e);     // Go ahead and get the one kid def
       Node rez = scope.rez();
       String var = _vars.at(0);
@@ -247,7 +248,7 @@ public class LetRec extends ASTVars {
   // generative.  Post definition extra defs act like the body and are all
   // let-polymorphic.
   @Override void addNonGen(FreshNode frsh) {
-    if( _stk != null )          // If null, nothing is mid-def, so its all fresh
+    if( _stk != null )          // If null, nothing is mid-def, so it is all fresh
       for( int i=_oldx; i<_stk.len(); i++ )
         if( !_stk.val(i).above_center() )
           frsh.addDef(_stk.in(i));
