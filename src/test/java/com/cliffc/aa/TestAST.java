@@ -31,7 +31,7 @@ public class TestAST {
     Arrays.sort(tests, (s0,s1) -> Util.alphanumCompare(s0.toString(),s1.toString()));
     for( File f : tests )
       for( int i=0; i<4; i++ )
-        testOne(0,f);
+        testOne(i,f);
   }
 
   public void testOne( int rseed, File f ) throws IOException {
