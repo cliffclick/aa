@@ -433,7 +433,7 @@ public abstract class PrimNode extends Node {
     if( rez instanceof TypeMemPtr tmp ) return wrap_base(PTR_STR().load().arg("^"),tmp);
     if( rez == TypeNil.XNIL )  return new TVPtr( BitsAlias.make0(0), new TVStruct(true) );
     // Variations on SCALAR types; plus or minus a few aliases, but e.g. ints & flts allow
-    if( rez.getClass()==TypeNil.class && !rez.above_center() )  return new TVLeaf();
+    if( rez.getClass()==TypeNil.class )  return new TVLeaf();
     //if( rez == TypeInt. TRUE  )  return  IINT(TypeInt.TRUE );
     //if( rez == TypeInt. BOOL  )  return IBOOL();
     //if( rez == TypeFlt.NFLT64 )  return INFLT();

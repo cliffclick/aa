@@ -11,7 +11,7 @@ import static com.cliffc.aa.AA.TODO;
 // Store a value into a struct.  Might be a field or whole struct.  Does it's
 // own nil-check and value testing; also checks final field updates.
 public abstract class StoreAbs extends Node {
-  private final Parse _bad;
+  final Parse _bad;
   public StoreAbs( Node mem, Node adr, Node val, Parse bad ) {
     super(null,mem,adr,val);
     _bad = bad;
