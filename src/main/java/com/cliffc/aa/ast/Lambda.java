@@ -71,8 +71,9 @@ public class Lambda extends ASTVars {
         // Take just the prefix of scope variables declared up through now (after
         // sorting for mutual-let-rec); add the mut-let-rec set to the nongens.
         frsh = new PartialScopeFreshNode(outScope).peep();
-        // CNC 6/Oct/2024 not sure needed
-        //frsh.addDef(e_cloz._scope.ptr());
+        // CNC  6/Oct/2024 not sure needed
+        // CNC 29/Oct/2024 think needed to stop open cycle; leads to endless expansion
+        frsh.addDef(outScope.ptr());
         // TODO: expecting to have to repeat this up-scope
         for( AST par = _par, old = this; par!=null; old = par, par = par._par )
           if( par instanceof LetRec let && old==let.body() && let._frefs != null )

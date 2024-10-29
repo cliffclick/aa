@@ -101,7 +101,13 @@ public class TVStruct extends TVExpanding {
     TV3 tv3 = arg(fld);         // Local search
     if( tv3 != null ) return tv3;
     TVPtr clz = pclz();
-    return clz==null ? null : clz.load().arg_clz(fld);
+    if( clz == null ) return null;
+    // CNC 29/Oct/2024 - do not normally search superclass chain; parser always
+    // inserts a chain of display/env loads and loads in the correct TVStruct -
+    // except when looking at primitives (many shortcuts taken there, I might
+    // be able to correct later).
+    if( !is_prim() ) return null;
+    return clz.load().arg_clz(fld);
   }
 
 

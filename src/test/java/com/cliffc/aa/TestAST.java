@@ -16,7 +16,7 @@ import static org.junit.Assert.assertEquals;
 
 public class TestAST {
   @Ignore @Test public void testJig() throws IOException {
-    testOne(1,new File("src/test/java/com/cliffc/aa/ast/testResolve0.aa"));
+    testOne(0,new File("src/test/java/com/cliffc/aa/ast/testResolve2.aa"));
   }
 
   //@Test public void testAll() throws IOException { testSet(""); }

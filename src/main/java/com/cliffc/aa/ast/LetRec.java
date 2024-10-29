@@ -190,21 +190,20 @@ public class LetRec extends ASTVars {
   @Override public void nodes( Env e ) {
     ScopeNode scope = e._scope;
     StructNode stk = _stk = scope.stk();
-    // Single variables can be re-definitions or StoreNodes
+    // Short/easy version
     if( !_cyclic ) {
       assert _vars._len==1 && _kids._len==2;
-      _oldx = 1; // Stack-slot-zero is "^", which not mid-def
+      _oldx = 1;                // Stack-slot-zero is "^"
       _kids.at(0).nodes(e);     // Go ahead and get the one kid def
       Node rez = scope.rez();
       String var = _vars.at(0);
       // Debug binding
       if( rez instanceof FunPtrNode fptr ) fptr.bind(var);
-      // If assignment is new, add field
-      if( stk.find(var)== -1 )
-        stk.add_fld(var,Access.RW,Env.ANY,null);
+      // Add field to stack frame
+      stk.add_fld(var,Access.RW,Env.ANY,null);
       _oldx = stk.len();
       scope.mem(new StoreNode(scope.mem(), scope.ptr(), rez, var, _accs.at(0), null ).peep());
-      if( body() != null ) body().nodes(e);
+      body().nodes(e);
       return;
     }
 
