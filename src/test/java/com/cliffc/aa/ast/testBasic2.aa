@@ -1,4 +1,4 @@
 // Simple struct test
-// GCP: *[21]@{ _; a=    1; b=    2  }
+// GCP: *[21]@{ _; a:=   1; b:=   2  }
 // HMT: *[21]@{ _; a=int:1; b=int:2; }
 @{ a=1; b=2; }

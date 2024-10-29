@@ -20,7 +20,9 @@ public class LetRec extends ASTVars {
   public  LetRec(String var, boolean rw, AST def, AST body) {
     this();
     _vars.push(var);
-    _accs.push(rw ? Access.RW : Access.Final);
+    // CNC turned off 10/26/2024 to try and get HM worked out
+    //_accs.push(rw ? Access.RW : Access.Final);
+    _accs.push(Access.RW);
     _kids.push(def);
     if( body instanceof LetRec let ) {
       _kids.addAll(let._kids);
@@ -90,6 +92,7 @@ public class LetRec extends ASTVars {
       _kids.at(_idx)._par = this;
       _kids.at(_idx).mutLetRec();
     }
+    if( body() == null ) return 0; // Happens for side effects
     body()._par = this;
     body().mutLetRec();
 
@@ -101,7 +104,7 @@ public class LetRec extends ASTVars {
     _stack = 0;
     for( int i=0; i<_vars._len; i++ )
       rebuild((byte)i, (byte)-1, null);
-    // Drop self, been replaces by a tower of sorted MutLetRec
+    // Drop self, been replaced by a tower of sorted MutLetRec
     _par._kids.replace(this,body());
     body()._par = _par;
     return 0;
@@ -201,7 +204,7 @@ public class LetRec extends ASTVars {
         stk.add_fld(var,Access.RW,Env.ANY,null);
       _oldx = stk.len();
       scope.mem(new StoreNode(scope.mem(), scope.ptr(), rez, var, _accs.at(0), null ).peep());
-      body().nodes(e);
+      if( body() != null ) body().nodes(e);
       return;
     }
 

@@ -59,8 +59,8 @@ public class TVPtr extends TV3 {
 
     // Update aliases
     if( aliases != ptr._aliases ) {
-      if( !test ) ptr._aliases = aliases;
       progress = ptrue();
+      if( !test ) ptr._aliases = aliases;
     }
     if( test && progress ) return progress;
 

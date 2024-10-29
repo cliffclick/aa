@@ -13,6 +13,7 @@ public abstract class ASTVars extends AST {
   final Ary<String> _vars;
 
   public ASTVars( Ary<String> vars ) { super(); _vars = vars;}
+  public ASTVars( Ary<AST> kids, Ary<String> vars ) { super(kids); _vars = vars;}
 
   // Used to find mutual let rec cycles
   abstract int addEdge(int to);

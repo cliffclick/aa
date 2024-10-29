@@ -6,6 +6,8 @@ import com.cliffc.aa.tvar.TVStruct;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.NonBlockingHashMapLong;
+import com.cliffc.aa.util.VBitSet;
+
 import java.util.HashSet;
 
 /** Combined Global Constant Propagation and Hindly-Milner with extensions.
@@ -236,11 +238,17 @@ public abstract class Combo {
       }
 
       // Very expensive assert: everything that can make progress is on worklist
-      //assert NodeUtil.more_work(Env.ROOT)==0;
+      assert NodeUtil.more_work(Env.ROOT)==0;
 
       if( Env.GVN.flow_len()==0 && progress ) {
         progress = false;
         Env.GVN.add_flow(FRESH);
+        // Bad O(n^2) resolve-attempt on TVDynTables.  Easy enough to make
+        // incremental, but tooo many balls in the air right now.
+        final VBitSet visit = new VBitSet();
+        int rez = Env.ROOT.walkReduce( (m,x) -> m._tvar!=null && m.tvar().dynWalk(visit) ? 1 : x );
+        if( rez!=0 ) progress = true;
+
       }
     }
     return cnt;

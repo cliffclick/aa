@@ -68,7 +68,7 @@ public class LoadNode extends Node {
     super(null,mem,adr);
     _fld = fld;
     _bad = bad;
-    _live_use = TypeStruct.UNUSED.add_fldx(TypeFld.make(_fld,Type.ALL));
+    _live_use = TypeStruct.UNUSED.add_fldx(TypeFld.make(_fld,Type.ALL, TypeFld.Access.bot()));
   }
   // A plain "_" field is a resolving field
   @Override public String label() { return ("."+_fld).intern(); }   // Self short name

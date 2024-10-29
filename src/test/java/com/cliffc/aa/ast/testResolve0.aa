@@ -1,0 +1,6 @@
+// Ignore f and make a 5
+// GCP: *[22]( _, 0:=int1, 1:=flt64)
+// HMT: *[22](_, int:int1,flt:flt64)
+// Eval: int:5
+q=(2,3.14);
+( !q._ , q._.sin() )

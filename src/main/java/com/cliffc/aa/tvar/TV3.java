@@ -331,8 +331,9 @@ abstract public class TV3 implements Cloneable {
     // incrementally, we do it all at the end.  We do it bulk stupid because
     // I'm tired of trying to be clever, and I just want it correct.
     boolean done = false;
-    while( !done ) {
-      if( test && progress ) break;
+    while( !done && progress ) {
+      done=true;
+      if( test ) break;
       ArrayList<TV3> vs = new ArrayList<>(VARS.keySet());
       ArrayList<TV3> ts = new ArrayList<>(VARS.values());
       VARS.clear();
@@ -341,7 +342,7 @@ abstract public class TV3 implements Cloneable {
         vs.set(i,v);  ts.set(i,t);
         TV3 told = VARS.get(v);
         if( told!=null && told!=t )
-          progress |= told._unify(t,test);
+          done &= !told._unify(t,test);
         VARS.put(v, t);
       }
       for( int i=0; i<vs.size(); i++ ) {
@@ -350,13 +351,13 @@ abstract public class TV3 implements Cloneable {
         TV3 other = VARS.get(vthat);
         if( other!=null && other!=vthat ) {
           if( other.unified() ) VARS.put(vthat,other=other.find());
-          progress |= other._unify(vthat,test);
+          done &= !other._unify(vthat,test);
         }
       }
-      done=true;
-      for( TV3 v : vs )
-        if( v.unified() )
-          { done = false; break; }
+      if( done )
+        for( TV3 v : vs )
+          if( v.unified() )
+            { done = false; break; }
     }
 
     VARS.clear();  DUPS.clear();
@@ -753,6 +754,7 @@ abstract public class TV3 implements Cloneable {
   }
   // Used to initialize primitives
   public void set_widen() { _widen=2; }
+  public void clr_widen() { _widen=0; }
   abstract void _widen( byte widen );
 
   // -----------------
@@ -911,6 +913,15 @@ abstract public class TV3 implements Cloneable {
     return this;
   }
 
+  public boolean dynWalk(VBitSet visit) {
+    if( visit.tset(_uid) ) return false;
+    boolean progress = false;
+    if( _args!=null )
+      for( int i=0; i<len(); i++ )
+        if( arg(i)!=null )
+          progress |= arg(i).dynWalk(visit);
+    return progress;
+  }
 
   // Initial state after loading e.g. primitives.
   public static int _INIT0_CNT = 99999;

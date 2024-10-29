@@ -14,6 +14,11 @@ public class TVBase extends TVExpanding {
     assert t!=Type.ALL;
     _t = t;
   }
+  public TVBase( Type t, byte widen ) {
+    assert t!=Type.ALL;
+    _t = t;
+    _widen = widen;
+  }
 
   @Override boolean can_progress() {
     if( _t instanceof TypeInt ) return _t!=TypeInt.INT64;

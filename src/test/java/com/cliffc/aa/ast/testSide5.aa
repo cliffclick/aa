@@ -3,12 +3,11 @@
 // Intended to force keeping the display Parm alive in the functions, while
 // keeping the types of {A,B} still polymorphic
 
-// GCP: *[18]@{ _; bfld=nil; ...}
-// HMT: *[18]@{_;  bfld=int:int8; }
+// GCP: *[22]@{ _; bfld:=nil }
+// HMT: *[22]@{_;  bfld=int:int64; }
 
 init := 0;
 A_noinline = { x -> @{ bfld = init; } };
 rez0 = A_noinline(1.2);
 init := 7;
 rez0
-

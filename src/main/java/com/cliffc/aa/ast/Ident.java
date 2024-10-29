@@ -15,7 +15,7 @@ public class Ident extends AST {
     int idx;
     // Find a defining LetRec, or null for lambdas and primitives.
     for( AST par = _par; par != null; par = par._par )
-      if( par instanceof ASTVars vars && (idx = vars._vars.find(_name)) != -1 )
+      if( par instanceof ASTVars vars && !(vars instanceof Struct) && (idx = vars.find(_name)) != -1 )
         // Edge in the LetRec graph from stack-top to idx
         return vars.addEdge(idx);
     // No defining LetRec, must be a primitive
@@ -32,7 +32,7 @@ public class Ident extends AST {
       ptr = new LoadNode(e._scope.mem(),ptr,"^",null).peep();
       e2 = e2._par;
     }
-    assert e2._scope.stk().is_closure();
+
     Node ld = new LoadNode(e._scope.mem(),ptr,_name,null).peep();
 
     // Bind unknown loads, in case an FP is involved
@@ -47,7 +47,7 @@ public class Ident extends AST {
       FreshNode frsh = new FreshNode(x).init();
       // Walk to the Root and collect the non-gen edges
       for( AST par = _par; par != null; par = par._par )
-        if( par instanceof ASTVars vars )
+        if( par instanceof ASTVars vars && !(vars instanceof Struct) )
           vars.addNonGen(frsh);
       x = frsh;
     }
@@ -57,10 +57,11 @@ public class Ident extends AST {
 
   private boolean isLetPolymorphic() {
     for( AST par = _par, old=this; par != null; old = par, par = par._par )
-      if( par instanceof LetRec let && let._vars.find(_name)!= -1 &&
-          // If the ident comes from the body side, needs a Fresh
-          let.body() == old )
-        return true;
+      // Find the ident def
+      if( par instanceof ASTVars vars && vars.find(_name)!= -1 )
+        // If the ident comes from the body side, needs a Fresh, otherwise no.
+        return vars instanceof LetRec let && let.body() == old;
+    // Not found; happens for named primitives, e.g. math.rand
     return false;
   }
 

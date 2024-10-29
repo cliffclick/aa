@@ -882,8 +882,11 @@ public abstract class Node implements Cloneable, IntSupplier {
     for( int i=0; i<nUses(); i++ ) {
       Node use = use(i);
       if( use == memw ) found=true; // Only memw mem-writer follows
-      else if( use.isMem()  ) return false; // Found a 2nd mem-writer
       else if( use.isKeep() ) return false; // Being built, might see a store-use yet
+      else if( use.isMem()  ) {  // Found a 2nd mem-writer
+        use.deps_add_live(memw); // If use goes away, check_solo_mem_writer might change
+        return false;
+      }
     }
     return found;
   }

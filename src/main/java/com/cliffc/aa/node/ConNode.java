@@ -26,7 +26,9 @@ public class ConNode<T extends Type> extends Node {
   @Override public Type value() { return _t; }
 
   @Override public boolean has_tvar() {
-    if( _t instanceof TypeNil ) return true; // Yes on NIL, INT, FLT, MEMPTR, FUNPTR, STRUCT
+    if( _t instanceof TypeNil &&
+        (!_t.above_center() || _t==TypeNil.NIL ) ) // Allow both flavors of NIL
+      return true; // Yes on NIL, INT, FLT, MEMPTR, FUNPTR, STRUCT
     // No for TFLD, RPC
     return false;
   }

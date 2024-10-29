@@ -65,23 +65,27 @@ public class Lambda extends ASTVars {
       RetNode ret = new RetNode(inScope.ctrl(),inScope.mem(),inScope.rez(),rpc,_fun).init();
 
       // The containing scope - it might be a struct scope, not just a closure scope
-      Env e_cloz = outer;
+      Node frsh;
 
-      // Take just the prefix of scope variables declared up through now (after
-      // sorting for mutual-let-rec); add the mut-let-rec set to the nongens.
-      Node frsh = new PartialScopeFreshNode(e_cloz._scope).peep();
-      // CNC 6/Oct/2024 not sure needed
-      //frsh.addDef(e_cloz._scope.ptr());
-      // TODO: expecting to have to repeat this up-scope
-      for( AST par = _par, old = this; par!=null; old = par, par = par._par )
-        if( par instanceof LetRec let && old==let.body() && let._frefs != null )
-          for( Node fref : let._frefs )
-            frsh.addDef(fref);
+      if( outScope.stk().is_closure() ) {
+        // Take just the prefix of scope variables declared up through now (after
+        // sorting for mutual-let-rec); add the mut-let-rec set to the nongens.
+        frsh = new PartialScopeFreshNode(outScope).peep();
+        // CNC 6/Oct/2024 not sure needed
+        //frsh.addDef(e_cloz._scope.ptr());
+        // TODO: expecting to have to repeat this up-scope
+        for( AST par = _par, old = this; par!=null; old = par, par = par._par )
+          if( par instanceof LetRec let && old==let.body() && let._frefs != null )
+            for( Node fref : let._frefs )
+              frsh.addDef(fref);
+      } else {
+        frsh = outScope.ptr();
+      }
 
       // Make a fat fcn pointer; the frsh is the closure pointer.
       Node code = new FunPtrNode(ret,frsh).peep();
 
-      // Return fat fcn pointer
+      // Return fat fcn pointer / closure
       outScope.rez(code);
     }
   }

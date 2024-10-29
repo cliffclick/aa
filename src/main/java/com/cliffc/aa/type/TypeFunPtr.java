@@ -12,14 +12,15 @@ import static com.cliffc.aa.AA.TODO;
 // not GC'd, and cannot be Loaded or Stored through (although they can be
 // loaded & stored).
 
-// A function pointer includes a display (a back pointer to the enclosing
-// environment or instance); i.e. function pointers are "fat".  The display is typed as
-// a TMP to a TypeStruct, or ANY (not live, nobody uses or cares) or XNIL.
+// A function pointer is a closure; it includes a environment (a back pointer to
+// the enclosing environment or instance); i.e. function pointers are "fat".
+// The environment is typed as a TMP to a TypeStruct, or ANY (not live, nobody uses
+// or cares) or XNIL.
 
-// The TFP indicates if it carries a display or not; a TFP without a display
-// cannot be called and has to be bound to a display first.  An unbound TFP
-// uses ANY.  For "static" functions, the display is bound to the prototype
-// object immediately.
+// The TFP indicates if it carries an environment or not; a TFP without a
+// environment cannot be called and has to be bound to a environment first.  An
+// unbound TFP uses ANY.  For "static" functions, the environment is bound to
+// the prototype object immediately.
 
 // Other arguments are not currently curried in the TFP itself, only nargs.
 
@@ -27,7 +28,7 @@ import static com.cliffc.aa.AA.TODO;
 // Cloning the code immediately also splits the fidx with a new fidx bit for
 // both the original and the new code.
 
-// Displays are semantically always part of a function, as an extra 0th argument.
+// Envs are semantically always part of a function, as an extra 0th argument.
 // For functions declared in closures, they represent the enclosing environment.
 // For functions declare in structs, they represent the "this" pointer.
 

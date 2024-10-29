@@ -146,16 +146,33 @@ public class ASTParse {
       ifex = default_nil ? new Const(TypeNil.NIL)
         : err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
     }
+    if( toks._len>1 ) throw AA.TODO();
 
-    // No assign, just an expression
-    if( !peek(';') ) return ifex;
+    //      expr; ;    // Empty body, no toks
+    // var =expr; ;    // def, no body; var is dead
+    // fld:=expr; ;    // field update, no body; end of outer expression; NEEDS BANG!
+    //      expr; body // no toks, just an expr (for side effects)
+    // var =expr; body // classic LetRec of var and body
+    // fld:=expr; body // field update or def
 
-    // Assign
-    push(toks,0,lookup_current_scope_only ? Kind.Field : Kind.Body); // Push toks into scope
-    AST body = stmt(lookup_current_scope_only);
-    pop(toks._len);       // Pull from scope; if we exit should not be in scope
+    // Get expression afterwards
+    AST body = null;
+    if( peek(';') ) {           // Has an expression after
+      push(toks,0,lookup_current_scope_only ? Kind.Field : Kind.Body); // Push toks into scope
+      body = stmt(lookup_current_scope_only);
+      pop(toks._len);       // Pull from scope; if we exit should not be in scope
+    }
 
-    if( body == null && toks._len == 0 ) return ifex;
+    // Updating a field; a side effect
+    if( toks._len!=0 && findField(toks.at(0)) )
+      return new Bang(toks.at(0),ifex,body);
+
+    // Since no body, new variables cannot be used.  Ignore variables and just
+    // return the expression.
+    if( body==null && (!lookup_current_scope_only  || toks._len==0) )
+      return ifex;
+
+    // Has body, has a def, might have tokens
     String  fld = toks._len==0 ? ("$ignore"+0).intern() : toks.at(0);
     boolean mut = toks._len==0 ? false : rs.get(0);
     return new LetRec(fld,mut,ifex,body);
@@ -172,6 +189,13 @@ public class ASTParse {
     _kinds.pop(len);
   }
 
+
+  private boolean findField( String fld ) {
+    for( int i=_vars.len()-1; i>=0; i-- )
+      if( Util.eq(_vars.at(i),fld) )
+        return _kinds.at(i)==Kind.Field;
+    return false;
+  }
 
   // Ignore the half-scope inside trinarys
   private boolean testIf() { return false; }

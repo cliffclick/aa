@@ -16,14 +16,14 @@ import static org.junit.Assert.assertEquals;
 
 public class TestAST {
   @Ignore @Test public void testJig() throws IOException {
-    testOne(0,new File("src/test/java/com/cliffc/aa/ast/testBasic11.aa"));
+    testOne(1,new File("src/test/java/com/cliffc/aa/ast/testResolve0.aa"));
   }
 
-  @Test public void testAll() throws IOException {
-    testBasic();
-  }
-
-  public void testBasic() throws IOException { testSet("Basic"); }
+  //@Test public void testAll() throws IOException { testSet(""); }
+  @Test public void testBasic  () throws IOException { testSet("Basic"  ); }
+  @Test public void testSide   () throws IOException { testSet("Side"   ); }
+  @Test public void testResolve() throws IOException { testSet("Resolve"); }
+  @Test public void testRecur  () throws IOException { testSet("Recur"  ); }
 
   public void testSet(String filter) throws IOException {
     File folder = new File("src/test/java/com/cliffc/aa/ast");

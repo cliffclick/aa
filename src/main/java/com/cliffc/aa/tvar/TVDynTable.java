@@ -205,7 +205,9 @@ public class TVDynTable extends TV3 {
       fields(dyn._resolves,dyn,Combo.HM_AMBI);
     }
     // We got the One True Match, unify
-    return matches.arg(i).unify(pattern,false);
+    boolean progress = matches.arg(i).unify(pattern,false);
+    set_match(idx,null);        // Null out match field
+    return progress;
   }
 
   // cmps, 2 bits indexed by 'idx'.
@@ -303,9 +305,9 @@ public class TVDynTable extends TV3 {
       } else {
         assert is_dyn(i) == that.is_dyn(idx);
         if( is_dyn(i) ) {
-
           // Unify match on match
-          progress |= first(i)._fresh_unify(that.first(idx),test);
+          if( first(i) != null && that.first(idx) != null  )
+            progress |= first(i)._fresh_unify(that.first(idx),test);
           that = that.find();
           // Unify pattern on pattern; resolved patterns still should unify
           progress |= secnd(i)._fresh_unify(that.secnd(idx),test);
@@ -436,7 +438,7 @@ public class TVDynTable extends TV3 {
     for( int i=0; i<_max; i++ ) {
       sb.p(fld_name(i)).p(": ");
       if( is_dyn(i) ) {
-        if( _labels[i]==null ) {
+        if( _labels[i]==null ) { // Not resolved, print the match and pattern
           _args[i*2  ]._str(sb,visit,dups,debug,prims);
           sb.p(" in ");
           _args[i*2+1]._str(sb,visit,dups,debug,prims);
@@ -445,11 +447,17 @@ public class TVDynTable extends TV3 {
           sb.p(_labels[i]).p('=');
           _args[i*2+1]._str(sb,visit,dups,debug,prims);
         }
-      } else {
+      } else { // Is nested TVDynTable or leaf
         _args[i*2]._str(sb,visit,dups,debug,prims);
       }
       sb.p(", ");
     }
     return sb.unchar(2).p("]]");
   }
+
+  @Override public boolean dynWalk(VBitSet visit) {
+    if( visit.tset(_uid) ) return false;
+    return resolve(false);
+  }
+
 }

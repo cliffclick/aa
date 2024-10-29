@@ -25,8 +25,9 @@ public abstract class StoreAbs extends Node {
   public Node rez() { return in(3); }
 
   @Override public final Type value() {
-    if( !(mem()._val instanceof TypeMem    tm ) ) return mem()._val.oob(TypeMem.ALLMEM);
-    if( !(adr()._val instanceof TypeMemPtr tmp) ) return adr()._val.oob(TypeMem.ALLMEM);
+    Type tmv = mem()._val, tav = adr()._val;
+    if( !(tmv instanceof TypeMem    tm ) )  return tmv.above_center() ? TypeMem.ANYMEM : RootNode.defMem(this);
+    if( !(tav instanceof TypeMemPtr tmp) )  return tav.above_center() ? TypeMem.ANYMEM : RootNode.defMem(this);
     // Meet no aliases into memory
     if( tmp._aliases.is_empty() )  return tm;
     if( tmp._aliases==BitsAlias.NALL ) return TypeMem.ALLMEM; // Updates all of memory
@@ -54,13 +55,13 @@ public abstract class StoreAbs extends Node {
     // an upgrade to RootNodes global default - which globally excludes kills.
     TypeMem live0 = RootNode.removeKills(in(i),_live);
 
+    adr().deps_add_live(in(i));
     if( tmp.above_center() ) {
       if( i!=MEM_IDX ) return Type.ANY;
       if( tmp._aliases==BitsAlias.NANY ) return TypeMem.ANYMEM; // High, killing all
       // Kill specific structs or fields
       return _live_kill(live0,tmp);
     }
-    adr().deps_add_live(in(i));
 
     // Specific live-use varies from field-vs-struct
     return _live_use(live0,tmp,i);
@@ -109,11 +110,13 @@ public abstract class StoreAbs extends Node {
           // Store field over struct
           if( this instanceof StoreNode sfld && st instanceof StoreXNode snew ) {
             StructNode str = snew.struct();
+            sfld.value();
             if( str.nUses()==1 && str.set_fld(sfld._fld,sfld._fin,rez(),false) ) {
+              // Struct value goes sideways since this is a precise store.
               str.xval();
-              str._live = _live;
               snew.xval();
-              snew._live = _live;
+              //str._live = _live;
+              //snew._live = _live;
               // Delete self
               return snew;
             }

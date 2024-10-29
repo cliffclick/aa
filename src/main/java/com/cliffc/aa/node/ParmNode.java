@@ -47,7 +47,7 @@ public class ParmNode extends Node {
       if( _idx==MEM_IDX ) {
         t = Combo.pre() ? RootNode.defMem(this) : Env.ROOT.rmem(this);
       } else if( Combo.pre() ) {
-        t = _t==TypeNil.SCALAR ? Env.ROOT.ext_scalar(this) : _t;
+        t = _t;
       } else if( has_tvar() ) {
         t = tvar().as_flow(this);
       } else {

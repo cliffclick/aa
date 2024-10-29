@@ -1,11 +1,11 @@
-// Mutually recursive
-// GCP: *[25]@{ _; someC=%[6,7][]; someD=%[6,7][]   }
-// HMT: *[25]@{ _; someC=flt:3.14; someD=int:nint8; }
+// Has a real closure with side-effects
+// GCP: *[25]( _, 0:=int64, 1:=int64, 2:=int64)
+// HMT: *[25](_,int:int64,int:int64,int:int64)
 gen = { init ->
   @{
     fld := init;
     get = { -> fld };
-    inc = { -> fld := fld+1 };
+    inc = { -> fld := fld+1; };
   }
 };
 A = gen(3);

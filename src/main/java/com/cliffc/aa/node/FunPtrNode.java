@@ -121,7 +121,7 @@ public final class FunPtrNode extends Node {
     // Display is either "ANY" meaning: no display; binding happens on load.
     // Or: bound to PartialScopeFreshNode - which is a Fresh.
     // Or: bound to a Fresh type of some struct (instanceof call)
-    if( dsp()!=null && dsp()!=Env.ANY ) {
+    if( dsp()!=null && dsp()!=Env.ANY && dsp().has_tvar() ) {
       TV3 tvdsp = dsp().set_tvar();
       args[DSP_IDX].find().unify(tvdsp,false);
     }

@@ -1,17 +1,17 @@
 package com.cliffc.aa.ast;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.TypeFld.Access;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 
-public class Struct extends AST {
-  final Ary<String> _vars;
+public class Struct extends ASTVars {
 
   // Any LetRecs are folded up into a Struct
   public Struct(LetRec let) { this(let._kids,let._vars); }
-  public Struct(Ary<AST> kids, Ary<String> vars) { super(kids); _vars = vars; }
+  public Struct(Ary<AST> kids, Ary<String> vars) { super(kids,vars); }
 
   // @{ fld0=expr0; ... }
   @Override public SB str(SB sb) {
@@ -39,7 +39,7 @@ public class Struct extends AST {
       s2.add_fld("^",Access.Final,outScope.ptr(),null);
       for( int i=0; i<_vars._len; i++ ) {
         _kids.at(i).nodes(eStruct);
-        s2.add_fld(_vars.at(i),Access.Final,inScope.rez(),null);
+        s2.add_fld(_vars.at(i),Access.RW,inScope.rez(),null);
       }
       s2.close();
       inScope.mem( new StoreXNode( inScope.mem(),inScope.ptr(),s2,null).init());
@@ -58,4 +58,7 @@ public class Struct extends AST {
       outScope.rez (inScope.ptr ());
     }
   }
+
+  @Override int addEdge(int to) { throw AA.TODO(); }
+  @Override void addNonGen(FreshNode frsh) { throw AA.TODO(); }
 }

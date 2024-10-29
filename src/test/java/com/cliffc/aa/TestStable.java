@@ -57,7 +57,7 @@ public class TestStable {
     test("!(2,3.14)._","nil","nil:nil", null, null, null, null);
     test("(2,3.14)._.sin()","0.0015926529164868282","flt:0.0015926529164868282", null, null, null, null);
     // Two DynLoads, no Fresh
-    test("q=(2,3.14); (!q._,q._.sin())","*[22]( _, int1, flt64)","*[22](_, int:int1,flt:flt64)", null, null, "[4,22]", null);
+    test("q=(2,3.14); (!q._,q._.sin())","*[22]( _, 0:=int1, 1:=flt64)","*[22](_, int:int1,flt:flt64)", null, null, "[4,22]", null);
   }
 
   // More complex overload tests

@@ -391,9 +391,9 @@ public abstract class PrimNode extends Node {
   }
   // Canonical Base for int,flt,str,nil
   private static final TVBase BASE_NIL = new TVBase(TypeNil.NIL);
-  private static final TVBase BASE_INT = new TVBase(TypeInt.INT64);
-  private static final TVBase BASE_FLT = new TVBase(TypeFlt.FLT64);
-  private static final TVBase BASE_STR = new TVBase(TypeMemPtr.STRPTR);
+  private static final TVBase BASE_INT = new TVBase(TypeInt.INT64,(byte)2);
+  private static final TVBase BASE_FLT = new TVBase(TypeFlt.FLT64,(byte)2);
+  private static final TVBase BASE_STR = new TVBase(TypeMemPtr.STRPTR,(byte)2);
   // Canonical wrapped prim; ptr-to-prim[clz,base]
   private static TVPtr PTR_NIL = wrap_prim(new TVLeaf(),BASE_NIL);
   private static TVPtr PTR_INT = wrap_prim(new TVLeaf(),BASE_INT);
@@ -409,8 +409,8 @@ public abstract class PrimNode extends Node {
   // This version is for mid-def of prims; it makes a base that is NOT the
   // "this" argument, used for e.g. returns or 2nd args.
   private static TV3 wrap_prim(TypeNil rez) {
-    if( rez instanceof TypeInt ti ) return wrap_prim(PTR_INT().load().arg("^"),new TVBase(ti));
-    if( rez instanceof TypeFlt tf ) return wrap_prim(PTR_FLT().load().arg("^"),new TVBase(tf));
+    if( rez instanceof TypeInt ti ) return wrap_prim(PTR_INT().load().arg("^"),new TVBase(ti,(byte)2));
+    if( rez instanceof TypeFlt tf ) return wrap_prim(PTR_FLT().load().arg("^"),new TVBase(tf,(byte)2));
     if( rez == TypeNil.SCALAR )  return new TVLeaf();
     throw TODO();
   }
@@ -431,8 +431,9 @@ public abstract class PrimNode extends Node {
     if( rez instanceof TypeInt    ti  ) return wrap_base(PTR_INT().load().arg("^"),ti);
     if( rez instanceof TypeFlt    tf  ) return wrap_base(PTR_FLT().load().arg("^"),tf);
     if( rez instanceof TypeMemPtr tmp ) return wrap_base(PTR_STR().load().arg("^"),tmp);
-    if( rez == TypeNil.SCALAR )  return new TVLeaf();
-    if( rez == TypeNil.XSCALAR || rez == TypeNil.XNIL )  return new TVPtr( BitsAlias.make0(0), new TVStruct(true) );
+    if( rez == TypeNil.XNIL )  return new TVPtr( BitsAlias.make0(0), new TVStruct(true) );
+    // Variations on SCALAR types; plus or minus a few aliases, but e.g. ints & flts allow
+    if( rez.getClass()==TypeNil.class && !rez.above_center() )  return new TVLeaf();
     //if( rez == TypeInt. TRUE  )  return  IINT(TypeInt.TRUE );
     //if( rez == TypeInt. BOOL  )  return IBOOL();
     //if( rez == TypeFlt.NFLT64 )  return INFLT();
@@ -452,6 +453,7 @@ public abstract class PrimNode extends Node {
     TVPtr prim = (TVPtr)sample.arg(DSP_IDX);        // Shared display (wrapped primitive) across all Lambdas
     TVBase base = (TVBase)prim.load().arg("_");     // Shared Base of wrapped primitive
     base._t = tn;                                   // Update the fresh'd copy to the sharper Type
+    base.clr_widen();
     return prim;
   }
 
@@ -509,7 +511,7 @@ public abstract class PrimNode extends Node {
 
 
   static class AddNil extends PrimNode {
-    AddNil() { super("_+_", TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, TypeNil.NIL, Type.ANY,TypeNil.SCALAR),TypeNil.SCALAR); }
+    AddNil() { super("_+_", TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, TypeNil.NIL, Type.ANY,TypeNil.EXTERNAL),TypeNil.EXTERNAL); }
     @Override public Type value() { return val(2); } // dsp is nil, skip dyn, return other arg
     @Override public TypeNil apply(TypeNil[] ignore) { throw AA.TODO(); }
     @Override TV3 _set_tvar() {
