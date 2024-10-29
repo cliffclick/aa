@@ -1,0 +1,5 @@
+// FCN returns one of two structs; pick the correct one.
+// GCP: *[25]( _, 0:=%[2,25][2]?, 1:=%[2,25][2]?)
+// HMT: *[25]( _, int:1, int:2 )
+fcn = { ( @{a=1;}, @{b=2;} )._ };
+( fcn().a, fcn().b )

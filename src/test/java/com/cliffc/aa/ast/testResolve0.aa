@@ -1,4 +1,4 @@
-// Ignore f and make a 5
+// Q is a pair/struct; select either the int or flt as needed
 // GCP: *[22]( _, 0:=int1, 1:=flt64)
 // HMT: *[22](_, int:int1,flt:flt64)
 // Eval: int:5

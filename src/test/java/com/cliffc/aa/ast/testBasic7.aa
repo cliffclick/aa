@@ -1,22 +1,11 @@
-// See       exe/testRecur12.aa
-// GCP: *[23]@{ _; Aflt:=%[6,7][]; Dint:=%[6,7][]}
-// HMT: *[23]@{ _; Aflt =flt:0.5f; Dint =int:1;  }
-
-// Learnings from exe/testRecur12.aa
-// Always loading from a display struct - which means no-Fresh on load.
-// Except when loading the display itself - which always needs a Fresh.
-// Can swap Load-from-Fresh display with a Load-from-display then Fresh (optimization).
-// If Loading from display and Binding to same display, I THINK I can do only 1 Fresh:
-// - dsp0=Fresh(display); dsp1=Fresh(display); x=Load.x(dsp0); Bind(x,dsp1)
-// - dsp =Fresh(display);                      x=Load.x(dsp ); Bind(x,dsp )
-
-// Untested: Wrap polymorphic function (e.g. A below) inside outer Lambda.
-// - Check that the display from the outer Lambda is Fresh'd before calling A.
-
-// Still unknown: do I need to break up display/frame here into individual
-// frames ala individual nested Lets?
-// -   dsp=@{ A = ...; D = ... }   vs    dsp0=@{A=...};  dsp1=@{dsp0=dsp0; D=...}
-
-A = { x -> math.rand(2) ? A(x) : x };
-D = {   -> A(1) };
-@{ Aflt = A(0.5); Dint = D(); }
+// Function in a struct needs proper display/self/this
+// GCP: *[24]( _, 0:=nint8, 1:=nint8)
+// HMT: *[24]( _, int:3, int:7)
+gen = { init ->
+  @{
+    get = { -> init };
+  }
+};
+xx = gen(3);
+yy = gen(7);
+(xx.get(),yy.get())
