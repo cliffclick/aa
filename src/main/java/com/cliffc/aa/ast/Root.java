@@ -7,6 +7,7 @@ import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 
 public class Root extends ASTVars {
+  public DefDynTableNode _dyn;
 
   public Root( AST prog ) {
     super(new Ary<>(new String[]{"$dyn"}));
@@ -15,12 +16,9 @@ public class Root extends ASTVars {
 
   @Override public SB str(SB sb) { return _str(sb); }
 
-  public DefDynTableNode _dyn;
   @Override public void nodes( Env e ) {
     // Print the program as Nodes.
     // Always an initial Dyn-Table
-    //_dyn = new DefDynTableNode().init();
-    //e._scope.stk().add_fld("$dyn",Access.Final,_dyn,null);
     _dyn = (DefDynTableNode)e._par._scope.stk().in("$dyn");
     _kids.at(0).nodes(e);
   }
@@ -30,5 +28,8 @@ public class Root extends ASTVars {
 
   // Add non-generative $dyn edge to a Fresh
   // Same as EXE, root does not have "$dyn" as Fresh, just a plain argument.
+  // CNC 29/Oct/2024
+  // - No  addDef breaks something
+  // - Yes addDef breaks testResolve2.aa but EXE testOver18.aa passes
   @Override void addNonGen(FreshNode frsh) { frsh.addDef(_dyn); }
 }

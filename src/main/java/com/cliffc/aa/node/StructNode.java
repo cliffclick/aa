@@ -244,14 +244,17 @@ public class StructNode extends Node {
 
   // Self is always @{flds...}
   @Override public TV3 _set_tvar() {
+    TVStruct ts = (TVStruct)_tvar;
     if( _tvar==null ) {
       // Must set _tvar before recursively calling set_tvar.  The primitive
       // ClzClz gets a specific type which triggers asserts for everybody else,
       // so uses a special constructor.
       if( this==PrimNode.ZCLZ ) return TVStruct.STRCLZ;
-      _tvar = new TVStruct(_flds);
+      _tvar = ts = new TVStruct(_flds);
+      // display/clazz is at least a tvptr
+      if( Util.eq(_flds.at(0),"^") )
+        ts.arg(0).unify(new TVPtr(BitsAlias.EMPTY,new TVStruct(true)),false);
     }
-    TVStruct ts = (TVStruct)_tvar;
     // Unify all fields
     for( int i=0; i<len(); i++ )
       ts.arg(i).unify(in(i)==Env.ANY ? new TVLeaf() : in(i).set_tvar(),false); // Unify (possible cycle)

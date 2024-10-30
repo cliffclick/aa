@@ -95,18 +95,14 @@ public class TVStruct extends TVExpanding {
     return i>=0 ? arg(i) : null;
   }
 
-  // Return the TV3 for field 'fld' or null if missing.
-  // Searches the super class chain
+  // Return the TV3 for field 'fld' or null if missing.  Searches the super
+  // class chain.  Is ambiguous/incorrect if fields can shadow; Parser is
+  // responsible for mangling shadowing field names.
   public TV3 arg_clz(String fld) {
     TV3 tv3 = arg(fld);         // Local search
     if( tv3 != null ) return tv3;
     TVPtr clz = pclz();
     if( clz == null ) return null;
-    // CNC 29/Oct/2024 - do not normally search superclass chain; parser always
-    // inserts a chain of display/env loads and loads in the correct TVStruct -
-    // except when looking at primitives (many shortcuts taken there, I might
-    // be able to correct later).
-    if( !is_prim() ) return null;
     return clz.load().arg_clz(fld);
   }
 

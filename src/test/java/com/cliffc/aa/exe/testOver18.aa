@@ -1,0 +1,25 @@
+// One DynLoad, fcn needs DynTable
+// Type: *[FLT]( _, int:2, flt:3.300000011920929)
+// Eval: *[7]( _, 2, 3.300000011920929f)
+
+fcn = { y ->
+  ( @{
+       qi ={ x -> x.a };
+       qf ={ x -> x.b };
+    }._     // Which of {q*} should be picked?
+    y )
+};
+(pair (fcn @{a =2;}) (fcn @{b =3.3f;}) )
+
+
+//Root
+//  fcn = 6{ ^ $dyn y ->
+//    (
+//      *3@{
+//        qi = 4{ ^ $dyn x -> x.a };
+//        qf = 5{ ^ $dyn x -> x.b };
+//      }._
+//      $dyn.A13 y)
+//};
+//
+//(pair $dyn.A30 (fcn $dyn.A23 *8@{ a = 2;}) (fcn $dyn.A29 *9@{ b = 3.300000011920929f;}))

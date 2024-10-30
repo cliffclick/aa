@@ -21,6 +21,7 @@ public class Ident extends AST {
     // No defining LetRec, must be a primitive
     return 0;
   }
+
   @Override public void nodes( Env e ) {
 
     // Load the ident from the correct scope, issuing a linked list of display
@@ -35,24 +36,18 @@ public class Ident extends AST {
 
     Node ld = new LoadNode(e._scope.mem(),ptr,_name,null).peep();
 
-    // Bind unknown loads, in case an FP is involved
-    //Node x = Util.eq(_name,"$dyn") || Util.eq(_name,TypeFld.CLZ)
-    //  ? ld
-    //  : new BindFPNode(ld,ptr,0).peep();
-    Node x = ld; // AST not inserting Binds right now
-
     // Fresh check: if not needed, skip collecting the nongen and making a fresh
     if( isLetPolymorphic() ) {
       // Fresh: this variable is let-polymorphic, and needs a non-gen set.
-      FreshNode frsh = new FreshNode(x).init();
+      FreshNode frsh = new FreshNode(ld).init();
       // Walk to the Root and collect the non-gen edges
       for( AST par = _par; par != null; par = par._par )
         if( par instanceof ASTVars vars && !(vars instanceof Struct) )
           vars.addNonGen(frsh);
-      x = frsh;
+      ld = frsh;
     }
 
-    e._scope.rez(x);
+    e._scope.rez(ld);
   }
 
   private boolean isLetPolymorphic() {

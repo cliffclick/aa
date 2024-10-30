@@ -36,7 +36,15 @@ public class Struct extends ASTVars {
       // Now we make a bulk update again, but code within the fields can use
       // the struct display to find things in outer scopes.
       StructNode s2 = new StructNode(0,false,null,s._hint);
-      s2.add_fld("^",Access.Final,outScope.ptr(),null);
+      // CNC - 30/10/2024 Fresh copy of outer display, to fix outer $DYN tables
+      // nested in scope getting captured, and then forced to unify with which
+      // should be fresh $dyn instances.
+      Node ptr =  outScope.ptr();
+      if( !outScope.stk().is_closure() ) {
+        ptr = new FreshNode(ptr).init();
+        // TODO: ADD NONGEN?
+      }
+      s2.add_fld("^",Access.Final,ptr,null);
       for( int i=0; i<_vars._len; i++ ) {
         _kids.at(i).nodes(eStruct);
         s2.add_fld(_vars.at(i),Access.RW,inScope.rez(),null);

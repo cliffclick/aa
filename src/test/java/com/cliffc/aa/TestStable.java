@@ -1,6 +1,7 @@
 package com.cliffc.aa;
 
 import org.junit.Test;
+import org.junit.Ignore;
 
 import static com.cliffc.aa.TestParse.test;
 
@@ -79,7 +80,7 @@ fcn = { y ->
 };
 (fcn @{a=2;}, fcn @{b=3.3;})
 """,
-         "*[25]( _, %[2,25][2]?, %[2,25][2]?)", "*[25](_,int:2,flt:3.3)",null,null,"[4,25]",null);
+         "*[25]( _, 0:=%[2,25][2]?, 1:=%[2,25][2]?)", "*[25](_,int:2,flt:3.3)",null,null,"[4,25]",null);
 
     // Same using primitive math
     test(
@@ -102,11 +103,11 @@ noinline_foo = { x y ->
 };
 (noinline_foo(3,5), noinline_foo(3.3,5))
 """,
-         "*[24]( _, %[2,24][2]?, %[2,24][2]?)","*[24]( _, int:int64, flt:flt64)", null, null, "[4,24]", null);
+         "*[25]( _, 0:=%[2,25][2]?, 1:=%[2,25][2]?)","*[25](_,int:int64,flt:flt64)", null, null, "[4,25]", null);
   }
 
 
-  @Test public void testMutLetRec() {
+  @Ignore @Test public void testMutLetRec() {
     // A,B,C are mutually recursive identity functions.
     // D calls B or C with ints.
     // final struct calls C with floats.

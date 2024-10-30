@@ -459,8 +459,30 @@ public class ASTParse {
     return new Ident(tok);
   }
 
+  // A lexically unique $dyn name, based on solely on lexical scope.  Avoids
+  // shadowing $dyn names in HM types, so the HM class-level picks for missing
+  // field names is not ambiguous.
+  private String dynName() {
+    for( int i=_vars._len-1; i>=0; i-- )
+      if( _vars.at(i).startsWith("$dyn") )
+        return _vars.at(i);
+    // You get the global one at Root
+    return "$dyn";
+  }
+  private String newDynName() {
+    String dyn = dynName();
+    if( dyn.equals("$dyn") ) return "$dyn1";
+    char c = dyn.charAt(dyn.length()-1);
+    assert Character.isDigit(c);
+    int x = c-'0';
+    if( x==9 )
+      throw AA.TODO();          // Need to do number things
+    String rez = ("$dyn"+(x+1)).intern();
+    return rez;
+  }
+
   // A fact hardwired to "$dyn".
-  private Ident dynLoad() { return new Ident("$dyn");  }
+  private Ident dynLoad() { return new Ident(dynName());  }
   // Load a Call/Apply field out of a DynTable
   private AField dynCall() { return new AField(dynLoad()); }
 
@@ -505,7 +527,7 @@ public class ASTParse {
     // Incrementally build up the formals, starting with the display
     Ary<Type  > formals= new Ary<>(new Type  []{null,null,null,null});
     Ary<ASTParse> bads = new Ary<>(new ASTParse[ARG_IDX+1]);
-    Ary<String> ids    = new Ary<>(new String[]{null,null,"^","$dyn"});
+    Ary<String> ids    = new Ary<>(new String[]{null,null,"^",newDynName()});
 
     // Parse arguments
     while( true ) {

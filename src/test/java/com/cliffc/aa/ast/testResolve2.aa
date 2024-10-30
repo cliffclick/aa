@@ -1,6 +1,6 @@
 // FCN selects correct field/function based on argument type
-// GCP: *[25]@{ _, 0:=%[2,25][2]?, 1:=%[2,25][2]? }
-// HMT: *[25] ( _,    int:2,          flt:3.3     )
+// GCP: *[25]( _, 0:=%[2,25][2]?, 1:=%[2,25][2]? )
+// HMT: *[25]( _,    int:2,          flt:3.3     )
 
 fcn = { y ->
   @{ qi = { x -> x.a };

@@ -21,7 +21,7 @@ public class Lambda extends ASTVars {
 
   @Override public SB str(SB sb) {
     sb.p("{ ");
-    for( int i=ARG_IDX+1; i<_vars._len; i++ )
+    for( int i=ARG_IDX; i<_vars._len; i++ )
       sb.p(_vars.at(i)).p(" ");
     sb.p("->").nl();
     body().str(sb.ii(1).i()).nl().di(1);

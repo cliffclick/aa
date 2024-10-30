@@ -319,13 +319,21 @@ public class TVDynTable extends TV3 {
             TVStruct str = ptr.load();
             for( int j=0; j<str.len(); j++ ) {
               int cmp = get_cmp(i,j);
+              // The Fresh/THIS is not yet resolved, and further says pattern
+              // "j" is a hard yes or hard no, we need to force this onto THAT
               if( cmp==1 || cmp==7 ) { // Force
-                TVStruct thatstr = ((TVPtr)that.first(idx)).load();
-                int thatj = thatstr.idx(str.fld(j));
-                int thatcmp = that.get_cmp(idx,thatj);
-                if( cmp != thatcmp ) {
-                  assert thatcmp==0 || thatcmp==3; // Forcing the cmp requires it be forcable
-                  that.set_cmp(idx,thatj,cmp);
+                // If THAT is not resolved, we force his choices to match the
+                // FRESH/THIS choices.  If THAT has already resolved, he lost
+                // his patterns so can no longer confirm that his choices are
+                // the same.  We assume they are.
+                if( that.first(idx)!=null ) {
+                  TVStruct thatstr = ((TVPtr)that.first(idx)).load();
+                  int thatj = thatstr.idx(str.fld(j));
+                  int thatcmp = that.get_cmp(idx,thatj);
+                  if( cmp != thatcmp ) {
+                    assert thatcmp==0 || thatcmp==3; // Forcing the cmp requires it be forcable
+                    that.set_cmp(idx,thatj,cmp);
+                  }
                 }
               }
               else ;   // MAYBE does not force.
@@ -360,7 +368,7 @@ public class TVDynTable extends TV3 {
       cmp |= _trial_unify_half(secnd(i),that.secnd(idx));
       if( _labels[i]!=null && that._labels[idx]!=null && !Util.eq(_labels[i],that._labels[idx]))
         throw TODO();           // just fail if both non-null and not-equal
-      if( cmp == 7 ) return 7;    // Arg failed so trial fails
+      if( cmp == 7 ) return 7;  // Arg failed so trial fails
     }
     return cmp;                   // Trial result
   }
