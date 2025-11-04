@@ -87,5 +87,5 @@ public class TypeRPC extends TypeNil<TypeRPC> {
   // RPC refers to the single call-site - but we can only strengthen this is we
   // declare a call-site to be uncloneable.
   // nil is a constant.
-  @Override public boolean isCon() { return false; }
+  @Override boolean _isCon(VBitSet visit) { return false; }
 }

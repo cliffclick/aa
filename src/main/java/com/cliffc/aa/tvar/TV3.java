@@ -803,9 +803,9 @@ abstract public class TV3 implements Cloneable {
   }
   public VBitSet _get_dups_impl(VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     if( _args != null )
-      for( TV3 tv3 : _args )  // Edge lookup does NOT 'find()'
-        if( tv3!=null )
-          tv3._get_dups(visit,dups,debug,prims);
+      for( int i=0; i<len(); i++ ) // Edge lookup does NOT 'find()'
+        if( _args[i] != null )
+          _args[i]._get_dups(visit,dups,debug,prims);
     return dups;
   }
 
@@ -851,8 +851,9 @@ abstract public class TV3 implements Cloneable {
   SB _str_impl(SB sb, VBitSet visit, VBitSet dups, boolean debug, boolean prims) {
     sb.p(getClass().getSimpleName()).p("( ");
     if( _args!=null )
-      for( TV3 tv3 : _args )
-        tv3._str(sb,visit,dups,debug,prims).p(" ");
+      for( int i=0; i<len(); i++ )
+        if( _args[i] != null )
+          _args[i]._str(sb,visit,dups,debug,prims).p(" ");
     return sb.unchar().p(")");
   }
 

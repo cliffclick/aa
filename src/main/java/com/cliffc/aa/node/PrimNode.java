@@ -87,6 +87,7 @@ public abstract class PrimNode extends Node {
       //{ new NE_I64(), new NE_IF64() },
       //{ new MinusI64() }, { new ModI64() },
       { new NotI64() },         // Triggers the shortcut for int printing
+      { new BarI64() },         // Triggers the shortcut for int printing
       //{ new AndI64() }, { new OrI64() },
       //{ new AndThen() }, { new OrElse() },
     };
@@ -557,6 +558,19 @@ public abstract class PrimNode extends Node {
   static class MinusI64 extends Prim1OpI64 { MinusI64() { super("-_"); } long op( long x ) { return -x; } }
   static class NotI64 extends PrimNode {
     public NotI64() { super("!_",TypeTuple.INT64,TypeInt.BOOL); }
+    @Override public TypeNil apply( TypeNil[] args ) {
+      TypeNil t0 = args[0];
+      if( t0._nil )
+        return t0._sub
+          ? TypeInt.BOOL.dual() // Choice nil and choice nint, could go either way
+          : TypeInt.TRUE;       // Yes nil & ignore sub, so always true
+      return t0._sub
+        ? TypeNil.NIL           // not-nil, so always false
+        : TypeInt.BOOL;         // Could go either way
+    }
+  }
+  static class BarI64 extends PrimNode {
+    public BarI64() { super("%_",TypeTuple.INT64,TypeInt.BOOL); }
     @Override public TypeNil apply( TypeNil[] args ) {
       TypeNil t0 = args[0];
       if( t0._nil )

@@ -630,5 +630,5 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   @Override public boolean above_center() { return _objs[1].above_center(); }
-  @Override public boolean isCon() { return false;}
+  @Override boolean _isCon(VBitSet visit) { return false;}
 }

@@ -1,0 +1,5 @@
+// factorial
+// Type: A:{ *[2]@{ $dyn=-; f=A; } B:[[  5Call: B]] A -> C }
+// Eval: A:<*[2]@{ _ $dyn=-; f=A; },LAM3>
+f = { x -> (f f) };
+f

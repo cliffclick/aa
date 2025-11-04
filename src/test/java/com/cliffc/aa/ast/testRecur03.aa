@@ -1,0 +1,10 @@
+// Simple recursive. GCP conflates the two argument types, HMT does not.
+// GCP: *[22]@{ _; a:=%[6,7][]; b:=%[6,7][]  }
+// HMT: *[22]@{ _; a =int:2   ; b =flt:3.14; }
+//f = { x -> g x };
+//g = { x -> f (x+1) };
+//f
+//
+
+f = { x -> f x };
+f

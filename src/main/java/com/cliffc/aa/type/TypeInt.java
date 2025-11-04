@@ -144,7 +144,7 @@ public class TypeInt extends TypeNil<TypeInt> {
     return make(false,_nil,_sub,aliases,_fidxs);
   }
 
-  @Override public boolean isCon()  { return _z==0; }
+  @Override boolean _isCon(VBitSet visit)  { return _z==0; }
   public TypeInt minsize(TypeInt ti) {
     int zs =    _z==0 ? log(   _con) :    _z;
     int zi = ti._z==0 ? log(ti._con) : ti._z;

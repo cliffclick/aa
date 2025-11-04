@@ -130,7 +130,7 @@ public class TypeFlt extends TypeNil<TypeFlt> {
     BitsAlias aliases = _aliases.above_center() ? _aliases.dual() : _aliases;
     return make(false,_nil,_sub,aliases,_fidxs);
   }
-  @Override public boolean isCon() { return _z==0; }
+  @Override boolean _isCon(VBitSet visit) { return _z==0; }
 
   // Shallow wrap
   public TypeMemPtr wrap() {

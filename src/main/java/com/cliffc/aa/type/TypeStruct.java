@@ -775,10 +775,11 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     return make_from(flds);
   }
 
-  @Override public boolean isCon() {
+  @Override boolean _isCon(VBitSet visit) {
+    if( visit.tset(_uid) ) return false;
     if( !_def.isCon() ) return false;
-    for( TypeFld fld : _flds )
-      if( !fld.isCon() )
+    for( int i=0; i<_flds.length; i++ )
+      if( !_flds[i]._isCon(visit) )
         return false;
     return true;
   }

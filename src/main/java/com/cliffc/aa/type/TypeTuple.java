@@ -170,8 +170,9 @@ public class TypeTuple extends Type<TypeTuple> {
 
   @Override public boolean above_center() { return _any; }
   // True if all internals is_con
-  @Override public boolean isCon() {
-    for( Type _t : _ts ) if( !_t.isCon() ) return false;
+  @Override boolean _isCon(VBitSet visit)  {
+    if( visit.tset(_uid) ) return false;
+    for( Type _t : _ts ) if( !_t._isCon(visit) ) return false;
     return true;
   }
   @Override public TypeTuple sharptr2( TypeMem mem ) {

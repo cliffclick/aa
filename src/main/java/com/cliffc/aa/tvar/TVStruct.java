@@ -467,8 +467,8 @@ public class TVStruct extends TVExpanding {
   }
 
   boolean is_nil_clz() { return idx(" nilclz"  ) >= 0; }
-  boolean is_int_clz() { return idx("!_"  ) >= 0; }
-  boolean is_flt_clz() { return idx("sin" ) >= 0; }
+  boolean is_int_clz() { return false && idx("!_"  ) >= 0; }
+  boolean is_flt_clz() { return false && idx("sin" ) >= 0; }
   boolean is_str_clz() { return idx("#_"  ) >= 0; }
   boolean is_math_clz(){ return idx("pi"  ) >= 0; }
   boolean is_top_clz() { return idx("math") >= 0; }

@@ -313,7 +313,7 @@ public class CallNode extends Node {
     TypeFunPtr tfx = switch( fdx._val ) {
     case TypeFunPtr tfx2 -> tfx2;
     case TypeNil tn -> {
-      int nargs = Combo.pre() ? 1
+      int nargs = tn.above_center() || Combo.pre() ? 1
         : (switch( fdx.tvar() ) {
           case TVLambda lam -> lam.nargs();
           case TVErr err -> err.as_lambda().nargs();

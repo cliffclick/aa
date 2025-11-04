@@ -397,7 +397,7 @@ public class TVDynTable extends TV3 {
       flds[i] = TypeFld.malloc(fld_name(i),null,TypeFld.Access.Final);
     Arrays.sort(flds,( tf0, tf1) -> TypeFld.scmp(tf0._fld,tf1._fld));
     TypeStruct ts = TypeStruct.malloc(false,false,false,Type.ANY,flds);
-    TypeMemPtr tmp = TypeMemPtr.malloc(false,false,BitsAlias.EMPTY,true,ts);
+    TypeMemPtr tmp = TypeMemPtr.malloc(false,false,BitsAlias.EMPTY,false,ts);
     ADUPS.put(_uid,tmp);         // Stop cycles
 
     // Recursively type fields
@@ -421,7 +421,7 @@ public class TVDynTable extends TV3 {
   private static final VBitSet HDVBS = new VBitSet();
   boolean noDynLoad() { HDVBS.clear(); return !_hasDyn(); };
   private boolean _hasDyn() {
-    if( HDVBS.tset(_uid) ) return false;
+    if( HDVBS.tset(_uid) ) return true;
     for( int i=0; i<_max; i++ )
       if( is_dyn(i) ||
           ((first(i) instanceof TVDynTable tdyn) && tdyn._hasDyn() ) )

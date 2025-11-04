@@ -747,7 +747,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     };
   }
   // True if a constant.  Same as centerline-or-above-center.
-  public boolean isCon() {
+  public final boolean isCon() { return _isCon(new VBitSet()); }
+  boolean _isCon(VBitSet visit) {
     assert is_simple();
     return above_center();
   }

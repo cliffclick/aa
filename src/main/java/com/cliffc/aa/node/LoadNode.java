@@ -107,7 +107,7 @@ public class LoadNode extends Node {
       //     - Lookup memory, get a TS
       //     - If lookup field in TS, return loaded value
       //     - Else switch to TS CLAZZ
-      assert ptr.is_simple_ptr();
+      //assert ptr.is_simple_ptr();
       TypeStruct ts = mem.ld(ptr);
       // Load here looks once here at _fld, then again in clazz
       // DynLoad looks across all _flds and all clazz fields and can not "miss".
